@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Pytest
+.pytest_cache/
+
+# Virtualenv
+.venv/
+venv/
+
+# Numba
+numba_cache/
+*.nbc
+*.nbi
+
+# OS
+.DS_Store
+
+# Local scratch
+scratch/
+tmp/

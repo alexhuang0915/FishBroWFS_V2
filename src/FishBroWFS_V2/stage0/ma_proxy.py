@@ -32,10 +32,17 @@ except Exception:  # pragma: no cover
 
 
 def _validate_inputs(close: np.ndarray, params_matrix: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    c = np.asarray(close, dtype=np.float64)
+    """
+    Validate and normalize inputs for Stage0 proxy scoring.
+    
+    Accepts float32 or float64, but converts to float32 for Stage0 optimization.
+    """
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    
+    c = np.asarray(close, dtype=PRICE_DTYPE_STAGE0)
     if c.ndim != 1:
         raise ValueError("close must be 1D")
-    pm = np.asarray(params_matrix, dtype=np.float64)
+    pm = np.asarray(params_matrix, dtype=PRICE_DTYPE_STAGE0)
     if pm.ndim != 2:
         raise ValueError("params_matrix must be 2D")
     if pm.shape[1] < 2:
@@ -43,9 +50,9 @@ def _validate_inputs(close: np.ndarray, params_matrix: np.ndarray) -> Tuple[np.n
     if c.shape[0] < 3:
         raise ValueError("close must have at least 3 bars for Stage0 scoring")
     if not c.flags["C_CONTIGUOUS"]:
-        c = np.ascontiguousarray(c)
+        c = np.ascontiguousarray(c, dtype=PRICE_DTYPE_STAGE0)
     if not pm.flags["C_CONTIGUOUS"]:
-        pm = np.ascontiguousarray(pm)
+        pm = np.ascontiguousarray(pm, dtype=PRICE_DTYPE_STAGE0)
     return c, pm
 
 
@@ -54,8 +61,8 @@ def stage0_score_ma_proxy(close: np.ndarray, params_matrix: np.ndarray) -> np.nd
     Compute Stage 0 proxy scores for a parameter matrix.
 
     Args:
-        close: float64 1D array (n_bars,)
-        params_matrix: float64 2D array (n_params, >=2)
+        close: float32 or float64 1D array (n_bars,) - will be converted to float32
+        params_matrix: float32 or float64 2D array (n_params, >=2) - will be converted to float32
             - col0: fast_len
             - col1: slow_len
             - additional columns allowed and ignored by v0

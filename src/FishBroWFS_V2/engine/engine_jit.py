@@ -34,6 +34,10 @@ from FishBroWFS_V2.engine.constants import (
     SIDE_SELL,
 )
 
+# Side enum codes for uint8 encoding (avoid -1 cast deprecation)
+SIDE_BUY_CODE = 1
+SIDE_SELL_CODE = 255  # SIDE_SELL (-1) encoded as uint8
+
 STATUS_OK = 0
 STATUS_ERROR_UNSORTED = 1
 
@@ -74,51 +78,117 @@ def _to_role_int(r: OrderRole) -> int:
 
 
 def _to_side_int(s: Side) -> int:
-    return int(s.value)
+    """
+    Convert Side enum to integer code for uint8 encoding.
+    
+    Returns:
+        SIDE_BUY_CODE (1) for Side.BUY
+        SIDE_SELL_CODE (255) for Side.SELL (avoid -1 cast deprecation)
+    """
+    if s == Side.BUY:
+        return SIDE_BUY_CODE
+    elif s == Side.SELL:
+        return SIDE_SELL_CODE
+    else:
+        raise ValueError(f"Unknown Side enum: {s}")
 
 
 def _kind_from_int(v: int) -> OrderKind:
-    return OrderKind.STOP if v == 0 else OrderKind.LIMIT
+    """
+    Decode kind enum from integer value (strict mode).
+    
+    Allowed values:
+    - 0 (KIND_STOP) -> OrderKind.STOP
+    - 1 (KIND_LIMIT) -> OrderKind.LIMIT
+    
+    Raises ValueError for any other value to catch silent corruption.
+    """
+    if v == KIND_STOP:  # 0
+        return OrderKind.STOP
+    elif v == KIND_LIMIT:  # 1
+        return OrderKind.LIMIT
+    else:
+        raise ValueError(
+            f"Invalid kind enum value: {v}. Allowed values are {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)"
+        )
 
 
 def _role_from_int(v: int) -> OrderRole:
-    return OrderRole.EXIT if v == 0 else OrderRole.ENTRY
+    """
+    Decode role enum from integer value (strict mode).
+    
+    Allowed values:
+    - 0 (ROLE_EXIT) -> OrderRole.EXIT
+    - 1 (ROLE_ENTRY) -> OrderRole.ENTRY
+    
+    Raises ValueError for any other value to catch silent corruption.
+    """
+    if v == ROLE_EXIT:  # 0
+        return OrderRole.EXIT
+    elif v == ROLE_ENTRY:  # 1
+        return OrderRole.ENTRY
+    else:
+        raise ValueError(
+            f"Invalid role enum value: {v}. Allowed values are {ROLE_EXIT} (EXIT) or {ROLE_ENTRY} (ENTRY)"
+        )
 
 
 def _side_from_int(v: int) -> Side:
-    return Side.BUY if v == 1 else Side.SELL
+    """
+    Decode side enum from integer value (strict mode).
+    
+    Allowed values:
+    - SIDE_BUY_CODE (1) -> Side.BUY
+    - SIDE_SELL_CODE (255) -> Side.SELL
+    
+    Raises ValueError for any other value to catch silent corruption.
+    """
+    if v == SIDE_BUY_CODE:  # 1
+        return Side.BUY
+    elif v == SIDE_SELL_CODE:  # 255
+        return Side.SELL
+    else:
+        raise ValueError(
+            f"Invalid side enum value: {v}. Allowed values are {SIDE_BUY_CODE} (BUY) or {SIDE_SELL_CODE} (SELL)"
+        )
 
 
 def _pack_intents(intents: Iterable[OrderIntent]):
     """
     Pack intents into plain arrays for numba.
 
-    Fields:
-      order_id: int64
-      created_bar: int64
-      role: int8 (0=EXIT,1=ENTRY)
-      kind: int8 (0=STOP,1=LIMIT)
-      side: int8 (1=BUY,-1=SELL)
-      price: float64
-      qty: int64
+    Fields (optimized dtypes):
+      order_id: int32 (INDEX_DTYPE)
+      created_bar: int32 (INDEX_DTYPE)
+      role: uint8 (INTENT_ENUM_DTYPE, 0=EXIT,1=ENTRY)
+      kind: uint8 (INTENT_ENUM_DTYPE, 0=STOP,1=LIMIT)
+      side: uint8 (INTENT_ENUM_DTYPE, SIDE_BUY_CODE=BUY, SIDE_SELL_CODE=SELL)
+      price: float64 (INTENT_PRICE_DTYPE)
+      qty: int32 (INDEX_DTYPE)
     """
+    from FishBroWFS_V2.config.dtypes import (
+        INDEX_DTYPE,
+        INTENT_ENUM_DTYPE,
+        INTENT_PRICE_DTYPE,
+    )
+    
     it = list(intents)
     n = len(it)
-    order_id = np.empty(n, dtype=np.int64)
-    created_bar = np.empty(n, dtype=np.int64)
-    role = np.empty(n, dtype=np.int8)
-    kind = np.empty(n, dtype=np.int8)
-    side = np.empty(n, dtype=np.int8)
-    price = np.empty(n, dtype=np.float64)
-    qty = np.empty(n, dtype=np.int64)
+    order_id = np.empty(n, dtype=INDEX_DTYPE)
+    created_bar = np.empty(n, dtype=INDEX_DTYPE)
+    role = np.empty(n, dtype=INTENT_ENUM_DTYPE)
+    kind = np.empty(n, dtype=INTENT_ENUM_DTYPE)
+    side = np.empty(n, dtype=INTENT_ENUM_DTYPE)
+    price = np.empty(n, dtype=INTENT_PRICE_DTYPE)
+    qty = np.empty(n, dtype=INDEX_DTYPE)
 
     for i, x in enumerate(it):
         order_id[i] = int(x.order_id)
         created_bar[i] = int(x.created_bar)
-        role[i] = np.int8(_to_role_int(x.role))
-        kind[i] = np.int8(_to_kind_int(x.kind))
-        side[i] = np.int8(_to_side_int(x.side))
-        price[i] = float(x.price)
+        role[i] = INTENT_ENUM_DTYPE(_to_role_int(x.role))
+        kind[i] = INTENT_ENUM_DTYPE(_to_kind_int(x.kind))
+        side[i] = INTENT_ENUM_DTYPE(_to_side_int(x.side))
+        price[i] = INTENT_PRICE_DTYPE(x.price)
         qty[i] = int(x.qty)
 
     return order_id, created_bar, role, kind, side, price, qty
@@ -237,23 +307,35 @@ def simulate_arrays(
     """
     Array/SoA entry point: bypass OrderIntent objects and _pack_intents hot-path.
 
-    Arrays must be 1D and same length. Dtypes are expected:
-      order_id,int64 ; created_bar,int64 ; role,int8 ; kind,int8 ; side,int8 ; price,float64 ; qty,int64
+    Arrays must be 1D and same length. Dtypes are expected (optimized):
+      order_id: int32 (INDEX_DTYPE)
+      created_bar: int32 (INDEX_DTYPE)
+      role: uint8 (INTENT_ENUM_DTYPE)
+      kind: uint8 (INTENT_ENUM_DTYPE)
+      side: uint8 (INTENT_ENUM_DTYPE)
+      price: float64 (INTENT_PRICE_DTYPE)
+      qty: int32 (INDEX_DTYPE)
 
     ttl_bars:
       1 => one-shot next-bar-only (Phase 2 semantics)
       0 => GTC extension point (debug/tests)
     """
+    from FishBroWFS_V2.config.dtypes import (
+        INDEX_DTYPE,
+        INTENT_ENUM_DTYPE,
+        INTENT_PRICE_DTYPE,
+    )
+    
     global JIT_PATH_USED_LAST, JIT_KERNEL_SIGNATURES_LAST
 
     # Normalize/ensure arrays are numpy with the expected dtypes (cold path).
-    oid = np.asarray(order_id, dtype=np.int64)
-    cb = np.asarray(created_bar, dtype=np.int64)
-    rl = np.asarray(role, dtype=np.int8)
-    kd = np.asarray(kind, dtype=np.int8)
-    sd = np.asarray(side, dtype=np.int8)
-    px = np.asarray(price, dtype=np.float64)
-    qy = np.asarray(qty, dtype=np.int64)
+    oid = np.asarray(order_id, dtype=INDEX_DTYPE)
+    cb = np.asarray(created_bar, dtype=INDEX_DTYPE)
+    rl = np.asarray(role, dtype=INTENT_ENUM_DTYPE)
+    kd = np.asarray(kind, dtype=INTENT_ENUM_DTYPE)
+    sd = np.asarray(side, dtype=INTENT_ENUM_DTYPE)
+    px = np.asarray(price, dtype=INTENT_PRICE_DTYPE)
+    qy = np.asarray(qty, dtype=INDEX_DTYPE)
 
     if nb is None:
         JIT_PATH_USED_LAST = False
@@ -261,9 +343,30 @@ def simulate_arrays(
         intents: List[OrderIntent] = []
         n = int(oid.shape[0])
         for i in range(n):
-            r = OrderRole.EXIT if int(rl[i]) == ROLE_EXIT else OrderRole.ENTRY
-            k = OrderKind.STOP if int(kd[i]) == KIND_STOP else OrderKind.LIMIT
-            s = Side.BUY if int(sd[i]) == SIDE_BUY else Side.SELL
+            # Strict decoding: fail fast on invalid enum values
+            rl_val = int(rl[i])
+            if rl_val == ROLE_EXIT:
+                r = OrderRole.EXIT
+            elif rl_val == ROLE_ENTRY:
+                r = OrderRole.ENTRY
+            else:
+                raise ValueError(f"Invalid role enum value: {rl_val}. Allowed: {ROLE_EXIT} (EXIT) or {ROLE_ENTRY} (ENTRY)")
+            
+            kd_val = int(kd[i])
+            if kd_val == KIND_STOP:
+                k = OrderKind.STOP
+            elif kd_val == KIND_LIMIT:
+                k = OrderKind.LIMIT
+            else:
+                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+            
+            sd_val = int(sd[i])
+            if sd_val == SIDE_BUY_CODE:  # 1
+                s = Side.BUY
+            elif sd_val == SIDE_SELL_CODE:  # 255
+                s = Side.SELL
+            else:
+                raise ValueError(f"Invalid side enum value: {sd_val}. Allowed: {SIDE_BUY_CODE} (BUY) or {SIDE_SELL_CODE} (SELL)")
             intents.append(
                 OrderIntent(
                     order_id=int(oid[i]),
@@ -285,9 +388,30 @@ def simulate_arrays(
         intents: List[OrderIntent] = []
         n = int(oid.shape[0])
         for i in range(n):
-            r = OrderRole.EXIT if int(rl[i]) == ROLE_EXIT else OrderRole.ENTRY
-            k = OrderKind.STOP if int(kd[i]) == KIND_STOP else OrderKind.LIMIT
-            s = Side.BUY if int(sd[i]) == SIDE_BUY else Side.SELL
+            # Strict decoding: fail fast on invalid enum values
+            rl_val = int(rl[i])
+            if rl_val == ROLE_EXIT:
+                r = OrderRole.EXIT
+            elif rl_val == ROLE_ENTRY:
+                r = OrderRole.ENTRY
+            else:
+                raise ValueError(f"Invalid role enum value: {rl_val}. Allowed: {ROLE_EXIT} (EXIT) or {ROLE_ENTRY} (ENTRY)")
+            
+            kd_val = int(kd[i])
+            if kd_val == KIND_STOP:
+                k = OrderKind.STOP
+            elif kd_val == KIND_LIMIT:
+                k = OrderKind.LIMIT
+            else:
+                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+            
+            sd_val = int(sd[i])
+            if sd_val == SIDE_BUY_CODE:  # 1
+                s = Side.BUY
+            elif sd_val == SIDE_SELL_CODE:  # 255
+                s = Side.SELL
+            else:
+                raise ValueError(f"Invalid side enum value: {sd_val}. Allowed: {SIDE_BUY_CODE} (BUY) or {SIDE_SELL_CODE} (SELL)")
             intents.append(
                 OrderIntent(
                     order_id=int(oid[i]),

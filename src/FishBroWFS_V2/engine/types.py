@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
 import numpy as np
 
@@ -54,4 +54,14 @@ class Fill:
     price: float
     qty: int
     order_id: int
+
+
+@dataclass(frozen=True)
+class SimResult:
+    """
+    Simulation result from simulate_run().
+    
+    This is the standard return type for Phase 4 unified simulate entry point.
+    """
+    fills: List[Fill]
 

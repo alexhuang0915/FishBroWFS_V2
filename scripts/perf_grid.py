@@ -24,6 +24,7 @@ from typing import List, Dict, Any, Optional
 
 import numpy as np
 
+from FishBroWFS_V2.perf.cost_model import estimate_seconds
 from FishBroWFS_V2.perf.profile_report import _format_profile_report
 
 # ==========================================
@@ -40,9 +41,10 @@ class PerfConfig:
     disable_jit: bool
     sort_params: bool
 
-# Warmup Tier: Ensure cold can complete within timeout to get hot (steady-state) numbers
-TIER_JIT_BARS = int(os.environ.get("FISHBRO_PERF_BARS", "200000"))
-TIER_JIT_PARAMS = int(os.environ.get("FISHBRO_PERF_PARAMS", "10000"))
+# Baseline Tier (default): Fast, suitable for commit-to-commit comparison
+# Can be overridden via FISHBRO_PERF_BARS and FISHBRO_PERF_PARAMS env vars
+TIER_JIT_BARS = int(os.environ.get("FISHBRO_PERF_BARS", "20000"))
+TIER_JIT_PARAMS = int(os.environ.get("FISHBRO_PERF_PARAMS", "1000"))
 TIER_JIT_HOT_RUNS = int(os.environ.get("FISHBRO_PERF_HOTRUNS", "5"))
 TIER_JIT_TIMEOUT = int(os.environ.get("FISHBRO_PERF_TIMEOUT_S", "600"))
 
@@ -67,6 +69,13 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 # ==========================================
 
 def generate_synthetic_data(n_bars: int, seed: int = 42) -> Dict[str, np.ndarray]:
+    """
+    Generate synthetic OHLC data for perf harness.
+    
+    Uses float32 for Stage0/perf optimization (memory bandwidth reduction).
+    """
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    
     rng = np.random.default_rng(seed)
     close = 10000 + np.cumsum(rng.standard_normal(n_bars)) * 10
     high = close + np.abs(rng.standard_normal(n_bars)) * 5
@@ -76,28 +85,36 @@ def generate_synthetic_data(n_bars: int, seed: int = 42) -> Dict[str, np.ndarray
     high = np.maximum(high, np.maximum(open_, close))
     low = np.minimum(low, np.minimum(open_, close))
     
+    # Use float32 for perf harness (Stage0 optimization)
     data = {
-        "open": open_.astype(np.float64),
-        "high": high.astype(np.float64),
-        "low": low.astype(np.float64),
-        "close": close.astype(np.float64),
+        "open": open_.astype(PRICE_DTYPE_STAGE0),
+        "high": high.astype(PRICE_DTYPE_STAGE0),
+        "low": low.astype(PRICE_DTYPE_STAGE0),
+        "close": close.astype(PRICE_DTYPE_STAGE0),
     }
     
     for k, v in data.items():
         if not v.flags['C_CONTIGUOUS']:
-            data[k] = np.ascontiguousarray(v)
+            data[k] = np.ascontiguousarray(v, dtype=PRICE_DTYPE_STAGE0)
     return data
 
 def generate_params(n_params: int, seed: int = 999) -> np.ndarray:
+    """
+    Generate parameter matrix for perf harness.
+    
+    Uses float32 for Stage0 optimization (memory bandwidth reduction).
+    """
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    
     rng = np.random.default_rng(seed)
     w1 = rng.integers(10, 100, size=n_params)
     w2 = rng.integers(5, 50, size=n_params)
     # runner_grid contract: params_matrix must be (n, >=3)
     # Provide a minimal 3-column schema for perf harness.
     w3 = rng.integers(2, 30, size=n_params)
-    params = np.column_stack((w1, w2, w3)).astype(np.float64)
+    params = np.column_stack((w1, w2, w3)).astype(PRICE_DTYPE_STAGE0)
     if not params.flags['C_CONTIGUOUS']:
-        params = np.ascontiguousarray(params)
+        params = np.ascontiguousarray(params, dtype=PRICE_DTYPE_STAGE0)
     return params
 
 # ==========================================
@@ -115,6 +132,13 @@ def _env_flag(name: str) -> bool:
 def _env_int(name: str, default: int) -> int:
     try:
         return int(os.environ.get(name, str(default)))
+    except Exception:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
     except Exception:
         return default
 
@@ -170,6 +194,12 @@ def run_worker(
     microbench: bool = False,
 ):
     try:
+        # Stage P2-1.6: Parse trigger_rate env var
+        trigger_rate = _env_float("FISHBRO_PERF_TRIGGER_RATE", 1.0)
+        if trigger_rate < 0.0 or trigger_rate > 1.0:
+            raise ValueError(f"FISHBRO_PERF_TRIGGER_RATE must be in [0, 1], got {trigger_rate}")
+        worker_log(f"trigger_rate={trigger_rate}")
+        
         worker_log(f"Starting. Loading input: {npz_path}")
         
         with np.load(npz_path, allow_pickle=False) as data:
@@ -350,6 +380,16 @@ def run_worker(
         # Attach runner_grid observability payload (timings + jit truth + counts)
         if isinstance(last_out, dict) and "perf" in last_out:
             result["perf"] = last_out["perf"]
+            # Stage P2-1.6: Add trigger_rate_configured to perf dict
+            if isinstance(result["perf"], dict):
+                result["perf"]["trigger_rate_configured"] = float(trigger_rate)
+        
+        # Stage P2-1.8: Debug timing keys (only if PERF_DEBUG=1)
+        if os.environ.get("PERF_DEBUG", "").strip() == "1":
+            perf_keys = sorted(result.get("perf", {}).keys()) if isinstance(result.get("perf"), dict) else []
+            worker_log(f"DEBUG: perf keys count={len(perf_keys)}, has t_total_kernel_s={'t_total_kernel_s' in perf_keys}")
+            if len(perf_keys) > 0:
+                worker_log(f"DEBUG: perf keys sample: {perf_keys[:20]}")
         
         print(f"__RESULT_JSON_START__")
         print(json.dumps(result))
@@ -407,6 +447,12 @@ def run_lane(
         env["NUMBA_DISABLE_JIT"] = "1"
     else:
         env.pop("NUMBA_DISABLE_JIT", None)
+    
+    # Stage P2-1.6: Pass FISHBRO_PERF_TRIGGER_RATE to worker if set
+    # (env.copy() already includes it, but we ensure it's explicitly passed)
+    trigger_rate_env = os.environ.get("FISHBRO_PERF_TRIGGER_RATE")
+    if trigger_rate_env:
+        env["FISHBRO_PERF_TRIGGER_RATE"] = trigger_rate_env
         
     # Build worker command
     cmd = [
@@ -511,9 +557,9 @@ def print_report(results: List[Dict[str, Any]]):
     
     jit_no_sort_tput = 0
     for r in results:
-        if not r: continue
-        lane_id = r['lane_id']
-        name = r['name']
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        name = r.get('name', 'Unknown')
         bars = r['res'].get('n_bars', 0)
         params = r['res'].get('n_params', 0)
         cold = r['res'].get('cold_time', 0)
@@ -533,6 +579,157 @@ def print_report(results: List[Dict[str, Any]]):
         sort = "Yes" if r.get("sort_params", False) else "No"
         print(f"| {lane_id} | {mode} | {sort} | {bars} | {params} | {cold:.4f} | {hot:.4f} | {int(tput):,} | {speedup} |")
     print("\nNote: Tput = (Bars * Params) / Min Hot Run Time")
+    
+    # Phase 4 Stage E: Cost Model Output
+    print("\n=== Cost Model (Predictable Cost Estimation) ===")
+    for r in results:
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        res = r.get('res', {})
+        bars = res.get('n_bars', 0)
+        params = res.get('n_params', 0)
+        min_hot_time = res.get('min_hot_time', 0)
+        
+        if min_hot_time > 0 and params > 0:
+            # Calculate cost per parameter (milliseconds)
+            cost_ms_per_param = (min_hot_time / params) * 1000.0
+            
+            # Calculate params per second
+            params_per_sec = params / min_hot_time
+            
+            # Estimate time for 50k params
+            estimated_time_for_50k_params = estimate_seconds(
+                bars=bars,
+                params=50000,
+                cost_ms_per_param=cost_ms_per_param,
+            )
+            
+            # Output cost model fields (stdout)
+            print(f"\nLane {lane_id} Cost Model:")
+            print(f"  bars: {bars}")
+            print(f"  params: {params}")
+            print(f"  best_time_s: {min_hot_time:.6f}")
+            print(f"  params_per_sec: {params_per_sec:,.2f}")
+            print(f"  cost_ms_per_param: {cost_ms_per_param:.6f}")
+            print(f"  estimated_time_for_50k_params: {estimated_time_for_50k_params:.2f}")
+            
+            # Stage P2-1.5: Entry Sparse Observability
+            perf = res.get('perf', {})
+            if isinstance(perf, dict):
+                entry_valid_mask_sum = perf.get('entry_valid_mask_sum')
+                entry_intents_total = perf.get('entry_intents_total')
+                entry_intents_per_bar_avg = perf.get('entry_intents_per_bar_avg')
+                intents_total_reported = perf.get('intents_total_reported')
+                trigger_rate_configured = perf.get('trigger_rate_configured')
+                
+                # Always output if perf dict exists (fields should always be present)
+                if entry_valid_mask_sum is not None or entry_intents_total is not None:
+                    print(f"\nLane {lane_id} Entry Sparse Observability:")
+                    # Stage P2-1.6: Display trigger_rate_configured
+                    if trigger_rate_configured is not None:
+                        print(f"  trigger_rate_configured: {trigger_rate_configured:.6f}")
+                    print(f"  entry_valid_mask_sum: {entry_valid_mask_sum if entry_valid_mask_sum is not None else 0}")
+                    print(f"  entry_intents_total: {entry_intents_total if entry_intents_total is not None else 0}")
+                    if entry_intents_per_bar_avg is not None:
+                        print(f"  entry_intents_per_bar_avg: {entry_intents_per_bar_avg:.6f}")
+                    else:
+                        # Calculate if missing
+                        if entry_intents_total is not None and bars > 0:
+                            print(f"  entry_intents_per_bar_avg: {entry_intents_total / bars:.6f}")
+                    print(f"  intents_total_reported: {intents_total_reported if intents_total_reported is not None else perf.get('intents_total', 0)}")
+    
+    # Stage P2-1.8: Breakdown (Kernel Stage Timings)
+    print("\n=== Breakdown (Kernel Stage Timings) ===")
+    for r in results:
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        res = r.get('res', {})
+        perf = res.get('perf', {})
+        
+        if isinstance(perf, dict):
+            trigger_rate = perf.get('trigger_rate_configured')
+            t_ind_donchian = perf.get('t_ind_donchian_s')
+            t_ind_atr = perf.get('t_ind_atr_s')
+            t_build_entry = perf.get('t_build_entry_intents_s')
+            t_sim_entry = perf.get('t_simulate_entry_s')
+            t_calc_exits = perf.get('t_calc_exits_s')
+            t_sim_exit = perf.get('t_simulate_exit_s')
+            t_total_kernel = perf.get('t_total_kernel_s')
+            
+            print(f"\nLane {lane_id} Breakdown:")
+            if trigger_rate is not None:
+                print(f"  trigger_rate_configured: {trigger_rate:.6f}")
+            
+            # Helper to format timing with "(missing)" if None
+            def fmt_time(key: str, val) -> str:
+                if val is None:
+                    return f"  {key}: (missing)"
+                return f"  {key}: {val:.6f}"
+            
+            # Stage P2-2 Step A: Micro-profiling indicators
+            print(fmt_time("t_ind_donchian_s", t_ind_donchian))
+            print(fmt_time("t_ind_atr_s", t_ind_atr))
+            print(fmt_time("t_build_entry_intents_s", t_build_entry))
+            print(fmt_time("t_simulate_entry_s", t_sim_entry))
+            print(fmt_time("t_calc_exits_s", t_calc_exits))
+            print(fmt_time("t_simulate_exit_s", t_sim_exit))
+            print(fmt_time("t_total_kernel_s", t_total_kernel))
+            
+            # Print percentages if t_total_kernel is available and > 0
+            if t_total_kernel is not None and t_total_kernel > 0:
+                def fmt_pct(key: str, val, total: float) -> str:
+                    if val is None:
+                        return f"    {key}: (missing)"
+                    pct = (val / total) * 100.0
+                    return f"    {key}: {pct:.1f}%"
+                
+                print("  Percentages:")
+                print(fmt_pct("t_ind_donchian_s", t_ind_donchian, t_total_kernel))
+                print(fmt_pct("t_ind_atr_s", t_ind_atr, t_total_kernel))
+                print(fmt_pct("t_build_entry_intents_s", t_build_entry, t_total_kernel))
+                print(fmt_pct("t_simulate_entry_s", t_sim_entry, t_total_kernel))
+                print(fmt_pct("t_calc_exits_s", t_calc_exits, t_total_kernel))
+                print(fmt_pct("t_simulate_exit_s", t_sim_exit, t_total_kernel))
+            
+            # Stage P2-2 Step A: Memoization potential assessment
+            unique_ch = perf.get('unique_channel_len_count')
+            unique_atr = perf.get('unique_atr_len_count')
+            unique_pair = perf.get('unique_ch_atr_pair_count')
+            
+            if unique_ch is not None or unique_atr is not None or unique_pair is not None:
+                print(f"\nLane {lane_id} Memoization Potential:")
+                if unique_ch is not None:
+                    print(f"  unique_channel_len_count: {unique_ch}")
+                else:
+                    print(f"  unique_channel_len_count: (missing)")
+                if unique_atr is not None:
+                    print(f"  unique_atr_len_count: {unique_atr}")
+                else:
+                    print(f"  unique_atr_len_count: (missing)")
+                if unique_pair is not None:
+                    print(f"  unique_ch_atr_pair_count: {unique_pair}")
+                else:
+                    print(f"  unique_ch_atr_pair_count: (missing)")
+            
+            # Stage P2-1.8: Display downstream counts
+            entry_fills_total = perf.get('entry_fills_total')
+            exit_intents_total = perf.get('exit_intents_total')
+            exit_fills_total = perf.get('exit_fills_total')
+            
+            if entry_fills_total is not None or exit_intents_total is not None or exit_fills_total is not None:
+                print(f"\nLane {lane_id} Downstream Observability:")
+                if entry_fills_total is not None:
+                    print(f"  entry_fills_total: {entry_fills_total}")
+                else:
+                    print(f"  entry_fills_total: (missing)")
+                if exit_intents_total is not None:
+                    print(f"  exit_intents_total: {exit_intents_total}")
+                else:
+                    print(f"  exit_intents_total: (missing)")
+                if exit_fills_total is not None:
+                    print(f"  exit_fills_total: {exit_fills_total}")
+                else:
+                    print(f"  exit_fills_total: (missing)")
 
 def run_matcherbench() -> None:
     """
@@ -670,6 +867,13 @@ def main():
         return
 
     print("Initializing Perf Harness...")
+    
+    # Stage P2-1.6: Parse and display trigger_rate in main process
+    trigger_rate = _env_float("FISHBRO_PERF_TRIGGER_RATE", 1.0)
+    if trigger_rate < 0.0 or trigger_rate > 1.0:
+        raise ValueError(f"FISHBRO_PERF_TRIGGER_RATE must be in [0, 1], got {trigger_rate}")
+    print(f"trigger_rate={trigger_rate}")
+    
     lanes_cfg: List[PerfConfig] = []
     
     # Select tier based on stress-tier flag

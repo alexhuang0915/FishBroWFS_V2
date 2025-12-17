@@ -15,7 +15,8 @@ from FishBroWFS_V2.pipeline.metrics_schema import (
     METRICS_N_COLUMNS,
 )
 from FishBroWFS_V2.pipeline.param_sort import sort_params_cache_friendly
-from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, run_kernel
+from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, PrecomputedIndicators, run_kernel
+from FishBroWFS_V2.indicators.numba_indicators import rolling_max, rolling_min, atr_wilder
 
 
 def _max_drawdown(equity: np.ndarray) -> float:
@@ -74,7 +75,20 @@ def run_grid(
             [net_profit, trades, max_dd] (see pipeline.metrics_schema for column indices)
         - order: np.ndarray indices mapping output rows back to original params (or identity)
     """
-    profile = os.environ.get("FISHBRO_PROFILE_GRID", "").strip() == "1"
+    profile_grid = os.environ.get("FISHBRO_PROFILE_GRID", "").strip() == "1"
+    profile_kernel = os.environ.get("FISHBRO_PROFILE_KERNEL", "").strip() == "1"
+    
+    # Stage P2-1.8: Bridge (B) - if user turns on GRID profiling, kernel timing must be enabled too.
+    # This provides stable UX: grid breakdown automatically enables kernel timing.
+    # Only restore if we set it ourselves, to avoid polluting external caller's environment.
+    _set_kernel_profile = False
+    if profile_grid and not profile_kernel:
+        os.environ["FISHBRO_PROFILE_KERNEL"] = "1"
+        _set_kernel_profile = True
+    
+    # Treat either flag as "profile mode" for grid aggregation.
+    profile = profile_grid or profile_kernel
+    
     sim_only = os.environ.get("FISHBRO_PERF_SIM_ONLY", "").strip() == "1"
     t0 = time.perf_counter()
 
@@ -84,12 +98,18 @@ def run_grid(
     if params_matrix.ndim != 2 or params_matrix.shape[1] < 3:
         raise ValueError("params_matrix must be (n, >=3)")
 
-    pm = np.asarray(params_matrix, dtype=np.float64)
+    from FishBroWFS_V2.config.dtypes import INDEX_DTYPE
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE2
+    
+    # runner_grid is used in Stage2, so keep float64 for params_matrix (conservative)
+    pm = np.asarray(params_matrix, dtype=PRICE_DTYPE_STAGE2)
     if sort_params:
         pm_sorted, order = sort_params_cache_friendly(pm)
+        # Convert order to INDEX_DTYPE (int32) for memory optimization
+        order = order.astype(INDEX_DTYPE)
     else:
         pm_sorted = pm
-        order = np.arange(pm.shape[0], dtype=np.int64)
+        order = np.arange(pm.shape[0], dtype=INDEX_DTYPE)
     t_sort = time.perf_counter()
 
     n = pm_sorted.shape[0]
@@ -104,6 +124,70 @@ def run_grid(
 
     # Initialize result dict early (minimal structure)
     perf: Dict[str, object] = {}
+    
+    # Stage P2-2 Step A: Memoization potential assessment - unique counts
+    # Extract channel_len and atr_len values (as int32 for unique counting)
+    ch_vals = pm_sorted[:, 0].astype(np.int32, copy=False)
+    atr_vals = pm_sorted[:, 1].astype(np.int32, copy=False)
+    
+    perf["unique_channel_len_count"] = int(np.unique(ch_vals).size)
+    perf["unique_atr_len_count"] = int(np.unique(atr_vals).size)
+    
+    # Pack pair to int64 key: (ch<<32) | atr
+    pair_keys = (ch_vals.astype(np.int64) << 32) | (atr_vals.astype(np.int64) & 0xFFFFFFFF)
+    perf["unique_ch_atr_pair_count"] = int(np.unique(pair_keys).size)
+    
+    # Stage P2-2 Step B3: Pre-compute indicators for unique channel_len and atr_len
+    unique_ch = np.unique(ch_vals)
+    unique_atr = np.unique(atr_vals)
+    
+    # Build caches for precomputed indicators
+    donch_cache_hi: Dict[int, np.ndarray] = {}
+    donch_cache_lo: Dict[int, np.ndarray] = {}
+    atr_cache: Dict[int, np.ndarray] = {}
+    
+    # Pre-compute timing (if profiling enabled)
+    t_precompute_start = time.perf_counter() if profile else 0.0
+    
+    # Pre-compute Donchian indicators for unique channel_len values
+    for ch_len in unique_ch:
+        ch_len_int = int(ch_len)
+        donch_cache_hi[ch_len_int] = rolling_max(bars.high, ch_len_int)
+        donch_cache_lo[ch_len_int] = rolling_min(bars.low, ch_len_int)
+    
+    # Pre-compute ATR indicators for unique atr_len values
+    for atr_len in unique_atr:
+        atr_len_int = int(atr_len)
+        atr_cache[atr_len_int] = atr_wilder(bars.high, bars.low, bars.close, atr_len_int)
+    
+    t_precompute_end = time.perf_counter() if profile else 0.0
+    
+    # Stage P2-2 Step B4: Memory observation fields
+    precomp_bytes_donchian = sum(arr.nbytes for arr in donch_cache_hi.values()) + sum(arr.nbytes for arr in donch_cache_lo.values())
+    precomp_bytes_atr = sum(arr.nbytes for arr in atr_cache.values())
+    precomp_bytes_total = precomp_bytes_donchian + precomp_bytes_atr
+    
+    perf["precomp_unique_channel_len_count"] = int(len(unique_ch))
+    perf["precomp_unique_atr_len_count"] = int(len(unique_atr))
+    perf["precomp_bytes_donchian"] = int(precomp_bytes_donchian)
+    perf["precomp_bytes_atr"] = int(precomp_bytes_atr)
+    perf["precomp_bytes_total"] = int(precomp_bytes_total)
+    if profile:
+        perf["t_precompute_indicators_s"] = float(t_precompute_end - t_precompute_start)
+    
+    # Stage P2-1.8: Initialize granular timing and count accumulators (only if profile enabled)
+    if profile:
+        # Stage P2-2 Step A: Micro-profiling timing keys
+        perf["t_ind_donchian_s"] = 0.0
+        perf["t_ind_atr_s"] = 0.0
+        perf["t_build_entry_intents_s"] = 0.0
+        perf["t_simulate_entry_s"] = 0.0
+        perf["t_calc_exits_s"] = 0.0
+        perf["t_simulate_exit_s"] = 0.0
+        perf["t_total_kernel_s"] = 0.0
+        perf["entry_fills_total"] = 0
+        perf["exit_intents_total"] = 0
+        perf["exit_fills_total"] = 0
     result: Dict[str, object] = {"metrics": metrics, "order": order, "perf": perf}
 
     if sim_only:
@@ -176,14 +260,24 @@ def run_grid(
     fills_total = 0
     any_profile_missing = False
     intent_mode: str | None = None
+    # Stage P2-1.5: Entry sparse observability (accumulate across params)
+    entry_valid_mask_sum = 0
+    entry_intents_total = 0
+    n_bars_for_entry_obs = None  # Will be set from first kernel result
     for i in range(n):
         ch = int(pm_sorted[i, 0])
         atr = int(pm_sorted[i, 1])
         sm = float(pm_sorted[i, 2])
 
-        if profile:
-            # enable kernel profiling (cheap, coarse) so we can attribute time and counts
-            os.environ["FISHBRO_PROFILE_KERNEL"] = "1"
+        # Stage P2-2 Step B3: Lookup precomputed indicators and create PrecomputedIndicators pack
+        precomp_pack = PrecomputedIndicators(
+            donch_hi=donch_cache_hi[ch],
+            donch_lo=donch_cache_lo[ch],
+            atr=atr_cache[atr],
+        )
+
+        # Stage P2-1.8: Kernel profiling is already enabled at function start if profile=True
+        # No need to set FISHBRO_PROFILE_KERNEL here again
         out = run_kernel(
             bars,
             DonchianAtrParams(channel_len=ch, atr_len=atr, stop_mult=sm),
@@ -191,6 +285,7 @@ def run_grid(
             slip=float(slip),
             order_qty=int(order_qty),
             return_debug=return_debug,
+            precomp=precomp_pack,
         )
         obs = out.get("_obs", None)  # type: ignore
         if isinstance(obs, dict):
@@ -200,6 +295,50 @@ def run_grid(
             # Use intents_total directly from kernel (Source of Truth), not recompute from entry+exit
             intents_total += int(obs.get("intents_total", 0))
             fills_total += int(obs.get("fills_total", 0))
+            
+            # Stage P2-1.5: Accumulate entry sparse observability
+            # These fields come from _build_entry_intents_from_trigger() via obs_extra
+            if "valid_mask_sum" in obs:
+                entry_valid_mask_sum += int(obs.get("valid_mask_sum", 0))
+            if "entry_intents" in obs:
+                entry_intents_total += int(obs.get("entry_intents", 0))
+            elif "valid_mask_sum" in obs:
+                # Fallback: if entry_intents not present, use valid_mask_sum (they should be equal)
+                entry_intents_total += int(obs.get("valid_mask_sum", 0))
+            # Capture n_bars from first kernel result (should be same for all params)
+            if n_bars_for_entry_obs is None and "n_bars" in obs:
+                n_bars_for_entry_obs = int(obs.get("n_bars", 0))
+            
+            # Stage P2-1.8: Accumulate timing keys from _obs (timing is now in _obs, not _perf)
+            # Timing keys have pattern: t_*_s
+            for key, value in obs.items():
+                if key.startswith("t_") and key.endswith("_s"):
+                    if key not in perf:
+                        perf[key] = 0.0
+                    perf[key] = float(perf[key]) + float(value)
+            
+            # Stage P2-1.8: Accumulate downstream counts from _obs
+            if "entry_fills_total" in obs:
+                perf["entry_fills_total"] = int(perf.get("entry_fills_total", 0)) + int(obs.get("entry_fills_total", 0))
+            if "exit_intents_total" in obs:
+                perf["exit_intents_total"] = int(perf.get("exit_intents_total", 0)) + int(obs.get("exit_intents_total", 0))
+            if "exit_fills_total" in obs:
+                perf["exit_fills_total"] = int(perf.get("exit_fills_total", 0)) + int(obs.get("exit_fills_total", 0))
+        
+        # Stage P2-1.8: Fallback - also check _perf for backward compatibility
+        # Handle cases where old kernel versions put timing in _perf instead of _obs
+        # Only use fallback if _obs doesn't have timing keys
+        obs_has_timing = isinstance(obs, dict) and any(k.startswith("t_") and k.endswith("_s") for k in obs.keys())
+        if not obs_has_timing:
+            kernel_perf = out.get("_perf", None)
+            if isinstance(kernel_perf, dict):
+                # Accumulate timings across params (for grid-level aggregation)
+                # Note: For grid-level, we sum timings across params
+                for key, value in kernel_perf.items():
+                    if key.startswith("t_") and key.endswith("_s"):
+                        if key not in perf:
+                            perf[key] = 0.0
+                        perf[key] = float(perf[key]) + float(value)
 
         if profile:
             kp = out.get("_profile", None)  # type: ignore
@@ -346,11 +485,20 @@ def run_grid(
 
     if not profile:
         # Return minimal perf with evidence fields only
-        perf = {
-            "intent_mode": intent_mode,
-            "intents_total": int(intents_total),
-            "fills_total": int(fills_total),
-        }
+        # Stage P2-1.8: Preserve accumulated timings (already in perf dict from loop)
+        perf["intent_mode"] = intent_mode
+        perf["intents_total"] = int(intents_total)
+        perf["fills_total"] = int(fills_total)
+        # Stage P2-1.5: Add entry sparse observability (always include, even if 0)
+        perf["intents_total_reported"] = int(intents_total)  # Preserve original for comparison
+        perf["entry_valid_mask_sum"] = int(entry_valid_mask_sum)
+        perf["entry_intents_total"] = int(entry_intents_total)
+        if n_bars_for_entry_obs is not None and n_bars_for_entry_obs > 0:
+            perf["entry_intents_per_bar_avg"] = float(entry_intents_total / n_bars_for_entry_obs)
+        else:
+            # Fallback: use bars.open.shape[0] if n_bars_for_entry_obs not available
+            perf["entry_intents_per_bar_avg"] = float(entry_intents_total / max(1, bars.open.shape[0]))
+        
         result["perf"] = perf
         if return_debug and debug_fills_first is not None:
             result["debug_fills_first"] = debug_fills_first
@@ -363,10 +511,12 @@ def run_grid(
     sigs = jt.get("kernel_signatures") or []
 
     # Best-effort: avoid leaking this env to callers
-    try:
-        del os.environ["FISHBRO_PROFILE_KERNEL"]
-    except KeyError:
-        pass
+    # Only clean up if we set it ourselves (Task A: bridge logic)
+    if _set_kernel_profile:
+        try:
+            del os.environ["FISHBRO_PROFILE_KERNEL"]
+        except KeyError:
+            pass
 
     # Phase 3.0-E: Ensure intent_mode is never None
     # If no kernel results (n == 0), default to "arrays" (default kernel path)
@@ -375,7 +525,8 @@ def run_grid(
         # Edge case: n == 0 (no params) - use default "arrays" since run_kernel defaults to array path
         intent_mode = "arrays"
 
-    perf = {
+    # Stage P2-1.8: Create summary dict and merge into accumulated perf (preserve t_*_s from loop)
+    perf_summary = {
         "t_features": float(t_prep1 - t0),
         # current architecture: indicators are computed inside run_kernel per param
         "t_indicators": None if any_profile_missing else float(t_ind),
@@ -391,6 +542,19 @@ def run_grid(
         "fills_total": int(fills_total),
         "intents_per_bar_avg": float(intents_total / float(max(1, bars.open.shape[0]))),
     }
+    
+    # Stage P2-1.5: Add entry sparse observability and preserve original intents_total
+    perf_summary["intents_total_reported"] = int(intents_total)  # Preserve original for comparison
+    perf_summary["entry_valid_mask_sum"] = int(entry_valid_mask_sum)
+    perf_summary["entry_intents_total"] = int(entry_intents_total)
+    if n_bars_for_entry_obs is not None and n_bars_for_entry_obs > 0:
+        perf_summary["entry_intents_per_bar_avg"] = float(entry_intents_total / n_bars_for_entry_obs)
+    else:
+        # Fallback: use bars.open.shape[0] if n_bars_for_entry_obs not available
+        perf_summary["entry_intents_per_bar_avg"] = float(entry_intents_total / max(1, bars.open.shape[0]))
+    
+    # Keep accumulated per-kernel timings already stored in `perf` (t_*_s, entry_fills_total, etc.)
+    perf.update(perf_summary)
 
     result["perf"] = perf
     if return_debug and debug_fills_first is not None:

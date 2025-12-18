@@ -1,0 +1,29 @@
+{
+  "config_hash": "abc123def456",
+  "run_id": "test-run-123",
+  "items": [
+    {
+      "candidate_id": "donchian_atr:123",
+      "strategy_id": "donchian_atr",
+      "decision": "KEEP",
+      "rule_id": "R1",
+      "reason": "Passes all checks",
+      "run_id": "test-run-123",
+      "stage": "stage1_topk",
+      "config_hash": "abc123def456",
+      "evidence": [
+        {
+          "source_path": "winners_v2.json",
+          "json_pointer": "/rows/0/net_profit",
+          "note": "Net profit from winners"
+        }
+      ],
+      "key_metrics": {
+        "net_profit": 100.0,
+        "max_dd": -10.0,
+        "trades": 10
+      }
+    }
+  ],
+  "metadata": {}
+}

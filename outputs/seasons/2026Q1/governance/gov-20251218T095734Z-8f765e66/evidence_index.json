@@ -1,0 +1,71 @@
+{
+  "evidence_by_candidate": {
+    "donchian_atr:2f47f7af7d8c": [
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage1_topk-20251218T093512Z-943e749a",
+        "stage_name": "stage1_topk"
+      },
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage2_confirm-20251218T093513Z-354cee6b",
+        "stage_name": "stage2_confirm"
+      }
+    ],
+    "donchian_atr:c7bc8b64916c": [
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage1_topk-20251218T093512Z-943e749a",
+        "stage_name": "stage1_topk"
+      },
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage2_confirm-20251218T093513Z-354cee6b",
+        "stage_name": "stage2_confirm"
+      }
+    ],
+    "donchian_atr:dec75bc8cf8c": [
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage1_topk-20251218T093512Z-943e749a",
+        "stage_name": "stage1_topk"
+      },
+      {
+        "artifact_paths": [
+          "manifest.json",
+          "metrics.json",
+          "winners.json",
+          "config_snapshot.json"
+        ],
+        "run_id": "stage2_confirm-20251218T093513Z-354cee6b",
+        "stage_name": "stage2_confirm"
+      }
+    ]
+  },
+  "governance_id": "stage1_topk-20251218T093512Z-943e749a"
+}

@@ -1,0 +1,27 @@
+{
+  "notes":{
+    "schema":"v1",
+    "stage":"stage1_topk",
+    "topk_count":3
+  },
+  "topk":[
+    {
+      "max_dd":0.0,
+      "net_profit":0.0,
+      "param_id":9,
+      "trades":0
+    },
+    {
+      "max_dd":0.0,
+      "net_profit":0.0,
+      "param_id":8,
+      "trades":0
+    },
+    {
+      "max_dd":0.0,
+      "net_profit":0.0,
+      "param_id":7,
+      "trades":0
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "bars": 100,
+  "mem_est_mb": 0.0,
+  "mem_limit_mb": 2048.0,
+  "oom_gate_action": "PASS",
+  "oom_gate_reason": "mem_est_mb=0.0 <= limit=2048.0",
+  "ops_est": 1000,
+  "param_subsample_rate": 1.0,
+  "params_effective": 10,
+  "params_total": 10,
+  "stage_name": "stage2_confirm",
+  "stage_planned_subsample": 1.0
+}

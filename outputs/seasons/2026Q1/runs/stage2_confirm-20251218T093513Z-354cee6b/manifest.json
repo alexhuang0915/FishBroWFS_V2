@@ -1,0 +1,14 @@
+{
+  "artifact_version": "v1",
+  "bars": 100,
+  "config_hash": "74ea19773784aba47a99eb464eee705a75bdc5c7c0a59227fa16c7d157513f77",
+  "created_at": "2025-12-18T09:35:12.010125Z",
+  "dataset_id": "SMOKE",
+  "dirty_repo": true,
+  "git_sha": "c1930fb9154b",
+  "param_subsample_rate": 1.0,
+  "params_effective": 10,
+  "params_total": 10,
+  "run_id": "stage2_confirm-20251218T093513Z-354cee6b",
+  "season": "2026Q1"
+}

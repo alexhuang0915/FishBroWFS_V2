@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ui.core.artifact_reader import read_artifact
+from FishBroWFS_V2.core.artifact_reader import read_artifact
 
 
 @pytest.fixture

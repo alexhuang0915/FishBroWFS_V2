@@ -5,13 +5,21 @@ Validates governance decisions with KEEP/DROP/FREEZE and evidence chain.
 
 from __future__ import annotations
 
+from enum import Enum
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Dict, List, Optional, Literal
-
-from ui.core.evidence import EvidenceLink
+from typing import Any, Dict, List, Optional, Literal, TypeAlias
 
 
-Decision = Literal["KEEP", "DROP", "FREEZE"]
+class Decision(str, Enum):
+    """Governance decision types (SSOT)."""
+    KEEP = "KEEP"
+    FREEZE = "FREEZE"
+    DROP = "DROP"
+
+
+LifecycleState: TypeAlias = Literal["INCUBATION", "CANDIDATE", "LIVE", "RETIRED"]
+
+RenderHint = Literal["highlight", "chart_annotation", "diff"]
 
 
 class EvidenceLinkModel(BaseModel):
@@ -19,6 +27,8 @@ class EvidenceLinkModel(BaseModel):
     source_path: str
     json_pointer: str
     note: str = ""
+    render_hint: RenderHint = "highlight"  # Rendering hint for viewer (highlight/chart_annotation/diff)
+    render_payload: dict = Field(default_factory=dict)  # Optional payload for custom rendering
 
 
 class GovernanceDecisionRow(BaseModel):
@@ -34,6 +44,8 @@ class GovernanceDecisionRow(BaseModel):
     run_id: str
     stage: str
     config_hash: Optional[str] = None
+    
+    lifecycle_state: LifecycleState = "INCUBATION"  # Lifecycle state (INCUBATION/CANDIDATE/LIVE/RETIRED)
     
     evidence: List[EvidenceLinkModel] = Field(default_factory=list)
     metrics_snapshot: Dict[str, Any] = Field(default_factory=dict)

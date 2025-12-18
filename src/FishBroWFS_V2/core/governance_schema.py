@@ -6,15 +6,9 @@ Single Source of Truth (SSOT) for governance decisions.
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
-from enum import Enum
 from typing import Any, Dict, List
 
-
-class Decision(str, Enum):
-    """Governance decision types."""
-    KEEP = "KEEP"
-    FREEZE = "FREEZE"
-    DROP = "DROP"
+from FishBroWFS_V2.core.schemas.governance import Decision
 
 
 @dataclass(frozen=True)

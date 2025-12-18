@@ -165,12 +165,24 @@ def run_one_job(db_path: Path, job_id: str) -> None:
         mark_killed(db_path, job_id, error="Interrupted by user")
         raise
     except Exception as e:
-        error_msg = str(e)[:500]  # Limit error message length
+        import traceback
+        
+        # Short for DB column (500 chars)
+        error_msg = str(e)[:500]
+        mark_failed(db_path, job_id, error=error_msg)
+        
+        # Full traceback for audit log (MUST)
+        tb = traceback.format_exc()
+        from FishBroWFS_V2.control.jobs_db import append_log
+        append_log(db_path, job_id, "[ERROR] Unhandled exception\n" + tb)
+        
+        # Also write to file log if available
         if log_path:
             timestamp = datetime.now(timezone.utc).isoformat()
-            _append_log(log_path, f"{timestamp} [job_id={job_id}] [status=FAILED] Error: {error_msg}")
-        mark_failed(db_path, job_id, error=error_msg)
-        raise
+            _append_log(log_path, f"{timestamp} [job_id={job_id}] [status=FAILED] Error: {error_msg}\n{tb}")
+        
+        # Keep worker stable
+        return
 
 
 def _check_pause_stop(db_path: Path, job_id: str) -> None:

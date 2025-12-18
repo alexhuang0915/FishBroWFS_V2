@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any, Literal, Optional
 
@@ -51,4 +51,5 @@ class JobRecord:
     run_link: Optional[str] = None  # e.g. outputs/.../stage0_run_id or final run index pointer
     report_link: Optional[str] = None  # Link to B5 report viewer
     last_error: Optional[str] = None
+    tags: list[str] = field(default_factory=list)  # Tags for job categorization and search
 

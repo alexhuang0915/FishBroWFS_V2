@@ -157,11 +157,8 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         planned_subsample = float(spec.param_subsample_rate)
         final_subsample = gate_result["final_subsample"]
         
-        if gate_result["action"] == "AUTO_DOWNSAMPLE":
-            # Update runtime config
-            stage_cfg["param_subsample_rate"] = final_subsample
-            # Also update spec for consistency (but spec is frozen, so we track separately)
-            # The final_subsample will be used for all subsequent calculations
+        # SSOT: Use new_cfg from gate_result (never mutate original stage_cfg)
+        stage_cfg = gate_result["new_cfg"]
         
         # Use final_subsample for all calculations
         effective_subsample = final_subsample

@@ -10,28 +10,22 @@ Tests verify:
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
-# Add repo root to path for ui module
-REPO_ROOT = Path(__file__).resolve().parents[1]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-from ui.core.artifact_reader import ReadResult, SafeReadResult, try_read_artifact
-from ui.core.evidence import EvidenceLink
-from ui.core.status import (
+from FishBroWFS_V2.core.artifact_reader import ReadResult, SafeReadResult, try_read_artifact
+from FishBroWFS_V2.core.artifact_status import (
     ArtifactStatus,
     ValidationResult,
     validate_governance_status,
     validate_manifest_status,
     validate_winners_v2_status,
 )
-from ui.core.schemas.governance import GovernanceReport
-from ui.core.schemas.manifest import RunManifest
-from ui.core.schemas.winners_v2 import WinnersV2
+from FishBroWFS_V2.core.schemas.governance import GovernanceReport
+from FishBroWFS_V2.core.schemas.manifest import RunManifest
+from FishBroWFS_V2.core.schemas.winners_v2 import WinnersV2
+from FishBroWFS_V2.gui.viewer.schema import EvidenceLink
 
 
 # Fixtures
@@ -313,23 +307,25 @@ def test_try_read_artifact_missing_file(temp_dir: Path) -> None:
 
 # Test: EvidenceLink
 def test_evidence_link() -> None:
-    """Test EvidenceLink dataclass."""
+    """Test EvidenceLink BaseModel."""
     link = EvidenceLink(
-        source_path="winners_v2.json",
+        artifact="winners_v2",
         json_pointer="/rows/0/net_profit",
-        note="Net profit from winners",
+        description="Net profit from winners",
     )
     
-    assert link.source_path == "winners_v2.json"
+    assert link.artifact == "winners_v2"
     assert link.json_pointer == "/rows/0/net_profit"
-    assert link.note == "Net profit from winners"
+    assert link.description == "Net profit from winners"
     
-    # Test immutability
-    assert link == EvidenceLink(
-        source_path="winners_v2.json",
-        json_pointer="/rows/0/net_profit",
-        note="Net profit from winners",
+    # Test with None description
+    link2 = EvidenceLink(
+        artifact="governance",
+        json_pointer="/scoring/final_score",
     )
+    assert link2.artifact == "governance"
+    assert link2.json_pointer == "/scoring/final_score"
+    assert link2.description is None
 
 
 # Test: Pydantic schemas can parse valid data
@@ -376,3 +372,76 @@ def test_governance_schema_parse(fixtures_dir: Path) -> None:
     assert governance.run_id == "test-run-123"
     assert governance.items is not None
     assert len(governance.items) == 1
+
+
+# Test: EvidenceLinkModel render_hint (PR-A)
+def test_evidence_link_model_backward_compatibility() -> None:
+    """Test that EvidenceLinkModel can parse old data without render_hint."""
+    from FishBroWFS_V2.core.schemas.governance import EvidenceLinkModel
+    
+    # Old data format (without render_hint)
+    old_data = {
+        "source_path": "winners_v2.json",
+        "json_pointer": "/rows/0/net_profit",
+        "note": "Net profit from winners",
+    }
+    
+    # Should parse successfully with default render_hint="highlight"
+    link = EvidenceLinkModel(**old_data)
+    
+    assert link.source_path == "winners_v2.json"
+    assert link.json_pointer == "/rows/0/net_profit"
+    assert link.note == "Net profit from winners"
+    assert link.render_hint == "highlight"  # Default value
+    assert link.render_payload == {}  # Default empty dict
+
+
+def test_evidence_link_model_with_render_hint() -> None:
+    """Test that EvidenceLinkModel can parse new data with render_hint."""
+    from FishBroWFS_V2.core.schemas.governance import EvidenceLinkModel
+    
+    # New data format (with render_hint) - using allowed value
+    new_data = {
+        "source_path": "winners_v2.json",
+        "json_pointer": "/rows/0/net_profit",
+        "note": "Net profit from winners",
+        "render_hint": "highlight",
+        "render_payload": {"start_idx": 0, "end_idx": 0},
+    }
+    
+    link = EvidenceLinkModel(**new_data)
+    
+    assert link.source_path == "winners_v2.json"
+    assert link.json_pointer == "/rows/0/net_profit"
+    assert link.note == "Net profit from winners"
+    assert link.render_hint == "highlight"
+    assert link.render_payload == {"start_idx": 0, "end_idx": 0}
+
+
+def test_evidence_link_model_roundtrip() -> None:
+    """Test that EvidenceLinkModel can roundtrip through JSON."""
+    from FishBroWFS_V2.core.schemas.governance import EvidenceLinkModel
+    
+    # Create model with render_hint - using allowed value
+    link = EvidenceLinkModel(
+        source_path="governance.json",
+        json_pointer="/rows/0/decision",
+        note="Decision evidence",
+        render_hint="diff",
+        render_payload={"lhs_pointer": "/rows/0/decision", "rhs_pointer": "/rows/0/decision"},
+    )
+    
+    # Convert to dict
+    link_dict = link.model_dump()
+    
+    # Roundtrip: dict -> JSON -> dict -> model
+    json_str = json.dumps(link_dict)
+    link_dict_roundtrip = json.loads(json_str)
+    link_roundtrip = EvidenceLinkModel(**link_dict_roundtrip)
+    
+    # Verify all fields preserved
+    assert link_roundtrip.source_path == link.source_path
+    assert link_roundtrip.json_pointer == link.json_pointer
+    assert link_roundtrip.note == link.note
+    assert link_roundtrip.render_hint == link.render_hint
+    assert link_roundtrip.render_payload == link.render_payload

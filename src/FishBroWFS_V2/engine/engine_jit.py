@@ -40,6 +40,10 @@ SIDE_SELL_CODE = 255  # SIDE_SELL (-1) encoded as uint8
 
 STATUS_OK = 0
 STATUS_ERROR_UNSORTED = 1
+STATUS_BUFFER_FULL = 2
+
+# Intent TTL default (Constitution constant)
+INTENT_TTL_BARS_DEFAULT = 1  # one-shot next-bar-only (Phase 2 semantics)
 
 # JIT truth (debug/perf observability)
 JIT_PATH_USED_LAST = False
@@ -256,7 +260,7 @@ def simulate(
         packed[4],
         packed[5],
         packed[6],
-        np.int64(1),  # ttl_bars=1 keeps Phase-2 semantics (next-bar only)
+        np.int64(INTENT_TTL_BARS_DEFAULT),  # Use Constitution constant
     )
     if int(status) != STATUS_OK:
         JIT_PATH_USED_LAST = True
@@ -317,8 +321,11 @@ def simulate_arrays(
       qty: int32 (INDEX_DTYPE)
 
     ttl_bars:
-      1 => one-shot next-bar-only (Phase 2 semantics)
-      0 => GTC extension point (debug/tests)
+      - activate_bar = created_bar + 1
+      - 0 => GTC (Good Till Canceled, never expire)
+      - 1 => one-shot next-bar-only (intent valid only on activate_bar)
+      - >= 1 => intent valid for bars t in [activate_bar, activate_bar + ttl_bars - 1]
+      - When t > activate_bar + ttl_bars - 1, intent is removed from active book
     """
     from FishBroWFS_V2.config.dtypes import (
         INDEX_DTYPE,
@@ -498,6 +505,11 @@ def _simulate_with_ttl(bars: BarArrays, intents: Iterable[OrderIntent], ttl_bars
         packed[6],
         np.int64(ttl_bars),
     )
+    if int(status) == STATUS_BUFFER_FULL:
+        raise RuntimeError(
+            f"engine_jit kernel buffer full: fills exceeded capacity. "
+            f"Consider reducing intents or increasing buffer size."
+        )
     if int(status) != STATUS_OK:
         raise RuntimeError(f"engine_jit kernel error: status={int(status)}")
 
@@ -592,11 +604,23 @@ if nb is not None:
 
         Assumption:
           - intents are sorted by (created_bar, order_id) before calling this kernel.
+
+        TTL Semantics (ttl_bars):
+          - activate_bar = created_bar + 1
+          - ttl_bars == 0: GTC (Good Till Canceled, never expire)
+          - ttl_bars >= 1: intent is valid for bars t in [activate_bar, activate_bar + ttl_bars - 1]
+          - When t > activate_bar + ttl_bars - 1, intent is removed from active book (even if not filled)
+          - ttl_bars == 1: one-shot next-bar-only (intent valid only on activate_bar)
         """
         n_bars = open_.shape[0]
         n_intents = order_id.shape[0]
 
+        # Buffer size must accommodate at least n_intents (each intent can produce a fill)
+        # Default heuristic: n_bars * 2 (allows 2 fills per bar on average)
         max_fills = n_bars * 2
+        if n_intents > max_fills:
+            max_fills = n_intents
+        
         out = np.empty((max_fills, 7), dtype=np.float64)
         out_n = 0
 
@@ -638,6 +662,25 @@ if nb is not None:
                 # a < t should not happen if monotonicity check passed
                 return np.int64(STATUS_ERROR_UNSORTED), out[:0]
 
+            # Step A.5 — Prune expired intents (TTL/GTC extension point)
+            # Remove intents that have expired before processing Step B/C.
+            # Contract: activate_bar = created_bar + 1
+            #   - ttl_bars == 0: GTC (never expire)
+            #   - ttl_bars >= 1: valid bars are t in [activate_bar, activate_bar + ttl_bars - 1]
+            #   - When t > activate_bar + ttl_bars - 1, intent must be removed
+            if ttl_bars > np.int64(0) and active_count > 0:
+                k = np.int64(0)
+                while k < active_count:
+                    idx = active_indices[k]
+                    activate_bar = np.int64(created_bar[idx]) + np.int64(1)
+                    expire_bar = activate_bar + (ttl_bars - np.int64(1))
+                    if np.int64(t) > expire_bar:
+                        # swap-remove expired intent
+                        active_indices[k] = active_indices[active_count - 1]
+                        active_count -= np.int64(1)
+                        continue
+                    k += np.int64(1)
+
             # Step B — Pass 1 (ENTRY scan, best-pick, swap-remove)
             # Deterministic selection: STOP(0) before LIMIT(1), then order_id asc.
             if pos == 0 and active_count > 0:
@@ -665,6 +708,10 @@ if nb is not None:
                     k += np.int64(1)
 
                 if best_k != np.int64(-1):
+                    # Buffer protection: check before writing
+                    if out_n >= max_fills:
+                        return np.int64(STATUS_BUFFER_FULL), out[:out_n]
+                    
                     idx = active_indices[best_k]
                     out[out_n, 0] = float(t)
                     out[out_n, 1] = float(role[idx])
@@ -717,6 +764,10 @@ if nb is not None:
                     k += np.int64(1)
 
                 if best_k != np.int64(-1):
+                    # Buffer protection: check before writing
+                    if out_n >= max_fills:
+                        return np.int64(STATUS_BUFFER_FULL), out[:out_n]
+                    
                     idx = active_indices[best_k]
                     out[out_n, 0] = float(t)
                     out[out_n, 1] = float(role[idx])
@@ -732,19 +783,6 @@ if nb is not None:
                     # swap-remove filled intent
                     active_indices[best_k] = active_indices[active_count - 1]
                     active_count -= np.int64(1)
-
-            # Step D — Housekeeping (TTL/GTC extension point)
-            if ttl_bars > np.int64(0) and active_count > 0:
-                k = np.int64(0)
-                while k < active_count:
-                    idx = active_indices[k]
-                    activate_bar = np.int64(created_bar[idx]) + np.int64(1)
-                    expire_bar = activate_bar + (ttl_bars - np.int64(1))
-                    if np.int64(t) > expire_bar:
-                        active_indices[k] = active_indices[active_count - 1]
-                        active_count -= np.int64(1)
-                        continue
-                    k += np.int64(1)
 
         return np.int64(STATUS_OK), out[:out_n]
 

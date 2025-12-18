@@ -13,6 +13,8 @@ from typing import Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from collections import deque
+
 from FishBroWFS_V2.control.jobs_db import (
     create_job,
     get_job,
@@ -27,6 +29,26 @@ from FishBroWFS_V2.control.types import JobRecord, JobSpec, StopMode
 
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
+
+
+def read_tail(path: Path, n: int = 200) -> list[str]:
+    """
+    Read last n lines from a file using deque (memory-efficient for large files).
+    
+    Args:
+        path: Path to file
+        n: Number of lines to return
+        
+    Returns:
+        List of lines (with trailing newlines preserved)
+    """
+    if not path.exists():
+        return []
+    
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        tail = deque(f, maxlen=n)
+    
+    return list(tail)
 
 
 def get_db_path() -> Path:
@@ -208,13 +230,13 @@ async def get_log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
             "truncated": False,
         }
     
-    # Read last n lines
+    # Read last n lines using deque (memory-efficient for large files)
     try:
-        with log_path.open("r", encoding="utf-8") as f:
-            all_lines = f.readlines()
-        
-        lines = all_lines[-n:] if len(all_lines) > n else all_lines
-        truncated = len(all_lines) > n
+        lines = read_tail(log_path, n)
+        # Check if file was truncated (if we read exactly n lines, might be more)
+        # Simple heuristic: if file size is very large, likely truncated
+        file_size = log_path.stat().st_size
+        truncated = file_size > 1024 * 1024  # 1MB threshold
         
         return {
             "ok": True,
@@ -238,13 +260,31 @@ async def get_report_link_endpoint(job_id: str) -> dict[str, Any]:
     """
     Get report_link for a job.
     
+    Phase 6 rule: Always return Viewer URL if run_id exists.
+    Viewer will handle missing/invalid artifacts gracefully.
+    
     Returns:
-        - report_link: Report link URL (always present, can be None)
+        - ok: Always True if job exists
+        - report_link: Report link URL (always present if run_id exists)
     """
+    from FishBroWFS_V2.control.report_links import build_report_link
+    
     db_path = get_db_path()
     try:
         job = get_job(db_path, job_id)
-        return {"report_link": job.report_link}  # Always return the key, even if None
+        
+        # Respect DB: if report_link exists in DB, return it as-is
+        if job.report_link:
+            return {"ok": True, "report_link": job.report_link}
+        
+        # If no report_link in DB but has run_id, build it
+        if job.run_id:
+            season = job.spec.season
+            report_link = build_report_link(season, job.run_id)
+            return {"ok": True, "report_link": report_link}
+        
+        # If no run_id, return empty string (never None)
+        return {"ok": True, "report_link": ""}
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -252,6 +292,9 @@ async def get_report_link_endpoint(job_id: str) -> dict[str, Any]:
 def _ensure_worker_running(db_path: Path) -> None:
     """
     Ensure worker process is running (start if not).
+    
+    Worker stdout/stderr are redirected to worker_process.log (append mode)
+    to avoid deadlock from unread PIPE buffers.
     
     Args:
         db_path: Path to SQLite database
@@ -268,11 +311,23 @@ def _ensure_worker_running(db_path: Path) -> None:
             # Process dead, remove pidfile
             pidfile.unlink(missing_ok=True)
     
+    # Prepare log file (same directory as db_path)
+    logs_dir = db_path.parent  # usually outputs/.../control/
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    worker_log = logs_dir / "worker_process.log"
+    
+    # Open in append mode, line-buffered
+    out = open(worker_log, "a", buffering=1, encoding="utf-8")  # noqa: SIM115
+    
     # Start worker in background
     proc = subprocess.Popen(
         [sys.executable, "-m", "FishBroWFS_V2.control.worker_main", str(db_path)],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        stdout=out,
+        stderr=out,
+        stdin=subprocess.DEVNULL,
+        close_fds=True,
+        start_new_session=True,  # detach from API server session
+        env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
     )
     
     # Write pidfile

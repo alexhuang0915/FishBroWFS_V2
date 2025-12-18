@@ -8,6 +8,7 @@ Generates release packages (txt or zip) excluding sensitive information like .gi
 from __future__ import annotations
 
 import os
+import subprocess
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -177,6 +178,29 @@ def generate_release_zip(repo_root: Path, output_path: Path) -> None:
     print(f"  Total files: {len(all_files)}")
 
 
+def get_git_sha(repo_root: Path) -> str:
+    """
+    Get short git SHA for current HEAD.
+    
+    Returns empty string if git is not available or not in a git repo.
+    Does not fail if git command fails (non-blocking).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+        # Git not available or command failed - silently skip
+        pass
+    return ""
+
+
 def main() -> None:
     """Main entry point."""
     import sys
@@ -191,15 +215,18 @@ def main() -> None:
     script_dir = Path(__file__).resolve().parent
     repo_root = script_dir.parent
     
-    # Generate output filename with timestamp
+    # Generate output filename with timestamp and optional git SHA
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     project_name = repo_root.name
     
+    git_sha = get_git_sha(repo_root)
+    git_suffix = f"-{git_sha}" if git_sha else ""
+    
     if mode == 'txt':
-        output_path = repo_root / f"{project_name}_release_{timestamp}.txt"
+        output_path = repo_root / f"{project_name}_release_{timestamp}{git_suffix}.txt"
         generate_release_txt(repo_root, output_path)
     elif mode == 'zip':
-        output_path = repo_root / f"{project_name}_release_{timestamp}.zip"
+        output_path = repo_root / f"{project_name}_release_{timestamp}{git_suffix}.zip"
         generate_release_zip(repo_root, output_path)
     else:
         print(f"Unknown mode: {mode}. Use 'txt' or 'zip'")

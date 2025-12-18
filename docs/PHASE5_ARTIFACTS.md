@@ -292,3 +292,120 @@ write_run_artifacts(
 - UI **不得**直接讀取或修改 engine/kernel 相關檔案
 
 此契約確保 UI 與核心邏輯解耦。
+
+## Viewer UX Constitution (Phase 6)
+
+Phase 6.0 建立 Viewer Foundation Hardening，確保 Viewer 頁面的一致性和穩定性。
+
+### 核心原則
+
+1. **Viewer-only**: Viewer 頁面只負責顯示 artifacts，不執行任何計算或修改
+2. **不 raise**: Viewer 頁面永遠不會因為 artifact 錯誤而崩潰
+3. **status bar 一致**: 所有 Viewer 頁面使用統一的 Artifact Status Bar
+4. **blocked 規則**: 當 artifacts 為 MISSING 或 INVALID 時，顯示 BLOCKED 面板但頁面繼續渲染
+
+### 載入狀態模型
+
+**檔案**: `src/FishBroWFS_V2/gui/viewer/load_state.py`
+
+定義統一的 artifact 載入狀態：
+
+- `ArtifactLoadStatus`: Enum (OK | MISSING | INVALID | DIRTY)
+- `ArtifactLoadState`: dataclass 包含 status、artifact_name、path、error、dirty_reasons
+- `compute_load_state()`: 純 mapping 函數，從 `SafeReadResult` 和 `ValidationResult` 映射到 `ArtifactLoadState`
+
+**契約**:
+- `compute_load_state()` 永遠不 raise exceptions
+- Status 字串固定（避免 UI 分裂）
+- DIRTY 狀態保留 `dirty_reasons`（不吞）
+
+### Artifact Status Bar
+
+**檔案**: `src/FishBroWFS_V2/gui/viewer/components/status_bar.py`
+
+統一的狀態顯示組件：
+
+- `render_artifact_status_bar()`: 渲染所有 artifacts 的狀態 badge
+- 每個 artifact 顯示：名稱 + badge（OK/MISSING/INVALID/DIRTY）
+- INVALID 顯示 error 摘要（最多 1 行）
+- DIRTY 顯示 dirty_reasons（折疊/expander）
+
+**契約**:
+- 永遠不 raise exceptions
+- 即使 artifacts MISSING/INVALID，頁面照樣渲染（只是內容區顯示 BLOCKED）
+
+### 頁面骨架 (Page Scaffold)
+
+**檔案**: `src/FishBroWFS_V2/gui/viewer/page_scaffold.py`
+
+統一的頁面骨架：
+
+- `render_viewer_page()`: 統一的頁面渲染函數
+- `Bundle`: 包含所有 artifacts 的載入狀態
+- 自動處理 artifact 載入、驗證、狀態映射
+- 當 artifacts MISSING/INVALID 時顯示 BLOCKED 面板
+
+**使用方式**:
+```python
+from FishBroWFS_V2.gui.viewer.page_scaffold import render_viewer_page
+from pathlib import Path
+
+def render_content(bundle: Bundle) -> None:
+    # 渲染頁面內容
+    st.json(bundle.manifest_state.path)
+
+render_viewer_page(
+    title="My Viewer Page",
+    run_dir=Path("outputs/seasons/2026Q1/runs/run-123"),
+    content_render_fn=render_content,
+)
+```
+
+**契約**:
+- 絕對禁止在 pages 裡散落 try/except 各自處理（會造成 UX 不一致）
+- 所有錯誤處理統一在 scaffold 層
+- `content_render_fn` 的 exceptions 也會被捕獲並顯示錯誤訊息
+
+### Blocked 規則
+
+當 `Bundle.has_blocking_error` 為 `True` 時（即任何 artifact 為 MISSING 或 INVALID）：
+
+1. 顯示錯誤訊息："**BLOCKED / 無法載入**"
+2. 顯示說明資訊：提示檢查 Artifact Status 區塊
+3. **不調用** `content_render_fn`（避免內容渲染錯誤）
+4. 頁面繼續渲染（不崩潰）
+
+DIRTY 狀態**不阻塞**頁面內容（因為 artifacts 仍然有效，只是 config_hash 不匹配）。
+
+### 測試要求
+
+Phase 6.0 必須通過以下測試：
+
+1. **`tests/test_viewer_load_state.py`**:
+   - 測試 `compute_load_state()` 對 OK/MISSING/INVALID/DIRTY 的 mapping
+   - 驗證 `dirty_reasons` 在 DIRTY 狀態時保留（不吞）
+
+2. **`tests/test_viewer_page_scaffold_no_raise.py`**:
+   - 使用 monkeypatch 讓 `load_bundle_fn()` 回傳 MISSING/INVALID
+   - 驗證 `render_viewer_page()` 不 raise（只要能走完整函式即可）
+   - 測試不使用真實 Streamlit（避免 UI 測試地獄），只測試純邏輯層
+
+### 檔案結構
+
+```
+src/FishBroWFS_V2/gui/viewer/
+  ├── __init__.py
+  ├── load_state.py              # 載入狀態模型
+  ├── page_scaffold.py           # 頁面骨架
+  └── components/
+      ├── __init__.py
+      └── status_bar.py          # Status Bar 組件
+```
+
+### 向後兼容
+
+Phase 6.0 不破壞現有 Viewer 頁面，但建議逐步遷移到新的 scaffold：
+
+- 現有頁面可以繼續使用 `try_read_artifact()` 和 `validate_*_status()`
+- 新頁面應該使用 `render_viewer_page()` scaffold
+- 未來 Phase 6.x 可能會要求所有 Viewer 頁面使用 scaffold

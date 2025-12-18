@@ -84,7 +84,7 @@ def validate_manifest_status(
         ValidationResult with status and message
     """
     from pathlib import Path
-    from ui.core.schemas.manifest import RunManifest
+    from FishBroWFS_V2.core.schemas.manifest import RunManifest
     
     path = Path(file_path)
     
@@ -161,7 +161,7 @@ def validate_winners_v2_status(
         ValidationResult with status and message
     """
     from pathlib import Path
-    from ui.core.schemas.winners_v2 import WinnersV2
+    from FishBroWFS_V2.core.schemas.winners_v2 import WinnersV2
     
     path = Path(file_path)
     
@@ -263,7 +263,7 @@ def validate_governance_status(
         ValidationResult with status and message
     """
     from pathlib import Path
-    from ui.core.schemas.governance import GovernanceReport
+    from FishBroWFS_V2.core.schemas.governance import GovernanceReport
     
     path = Path(file_path)
     

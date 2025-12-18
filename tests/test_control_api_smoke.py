@@ -266,6 +266,7 @@ def test_report_link_endpoint(test_client: TestClient) -> None:
     resp = test_client.get(f"/jobs/{job_id}/report_link")
     assert resp.status_code == 200
     data = resp.json()
+    # build_report_link always returns a string (never None)
     assert data["report_link"] == "/b5?season=test&run_id=abc123"
 
 
@@ -282,9 +283,10 @@ def test_report_link_endpoint_no_link(test_client: TestClient) -> None:
     create_resp = test_client.post("/jobs", json=req)
     job_id = create_resp.json()["job_id"]
     
-    # Get report_link (no link set)
+    # Get report_link (no run_id set)
     resp = test_client.get(f"/jobs/{job_id}/report_link")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["report_link"] is None
+    # build_report_link always returns a string (never None)
+    assert data["report_link"] == ""
 

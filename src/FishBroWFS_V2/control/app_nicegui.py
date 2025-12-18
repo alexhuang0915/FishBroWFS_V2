@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+from collections import deque
 from pathlib import Path
 
 import requests
@@ -14,6 +15,24 @@ from FishBroWFS_V2.core.config_snapshot import make_config_snapshot
 
 # API base URL (default to localhost)
 API_BASE = "http://localhost:8000"
+
+
+def read_tail(path: Path, n: int = 200) -> str:
+    """
+    Read last n lines from a file using deque (memory-efficient for large files).
+    
+    Args:
+        path: Path to file
+        n: Number of lines to return
+        
+    Returns:
+        String containing last n lines (with newlines preserved)
+    """
+    if not path.exists():
+        return ""
+    with path.open("r", encoding="utf-8", errors="replace") as f:
+        tail = deque(f, maxlen=n)
+    return "".join(tail)
 
 
 def create_job_from_config(cfg: dict) -> str:
@@ -99,9 +118,10 @@ def main_page() -> None:
                             # Show Open Report and Open Outputs Folder for DONE jobs
                             if job["status"] == "DONE":
                                 with ui.row().classes("w-full mt-2"):
-                                    if job.get("report_link"):
-                                        def open_report(jid: str = job["job_id"]) -> None:
-                                            """Open report link."""
+                                    # Show Open Report button if run_id exists
+                                    if job.get("run_id"):
+                                        def get_report_url(jid: str = job["job_id"]) -> str | None:
+                                            """Get report URL from API."""
                                             try:
                                                 resp = requests.get(f"{API_BASE}/jobs/{jid}/report_link")
                                                 resp.raise_for_status()
@@ -109,11 +129,26 @@ def main_page() -> None:
                                                 if data.get("ok") and data.get("report_link"):
                                                     b5_base = os.getenv("FISHBRO_B5_BASE_URL", "http://localhost:8502")
                                                     report_url = f"{b5_base}{data['report_link']}"
-                                                    ui.open(report_url, new_tab=True)
-                                                else:
-                                                    ui.notify("Report not ready", type="warning")
+                                                    
+                                                    # Dev mode assertion (can be disabled in production)
+                                                    if os.getenv("FISHBRO_DEV_MODE", "0") == "1":
+                                                        assert isinstance(report_url, str), f"report_url must be str, got {type(report_url)}"
+                                                        assert report_url.startswith("http"), f"report_url must start with http, got {report_url}"
+                                                    
+                                                    return report_url
+                                                return None
                                             except Exception as e:
-                                                ui.notify(f"Error: {e}", type="negative")
+                                                ui.notify(f"Error getting report link: {e}", type="negative")
+                                                return None
+                                        
+                                        def open_report(jid: str = job["job_id"]) -> None:
+                                            """Open report link."""
+                                            report_url = get_report_url(jid)
+                                            if report_url:
+                                                # Use ui.navigate.to() for external URLs
+                                                ui.navigate.to(report_url, new_tab=True)
+                                            else:
+                                                ui.notify("Report link not available", type="warning")
                                         
                                         ui.button("✅ Open Report", on_click=lambda: open_report()).classes("bg-blue-500 text-white")
                                     
@@ -125,6 +160,19 @@ def main_page() -> None:
                     ui.label(f"Error: {e}").classes("text-red-600")
             
             ui.button("Refresh", on_click=refresh_job_list)
+            
+            # Demo job button (DEV/demo only)
+            def create_demo_job() -> None:
+                """Create demo job for Viewer validation."""
+                try:
+                    from FishBroWFS_V2.control.seed_demo_run import main
+                    run_id = main()
+                    ui.notify(f"Demo job created: {run_id}", type="positive")
+                    refresh_job_list()
+                except Exception as e:
+                    ui.notify(f"Error creating demo job: {e}", type="negative")
+            
+            ui.button("Create Demo Job", on_click=create_demo_job).classes("bg-purple-500 text-white mt-2")
             refresh_job_list()
         
         # Right: Config Composer + Control

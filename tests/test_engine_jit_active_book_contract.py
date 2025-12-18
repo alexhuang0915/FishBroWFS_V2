@@ -110,3 +110,110 @@ def test_ttl_one_shot_vs_gtc_extension_point() -> None:
     assert abs(fills_gtc[0].price - 100.0) <= 1e-9
 
 
+def test_ttl_one_expires_before_fill_opportunity() -> None:
+    """
+    Case A: ttl=1 is one-shot next-bar-only (does not fill if not triggered on activate bar).
+    
+    Scenario:
+      - BUY STOP order, created_bar=-1 (activates at bar0)
+      - bar0: high < stop (not triggered)
+      - bar1: high >= stop (would trigger, but order expired)
+      - ttl_bars=1: order should expire after bar0, not fill on bar1
+    """
+    import FishBroWFS_V2.engine.engine_jit as ej
+
+    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
+        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
+
+    # 2 bars: bar0 doesn't trigger, bar1 would trigger
+    bars = normalize_bars(
+        np.array([90.0, 90.0], dtype=np.float64),  # open
+        np.array([99.0, 110.0], dtype=np.float64),  # high: bar0 < 100, bar1 >= 100
+        np.array([90.0, 90.0], dtype=np.float64),  # low
+        np.array([95.0, 100.0], dtype=np.float64),  # close
+    )
+    intents = [
+        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
+    ]
+
+    # ttl_bars=1: activate_bar=0, expire_bar=0, so at bar1 (t=1) > expire_bar (0), order expired
+    fills_ttl1 = _simulate_with_ttl(bars, intents, ttl_bars=1)
+    assert len(fills_ttl1) == 0, "ttl=1 should expire after activate bar, no fill on bar1"
+
+    # Verify JIT matches expected semantics
+    # activate_bar = created_bar + 1 = -1 + 1 = 0
+    # expire_bar = activate_bar + (ttl_bars - 1) = 0 + (1 - 1) = 0
+    # At bar1 (t=1), t > expire_bar (0), so order should be removed before Step B/C
+
+
+def test_ttl_zero_gtc_never_expires() -> None:
+    """
+    Case B: ttl=0 is GTC (Good Till Canceled), order never expires.
+    
+    Scenario:
+      - BUY STOP order, created_bar=-1 (activates at bar0)
+      - bar0: high < stop (not triggered)
+      - bar1: high >= stop (triggers)
+      - ttl_bars=0: order should remain active and fill on bar1
+    """
+    import FishBroWFS_V2.engine.engine_jit as ej
+
+    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
+        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
+
+    # 2 bars: bar0 doesn't trigger, bar1 triggers
+    bars = normalize_bars(
+        np.array([90.0, 90.0], dtype=np.float64),  # open
+        np.array([99.0, 110.0], dtype=np.float64),  # high: bar0 < 100, bar1 >= 100
+        np.array([90.0, 90.0], dtype=np.float64),  # low
+        np.array([95.0, 100.0], dtype=np.float64),  # close
+    )
+    intents = [
+        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
+    ]
+
+    # ttl_bars=0: GTC, order never expires, should fill on bar1
+    fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
+    assert len(fills_gtc) == 1, "ttl=0 (GTC) should allow fill on bar1"
+    assert fills_gtc[0].bar_index == 1, "Fill should occur on bar1"
+    assert fills_gtc[0].order_id == 1
+    assert abs(fills_gtc[0].price - 100.0) <= 1e-9, "Fill price should be stop price"
+
+
+def test_ttl_semantics_three_bars() -> None:
+    """
+    Additional test: verify ttl=1 semantics with 3 bars to ensure expiration timing is correct.
+    
+    Scenario:
+      - BUY STOP order, created_bar=-1 (activates at bar0)
+      - bar0: high < stop (not triggered)
+      - bar1: high < stop (not triggered)
+      - bar2: high >= stop (would trigger, but order expired)
+      - ttl_bars=1: order should expire after bar0, not fill on bar2
+    """
+    import FishBroWFS_V2.engine.engine_jit as ej
+
+    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
+        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
+
+    # 3 bars: bar0 and bar1 don't trigger, bar2 would trigger
+    bars = normalize_bars(
+        np.array([90.0, 90.0, 90.0], dtype=np.float64),  # open
+        np.array([99.0, 99.0, 110.0], dtype=np.float64),  # high: bar0,bar1 < 100, bar2 >= 100
+        np.array([90.0, 90.0, 90.0], dtype=np.float64),  # low
+        np.array([95.0, 95.0, 100.0], dtype=np.float64),  # close
+    )
+    intents = [
+        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
+    ]
+
+    # ttl_bars=1: activate_bar=0, expire_bar=0, so at bar1 (t=1) > expire_bar (0), order expired
+    fills_ttl1 = _simulate_with_ttl(bars, intents, ttl_bars=1)
+    assert len(fills_ttl1) == 0, "ttl=1 should expire after activate bar, no fill on bar2"
+
+    # ttl_bars=0: GTC, should fill on bar2
+    fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
+    assert len(fills_gtc) == 1, "ttl=0 (GTC) should allow fill on bar2"
+    assert fills_gtc[0].bar_index == 2, "Fill should occur on bar2"
+
+

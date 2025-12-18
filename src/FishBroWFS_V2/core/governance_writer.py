@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from FishBroWFS_V2.core.governance_schema import GovernanceReport
+from FishBroWFS_V2.core.schemas.governance import Decision
 from FishBroWFS_V2.core.run_id import make_run_id
 
 
@@ -67,7 +68,7 @@ def write_governance_artifacts(
     ])
     
     # List FREEZE reasons (concise)
-    freeze_items = [item for item in report.items if item.decision.value == "FREEZE"]
+    freeze_items = [item for item in report.items if item.decision is Decision.FREEZE]
     if freeze_items:
         readme_lines.extend([
             "## FREEZE Reasons",

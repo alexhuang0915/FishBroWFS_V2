@@ -637,6 +637,24 @@ def print_report(results: List[Dict[str, Any]]):
                         if entry_intents_total is not None and bars > 0:
                             print(f"  entry_intents_per_bar_avg: {entry_intents_total / bars:.6f}")
                     print(f"  intents_total_reported: {intents_total_reported if intents_total_reported is not None else perf.get('intents_total', 0)}")
+                
+                # Stage P2-3: Sparse Builder Scaling (for scaling verification)
+                allowed_bars = perf.get('allowed_bars')
+                selected_params = perf.get('selected_params')
+                intents_generated = perf.get('intents_generated')
+                
+                if allowed_bars is not None or selected_params is not None or intents_generated is not None:
+                    print(f"\nLane {lane_id} Sparse Builder Scaling:")
+                    if allowed_bars is not None:
+                        print(f"  allowed_bars: {allowed_bars:,}")
+                    if selected_params is not None:
+                        print(f"  selected_params: {selected_params:,}")
+                    if intents_generated is not None:
+                        print(f"  intents_generated: {intents_generated:,}")
+                    # Calculate scaling ratio if both available
+                    if allowed_bars is not None and intents_generated is not None and allowed_bars > 0:
+                        scaling_ratio = intents_generated / allowed_bars
+                        print(f"  scaling_ratio (intents/allowed): {scaling_ratio:.4f}")
     
     # Stage P2-1.8: Breakdown (Kernel Stage Timings)
     print("\n=== Breakdown (Kernel Stage Timings) ===")

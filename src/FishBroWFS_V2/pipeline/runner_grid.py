@@ -175,6 +175,69 @@ def run_grid(
     if profile:
         perf["t_precompute_indicators_s"] = float(t_precompute_end - t_precompute_start)
     
+    # CURSOR TASK 3: Grid 層把 intent sparse 傳到底
+    # Read FISHBRO_PERF_TRIGGER_RATE as intent_sparse_rate and pass to kernel
+    intent_sparse_rate_env = os.environ.get("FISHBRO_PERF_TRIGGER_RATE", "").strip()
+    intent_sparse_rate = 1.0
+    if intent_sparse_rate_env:
+        try:
+            intent_sparse_rate = float(intent_sparse_rate_env)
+            if not (0.0 <= intent_sparse_rate <= 1.0):
+                intent_sparse_rate = 1.0
+        except ValueError:
+            intent_sparse_rate = 1.0
+    
+    # Stage P2-3: Param-subsample (deterministic selection)
+    # FISHBRO_PERF_PARAM_SUBSAMPLE_RATE controls param subsampling (separate from trigger_rate)
+    # FISHBRO_PERF_TRIGGER_RATE is for bar/intent-level sparsity (handled in kernel)
+    param_subsample_rate_env = os.environ.get("FISHBRO_PERF_PARAM_SUBSAMPLE_RATE", "").strip()
+    param_subsample_seed_env = os.environ.get("FISHBRO_PERF_PARAM_SUBSAMPLE_SEED", "").strip()
+    
+    param_subsample_rate = 1.0
+    if param_subsample_rate_env:
+        try:
+            param_subsample_rate = float(param_subsample_rate_env)
+            if not (0.0 <= param_subsample_rate <= 1.0):
+                param_subsample_rate = 1.0
+        except ValueError:
+            param_subsample_rate = 1.0
+    
+    param_subsample_seed = 42
+    if param_subsample_seed_env:
+        try:
+            param_subsample_seed = int(param_subsample_seed_env)
+        except ValueError:
+            param_subsample_seed = 42
+    
+    # Stage P2-3: Determine selected params (deterministic)
+    # CURSOR TASK 1: Use "pos" (sorted space position) for selection, "orig" (original index) for scatter-back
+    if param_subsample_rate < 1.0:
+        k = max(1, int(round(n * param_subsample_rate)))
+        rng = np.random.default_rng(param_subsample_seed)
+        # Generate deterministic permutation
+        perm = rng.permutation(n)
+        selected_pos = np.sort(perm[:k]).astype(INDEX_DTYPE)  # Sort to maintain deterministic loop order
+    else:
+        selected_pos = np.arange(n, dtype=INDEX_DTYPE)
+    
+    # CURSOR TASK 1: Map selected_pos (sorted space) to selected_orig (original space)
+    selected_orig = order[selected_pos].astype(np.int64)  # Map sorted positions to original indices
+    
+    selected_params_count = len(selected_pos)
+    selected_params_ratio = float(selected_params_count) / float(n) if n > 0 else 0.0
+    
+    # Create metrics_computed_mask: boolean array indicating which rows were computed
+    metrics_computed_mask = np.zeros(n, dtype=bool)
+    for orig_i in selected_orig:
+        metrics_computed_mask[orig_i] = True
+    
+    # Add param subsample info to perf
+    perf["param_subsample_rate_configured"] = float(param_subsample_rate)
+    perf["selected_params_count"] = int(selected_params_count)
+    perf["selected_params_ratio"] = float(selected_params_ratio)
+    perf["metrics_rows_computed"] = int(selected_params_count)
+    perf["metrics_computed_mask"] = metrics_computed_mask.tolist()  # Convert to list for JSON serialization
+    
     # Stage P2-1.8: Initialize granular timing and count accumulators (only if profile enabled)
     if profile:
         # Stage P2-2 Step A: Micro-profiling timing keys
@@ -264,10 +327,26 @@ def run_grid(
     entry_valid_mask_sum = 0
     entry_intents_total = 0
     n_bars_for_entry_obs = None  # Will be set from first kernel result
-    for i in range(n):
-        ch = int(pm_sorted[i, 0])
-        atr = int(pm_sorted[i, 1])
-        sm = float(pm_sorted[i, 2])
+    # Stage P2-3: Sparse builder observability (accumulate across params)
+    allowed_bars_total = 0  # Total allowed bars (before trigger rate filtering)
+    intents_generated_total = 0  # Total intents generated (after trigger rate filtering)
+    
+    # CURSOR TASK 1: Collect metrics_subset (will be scattered back after loop)
+    metrics_subset = np.zeros((len(selected_pos), METRICS_N_COLUMNS), dtype=np.float64)
+    debug_fills_first_subset = None
+    if return_debug:
+        debug_fills_first_subset = np.full((len(selected_pos), 6), np.nan, dtype=np.float64)
+    
+    # Stage P2-3: Only loop selected params (param-subsample)
+    # CURSOR TASK 1: Use selected_pos (sorted space) to access pm_sorted, selected_orig for scatter-back
+    for subset_idx, pos in enumerate(selected_pos):
+        # Initialize row for this iteration (will be written at loop end regardless of any continue/early exit)
+        row = np.array([0.0, 0, 0.0], dtype=np.float64)
+        
+        # CURSOR TASK 1: Use pos (sorted space position) to access params_sorted
+        ch = int(pm_sorted[pos, 0])
+        atr = int(pm_sorted[pos, 1])
+        sm = float(pm_sorted[pos, 2])
 
         # Stage P2-2 Step B3: Lookup precomputed indicators and create PrecomputedIndicators pack
         precomp_pack = PrecomputedIndicators(
@@ -286,6 +365,7 @@ def run_grid(
             order_qty=int(order_qty),
             return_debug=return_debug,
             precomp=precomp_pack,
+            intent_sparse_rate=intent_sparse_rate,  # CURSOR TASK 3: Pass intent sparse rate
         )
         obs = out.get("_obs", None)  # type: ignore
         if isinstance(obs, dict):
@@ -296,18 +376,34 @@ def run_grid(
             intents_total += int(obs.get("intents_total", 0))
             fills_total += int(obs.get("fills_total", 0))
             
-            # Stage P2-1.5: Accumulate entry sparse observability
-            # These fields come from _build_entry_intents_from_trigger() via obs_extra
-            if "valid_mask_sum" in obs:
-                entry_valid_mask_sum += int(obs.get("valid_mask_sum", 0))
-            if "entry_intents" in obs:
+            # CURSOR TASK 2: Accumulate entry_valid_mask_sum (after intent sparse)
+            # entry_valid_mask_sum must be sum(allow_mask) - not dense valid bars, not multiplied by params
+            if "entry_valid_mask_sum" in obs:
+                entry_valid_mask_sum += int(obs.get("entry_valid_mask_sum", 0))
+            elif "allowed_bars" in obs:
+                # Fallback: use allowed_bars if entry_valid_mask_sum not present
+                entry_valid_mask_sum += int(obs.get("allowed_bars", 0))
+            # CURSOR TASK 2: entry_intents_total should come from obs["entry_intents_total"] (set by kernel)
+            if "entry_intents_total" in obs:
+                entry_intents_total += int(obs.get("entry_intents_total", 0))
+            elif "entry_intents" in obs:
+                # Fallback: use entry_intents if entry_intents_total not present
                 entry_intents_total += int(obs.get("entry_intents", 0))
-            elif "valid_mask_sum" in obs:
-                # Fallback: if entry_intents not present, use valid_mask_sum (they should be equal)
-                entry_intents_total += int(obs.get("valid_mask_sum", 0))
+            elif "n_entry" in obs:
+                # Fallback: use n_entry if entry_intents_total not present
+                entry_intents_total += int(obs.get("n_entry", 0))
             # Capture n_bars from first kernel result (should be same for all params)
             if n_bars_for_entry_obs is None and "n_bars" in obs:
                 n_bars_for_entry_obs = int(obs.get("n_bars", 0))
+            
+            # Stage P2-3: Accumulate sparse builder observability (from new builder_sparse)
+            if "allowed_bars" in obs:
+                allowed_bars_total += int(obs.get("allowed_bars", 0))
+            if "intents_generated" in obs:
+                intents_generated_total += int(obs.get("intents_generated", 0))
+            elif "n_entry" in obs:
+                # Fallback: if intents_generated not present, use n_entry
+                intents_generated_total += int(obs.get("n_entry", 0))
             
             # Stage P2-1.8: Accumulate timing keys from _obs (timing is now in _obs, not _perf)
             # Timing keys have pattern: t_*_s
@@ -340,17 +436,24 @@ def run_grid(
                             perf[key] = 0.0
                         perf[key] = float(perf[key]) + float(value)
 
-        if profile:
-            kp = out.get("_profile", None)  # type: ignore
-            if not isinstance(kp, dict):
-                any_profile_missing = True
-                continue
-            t_ind += float(kp.get("indicators_s", 0.0))
-            # include both entry+exit intent generation as "intent generation"
-            t_intgen += float(kp.get("intent_gen_s", 0.0)) + float(kp.get("exit_intent_gen_s", 0.0))
-            t_sim += float(kp.get("simulate_entry_s", 0.0)) + float(kp.get("simulate_exit_s", 0.0))
-
-        m = out["metrics"]
+        # Get metrics from kernel output (always available, even if profile missing)
+        m = out.get("metrics", {})
+        if not isinstance(m, dict):
+            # Fallback: kernel didn't return metrics dict, use zeros
+            m_net_profit = 0.0
+            m_trades = 0
+            m_max_dd = 0.0
+        else:
+            m_net_profit = float(m.get("net_profit", 0.0))
+            m_trades = int(m.get("trades", 0))
+            m_max_dd = float(m.get("max_dd", 0.0))
+            # Clean NaN/Inf at source
+            m_net_profit = float(np.nan_to_num(m_net_profit, nan=0.0, posinf=0.0, neginf=0.0))
+            m_max_dd = float(np.nan_to_num(m_max_dd, nan=0.0, posinf=0.0, neginf=0.0))
+        
+        # Get fills count for debug assert
+        fills_this_param = out.get("fills", [])
+        fills_count_this_param = len(fills_this_param) if isinstance(fills_this_param, list) else 0
         
         # Collect debug data if requested
         if return_debug:
@@ -359,9 +462,6 @@ def run_grid(
             entry_price = debug_info.get("entry_price", np.nan)
             exit_bar = debug_info.get("exit_bar", -1)
             exit_price = debug_info.get("exit_price", np.nan)
-            
-            # Handle force_close_last: update exit_bar/exit_price if forced close
-            # (will be updated below if force_close_last triggers)
         
         # Handle force_close_last: if still in position, force close at last bar
         if force_close_last:
@@ -390,8 +490,8 @@ def run_grid(
                         forced_pnl.append(trade_pnl)
                     
                     # Update metrics with forced closes
-                    original_net_profit = float(m["net_profit"])
-                    original_trades = int(m["trades"])
+                    original_net_profit = m_net_profit
+                    original_trades = m_trades
                     
                     # Add forced close trades
                     new_net_profit = original_net_profit + sum(forced_pnl)
@@ -421,60 +521,118 @@ def run_grid(
                     
                     new_max_dd = _max_drawdown(new_equity)
                     
-                    metrics[i, METRICS_COL_NET_PROFIT] = new_net_profit
-                    metrics[i, METRICS_COL_TRADES] = new_trades
-                    metrics[i, METRICS_COL_MAX_DD] = new_max_dd
+                    # Update row with forced close metrics
+                    row = np.array([new_net_profit, new_trades, new_max_dd], dtype=np.float64)
                     
-                    # Update debug with final metrics after force_close_last
+                    # Update debug subset with final metrics after force_close_last
                     if return_debug:
-                        debug_fills_first[i, 0] = entry_bar
-                        debug_fills_first[i, 1] = entry_price
-                        debug_fills_first[i, 2] = exit_bar
-                        debug_fills_first[i, 3] = exit_price
-                        debug_fills_first[i, 4] = new_net_profit
-                        debug_fills_first[i, 5] = float(new_trades)
+                        debug_fills_first_subset[subset_idx, 0] = entry_bar
+                        debug_fills_first_subset[subset_idx, 1] = entry_price
+                        debug_fills_first_subset[subset_idx, 2] = exit_bar
+                        debug_fills_first_subset[subset_idx, 3] = exit_price
+                        debug_fills_first_subset[subset_idx, 4] = new_net_profit
+                        debug_fills_first_subset[subset_idx, 5] = float(new_trades)
                 else:
                     # No unpaired entries, use original metrics
-                    metrics[i, METRICS_COL_NET_PROFIT] = float(m["net_profit"])
-                    metrics[i, METRICS_COL_TRADES] = float(m["trades"])
-                    metrics[i, METRICS_COL_MAX_DD] = float(m["max_dd"])
+                    row = np.array([m_net_profit, m_trades, m_max_dd], dtype=np.float64)
                     
-                    # Store debug data
+                    # Store debug data in subset
                     if return_debug:
-                        debug_fills_first[i, 0] = entry_bar
-                        debug_fills_first[i, 1] = entry_price
-                        debug_fills_first[i, 2] = exit_bar
-                        debug_fills_first[i, 3] = exit_price
-                        debug_fills_first[i, 4] = float(m["net_profit"])
-                        debug_fills_first[i, 5] = float(m["trades"])
+                        debug_fills_first_subset[subset_idx, 0] = entry_bar
+                        debug_fills_first_subset[subset_idx, 1] = entry_price
+                        debug_fills_first_subset[subset_idx, 2] = exit_bar
+                        debug_fills_first_subset[subset_idx, 3] = exit_price
+                        debug_fills_first_subset[subset_idx, 4] = m_net_profit
+                        debug_fills_first_subset[subset_idx, 5] = float(m_trades)
             else:
                 # No fills, use original metrics
-                metrics[i, METRICS_COL_NET_PROFIT] = float(m["net_profit"])
-                metrics[i, METRICS_COL_TRADES] = int(m["trades"])
-                metrics[i, METRICS_COL_MAX_DD] = float(m["max_dd"])
+                row = np.array([m_net_profit, m_trades, m_max_dd], dtype=np.float64)
                 
-                # Store debug data (no fills case)
+                # Store debug data in subset (no fills case)
                 if return_debug:
-                    debug_fills_first[i, 0] = entry_bar
-                    debug_fills_first[i, 1] = entry_price
-                    debug_fills_first[i, 2] = exit_bar
-                    debug_fills_first[i, 3] = exit_price
-                    debug_fills_first[i, 4] = float(m["net_profit"])
-                    debug_fills_first[i, 5] = float(m["trades"])
+                    debug_fills_first_subset[subset_idx, 0] = entry_bar
+                    debug_fills_first_subset[subset_idx, 1] = entry_price
+                    debug_fills_first_subset[subset_idx, 2] = exit_bar
+                    debug_fills_first_subset[subset_idx, 3] = exit_price
+                    debug_fills_first_subset[subset_idx, 4] = m_net_profit
+                    debug_fills_first_subset[subset_idx, 5] = float(m_trades)
         else:
             # Zero-trade safe: kernel guarantees valid numbers (0.0/0)
-            metrics[i, METRICS_COL_NET_PROFIT] = float(m["net_profit"])
-            metrics[i, METRICS_COL_TRADES] = int(m["trades"])
-            metrics[i, METRICS_COL_MAX_DD] = float(m["max_dd"])
+            row = np.array([m_net_profit, m_trades, m_max_dd], dtype=np.float64)
             
-            # Store debug data
+            # Store debug data in subset
             if return_debug:
-                debug_fills_first[i, 0] = entry_bar
-                debug_fills_first[i, 1] = entry_price
-                debug_fills_first[i, 2] = exit_bar
-                debug_fills_first[i, 3] = exit_price
-                debug_fills_first[i, 4] = float(m["net_profit"])
-                debug_fills_first[i, 5] = float(m["trades"])
+                debug_fills_first_subset[subset_idx, 0] = entry_bar
+                debug_fills_first_subset[subset_idx, 1] = entry_price
+                debug_fills_first_subset[subset_idx, 2] = exit_bar
+                debug_fills_first_subset[subset_idx, 3] = exit_price
+                debug_fills_first_subset[subset_idx, 4] = m_net_profit
+                debug_fills_first_subset[subset_idx, 5] = float(m_trades)
+        
+        # HARD CONTRACT: Always write metrics_subset at loop end, regardless of any continue/early exit
+        metrics_subset[subset_idx, :] = row
+        
+        # Debug assert: if trades > 0 (completed trades), metrics must be non-zero
+        # Note: entry fills without exits yield trades=0 and all-zero metrics, which is valid
+        if os.environ.get("FISHBRO_DEBUG_ASSERT", "").strip() == "1":
+            if m_trades > 0:
+                assert np.any(np.abs(metrics_subset[subset_idx, :]) > 0), (
+                    f"subset_idx={subset_idx}: trades={m_trades} > 0, "
+                    f"but metrics_subset[{subset_idx}, :]={metrics_subset[subset_idx, :]} is all zeros"
+                )
+        
+        # Handle profile timing accumulation (after metrics written)
+        if profile:
+            kp = out.get("_profile", None)  # type: ignore
+            if not isinstance(kp, dict):
+                any_profile_missing = True
+                # Continue after metrics already written
+                continue
+            t_ind += float(kp.get("indicators_s", 0.0))
+            # include both entry+exit intent generation as "intent generation"
+            t_intgen += float(kp.get("intent_gen_s", 0.0)) + float(kp.get("exit_intent_gen_s", 0.0))
+            t_sim += float(kp.get("simulate_entry_s", 0.0)) + float(kp.get("simulate_exit_s", 0.0))
+    
+    # CURSOR TASK 2: Handle NaN before scatter-back (avoid computed_non_zero being eaten by NaN)
+    # Note: Already handled at source (m_net_profit, m_max_dd), but double-check here for safety
+    metrics_subset = np.nan_to_num(metrics_subset, nan=0.0, posinf=0.0, neginf=0.0)
+    
+    # CURSOR TASK 3: Assert that if fills_total > 0, metrics_subset should have non-zero values
+    # This helps catch cases where metrics computation was skipped or returned zeros
+    # Only assert if FISHBRO_DEBUG_ASSERT=1 (not triggered by profile, as tests often enable profile)
+    if os.environ.get("FISHBRO_DEBUG_ASSERT", "").strip() == "1":
+        metrics_subset_abs_sum = float(np.sum(np.abs(metrics_subset)))
+        assert fills_total == 0 or metrics_subset_abs_sum > 0, (
+            f"CURSOR TASK B violation: fills_total={fills_total} > 0 but metrics_subset_abs_sum={metrics_subset_abs_sum} == 0. "
+            f"This indicates metrics computation was skipped or returned zeros."
+        )
+    
+    # CURSOR TASK 3: Add perf debug field (metrics_subset_nonzero_rows)
+    metrics_subset_nonzero_rows = int(np.sum(np.any(np.abs(metrics_subset) > 1e-10, axis=1)))
+    perf["metrics_subset_nonzero_rows"] = metrics_subset_nonzero_rows
+    
+    # === HARD CONTRACT: scatter metrics back to original param space ===
+    # CRITICAL: This must happen after all metrics computation and before any return
+    # Variables: selected_pos (sorted-space index), order (sorted_pos -> original_index), metrics_subset (computed metrics)
+    # For each selected param: metrics[orig_param_idx] must be written with non-zero values
+    for subset_i, pos in enumerate(selected_pos):
+        orig_i = int(order[int(pos)])
+        metrics[orig_i, :] = metrics_subset[subset_i, :]
+        
+        if return_debug and debug_fills_first is not None and debug_fills_first_subset is not None:
+            debug_fills_first[orig_i, :] = debug_fills_first_subset[subset_i, :]
+    
+    # CRITICAL: After scatter-back, metrics must not be modified (no metrics = np.zeros, no metrics[:] = 0, no result["metrics"] = metrics_subset)
+    
+    # CURSOR TASK 2: Add perf debug fields (for diagnostic)
+    perf["intent_sparse_rate_effective"] = float(intent_sparse_rate)
+    perf["fills_total"] = int(fills_total)
+    perf["metrics_subset_abs_sum"] = float(np.sum(np.abs(metrics_subset)))
+    
+    # CURSOR TASK A: Add entry_intents_total (subsample run) for diagnostic
+    # This helps distinguish: entry_intents_total > 0 but fills_total == 0 → matcher/engine issue
+    # vs entry_intents_total == 0 → builder didn't generate intents
+    perf["entry_intents_total"] = int(entry_intents_total)
 
     # Phase 3.0-E: Ensure intent_mode is never None
     # If no kernel results (n == 0), default to "arrays" (default kernel path)
@@ -488,16 +646,34 @@ def run_grid(
         # Stage P2-1.8: Preserve accumulated timings (already in perf dict from loop)
         perf["intent_mode"] = intent_mode
         perf["intents_total"] = int(intents_total)
-        perf["fills_total"] = int(fills_total)
+        # fills_total already set in scatter-back section (line 592), but ensure it's here too for clarity
+        if "fills_total" not in perf:
+            perf["fills_total"] = int(fills_total)
+        # CURSOR TASK 3: Add intent sparse rate and entry observability to perf
+        perf["intent_sparse_rate"] = float(intent_sparse_rate)
+        perf["entry_valid_mask_sum"] = int(entry_valid_mask_sum)  # CURSOR TASK 2: After intent sparse (sum(allow_mask))
+        perf["entry_intents_total"] = int(entry_intents_total)
+        
         # Stage P2-1.5: Add entry sparse observability (always include, even if 0)
         perf["intents_total_reported"] = int(intents_total)  # Preserve original for comparison
-        perf["entry_valid_mask_sum"] = int(entry_valid_mask_sum)
-        perf["entry_intents_total"] = int(entry_intents_total)
         if n_bars_for_entry_obs is not None and n_bars_for_entry_obs > 0:
             perf["entry_intents_per_bar_avg"] = float(entry_intents_total / n_bars_for_entry_obs)
         else:
             # Fallback: use bars.open.shape[0] if n_bars_for_entry_obs not available
             perf["entry_intents_per_bar_avg"] = float(entry_intents_total / max(1, bars.open.shape[0]))
+        
+        # Stage P2-3: Add sparse builder observability (for scaling verification)
+        perf["allowed_bars"] = int(allowed_bars_total)
+        perf["intents_generated"] = int(intents_generated_total)
+        perf["selected_params"] = int(selected_params_count)
+        
+        # CURSOR TASK 2: Ensure debug fields are present in non-profile branch too
+        if "intent_sparse_rate_effective" not in perf:
+            perf["intent_sparse_rate_effective"] = float(intent_sparse_rate)
+        if "fills_total" not in perf:
+            perf["fills_total"] = int(fills_total)
+        if "metrics_subset_abs_sum" not in perf:
+            perf["metrics_subset_abs_sum"] = float(np.sum(np.abs(metrics_subset)))
         
         result["perf"] = perf
         if return_debug and debug_fills_first is not None:
@@ -543,15 +719,28 @@ def run_grid(
         "intents_per_bar_avg": float(intents_total / float(max(1, bars.open.shape[0]))),
     }
     
+    # CURSOR TASK 3: Add intent sparse rate and entry observability to perf
+    perf_summary["intent_sparse_rate"] = float(intent_sparse_rate)
+    perf_summary["entry_valid_mask_sum"] = int(entry_valid_mask_sum)  # CURSOR TASK 2: After intent sparse
+    perf_summary["entry_intents_total"] = int(entry_intents_total)
+    
     # Stage P2-1.5: Add entry sparse observability and preserve original intents_total
     perf_summary["intents_total_reported"] = int(intents_total)  # Preserve original for comparison
-    perf_summary["entry_valid_mask_sum"] = int(entry_valid_mask_sum)
-    perf_summary["entry_intents_total"] = int(entry_intents_total)
     if n_bars_for_entry_obs is not None and n_bars_for_entry_obs > 0:
         perf_summary["entry_intents_per_bar_avg"] = float(entry_intents_total / n_bars_for_entry_obs)
     else:
         # Fallback: use bars.open.shape[0] if n_bars_for_entry_obs not available
         perf_summary["entry_intents_per_bar_avg"] = float(entry_intents_total / max(1, bars.open.shape[0]))
+    
+    # Stage P2-3: Add sparse builder observability (for scaling verification)
+    perf_summary["allowed_bars"] = int(allowed_bars_total)  # Total allowed bars across all params
+    perf_summary["intents_generated"] = int(intents_generated_total)  # Total intents generated across all params
+    perf_summary["selected_params"] = int(selected_params_count)  # Number of params actually computed
+    
+    # CURSOR TASK 2: Ensure debug fields are present in profile branch too
+    perf_summary["intent_sparse_rate_effective"] = float(intent_sparse_rate)
+    perf_summary["fills_total"] = int(fills_total)
+    perf_summary["metrics_subset_abs_sum"] = float(np.sum(np.abs(metrics_subset)))
     
     # Keep accumulated per-kernel timings already stored in `perf` (t_*_s, entry_fills_total, etc.)
     perf.update(perf_summary)

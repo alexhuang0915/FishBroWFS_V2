@@ -120,6 +120,10 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     if "tags_json" not in columns:
         conn.execute("ALTER TABLE jobs ADD COLUMN tags_json TEXT DEFAULT '[]'")
     
+    # Add data_fingerprint_sha1 column if missing
+    if "data_fingerprint_sha1" not in columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN data_fingerprint_sha1 TEXT DEFAULT ''")
+    
     # Create job_logs table if not exists
     conn.execute("""
         CREATE TABLE IF NOT EXISTS job_logs (
@@ -214,8 +218,8 @@ def create_job(db_path: Path, spec: JobSpec, *, tags: list[str] | None = None) -
                 INSERT INTO jobs (
                     job_id, status, created_at, updated_at,
                     season, dataset_id, outputs_root, config_hash,
-                    config_snapshot_json, requested_pause, tags_json
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    config_snapshot_json, requested_pause, tags_json, data_fingerprint_sha1
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job_id,
                 JobStatus.QUEUED.value,
@@ -228,6 +232,7 @@ def create_job(db_path: Path, spec: JobSpec, *, tags: list[str] | None = None) -
                 json.dumps(spec.config_snapshot),
                 0,
                 tags_json,
+                spec.data_fingerprint_sha1 if hasattr(spec, 'data_fingerprint_sha1') else '',
             ))
             conn.commit()
         return job_id
@@ -242,7 +247,36 @@ def _row_to_record(row: tuple) -> JobRecord:
     # - Middle: 13 columns (with report_link, before run_id)
     # - New: 14 columns (with run_id and report_link)
     # - Latest: 15 columns (with tags_json)
-    if len(row) == 15:
+    # - Phase 6.5: 16 columns (with data_fingerprint_sha1)
+    if len(row) == 16:
+        # Phase 6.5 schema with data_fingerprint_sha1
+        (
+            job_id,
+            status,
+            created_at,
+            updated_at,
+            season,
+            dataset_id,
+            outputs_root,
+            config_hash,
+            config_snapshot_json,
+            pid,
+            run_id,
+            run_link,
+            report_link,
+            last_error,
+            tags_json,
+            data_fingerprint_sha1,
+        ) = row
+        # Parse tags_json, fallback to [] if None or invalid
+        try:
+            tags = json.loads(tags_json) if tags_json else []
+            if not isinstance(tags, list):
+                tags = []
+        except (json.JSONDecodeError, TypeError):
+            tags = []
+        fingerprint_sha1 = data_fingerprint_sha1 if data_fingerprint_sha1 else ""
+    elif len(row) == 15:
         # Latest schema with tags_json
         (
             job_id,
@@ -268,6 +302,7 @@ def _row_to_record(row: tuple) -> JobRecord:
                 tags = []
         except (json.JSONDecodeError, TypeError):
             tags = []
+        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
     elif len(row) == 14:
         # New schema with run_id and report_link
         # Order: job_id, status, created_at, updated_at, season, dataset_id, outputs_root,
@@ -289,6 +324,7 @@ def _row_to_record(row: tuple) -> JobRecord:
             last_error,
         ) = row
         tags = []  # Fallback for schema without tags_json
+        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
     elif len(row) == 13:
         # Middle schema with report_link but no run_id
         (
@@ -308,6 +344,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         ) = row
         run_id = None
         tags = []  # Fallback for old schema
+        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
     else:
         # Old schema (backward compatibility)
         (
@@ -327,6 +364,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         run_id = None
         report_link = None
         tags = []  # Fallback for old schema
+        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
     
     spec = JobSpec(
         season=season,
@@ -334,6 +372,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         outputs_root=outputs_root,
         config_snapshot=json.loads(config_snapshot_json),
         config_hash=config_hash,
+        data_fingerprint_sha1=fingerprint_sha1,
     )
     
     return JobRecord(
@@ -348,6 +387,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         report_link=report_link if report_link else None,
         last_error=last_error,
         tags=tags if tags else [],
+        data_fingerprint_sha1=fingerprint_sha1,
     )
 
 
@@ -376,7 +416,8 @@ def get_job(db_path: Path, job_id: str) -> JobRecord:
                        run_link,
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
-                       COALESCE(tags_json, '[]') as tags_json
+                       COALESCE(tags_json, '[]') as tags_json,
+                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
                 FROM jobs
                 WHERE job_id = ?
             """, (job_id,))
@@ -410,7 +451,8 @@ def list_jobs(db_path: Path, *, limit: int = 50) -> list[JobRecord]:
                        run_link,
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
-                       COALESCE(tags_json, '[]') as tags_json
+                       COALESCE(tags_json, '[]') as tags_json,
+                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
                 FROM jobs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -812,7 +854,8 @@ def search_by_tag(db_path: Path, tag: str, *, limit: int = 50) -> list[JobRecord
                        run_link,
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
-                       COALESCE(tags_json, '[]') as tags_json
+                       COALESCE(tags_json, '[]') as tags_json,
+                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
                 FROM jobs
                 WHERE tags_json LIKE ?
                 ORDER BY created_at DESC

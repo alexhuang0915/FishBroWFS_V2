@@ -602,11 +602,20 @@ def evaluate_governance(
         )
     
     # Build metadata
+    # Extract data_fingerprint_sha1 from manifests (prefer Stage1, fallback to others)
+    data_fingerprint_sha1 = (
+        stage1_manifest.get("data_fingerprint_sha1") or
+        stage0_manifest.get("data_fingerprint_sha1") or
+        stage2_manifest.get("data_fingerprint_sha1") or
+        ""
+    )
+    
     metadata = {
         "governance_id": stage1_manifest.get("run_id", "unknown"),  # Use Stage1 run_id as base
         "season": stage1_manifest.get("season", "unknown"),
         "created_at": created_at,
         "git_sha": git_sha,
+        "data_fingerprint_sha1": data_fingerprint_sha1,  # Phase 6.5: Mandatory fingerprint
         "stage0_run_id": stage0_manifest.get("run_id", "unknown"),
         "stage1_run_id": stage1_manifest.get("run_id", "unknown"),
         "stage2_run_id": stage2_manifest.get("run_id", "unknown"),

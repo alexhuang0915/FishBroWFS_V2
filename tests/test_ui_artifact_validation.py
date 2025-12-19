@@ -35,10 +35,8 @@ def fixtures_dir() -> Path:
     return Path(__file__).parent / "fixtures" / "artifacts"
 
 
-@pytest.fixture
-def temp_dir(tmp_path: Path) -> Path:
-    """Return temporary directory for test artifacts."""
-    return tmp_path
+# Note: temp_dir fixture is now defined in conftest.py for all tests
+# This local definition is kept for backward compatibility but will be shadowed by conftest.py
 
 
 # Test: MISSING status
@@ -274,6 +272,99 @@ def test_governance_ok(fixtures_dir: Path) -> None:
     
     assert result.status == ArtifactStatus.OK
     assert "驗證通過" in result.message or "ok" in result.message.lower()
+
+
+# Test: Phase 6.5 - Missing fingerprint must be DIRTY (Binding Constraint)
+def test_manifest_missing_fingerprint_is_dirty(fixtures_dir: Path) -> None:
+    """Test that manifest without data_fingerprint_sha1 is marked DIRTY.
+    
+    Binding Constraint: This test locks down the requirement that
+    data_fingerprint_sha1 must be present and non-empty.
+    Prevents future changes from making fingerprint optional.
+    """
+    manifest_path = fixtures_dir / "manifest_valid.json"
+    
+    # Load data and remove fingerprint
+    with manifest_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    data.pop("data_fingerprint_sha1", None)
+    
+    result = validate_manifest_status(
+        str(manifest_path),
+        manifest_data=data,
+        expected_config_hash="abc123def456",
+    )
+    
+    assert result.status == ArtifactStatus.DIRTY
+    assert "fingerprint" in result.message.lower() or "untrustworthy" in result.message.lower()
+
+
+def test_manifest_empty_fingerprint_is_dirty(fixtures_dir: Path) -> None:
+    """Test that manifest with empty data_fingerprint_sha1 is marked DIRTY."""
+    manifest_path = fixtures_dir / "manifest_valid.json"
+    
+    # Load data and set fingerprint to empty string
+    with manifest_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    data["data_fingerprint_sha1"] = ""
+    
+    result = validate_manifest_status(
+        str(manifest_path),
+        manifest_data=data,
+        expected_config_hash="abc123def456",
+    )
+    
+    assert result.status == ArtifactStatus.DIRTY
+    assert "fingerprint" in result.message.lower() or "untrustworthy" in result.message.lower()
+
+
+def test_governance_missing_fingerprint_is_dirty(fixtures_dir: Path) -> None:
+    """Test that governance without data_fingerprint_sha1 in metadata is marked DIRTY.
+    
+    Binding Constraint: This test locks down the requirement that
+    data_fingerprint_sha1 must be present in governance metadata and non-empty.
+    """
+    governance_path = fixtures_dir / "governance_valid.json"
+    
+    # Load data and remove fingerprint from metadata
+    with governance_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    if "metadata" in data:
+        data["metadata"].pop("data_fingerprint_sha1", None)
+    else:
+        data["metadata"] = {}
+    
+    result = validate_governance_status(
+        str(governance_path),
+        governance_data=data,
+        expected_config_hash="abc123def456",
+    )
+    
+    assert result.status == ArtifactStatus.DIRTY
+    assert "fingerprint" in result.message.lower() or "untrustworthy" in result.message.lower()
+
+
+def test_governance_empty_fingerprint_is_dirty(fixtures_dir: Path) -> None:
+    """Test that governance with empty data_fingerprint_sha1 in metadata is marked DIRTY."""
+    governance_path = fixtures_dir / "governance_valid.json"
+    
+    # Load data and set fingerprint to empty string in metadata
+    with governance_path.open("r", encoding="utf-8") as f:
+        data = json.load(f)
+    
+    if "metadata" not in data:
+        data["metadata"] = {}
+    data["metadata"]["data_fingerprint_sha1"] = ""
+    
+    result = validate_governance_status(
+        str(governance_path),
+        governance_data=data,
+        expected_config_hash="abc123def456",
+    )
+    
+    assert result.status == ArtifactStatus.DIRTY
+    assert "fingerprint" in result.message.lower() or "untrustworthy" in result.message.lower()
 
 
 # Test: ArtifactReader (safe version)

@@ -1,0 +1,12 @@
+symbol: TWF.MXF
+version: v1
+mode: FIXED_TPE
+exchange_tz: Asia/Taipei
+local_tz: Asia/Taipei
+sessions:
+  - name: DAY
+    start: "08:45:00"
+    end: "13:45:00"
+  - name: NIGHT
+    start: "15:00:00"
+    end: "05:00:00"

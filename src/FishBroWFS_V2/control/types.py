@@ -34,6 +34,7 @@ class JobSpec:
     outputs_root: str
     config_snapshot: dict[str, Any]  # sanitized; no ndarrays
     config_hash: str
+    data_fingerprint_sha1: str = ""  # Data fingerprint SHA1 (empty if not provided, marks DIRTY)
     created_by: str = "b5c"
 
 
@@ -52,4 +53,5 @@ class JobRecord:
     report_link: Optional[str] = None  # Link to B5 report viewer
     last_error: Optional[str] = None
     tags: list[str] = field(default_factory=list)  # Tags for job categorization and search
+    data_fingerprint_sha1: str = ""  # Data fingerprint SHA1 (empty if missing, marks DIRTY)
 

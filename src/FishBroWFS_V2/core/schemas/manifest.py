@@ -41,3 +41,12 @@ class RunManifest(BaseModel):
     params_total: Optional[int] = None
     params_effective: Optional[int] = None
     artifact_version: Optional[str] = None
+    
+    # Phase 6.5: Mandatory fingerprint (validation enforces non-empty)
+    data_fingerprint_sha1: Optional[str] = None
+    
+    # Phase 6.6: Timezone database metadata
+    tzdb_provider: Optional[str] = None  # e.g., "zoneinfo"
+    tzdb_version: Optional[str] = None  # Timezone database version
+    data_tz: Optional[str] = None  # Data timezone (e.g., "Asia/Taipei")
+    exchange_tz: Optional[str] = None  # Exchange timezone (e.g., "America/Chicago")

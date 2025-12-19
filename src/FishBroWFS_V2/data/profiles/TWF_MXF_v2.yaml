@@ -1,0 +1,18 @@
+symbol: TWF.MXF
+version: v2
+mode: FIXED_TPE
+exchange_tz: Asia/Taipei
+data_tz: Asia/Taipei
+windows:
+  - state: TRADING
+    start: "08:45:00"  # Taiwan time
+    end: "13:45:00"    # Taiwan time
+  - state: BREAK
+    start: "13:45:00"  # Taiwan time
+    end: "15:00:00"    # Taiwan time
+  - state: TRADING
+    start: "15:00:00"  # Taiwan time (跨午夜)
+    end: "05:00:00"    # Taiwan time
+  - state: BREAK
+    start: "05:00:00"  # Taiwan time
+    end: "08:45:00"    # Taiwan time

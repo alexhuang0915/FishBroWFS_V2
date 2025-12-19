@@ -3,7 +3,7 @@ CACHE_CLEANER := GM_Huang/clean_repo_caches.py
 RELEASE_TOOL := GM_Huang/release_tool.py
 VIEWER_APP := $(shell PYTHONPATH=src python -c "import FishBroWFS_V2.gui.viewer.app as m; import inspect; print(inspect.getsourcefile(m))")
 
-.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry compile release-txt release-zip gui demo contract
+.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip gui demo contract
 
 help:
 	@echo ""
@@ -18,6 +18,7 @@ help:
 	@echo "  make perf-heavy       Run perf harness heavy-tier (200000×10000, expensive)"
 	@echo "  make clean-caches      Clean python bytecode caches"
 	@echo "  make clean-caches-dry  Dry-run cache cleanup"
+	@echo "  make clean-data        Clean parquet data cache (Binding #4)"
 	@echo "  make compile           Safe syntax check (no repo pollution)"
 	@echo "  make release-txt       Generate release TXT (structure + code)"
 	@echo "  make release-zip       Generate release ZIP (excludes .git)"
@@ -34,6 +35,10 @@ clean-caches:
 
 clean-caches-dry:
 	@FISHBRO_DRY_RUN=1 PYTHONDONTWRITEBYTECODE=1 python -B $(CACHE_CLEANER) || true
+
+clean-data:
+	@echo "==> Cleaning parquet data cache (Binding #4: Parquet is Cache, Not Truth)"
+	@PYTHONDONTWRITEBYTECODE=1 python -B scripts/clean_data_cache.py
 
 # ---------------------------------------------------------
 # Testing (safe mode)

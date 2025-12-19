@@ -139,6 +139,14 @@ def validate_manifest_status(
             message=f"manifest.config_hash={manifest.config_hash} 但預期值為 {expected_config_hash}",
         )
     
+    # Phase 6.5: Check data_fingerprint_sha1 (mandatory)
+    fingerprint_sha1 = getattr(manifest, 'data_fingerprint_sha1', None)
+    if not fingerprint_sha1 or fingerprint_sha1 == "":
+        return ValidationResult(
+            status=ArtifactStatus.DIRTY,
+            message="Missing Data Fingerprint — report is untrustworthy (data_fingerprint_sha1 is empty or missing)",
+        )
+    
     return ValidationResult(status=ArtifactStatus.OK, message="manifest.json 驗證通過")
 
 
@@ -324,5 +332,14 @@ def validate_governance_status(
                 status=ArtifactStatus.DIRTY,
                 message=f"governance.config_hash={governance.config_hash} 但 manifest.config_hash={manifest_config_hash}",
             )
+    
+    # Phase 6.5: Check data_fingerprint_sha1 in metadata (mandatory)
+    metadata = governance_data.get("metadata", {}) if governance_data else {}
+    fingerprint_sha1 = metadata.get("data_fingerprint_sha1", "")
+    if not fingerprint_sha1 or fingerprint_sha1 == "":
+        return ValidationResult(
+            status=ArtifactStatus.DIRTY,
+            message="Missing Data Fingerprint — report is untrustworthy (data_fingerprint_sha1 is empty or missing in metadata)",
+        )
     
     return ValidationResult(status=ArtifactStatus.OK, message="governance.json 驗證通過")

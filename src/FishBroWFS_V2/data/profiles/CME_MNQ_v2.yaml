@@ -1,0 +1,12 @@
+symbol: CME.MNQ
+version: v2
+mode: tz_convert
+exchange_tz: America/Chicago
+data_tz: Asia/Taipei
+windows:
+  - state: BREAK
+    start: "16:00:00"  # Chicago time
+    end: "17:00:00"    # Chicago time
+  - state: TRADING
+    start: "17:00:00"  # Chicago time (跨午夜)
+    end: "16:00:00"    # Chicago time

@@ -18,6 +18,7 @@ from FishBroWFS_V2.core.config_snapshot import make_config_snapshot
 from FishBroWFS_V2.core.oom_gate import decide_oom_action
 from FishBroWFS_V2.core.paths import ensure_run_dir
 from FishBroWFS_V2.core.run_id import make_run_id
+from FishBroWFS_V2.data.session.tzdb_info import get_tzdb_info
 from FishBroWFS_V2.pipeline.funnel_plan import build_default_funnel_plan
 from FishBroWFS_V2.pipeline.funnel_schema import FunnelResultIndex, FunnelStageIndex
 from FishBroWFS_V2.pipeline.runner_adapter import run_stage_job
@@ -219,11 +220,24 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
             stage_metrics["oom_gate_original_subsample"] = planned_subsample
             stage_metrics["oom_gate_final_subsample"] = final_subsample
         
+        # Phase 6.6: Add tzdb metadata to manifest
+        manifest_dict = audit.to_dict()
+        tzdb_provider, tzdb_version = get_tzdb_info()
+        manifest_dict["tzdb_provider"] = tzdb_provider
+        manifest_dict["tzdb_version"] = tzdb_version
+        
+        # Add data_tz and exchange_tz if available in config
+        # These come from session profile if session processing is used
+        if "data_tz" in stage_cfg:
+            manifest_dict["data_tz"] = stage_cfg["data_tz"]
+        if "exchange_tz" in stage_cfg:
+            manifest_dict["exchange_tz"] = stage_cfg["exchange_tz"]
+        
         # Write artifacts (unified artifact system)
         # Use sanitized snapshot (not runtime cfg with ndarrays)
         write_run_artifacts(
             run_dir=run_dir,
-            manifest=audit.to_dict(),
+            manifest=manifest_dict,
             config_snapshot=stage_snapshot,
             metrics=stage_metrics,
             winners=stage_winners,

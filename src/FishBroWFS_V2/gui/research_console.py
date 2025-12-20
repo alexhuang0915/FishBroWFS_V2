@@ -8,9 +8,46 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional, Iterable
 
 from FishBroWFS_V2.research.decision import append_decision
+
+
+def _norm_optional_text(x: Any) -> Optional[str]:
+    """Normalize optional free-text user input.
+    
+    Rules:
+    - None -> None
+    - non-str -> str(x)
+    - strip whitespace
+    - empty after strip -> None
+    """
+    if x is None:
+        return None
+    if not isinstance(x, str):
+        x = str(x)
+    s = x.strip()
+    return s if s != "" else None
+
+
+def _norm_optional_choice(x: Any, *, all_tokens: Iterable[str] = ("ALL",)) -> Optional[str]:
+    """Normalize optional dropdown choice.
+    
+    Rules:
+    - None -> None
+    - strip whitespace
+    - empty after strip -> None
+    - token in all_tokens (case-insensitive) -> None
+    - otherwise return stripped original (NOT uppercased)
+    """
+    s = _norm_optional_text(x)
+    if s is None:
+        return None
+    s_upper = s.upper()
+    for tok in all_tokens:
+        if s_upper == str(tok).upper():
+            return None
+    return s
 
 
 def load_research_artifacts(outputs_root: Path) -> dict:
@@ -91,31 +128,44 @@ def apply_filters(
     Deterministic filter.
     No IO.
     """
+    # Normalize inputs
+    text_q = _norm_optional_text(text)
+    symbol_q = _norm_optional_choice(symbol, all_tokens=("ALL",))
+    strategy_q = _norm_optional_choice(strategy_id, all_tokens=("ALL",))
+    decision_q = _norm_optional_choice(decision, all_tokens=("ALL",))
+    
     filtered = rows
     
-    # Text filter (case-insensitive search in run_id, symbol, strategy_id)
-    if text:
-        text_lower = text.lower()
+    # A) text filter
+    if text_q is not None:
+        text_lower = text_q.lower()
         filtered = [
             row for row in filtered
             if (
                 (row.get("run_id", "").lower().find(text_lower) >= 0) or
                 (row.get("symbol", "").lower().find(text_lower) >= 0) or
-                (row.get("strategy_id", "").lower().find(text_lower) >= 0)
+                (row.get("strategy_id", "").lower().find(text_lower) >= 0) or
+                (row.get("note", "").lower().find(text_lower) >= 0)
             )
         ]
     
-    # Symbol filter
-    if symbol:
-        filtered = [row for row in filtered if row.get("symbol") == symbol]
+    # B) symbol / strategy_id filter
+    if symbol_q is not None:
+        filtered = [row for row in filtered if row.get("symbol", "").lower() == symbol_q.lower()]
     
-    # Strategy filter
-    if strategy_id:
-        filtered = [row for row in filtered if row.get("strategy_id") == strategy_id]
+    if strategy_q is not None:
+        filtered = [row for row in filtered if row.get("strategy_id", "").lower() == strategy_q.lower()]
     
-    # Decision filter
-    if decision and decision != "ALL":
-        filtered = [row for row in filtered if row.get("decision") == decision]
+    # C) decision filter
+    if decision_q is not None:
+        if decision_q.lower() == "undecided":
+            # Match rows where decision is None, empty, or whitespace-only
+            filtered = [
+                row for row in filtered 
+                if _norm_optional_text(row.get("decision")) is None
+            ]
+        else:
+            filtered = [row for row in filtered if row.get("decision", "").lower() == decision_q.lower()]
     
     return filtered
 

@@ -32,12 +32,23 @@ def render(outputs_root: Path) -> None:
         st.session_state.selected_run_id = None
     if "last_refresh" not in st.session_state:
         st.session_state.last_refresh = datetime.now().timestamp()
+    if "note_text" not in st.session_state:
+        st.session_state.note_text = ""
     
     # Title and header
     st.title("📊 Research Console")
     
     # Configuration
     research_dir = outputs_root / "research"
+    
+    # Reload button at the top
+    reload_col1, reload_col2 = st.columns([3, 1])
+    with reload_col1:
+        st.write(f"**Outputs Root:** `{outputs_root}`")
+    with reload_col2:
+        if st.button("🔄 Reload Index", use_container_width=True):
+            st.session_state.last_refresh = datetime.now().timestamp()
+            st.rerun()
     
     # Check if research artifacts exist
     try:
@@ -48,13 +59,11 @@ def render(outputs_root: Path) -> None:
         return
     
     # Header information
-    col1, col2, col3 = st.columns(3)
+    col1, col2 = st.columns(2)
     with col1:
-        st.metric("Outputs Root", str(outputs_root))
-    with col2:
         index_mtime = datetime.fromtimestamp(artifacts["index_mtime"])
         st.metric("Index Last Updated", index_mtime.strftime("%Y-%m-%d %H:%M:%S"))
-    with col3:
+    with col2:
         total_runs = artifacts["index"].get("total_runs", 0)
         st.metric("Total Runs", total_runs)
     
@@ -92,7 +101,11 @@ def render(outputs_root: Path) -> None:
     filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
     
     with filter_col1:
-        text_filter = st.text_input("Search (run_id/symbol/strategy)", "")
+        text_filter = st.text_input(
+            "Keyword Search",
+            placeholder="run_id, symbol, or strategy",
+            help="Search in run_id, symbol, or strategy_id"
+        )
     
     with filter_col2:
         symbol_filter = st.selectbox(
@@ -139,7 +152,6 @@ def render(outputs_root: Path) -> None:
     with table_col:
         st.subheader("📋 Research Index")
         
-        # Create display table with clickable rows
         if filtered_rows:
             # Convert to DataFrame for display
             import pandas as pd
@@ -150,8 +162,14 @@ def render(outputs_root: Path) -> None:
             
             # Format numeric columns
             display_df["score_final"] = display_df["score_final"].round(3)
+            display_df["trades"] = display_df["trades"].fillna(0).astype(int)
             
-            # Display as interactive table
+            # Replace NaN/None with appropriate values
+            display_df["symbol"] = display_df["symbol"].fillna("N/A")
+            display_df["strategy_id"] = display_df["strategy_id"].fillna("N/A")
+            display_df["decision"] = display_df["decision"].fillna("EMPTY")
+            
+            # Display as interactive table with sorting
             st.dataframe(
                 display_df,
                 use_container_width=True,
@@ -166,14 +184,21 @@ def render(outputs_root: Path) -> None:
                 }
             )
             
-            # Row selection
-            selected_index = st.selectbox(
-                "Select a run for details:",
-                options=[row["run_id"] for row in filtered_rows],
-                index=0,
-                key="run_selector",
-            )
-            st.session_state.selected_run_id = selected_index
+            # Row selection using radio buttons for better UX
+            st.subheader("Select Run for Details")
+            if len(filtered_rows) > 0:
+                run_options = [row["run_id"] for row in filtered_rows]
+                selected_run = st.radio(
+                    "Choose a run to view details:",
+                    options=run_options,
+                    index=0,
+                    key="run_selection",
+                    label_visibility="collapsed"
+                )
+                st.session_state.selected_run_id = selected_run
+            else:
+                st.info("No runs match the current filters.")
+                st.session_state.selected_run_id = None
         else:
             st.info("No runs match the current filters.")
             st.session_state.selected_run_id = None
@@ -190,44 +215,71 @@ def render(outputs_root: Path) -> None:
                 st.write(f"**Directory:** `{detail['run_dir']}`")
                 
                 # Tabs for different artifact types
-                tab1, tab2, tab3, tab4 = st.tabs(["Manifest", "Metrics", "Winners", "README"])
+                tab1, tab2, tab3 = st.tabs(["Manifest", "Metrics", "README"])
                 
                 with tab1:
                     if detail["manifest"]:
-                        st.json(detail["manifest"], expanded=False)
+                        st.write("**Manifest Summary:**")
+                        manifest = detail["manifest"]
+                        for key, value in manifest.items():
+                            if value is not None:
+                                st.write(f"- **{key.replace('_', ' ').title()}:** `{value}`")
+                        
+                        # Show full manifest in expander
+                        if detail["full_manifest"]:
+                            with st.expander("View Full Manifest"):
+                                st.json(detail["full_manifest"])
                     else:
                         st.info("No manifest.json found")
                 
                 with tab2:
                     if detail["metrics"]:
-                        # Display key metrics
+                        st.write("**Metrics Summary:**")
                         metrics = detail["metrics"]
-                        if isinstance(metrics, dict):
-                            # Show important metrics
-                            important_keys = ["net_profit", "max_drawdown", "profit_factor", "sharpe", "trades"]
-                            for key in important_keys:
-                                if key in metrics:
-                                    st.metric(key.replace("_", " ").title(), metrics[key])
-                            
-                            # Show full JSON
-                            with st.expander("Full metrics.json"):
-                                st.json(metrics)
-                        else:
-                            st.json(metrics)
+                        
+                        # Display key metrics in columns
+                        metric_col1, metric_col2 = st.columns(2)
+                        
+                        with metric_col1:
+                            if metrics.get("net_profit") is not None:
+                                st.metric("Net Profit", f"{metrics['net_profit']:,.2f}")
+                            if metrics.get("trades") is not None:
+                                st.metric("Trades", metrics["trades"])
+                        
+                        with metric_col2:
+                            if metrics.get("max_drawdown") is not None:
+                                st.metric("Max Drawdown", f"{metrics['max_drawdown']:.2%}")
+                            if metrics.get("profit_factor") is not None:
+                                st.metric("Profit Factor", f"{metrics['profit_factor']:.2f}")
+                        
+                        # Show additional metrics
+                        if metrics.get("sharpe") is not None:
+                            st.metric("Sharpe Ratio", f"{metrics['sharpe']:.2f}")
+                        if metrics.get("win_rate") is not None:
+                            st.metric("Win Rate", f"{metrics['win_rate']:.2%}")
+                        
+                        # Show full metrics in expander
+                        if detail["full_metrics"]:
+                            with st.expander("View Full Metrics"):
+                                st.json(detail["full_metrics"])
                     else:
                         st.info("No metrics.json found")
                 
                 with tab3:
-                    if detail["winners_v2"]:
-                        st.json(detail["winners_v2"], expanded=False)
-                    elif detail["winners"]:
-                        st.json(detail["winners"], expanded=False)
-                    else:
-                        st.info("No winners.json or winners_v2.json found")
-                
-                with tab4:
                     if detail["readme"]:
-                        st.text(detail["readme"])
+                        st.write("**README Summary:**")
+                        st.text_area(
+                            "README Content",
+                            value=detail["readme"],
+                            height=300,
+                            disabled=True,
+                            label_visibility="collapsed"
+                        )
+                        
+                        # Show full README in expander if truncated
+                        if detail["full_readme"] and len(detail["full_readme"]) > 4000:
+                            with st.expander("View Full README"):
+                                st.text(detail["full_readme"])
                     else:
                         st.info("No README.md found")
                 
@@ -235,18 +287,21 @@ def render(outputs_root: Path) -> None:
                 st.divider()
                 st.subheader("🎯 Submit Decision")
                 
-                with st.form("decision_form"):
+                with st.form("decision_form", clear_on_submit=True):
                     decision_options = ["KEEP", "DROP", "ARCHIVE"]
                     selected_decision = st.selectbox(
                         "Decision",
                         options=decision_options,
                         index=0,
+                        key="decision_select"
                     )
                     
                     note = st.text_area(
                         "Note (minimum 5 characters)",
                         placeholder="Explain your decision...",
                         height=100,
+                        key="note_input",
+                        help="Note must be at least 5 characters long"
                     )
                     
                     submitted = st.form_submit_button("Submit Decision", type="primary")
@@ -264,20 +319,18 @@ def render(outputs_root: Path) -> None:
                                 )
                                 st.success(f"Decision '{selected_decision}' submitted successfully!")
                                 
-                                # Refresh the page to show updated decision
+                                # Clear note and refresh
+                                st.session_state.note_text = ""
                                 st.rerun()
                             except Exception as e:
                                 st.error(f"Error submitting decision: {e}")
                 
             except Exception as e:
                 st.error(f"Error loading run details: {e}")
+                st.info(f"Run ID: {st.session_state.selected_run_id}")
         else:
             st.info("Select a run from the table to view details.")
     
-    # Refresh button
-    if st.button("🔄 Refresh Data"):
-        st.rerun()
-    
     # Footer
     st.divider()
-    st.caption("Research Console v1.0 • Phase 10 • Read-only UI with Decision Input")
+    st.caption("Research Console v1.0 • Phase 10.1 • Read-only UI with Decision Input")

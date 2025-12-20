@@ -16,6 +16,7 @@ from FishBroWFS_V2.gui.viewer.pages.overview import render_page as render_overvi
 from FishBroWFS_V2.gui.viewer.pages.winners import render_page as render_winners_page
 from FishBroWFS_V2.gui.viewer.pages.governance import render_page as render_governance_page
 from FishBroWFS_V2.gui.viewer.pages.artifacts import render_page as render_artifacts_page
+from FishBroWFS_V2.gui.research.page import render as render_research_page
 
 
 def get_run_dir_from_query() -> Path | None:
@@ -46,6 +47,23 @@ def main() -> None:
         layout="wide",
     )
     
+    # Mode selection: Viewer or Research Console
+    mode = st.sidebar.radio(
+        "Mode",
+        ["Viewer", "Research Console"],
+        index=0,
+    )
+    
+    if mode == "Research Console":
+        # Research Console mode - doesn't need query parameters
+        outputs_root_str = os.getenv("FISHBRO_OUTPUTS_ROOT", "outputs")
+        outputs_root = Path(outputs_root_str)
+
+        # Show Research Console
+        render_research_page(outputs_root)
+        return
+
+    # Viewer mode - requires query parameters
     # Get run_dir from query params
     run_dir = get_run_dir_from_query()
     
@@ -60,8 +78,8 @@ def main() -> None:
         st.info(f"Outputs root: {run_dir.parent.parent.parent}")
         st.info(f"Expected path: {run_dir}")
         return
-    
-    # Page selection
+
+    # Page selection for Viewer mode
     page = st.sidebar.selectbox(
         "Viewer Pages",
         [
@@ -88,3 +106,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

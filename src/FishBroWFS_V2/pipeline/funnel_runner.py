@@ -233,6 +233,23 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         if "exchange_tz" in stage_cfg:
             manifest_dict["exchange_tz"] = stage_cfg["exchange_tz"]
         
+        # Phase 7: Add strategy metadata if available
+        if "strategy_id" in stage_cfg:
+            import json
+            import hashlib
+            
+            manifest_dict["strategy_id"] = stage_cfg["strategy_id"]
+            
+            if "strategy_version" in stage_cfg:
+                manifest_dict["strategy_version"] = stage_cfg["strategy_version"]
+            
+            if "param_schema" in stage_cfg:
+                param_schema = stage_cfg["param_schema"]
+                # Compute hash of param_schema
+                schema_json = json.dumps(param_schema, sort_keys=True)
+                schema_hash = hashlib.sha1(schema_json.encode("utf-8")).hexdigest()
+                manifest_dict["param_schema_hash"] = schema_hash
+        
         # Write artifacts (unified artifact system)
         # Use sanitized snapshot (not runtime cfg with ndarrays)
         write_run_artifacts(

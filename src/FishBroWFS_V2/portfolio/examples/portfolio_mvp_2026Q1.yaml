@@ -1,0 +1,26 @@
+portfolio_id: "mvp"
+version: "2026Q1"
+data_tz: "Asia/Taipei"
+legs:
+  - leg_id: "mnq_60_sma"
+    symbol: "CME.MNQ"
+    timeframe_min: 60
+    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    strategy_id: "sma_cross"
+    strategy_version: "v1"
+    params:
+      fast_period: 10.0
+      slow_period: 40.0
+    enabled: true
+    tags: ["mvp", "cme"]
+
+  - leg_id: "mxf_60_mrz"
+    symbol: "TWF.MXF"
+    timeframe_min: 60
+    session_profile: "src/FishBroWFS_V2/data/profiles/TWF_MXF_v2.yaml"
+    strategy_id: "mean_revert_zscore"
+    strategy_version: "v1"
+    params:
+      zscore_threshold: -2.0
+    enabled: true
+    tags: ["mvp", "twf"]

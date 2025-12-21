@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import pytest
 
 
 def test_no_streamlit_imports_outside_allowlist() -> None:
@@ -46,6 +47,10 @@ def test_no_streamlit_imports_outside_allowlist() -> None:
     for py_file in python_files:
         # Skip test files (they're allowed to import streamlit for testing)
         if "test" in str(py_file) or "tests" in str(py_file):
+            continue
+        
+        # Skip virtual environment directories
+        if any(part in {'.venv', 'venv', 'env', '.virtualenv'} for part in py_file.parts):
             continue
         
         # Skip if file is in allowlist
@@ -100,6 +105,10 @@ def test_no_main_function_outside_entrypoint() -> None:
         if "test" in str(py_file) or "tests" in str(py_file):
             continue
         
+        # Skip virtual environment directories
+        if any(part in {'.venv', 'venv', 'env', '.virtualenv'} for part in py_file.parts):
+            continue
+        
         # Skip the official entrypoint
         if py_file == entrypoint:
             continue
@@ -144,6 +153,10 @@ def test_no_name_main_guard_outside_entrypoint() -> None:
     for py_file in python_files:
         # Skip test files
         if "test" in str(py_file) or "tests" in str(py_file):
+            continue
+        
+        # Skip virtual environment directories
+        if any(part in {'.venv', 'venv', 'env', '.virtualenv'} for part in py_file.parts):
             continue
         
         # Skip the official entrypoint

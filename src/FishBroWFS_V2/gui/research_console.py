@@ -50,6 +50,15 @@ def _norm_optional_choice(x: Any, *, all_tokens: Iterable[str] = ("ALL",)) -> Op
     return s
 
 
+def _row_str(row: dict, key: str) -> str:
+    """Return safe string for row[key]. None -> ''."""
+    v = row.get(key)
+    if v is None:
+        return ""
+    # Keep as string, do not strip here (strip is for normalization functions)
+    return str(v)
+
+
 def load_research_artifacts(outputs_root: Path) -> dict:
     """
     Load:
@@ -142,30 +151,38 @@ def apply_filters(
         filtered = [
             row for row in filtered
             if (
-                (row.get("run_id", "").lower().find(text_lower) >= 0) or
-                (row.get("symbol", "").lower().find(text_lower) >= 0) or
-                (row.get("strategy_id", "").lower().find(text_lower) >= 0) or
-                (row.get("note", "").lower().find(text_lower) >= 0)
+                (_row_str(row, "run_id").lower().find(text_lower) >= 0) or
+                (_row_str(row, "symbol").lower().find(text_lower) >= 0) or
+                (_row_str(row, "strategy_id").lower().find(text_lower) >= 0) or
+                (_row_str(row, "note").lower().find(text_lower) >= 0)
             )
         ]
     
     # B) symbol / strategy_id filter
     if symbol_q is not None:
-        filtered = [row for row in filtered if row.get("symbol", "").lower() == symbol_q.lower()]
+        sym_q_l = symbol_q.lower()
+        filtered = [row for row in filtered if _row_str(row, "symbol").lower() == sym_q_l]
     
     if strategy_q is not None:
-        filtered = [row for row in filtered if row.get("strategy_id", "").lower() == strategy_q.lower()]
+        st_q_l = strategy_q.lower()
+        filtered = [row for row in filtered if _row_str(row, "strategy_id").lower() == st_q_l]
     
     # C) decision filter
     if decision_q is not None:
-        if decision_q.lower() == "undecided":
-            # Match rows where decision is None, empty, or whitespace-only
+        dec_q = decision_q.strip()
+        dec_q_l = dec_q.lower()
+        
+        if dec_q_l == "undecided":
+            # Match None / '' / whitespace-only
             filtered = [
                 row for row in filtered 
                 if _norm_optional_text(row.get("decision")) is None
             ]
         else:
-            filtered = [row for row in filtered if row.get("decision", "").lower() == decision_q.lower()]
+            filtered = [
+                row for row in filtered
+                if _row_str(row, "decision").lower() == dec_q_l
+            ]
     
     return filtered
 

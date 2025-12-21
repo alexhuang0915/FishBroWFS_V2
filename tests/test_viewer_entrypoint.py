@@ -57,6 +57,9 @@ def test_no_duplicate_viewer_entrypoints() -> None:
     
     # Check for other streamlit apps that might be Viewer entrypoints
     for path in repo_root.rglob("*.py"):
+        # Skip virtual environment directories
+        if any(part in {'.venv', 'venv', 'env', '.virtualenv'} for part in path.parts):
+            continue
         if "app" in path.name.lower() and "streamlit" in path.read_text().lower():
             # Skip test files
             if "test" in str(path):

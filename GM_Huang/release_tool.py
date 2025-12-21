@@ -23,6 +23,10 @@ def should_exclude(path: Path, repo_root: Path) -> bool:
     - __pycache__ directories
     - .pyc, .pyo files
     - Common build/test artifacts
+    - Virtual environments (.venv, venv, env, .env)
+    - Hidden directories starting with '.' (except specific files)
+    - Runtime/output directories (outputs/, tmp_data/)
+    - IDE/editor directories (.vscode, .continue, .idea)
     """
     path_str = str(path)
     path_parts = path.parts
@@ -43,15 +47,39 @@ def should_exclude(path: Path, repo_root: Path) -> bool:
     exclude_names = {
         '.pytest_cache', '.mypy_cache', '.ruff_cache',
         '.coverage', 'htmlcov', '.tox', 'dist', 'build',
-        '*.egg-info', '.eggs'
+        '*.egg-info', '.eggs', 'node_modules', '.npm',
+        '.cache', '.mypy_cache', '.ruff_cache'
     }
     
     for name in exclude_names:
         if name in path_parts or path.name.startswith(name.replace('*', '')):
             return True
     
-    # Exclude GM_Huang itself from the release (optional, but makes sense)
-    # Actually, let's include it since it's part of the project structure
+    # Exclude virtual environment directories
+    virtual_env_names = {'.venv', 'venv', 'env', '.env'}
+    for venv_name in virtual_env_names:
+        if venv_name in path_parts:
+            return True
+    
+    # Exclude hidden directories (starting with .) except at root level for specific files
+    # Allow files like .gitignore, .dockerignore, etc. but not directories
+    if path.is_dir() and path.name.startswith('.') and path != repo_root:
+        # Check if it's a directory we should keep (unlikely)
+        keep_hidden_dirs = set()  # No hidden directories to keep
+        if path.name not in keep_hidden_dirs:
+            return True
+    
+    # Exclude runtime/output directories
+    runtime_dirs = {'outputs', 'tmp_data', 'temp', 'tmp', 'logs', 'data'}
+    for runtime_dir in runtime_dirs:
+        if runtime_dir in path_parts:
+            return True
+    
+    # Exclude IDE/editor directories
+    ide_dirs = {'.vscode', '.continue', '.idea', '.cursor', '.history'}
+    for ide_dir in ide_dirs:
+        if ide_dir in path_parts:
+            return True
     
     return False
 

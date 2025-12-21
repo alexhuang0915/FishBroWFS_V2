@@ -1,23 +1,21 @@
-"""Portfolio OS.
+"""Portfolio package exports.
 
-Phase 8: Versioned, auditable, replayable portfolio definitions.
+Single source of truth: PortfolioSpec in spec.py
+Phase 11 research bridge uses PortfolioSpec (no spec split).
 """
 
-from FishBroWFS_V2.portfolio.artifacts import (
-    compute_portfolio_hash,
-    write_portfolio_artifacts,
-)
-from FishBroWFS_V2.portfolio.compiler import compile_portfolio
-from FishBroWFS_V2.portfolio.loader import load_portfolio_spec
+from __future__ import annotations
+
+from FishBroWFS_V2.portfolio.decisions_reader import parse_decisions_log_lines, read_decisions_log
+from FishBroWFS_V2.portfolio.research_bridge import build_portfolio_from_research
 from FishBroWFS_V2.portfolio.spec import PortfolioLeg, PortfolioSpec
-from FishBroWFS_V2.portfolio.validate import validate_portfolio_spec
+from FishBroWFS_V2.portfolio.writer import write_portfolio_artifacts
 
 __all__ = [
-    "PortfolioSpec",
     "PortfolioLeg",
-    "load_portfolio_spec",
-    "validate_portfolio_spec",
-    "compile_portfolio",
-    "compute_portfolio_hash",
+    "PortfolioSpec",
+    "parse_decisions_log_lines",
+    "read_decisions_log",
+    "build_portfolio_from_research",
     "write_portfolio_artifacts",
 ]

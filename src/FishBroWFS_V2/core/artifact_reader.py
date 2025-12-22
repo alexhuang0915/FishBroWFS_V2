@@ -1,3 +1,4 @@
+
 """Artifact reader for governance evaluation and Viewer.
 
 Reads artifacts (manifest/metrics/winners/config_snapshot) from run directories.
@@ -317,3 +318,5 @@ def try_read_artifact(file_path: Path | str) -> SafeReadResult:
     )
     
     return SafeReadResult(result=ReadResult(raw=raw, meta=meta))
+
+

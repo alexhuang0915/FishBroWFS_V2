@@ -1,3 +1,4 @@
+
 """Parameter Grid Expansion for Phase 13.
 
 Pure functions for turning ParamSpec + user grid config into value lists.
@@ -325,3 +326,5 @@ def validate_grid_for_param(
     
     # Compute values to ensure no errors
     values_for_param(grid)
+
+

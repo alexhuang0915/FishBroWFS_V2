@@ -1,3 +1,4 @@
+
 """Cost model for performance estimation.
 
 Provides predictable cost estimation: given bars and params, estimate execution time.
@@ -43,3 +44,5 @@ def estimate_seconds(
     estimated_seconds = (params * cost_ms_per_param) / 1000.0
     
     return estimated_seconds
+
+

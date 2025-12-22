@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -35,5 +36,7 @@ def test_stage0_rejects_invalid_lengths() -> None:
     assert scores[0] == -np.inf
     assert scores[1] == -np.inf
     assert scores[2] == -np.inf
+
+
 
 

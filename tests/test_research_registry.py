@@ -1,3 +1,4 @@
+
 """Tests for research registry module."""
 
 from __future__ import annotations
@@ -176,3 +177,5 @@ def test_build_research_index_preserves_decisions(tmp_path: Path) -> None:
         index_data = json.load(f)
     
     assert index_data["entries"][0]["decision"] == "KEEP"
+
+

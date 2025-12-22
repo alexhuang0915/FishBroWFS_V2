@@ -1,3 +1,4 @@
+
 """Winners Viewer page.
 
 Displays winners list and details.
@@ -35,3 +36,5 @@ def render_page(bundle: Bundle) -> None:
     
     except Exception as e:
         st.error(f"Error rendering winners page: {e}")
+
+

@@ -1,3 +1,4 @@
+
 """Portfolio specification data model.
 
 Phase 8: Portfolio OS - versioned, auditable, replayable portfolio definitions.
@@ -85,3 +86,5 @@ class PortfolioSpec:
         if len(leg_ids) != len(set(leg_ids)):
             duplicates = [lid for lid in leg_ids if leg_ids.count(lid) > 1]
             raise ValueError(f"Duplicate leg_id found: {set(duplicates)}")
+
+

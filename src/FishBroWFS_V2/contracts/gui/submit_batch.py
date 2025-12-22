@@ -1,3 +1,4 @@
+
 """
 Submit batch payload contract for GUI.
 
@@ -44,3 +45,5 @@ class SubmitBatchPayload(BaseModel):
     def ensure_path(cls, v: Path) -> Path:
         # Ensure it's a Path object (already is)
         return v
+
+

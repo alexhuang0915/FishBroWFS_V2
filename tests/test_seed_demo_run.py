@@ -1,3 +1,4 @@
+
 """Tests for seed_demo_run.
 
 Tests that seed_demo_run creates demo job and artifacts correctly.
@@ -148,3 +149,5 @@ def test_kpi_values_aligned(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
     assert kpi["max_drawdown"] == -0.18
     assert kpi["num_trades"] == 42
     assert kpi["final_score"] == 1.23
+
+

@@ -1,3 +1,4 @@
+
 """Viewer page scaffold - unified "never crash" page skeleton.
 
 Provides consistent page structure that never raises exceptions.
@@ -199,3 +200,5 @@ def _load_bundle(run_dir: Path) -> Bundle:
         winners_v2_state=winners_state,
         governance_state=governance_state,
     )
+
+

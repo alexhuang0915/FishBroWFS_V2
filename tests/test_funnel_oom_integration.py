@@ -1,3 +1,4 @@
+
 """Integration tests for OOM gate in funnel pipeline.
 
 Tests verify:
@@ -269,3 +270,5 @@ def test_block_action_raises_error():
         # Should raise RuntimeError
         with pytest.raises(RuntimeError, match="OOM Gate BLOCKED"):
             run_funnel(cfg, outputs_root)
+
+

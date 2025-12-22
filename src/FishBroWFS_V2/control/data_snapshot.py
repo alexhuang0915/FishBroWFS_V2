@@ -1,3 +1,4 @@
+
 """
 Phase 16.5: Data Snapshot Core (controlled mutation, deterministic).
 
@@ -234,3 +235,5 @@ def create_snapshot(
         stats=stats,
     )
     return meta
+
+

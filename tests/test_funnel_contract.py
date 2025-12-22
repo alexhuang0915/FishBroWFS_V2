@@ -1,3 +1,4 @@
+
 """Contract tests for funnel pipeline.
 
 Tests verify:
@@ -335,3 +336,5 @@ def test_config_snapshot_is_json_serializable_and_small():
             # Optional: verify metadata keys exist if needed
             # (e.g., "open__meta", "params_matrix_meta")
             # This is optional - metadata may or may not be included
+
+

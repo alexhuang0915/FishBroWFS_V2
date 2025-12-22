@@ -1,3 +1,4 @@
+
 """
 Contract Tests for Sparse Builder (P2-3)
 
@@ -259,3 +260,5 @@ def test_dense_vs_sparse_parity() -> None:
         assert np.array_equal(result_dense["price"], result_sparse["price"]), (
             "price should be identical"
         )
+
+

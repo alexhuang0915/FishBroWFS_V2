@@ -1,3 +1,4 @@
+
 """JobSpec Schema for Research Job Wizard.
 
 Phase 12: JobSpec is the ONLY output from GUI.
@@ -97,3 +98,5 @@ EXAMPLE_JOBSPEC = JobSpec(
     params={"window": 20, "threshold": 0.5},
     wfs=WFSSpec()
 )
+
+

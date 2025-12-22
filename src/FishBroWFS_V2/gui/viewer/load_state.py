@@ -1,3 +1,4 @@
+
 """Viewer load state model and contract.
 
 Defines unified artifact load status for Viewer pages.
@@ -193,3 +194,5 @@ def compute_load_state(
             dirty_reasons=[],
             last_modified_ts=None,
         )
+
+

@@ -1,3 +1,4 @@
+
 """Test portfolio compiler.
 
 Phase 8: Test compilation produces correct job configs.
@@ -114,3 +115,5 @@ legs:
     assert job["strategy_version"] == "v1"
     assert job["params"] == {"fast_period": 10.0, "slow_period": 20.0}
     assert job["tags"] == ["test"]
+
+

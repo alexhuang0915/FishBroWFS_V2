@@ -1,3 +1,4 @@
+
 """Test K-bar aggregation: anchor alignment to Session.start."""
 
 from __future__ import annotations
@@ -81,3 +82,5 @@ def test_anchor_to_session_start_30m(mnq_profile: Path) -> None:
     if len(result) > 1:
         second_bar_time = result["ts_str"].iloc[1].split(" ")[1]
         assert second_bar_time == "09:15:00", f"Second bar should be at 09:15:00, got {second_bar_time}"
+
+

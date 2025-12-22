@@ -1,3 +1,4 @@
+
 """Stage0 runner - proxy ranking without PnL metrics.
 
 Stage0 is a fast proxy filter that ranks parameters without running full backtests.
@@ -87,3 +88,5 @@ def run_stage0(
         )
     
     return results
+
+

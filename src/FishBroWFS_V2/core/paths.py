@@ -1,3 +1,4 @@
+
 """Path management for artifact output.
 
 Centralized contract for output directory structure.
@@ -40,3 +41,5 @@ def ensure_run_dir(outputs_root: Path, season: str, run_id: str) -> Path:
     run_dir = get_run_dir(outputs_root, season, run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
+
+

@@ -1,3 +1,4 @@
+
 """Smoke tests for API endpoints."""
 
 from __future__ import annotations
@@ -289,4 +290,6 @@ def test_report_link_endpoint_no_link(test_client: TestClient) -> None:
     data = resp.json()
     # build_report_link always returns a string (never None)
     assert data["report_link"] == ""
+
+
 

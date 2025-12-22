@@ -1,3 +1,4 @@
+
 """
 Stage P2-3: Contract Tests for Param-subsample Trigger Rate
 
@@ -342,3 +343,5 @@ def test_metrics_shape_preserved() -> None:
             os.environ.pop("FISHBRO_PERF_PARAM_SUBSAMPLE_SEED", None)
         else:
             os.environ["FISHBRO_PERF_PARAM_SUBSAMPLE_SEED"] = old_param_subsample_seed
+
+

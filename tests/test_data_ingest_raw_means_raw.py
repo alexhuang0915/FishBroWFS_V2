@@ -1,3 +1,4 @@
+
 """Test: Raw means RAW - regression prevention.
 
 RED TEAM #1: Lock down three things:
@@ -155,3 +156,5 @@ def test_no_dropna_called(temp_dir: Path) -> None:
     
     # All should have volume=0
     assert all(result.df["volume"] == 0)
+
+

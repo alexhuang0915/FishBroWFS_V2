@@ -1,3 +1,4 @@
+
 """Portfolio package exports.
 
 Single source of truth: PortfolioSpec in spec.py
@@ -19,3 +20,5 @@ __all__ = [
     "build_portfolio_from_research",
     "write_portfolio_artifacts",
 ]
+
+

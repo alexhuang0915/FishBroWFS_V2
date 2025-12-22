@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -80,3 +81,5 @@ def test_perf_evidence_chain_exists() -> None:
         f"fills_total must be an integer, got {type(perf['fills_total'])}"
     )
     # fills_total can be 0 (no trades), but must not be None
+
+

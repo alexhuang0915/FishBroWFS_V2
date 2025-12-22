@@ -1,3 +1,4 @@
+
 """Tests for research extract module."""
 
 from __future__ import annotations
@@ -203,3 +204,5 @@ def test_extract_canonical_metrics_no_trades(tmp_path: Path) -> None:
     assert metrics.max_drawdown == 0.0
     assert metrics.score_net_mdd == 0.0
     assert metrics.score_final == 0.0
+
+

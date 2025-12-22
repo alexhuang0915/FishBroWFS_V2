@@ -1,3 +1,4 @@
+
 import json
 import tempfile
 from pathlib import Path
@@ -119,3 +120,5 @@ def test_batch_artifacts_listing(client):
             assert [j["job_id"] for j in data["jobs"]] == ["jobA", "jobB"]
             jobA = data["jobs"][0]
             assert [a["attempt"] for a in jobA["attempts"]] == [1, 2]
+
+

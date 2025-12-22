@@ -1,3 +1,4 @@
+
 """Contract tests for artifacts winners v2 writing.
 
 Tests verify that write_run_artifacts automatically upgrades legacy winners to v2.
@@ -208,3 +209,5 @@ def test_artifacts_preserves_legacy_metrics_fields() -> None:
         # param_id should be in metrics (for backward compatibility)
         assert "param_id" in metrics
         assert metrics["param_id"] == 0
+
+

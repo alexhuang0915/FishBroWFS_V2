@@ -1,3 +1,4 @@
+
 """
 Phase Portfolio Bridge: CandidateSpec for Research → Market boundary.
 
@@ -143,3 +144,5 @@ def create_candidate_from_research(
         tags=tags or [],
         metadata=metadata or {},
     )
+
+

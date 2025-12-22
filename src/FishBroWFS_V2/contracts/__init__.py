@@ -1,3 +1,4 @@
+
 """
 Contracts for GUI payload validation and boundary enforcement.
 
@@ -6,3 +7,5 @@ ensuring GUI cannot inject execution semantics or violate governance rules.
 """
 
 from __future__ import annotations
+
+

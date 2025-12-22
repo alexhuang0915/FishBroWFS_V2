@@ -1,3 +1,4 @@
+
 """Funnel schema definitions.
 
 Defines stage names, specifications, and result indexing for funnel pipeline.
@@ -70,3 +71,5 @@ class FunnelResultIndex:
     """
     plan: FunnelPlan
     stages: List[FunnelStageIndex]
+
+

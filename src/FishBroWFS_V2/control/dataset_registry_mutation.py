@@ -1,3 +1,4 @@
+
 """
 Dataset registry mutation (controlled mutation) for snapshot registration.
 
@@ -136,3 +137,5 @@ def register_snapshot_as_dataset(
     temp_path.replace(registry_path)
 
     return entry
+
+

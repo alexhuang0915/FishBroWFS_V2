@@ -1,3 +1,4 @@
+
 """Artifacts Viewer page.
 
 Displays raw artifacts JSON.
@@ -48,3 +49,5 @@ def render_page(bundle: Bundle) -> None:
     
     except Exception as e:
         st.error(f"Error rendering artifacts page: {e}")
+
+

@@ -1,3 +1,4 @@
+
 """Artifact Status Bar component for Viewer pages.
 
 Renders consistent status bar across all Viewer pages.
@@ -103,3 +104,5 @@ def _render_detailed_info(states: list[ArtifactLoadState]) -> None:
                 else:
                     st.text("  • No specific reason provided")
                 st.markdown("---")
+
+

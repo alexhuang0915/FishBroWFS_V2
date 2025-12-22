@@ -1,3 +1,4 @@
+
 """Unified simulate entry point for Phase 4.
 
 This module provides the single entry point simulate_run() which routes to
@@ -43,3 +44,5 @@ def simulate_run(
     if use_reference:
         return simulate_reference_matcher(bars, intents)
     return simulate_cursor_kernel(bars, intents)
+
+

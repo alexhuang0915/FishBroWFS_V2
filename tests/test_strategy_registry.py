@@ -1,3 +1,4 @@
+
 """Test strategy registry.
 
 Phase 7: Test registry list/get/register behavior is deterministic.
@@ -158,3 +159,5 @@ def test_load_builtin_strategies() -> None:
     
     # Cleanup
     clear()
+
+

@@ -1,3 +1,4 @@
+
 """Decisions log parser for portfolio generation.
 
 Parses append-only decisions.log lines. Supports JSONL + pipe format.
@@ -128,3 +129,5 @@ def read_decisions_log(decisions_log_path: Path) -> list[dict]:
     except Exception:
         # If any error occurs (permission, encoding, etc.), return empty list
         return []
+
+

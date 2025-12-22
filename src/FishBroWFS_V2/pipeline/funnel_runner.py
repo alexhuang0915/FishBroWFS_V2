@@ -1,3 +1,4 @@
+
 """Funnel runner - orchestrates stage execution and artifact writing.
 
 Runs funnel pipeline stages sequentially, writing artifacts for each stage.
@@ -273,3 +274,5 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         prev_winners = stage_winners.get("topk", [])
     
     return FunnelResultIndex(plan=plan, stages=stage_indices)
+
+

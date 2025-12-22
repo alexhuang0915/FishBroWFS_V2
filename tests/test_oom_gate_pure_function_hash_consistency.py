@@ -1,3 +1,4 @@
+
 """Tests for OOM gate pure function hash consistency.
 
 Tests that decide_oom_action never mutates input cfg and returns new_cfg SSOT.
@@ -79,3 +80,5 @@ def test_oom_gate_pure_function_hash_consistency(monkeypatch) -> None:
     
     # Verify original_subsample preserved
     assert decision["original_subsample"] == 1.0, "original_subsample must be preserved"
+
+

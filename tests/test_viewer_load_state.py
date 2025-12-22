@@ -1,3 +1,4 @@
+
 """Tests for Viewer load state computation.
 
 Tests compute_load_state() mapping contract.
@@ -218,3 +219,5 @@ def test_dirty_reasons_preserved() -> None:
         assert "config_hash" in state.dirty_reasons[0]
         # Ensure dirty_reasons is not swallowed
         assert state.dirty_reasons[0] == "winners_v2.config_hash=abc123 但 manifest.config_hash=def456"
+
+

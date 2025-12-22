@@ -1,3 +1,4 @@
+
 """Contract tests for governance accepting winners v2.
 
 Tests verify that governance evaluator can read and process v2 winners.json.
@@ -230,3 +231,5 @@ def test_governance_handles_mixed_v2_legacy() -> None:
         assert len(report.items) == 1
         item = report.items[0]
         assert item.candidate_id == "donchian_atr:0"
+
+

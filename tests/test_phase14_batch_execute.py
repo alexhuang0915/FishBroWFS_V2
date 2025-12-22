@@ -1,3 +1,4 @@
+
 """Phase 14: Batch execution tests."""
 
 import tempfile
@@ -127,3 +128,5 @@ def test_retry_failed_mock(mock_executor_cls):
     mock_executor_cls.assert_called_once_with(batch_id, [])
     mock_executor.retry_failed.assert_called_once_with(artifacts_root)
     assert result == mock_executor
+
+

@@ -1,3 +1,4 @@
+
 """Test that engine fill buffer handles extreme intents without crashing."""
 
 from __future__ import annotations
@@ -63,3 +64,5 @@ def test_engine_fill_buffer_capacity_extreme_intents() -> None:
             f"Expected buffer full error, got: {error_msg}"
         )
         # This is acceptable - buffer protection worked correctly
+
+

@@ -1,3 +1,4 @@
+
 """Contract tests for runner adapter input coercion.
 
 Tests verify that input arrays are coerced to np.ndarray float64,
@@ -160,3 +161,5 @@ def test_coercion_handles_mixed_inputs() -> None:
     # Verify result structure
     assert "metrics" in result
     assert "winners" in result
+
+

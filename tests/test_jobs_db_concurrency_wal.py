@@ -1,3 +1,4 @@
+
 """Tests for jobs_db concurrency with WAL mode.
 
 Tests concurrent writes from multiple processes to ensure no database locked errors.
@@ -53,3 +54,5 @@ def test_jobs_db_concurrent_writes(tmp_path: Path, n: int) -> None:
 
     for pr in procs:
         assert pr.exitcode == 0, f"Process {pr.pid} exited with code {pr.exitcode}"
+
+

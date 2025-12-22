@@ -1,3 +1,4 @@
+
 import json
 import tempfile
 from pathlib import Path
@@ -146,3 +147,5 @@ def test_compare_endpoints_404_when_season_index_missing(client):
             assert r.status_code == 404
             r = client.get("/seasons/NOPE/compare/leaderboard")
             assert r.status_code == 404
+
+

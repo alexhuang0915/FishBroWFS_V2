@@ -1,3 +1,4 @@
+
 """Governance evaluator - rule engine for candidate decisions.
 
 Reads artifacts from stage run directories and applies governance rules
@@ -628,3 +629,5 @@ def evaluate_governance(
     }
     
     return GovernanceReport(items=items, metadata=metadata)
+
+

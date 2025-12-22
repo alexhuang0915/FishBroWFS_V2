@@ -1,3 +1,4 @@
+
 """Research to Portfolio Bridge.
 
 Phase 11: Bridge research decisions to executable portfolio specifications.
@@ -302,3 +303,5 @@ def _calculate_file_hash(file_path: Path) -> str:
         for chunk in iter(lambda: f.read(4096), b''):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+

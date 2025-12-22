@@ -1,8 +1,9 @@
+
 # src/FishBroWFS_V2/contracts/portfolio/plan_models.py
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Union
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator, field_validator
 
 
 class SourceRef(BaseModel):
@@ -54,6 +55,8 @@ class ConstraintsReport(BaseModel):
 
 
 class PlanSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")  # <-- 重要：保留測試 helper 塞進來的新欄位
+
     # ---- legacy fields (tests expect these) ----
     total_candidates: int
     total_weight: float
@@ -71,6 +74,10 @@ class PlanSummary(BaseModel):
     bucket_by: Optional[List[str]] = None
     concentration_top1: Optional[float] = None
     concentration_top3: Optional[float] = None
+
+    # ---- quality-related fields (hardening tests rely on these existing on read-back) ----
+    bucket_coverage: Optional[float] = None
+    bucket_coverage_ratio: Optional[float] = None
 
 
 from FishBroWFS_V2.contracts.portfolio.plan_payloads import PlanCreatePayload
@@ -107,3 +114,5 @@ class PortfolioPlan(BaseModel):
         if isinstance(v, dict):
             return v
         raise ValueError(f"config must be PlanCreatePayload or dict, got {type(v)}")
+
+

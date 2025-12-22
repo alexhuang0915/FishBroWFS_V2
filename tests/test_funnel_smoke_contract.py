@@ -1,3 +1,4 @@
+
 """Funnel smoke contract tests - Phase 4 Stage D.
 
 Basic smoke tests to ensure the complete funnel pipeline works end-to-end.
@@ -165,3 +166,5 @@ def test_funnel_smoke_pipeline_order():
     assert len(result.stage2_results) == 3
     stage2_param_ids = [r.param_id for r in result.stage2_results]
     assert set(stage2_param_ids) == set(result.topk_param_ids)
+
+

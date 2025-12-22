@@ -1,3 +1,4 @@
+
 """Portfolio runner - compile and write portfolio artifacts.
 
 Phase 8: Load, validate, compile, and write portfolio artifacts.
@@ -64,3 +65,5 @@ def run_portfolio(spec_path: Path, outputs_root: Path) -> Dict[str, Any]:
         "artifacts_dir": str(artifacts_dir),
         "jobs_count": len(jobs),
     }
+
+

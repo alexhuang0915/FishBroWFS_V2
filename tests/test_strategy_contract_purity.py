@@ -1,3 +1,4 @@
+
 """Test strategy contract purity.
 
 Phase 7: Test that same input produces same output (deterministic).
@@ -128,3 +129,5 @@ def test_mean_revert_zscore_purity() -> None:
     
     # Results should be identical
     assert result1 == result2
+
+

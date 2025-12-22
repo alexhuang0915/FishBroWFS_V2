@@ -1,3 +1,4 @@
+
 """Strategy Parameter Schema for GUI introspection.
 
 Phase 12: Strategy parameter schema definition for automatic UI generation.
@@ -59,3 +60,5 @@ class ParamSpec(BaseModel):
         ...,
         description="Human-readable description/help text"
     )
+
+

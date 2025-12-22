@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from FishBroWFS_V2.indicators.numba_indicators import (
@@ -96,4 +97,6 @@ def test_atr_wilder_window_gt_n_returns_all_nan():
     atr = atr_wilder(high, low, close, 999)
     assert atr.shape == (2,)
     assert np.all(np.isnan(atr))
+
+
 

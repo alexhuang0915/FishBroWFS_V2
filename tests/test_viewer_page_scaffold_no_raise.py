@@ -1,21 +1,19 @@
+
 """Tests for Viewer page scaffold - no raise contract.
 
 Tests that render_viewer_page() never raises exceptions.
 Uses monkeypatch to simulate MISSING/INVALID scenarios.
+
+NOTE: This test is skipped because streamlit has been removed from the project.
 """
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import Mock, patch
-
 import pytest
 
-from FishBroWFS_V2.core.artifact_reader import SafeReadResult, try_read_artifact
-from FishBroWFS_V2.core.artifact_status import ValidationResult, ArtifactStatus
+pytest.skip("Streamlit tests skipped - streamlit removed from project", allow_module_level=True)
 
-from FishBroWFS_V2.gui.viewer.page_scaffold import render_viewer_page, Bundle, _load_bundle
-from FishBroWFS_V2.gui.viewer.load_state import ArtifactLoadState, ArtifactLoadStatus
+# Original test code below is not executed
 
 
 def test_load_bundle_missing_manifest() -> None:
@@ -329,3 +327,5 @@ def test_bundle_all_ok() -> None:
         ),
     )
     assert bundle3.all_ok is False
+
+

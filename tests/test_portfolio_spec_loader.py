@@ -1,3 +1,4 @@
+
 """Test portfolio spec loader.
 
 Phase 8: Test YAML/JSON loader can load and type is correct.
@@ -128,3 +129,5 @@ legs:
     
     with pytest.raises(ValueError, match="params must be dict"):
         load_portfolio_spec(spec_path)
+
+

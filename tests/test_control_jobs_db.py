@@ -1,3 +1,4 @@
+
 """Tests for jobs database."""
 
 from __future__ import annotations
@@ -188,4 +189,6 @@ def test_mark_killed(temp_db: Path) -> None:
     job = get_job(temp_db, job_id)
     assert job.status == JobStatus.KILLED
     assert job.last_error == "Killed by user"
+
+
 

@@ -1,3 +1,4 @@
+
 """Tests for worker writing full traceback to log.
 
 Tests that worker writes complete traceback.format_exc() to job_logs table
@@ -64,3 +65,5 @@ def test_worker_writes_traceback_to_log(tmp_path: Path) -> None:
     
     # Verify error message is in last_error (truncated)
     assert "Test error" in job.last_error
+
+

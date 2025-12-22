@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from FishBroWFS_V2.data.layout import normalize_bars
@@ -97,4 +98,6 @@ def test_tc10_no_fill_when_not_touched():
     ]
     fills = simulate(bars, intents)
     assert fills == []
+
+
 

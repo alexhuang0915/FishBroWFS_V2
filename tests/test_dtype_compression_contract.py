@@ -1,3 +1,4 @@
+
 """Contract tests for dtype compression (Phase P1).
 
 These tests ensure:
@@ -414,3 +415,5 @@ class TestUint8EnumConsistency:
             _side_from_int(2)
         with pytest.raises(ValueError, match="Invalid side enum value"):
             _side_from_int(100)
+
+

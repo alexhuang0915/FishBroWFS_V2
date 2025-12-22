@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -107,3 +108,5 @@ def test_stage2_params_influence_extremes() -> None:
         f"{debug_msg}\n"
         f"This indicates params are not being used correctly in signal/stop calculation."
     )
+
+

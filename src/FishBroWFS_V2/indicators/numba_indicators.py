@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -150,4 +151,6 @@ else:
         for i in range(window, n):
             out[i] = (out[i - 1] * (window - 1) + tr[i]) / window
         return out
+
+
 

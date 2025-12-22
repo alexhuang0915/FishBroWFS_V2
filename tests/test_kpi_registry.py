@@ -1,3 +1,4 @@
+
 """Tests for KPI Registry.
 
 Tests registry key → EvidenceLink mapping and defensive behavior.
@@ -91,3 +92,5 @@ def test_registry_structure() -> None:
         assert link.artifact in ("manifest", "winners_v2", "governance")
         assert link.json_pointer.startswith("/")
         assert isinstance(link.description, str)
+
+

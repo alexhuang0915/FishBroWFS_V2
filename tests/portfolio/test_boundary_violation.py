@@ -1,3 +1,4 @@
+
 """
 Phase Portfolio Bridge: Boundary violation tests.
 
@@ -324,3 +325,5 @@ def test_boundary_safe_metadata():
                 research_score=1.5,
                 metadata={key: "value"},
             )
+
+

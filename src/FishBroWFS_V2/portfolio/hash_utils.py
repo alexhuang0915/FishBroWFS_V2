@@ -1,3 +1,4 @@
+
 """Hash utilities for deterministic portfolio ID generation."""
 
 import hashlib
@@ -30,3 +31,5 @@ def hash_params(params: dict[str, float]) -> str:
     if not params:
         return "empty"
     return sha1_text(stable_json_dumps(params))
+
+

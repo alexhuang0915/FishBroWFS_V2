@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, run_kernel, _max_drawdown
@@ -72,4 +73,6 @@ def test_costs_are_parameterized_not_hardcoded():
     # Costs increase => pnl decreases by 2*(commission+slip) per trade
     per_trade_delta = 2.0 * (1.25 + 0.75)
     np.testing.assert_allclose(pnl1, pnl0 - per_trade_delta, rtol=0.0, atol=1e-12)
+
+
 

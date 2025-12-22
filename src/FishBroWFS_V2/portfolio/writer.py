@@ -1,3 +1,4 @@
+
 """Portfolio artifacts writer.
 
 Phase 8/11:
@@ -178,3 +179,5 @@ def write_portfolio_artifacts(
     (out_dir / "README.md").write_text(readme, encoding="utf-8")
 
     return out_dir
+
+

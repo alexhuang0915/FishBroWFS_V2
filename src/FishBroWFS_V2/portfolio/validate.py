@@ -1,3 +1,4 @@
+
 """Portfolio specification validator.
 
 Phase 8: Validate portfolio spec against contracts.
@@ -93,3 +94,5 @@ def validate_portfolio_spec(spec: PortfolioSpec) -> None:
                 if param_key not in schema_props and param_key not in strategy_spec.defaults:
                     # Warning: extra param, but allowed (runner will log warning)
                     pass
+
+

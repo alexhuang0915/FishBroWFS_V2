@@ -1,3 +1,4 @@
+
 """
 Phase Portfolio Bridge: Export candidates.json from Research OS.
 
@@ -181,3 +182,5 @@ def load_candidates(candidates_path: Path) -> CandidateExport:
         candidates=candidates,
         deterministic_order=data.get("deterministic_order", "candidate_id asc"),
     )
+
+

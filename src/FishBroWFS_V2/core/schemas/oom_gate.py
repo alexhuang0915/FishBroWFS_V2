@@ -1,3 +1,4 @@
+
 """Pydantic schemas for OOM gate input and output.
 
 Locked schemas for PASS/BLOCK/AUTO_DOWNSAMPLE decisions.
@@ -39,3 +40,5 @@ class OomGateDecision(BaseModel):
         description="Recommended subsample rate (only for AUTO_DOWNSAMPLE)"
     )
     notes: str = Field(default="", description="Human-readable notes about the decision")
+
+

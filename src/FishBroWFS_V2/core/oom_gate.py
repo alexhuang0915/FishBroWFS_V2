@@ -1,3 +1,4 @@
+
 """OOM gate decision maker.
 
 Pure functions for estimating memory usage and deciding PASS/BLOCK/AUTO_DOWNSAMPLE.
@@ -410,3 +411,5 @@ def _build_result(
         "auto_downsample_min": float(auto_downsample_min),
         "work_factor": float(work_factor),
     }
+
+

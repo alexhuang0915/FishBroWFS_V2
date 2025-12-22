@@ -1,3 +1,4 @@
+
 """Status determination for artifact validation.
 
 Defines OK/MISSING/INVALID/DIRTY states with human-readable error messages.
@@ -343,3 +344,5 @@ def validate_governance_status(
         )
     
     return ValidationResult(status=ArtifactStatus.OK, message="governance.json 驗證通過")
+
+

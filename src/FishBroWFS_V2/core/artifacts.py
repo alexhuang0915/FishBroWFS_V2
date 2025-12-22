@@ -1,3 +1,4 @@
+
 """Artifact writer for unified run output.
 
 Provides consistent artifact structure for all runs, with mandatory
@@ -151,3 +152,5 @@ def write_run_artifacts(
     
     # Write logs.txt (empty initially)
     (run_dir / "logs.txt").write_text("", encoding="utf-8")
+
+

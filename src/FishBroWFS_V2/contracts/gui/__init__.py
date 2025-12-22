@@ -1,3 +1,4 @@
+
 """
 GUI payload contracts for Research OS.
 
@@ -18,3 +19,5 @@ __all__ = [
     "ExportSeasonPayload",
     "CompareRequestPayload",
 ]
+
+

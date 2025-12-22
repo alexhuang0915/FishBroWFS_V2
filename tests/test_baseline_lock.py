@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from FishBroWFS_V2.data.layout import normalize_bars
@@ -48,4 +49,6 @@ def test_gate_a_jit_matches_python_reference():
     # Event-level exactness except price tolerance
     np.testing.assert_array_equal(m_py[:, [0, 1, 2, 3, 5, 6]], m_jit[:, [0, 1, 2, 3, 5, 6]])
     np.testing.assert_allclose(m_py[:, 4], m_jit[:, 4], rtol=0.0, atol=1e-9)
+
+
 

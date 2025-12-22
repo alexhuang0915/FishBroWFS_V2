@@ -1,3 +1,4 @@
+
 """Artifact storage, hashing, and manifest generation for Phase 14.
 
 Deterministic canonical JSON, SHA256 hashing, atomic writes, and immutable artifact manifests.
@@ -201,3 +202,5 @@ def write_job_manifest(job_root: Path, manifest: dict) -> dict:
 compute_sha256 = sha256_bytes
 write_atomic_json = write_json_atomic
 # build_job_manifest is now the function above, not an alias
+
+

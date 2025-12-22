@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import os
@@ -215,5 +216,7 @@ def test_ttl_semantics_three_bars() -> None:
     fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
     assert len(fills_gtc) == 1, "ttl=0 (GTC) should allow fill on bar2"
     assert fills_gtc[0].bar_index == 2, "Fill should occur on bar2"
+
+
 
 

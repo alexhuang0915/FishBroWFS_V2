@@ -1,3 +1,4 @@
+
 """Research Console Core Module.
 
 Phase 10: Read-only UI for research artifacts with decision input.
@@ -310,3 +311,5 @@ def get_unique_values(rows: list[dict], field: str) -> list[str]:
         if value:
             values.add(value)
     return sorted(list(values))
+
+

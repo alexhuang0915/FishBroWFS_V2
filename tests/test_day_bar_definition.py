@@ -1,3 +1,4 @@
+
 """Test DAY bar definition: one complete session per bar."""
 
 from __future__ import annotations
@@ -94,3 +95,5 @@ def test_day_bar_multiple_sessions(mnq_profile: Path) -> None:
     # Verify NIGHT session bar
     night_bar = result[result["ts_str"].str.contains("2013/1/1 21:00:00")].iloc[0]
     assert night_bar["volume"] == 1300 + 1400 + 1500, "NIGHT bar volume should sum NIGHT session bars"
+
+

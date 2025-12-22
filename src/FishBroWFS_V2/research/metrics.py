@@ -1,3 +1,4 @@
+
 """Canonical Metrics Schema for research results.
 
 Phase 9: Standardized format for portfolio run results.
@@ -50,4 +51,6 @@ class CanonicalMetrics:
     def from_dict(cls, data: Dict[str, Any]) -> CanonicalMetrics:
         """Create from dictionary."""
         return cls(**data)
+
+
 

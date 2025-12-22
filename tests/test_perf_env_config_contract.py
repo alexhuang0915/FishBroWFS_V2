@@ -1,3 +1,4 @@
+
 """Test perf harness environment variable configuration contract.
 
 Ensures that FISHBRO_PERF_BARS and FISHBRO_PERF_PARAMS env vars are correctly parsed.
@@ -86,3 +87,5 @@ def test_perf_env_defaults():
         # Restore env vars
         for key, value in env_backup.items():
             os.environ[key] = value
+
+

@@ -1,3 +1,4 @@
+
 """
 Export season payload contract for GUI.
 
@@ -22,3 +23,5 @@ class ExportSeasonPayload(BaseModel):
             season="2026Q1",
             export_name="export_v1",
         )
+
+

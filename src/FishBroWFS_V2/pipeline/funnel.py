@@ -1,3 +1,4 @@
+
 """Funnel orchestrator - Stage0 → Top-K → Stage2 pipeline.
 
 This is the main entry point for the Phase 4 Funnel pipeline.
@@ -107,3 +108,5 @@ def run_funnel(
         stage2_results=stage2_results,
         meta=None,
     )
+
+

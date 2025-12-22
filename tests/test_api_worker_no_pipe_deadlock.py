@@ -1,3 +1,4 @@
+
 """Test that worker spawn does not use PIPE (prevents deadlock)."""
 
 from __future__ import annotations
@@ -58,3 +59,5 @@ def test_worker_spawn_not_using_pipes(monkeypatch, tmp_path):
     
     # Should have close_fds=True
     assert kw.get("close_fds") is True, "close_fds should be True"
+
+

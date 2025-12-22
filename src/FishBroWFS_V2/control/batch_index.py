@@ -1,3 +1,4 @@
+
 """Batch-level index generation for Phase 14.
 
 Deterministic batch index that references job manifests and provides immutable artifact references.
@@ -174,3 +175,5 @@ def validate_batch_index(index: dict) -> bool:
     computed_hash = sha256_bytes(canonical)
     
     return provided_hash == computed_hash
+
+

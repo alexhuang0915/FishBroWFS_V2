@@ -1,3 +1,4 @@
+
 """Tests for JSON Pointer resolver.
 
 Tests normal pointer, list index, missing keys, and never-raise contract.
@@ -216,3 +217,5 @@ def test_intermediate_type_mismatch() -> None:
     found, value = resolve_json_pointer(data, "/items/key")
     assert found is False
     assert value is None
+
+

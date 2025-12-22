@@ -1,3 +1,4 @@
+
 """
 Phase 17‑C: Portfolio Plan Determinism Tests.
 
@@ -255,3 +256,5 @@ def test_selection_constraints_deterministic():
         assert len(plan.universe) == 2
         selected_ids = {c.candidate_id for c in plan.universe}
         assert selected_ids == {"cand0", "cand1"}  # highest scores
+
+

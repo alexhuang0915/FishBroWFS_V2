@@ -1,3 +1,4 @@
+
 """Test portfolio artifacts hash stability.
 
 Phase 8: Test hash is deterministic and changes with spec changes.
@@ -217,3 +218,5 @@ legs:
     import json
     index_content = json.loads((out_dir / "portfolio_index.json").read_text(encoding="utf-8"))
     assert index_content["portfolio_hash"] == computed_hash
+
+

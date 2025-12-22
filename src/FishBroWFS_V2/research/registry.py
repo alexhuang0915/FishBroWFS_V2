@@ -1,3 +1,4 @@
+
 """Result Registry - scan outputs and build research index.
 
 Phase 9: Scan outputs/ directory and create canonical_results.json and research_index.json.
@@ -117,3 +118,5 @@ def build_research_index(outputs_root: Path, out_dir: Path) -> Path:
         json.dump(index_data, f, indent=2, ensure_ascii=False, sort_keys=True)
     
     return index_path
+
+

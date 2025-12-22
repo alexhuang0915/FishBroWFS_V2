@@ -1,3 +1,4 @@
+
 """Portfolio artifacts writer.
 
 Phase 8: Write portfolio artifacts for replayability and audit.
@@ -160,3 +161,5 @@ def write_portfolio_artifacts(
         "index": str(index_path.relative_to(out_dir)),
         "hash": str(hash_path.relative_to(out_dir)),
     }
+
+

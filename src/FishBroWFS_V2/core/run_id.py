@@ -1,3 +1,4 @@
+
 """Run ID generation for audit trail.
 
 Provides deterministic, sortable run IDs with timestamp and short token.
@@ -31,3 +32,5 @@ def make_run_id(prefix: str | None = None) -> str:
         return f"{prefix}-{ts}-{tok}"
     else:
         return f"{ts}-{tok}"
+
+

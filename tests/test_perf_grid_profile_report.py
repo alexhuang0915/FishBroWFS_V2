@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import cProfile
@@ -23,5 +24,7 @@ def test_profile_report_markers_present() -> None:
     assert "__PROFILE_START__" in report
     assert "pstats sort: cumtime" in report
     assert "__PROFILE_END__" in report
+
+
 
 

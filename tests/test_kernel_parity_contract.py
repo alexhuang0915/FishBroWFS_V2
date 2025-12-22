@@ -1,3 +1,4 @@
+
 """Kernel parity contract tests - Phase 4 Stage C.
 
 These tests ensure that Cursor kernel results are bit-level identical to matcher_core.
@@ -408,3 +409,5 @@ def test_parity_entry_skipped_when_position_exists():
     assert cursor_result.fills[0].role == OrderRole.ENTRY
     assert cursor_result.fills[1].bar_index == 1
     assert cursor_result.fills[1].role == OrderRole.EXIT
+
+

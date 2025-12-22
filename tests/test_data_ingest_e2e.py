@@ -1,3 +1,4 @@
+
 """End-to-end test: Ingest → Cache → Rebuild.
 
 Tests the complete data ingest pipeline:
@@ -166,3 +167,5 @@ def test_clean_rebuild_fingerprint_stable(tmp_path: Path, sample_raw_txt: Path) 
         f"Fingerprint computation changed: "
         f"first={fingerprint1.sha1}, second={fingerprint2.sha1}"
     )
+
+

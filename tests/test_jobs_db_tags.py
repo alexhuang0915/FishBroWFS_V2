@@ -1,3 +1,4 @@
+
 """Tests for jobs_db tags functionality.
 
 Tests:
@@ -194,3 +195,5 @@ def test_list_jobs_includes_tags(temp_db: Path) -> None:
     our_job = next((j for j in jobs if j.job_id == job_id), None)
     assert our_job is not None
     assert our_job.tags == ["test", "debug"]
+
+

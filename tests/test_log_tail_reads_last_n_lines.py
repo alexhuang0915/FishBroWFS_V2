@@ -1,3 +1,4 @@
+
 """Test that read_tail reads last n lines efficiently without loading entire file."""
 
 from __future__ import annotations
@@ -52,3 +53,5 @@ def test_read_tail_handles_missing_file(tmp_path: Path) -> None:
 
     out = read_tail(p, n=200)
     assert out == ""
+
+

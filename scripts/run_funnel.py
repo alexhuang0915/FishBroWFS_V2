@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 Funnel pipeline CLI entry point.
@@ -82,3 +83,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+

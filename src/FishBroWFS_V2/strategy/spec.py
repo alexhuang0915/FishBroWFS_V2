@@ -1,3 +1,4 @@
+
 """Strategy specification and function type definitions.
 
 Phase 7: Strategy system core data structures.
@@ -51,3 +52,5 @@ class StrategySpec:
             raise ValueError("defaults must be a dict")
         if not callable(self.fn):
             raise ValueError("fn must be callable")
+
+

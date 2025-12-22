@@ -1,3 +1,4 @@
+
 """Test research bridge builds portfolio correctly.
 
 Phase 11: Test that research bridge correctly builds portfolio from research data.
@@ -382,3 +383,5 @@ def test_pipe_format_decisions():
         assert manifest['counts']['total_decisions'] == 2
         assert manifest['counts']['keep_decisions'] == 2
         assert manifest['counts']['num_legs_final'] == 2
+
+

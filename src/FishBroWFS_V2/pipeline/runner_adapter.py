@@ -1,3 +1,4 @@
+
 """Runner adapter for funnel pipeline.
 
 Provides unified interface to existing runners without exposing engine details.
@@ -282,3 +283,5 @@ def _run_stage2_job(cfg: dict) -> dict:
     }
     
     return {"metrics": metrics, "winners": winners}
+
+

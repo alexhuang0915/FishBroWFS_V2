@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 """
@@ -45,5 +46,7 @@ def test_stage0_file_exists() -> None:
     root = Path(__file__).resolve().parent.parent
     p = root / "src" / "FishBroWFS_V2" / "stage0" / "ma_proxy.py"
     assert p.exists(), "Stage0 module must exist"
+
+
 
 

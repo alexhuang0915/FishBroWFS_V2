@@ -1,3 +1,4 @@
+
 """Contract tests for winners schema v2.
 
 Tests verify:
@@ -200,3 +201,5 @@ def test_winners_v2_empty_topk() -> None:
     assert winners["schema"] == WINNERS_SCHEMA_VERSION
     assert winners["topk"] == []
     assert isinstance(winners["topk"], list)
+
+

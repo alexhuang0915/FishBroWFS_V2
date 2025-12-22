@@ -1,3 +1,4 @@
+
 """Smoke test for jobs_db concurrency (WAL + retry + state machine)."""
 
 from __future__ import annotations
@@ -62,3 +63,5 @@ def test_jobs_db_concurrency_smoke(tmp_path: Path, n: int) -> None:
     # Verify all jobs are DONE
     for job in jobs:
         assert job.status.value == "DONE", f"Job {job.job_id} status is {job.status}, expected DONE"
+
+

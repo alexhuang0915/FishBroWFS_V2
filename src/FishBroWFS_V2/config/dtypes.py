@@ -1,3 +1,4 @@
+
 """Dtype configuration for memory optimization.
 
 Centralized dtype definitions to avoid hardcoding throughout the codebase.
@@ -18,3 +19,5 @@ INTENT_ENUM_DTYPE = np.uint8  # For role, kind, side
 
 # Index arrays: Use int32 instead of int64 where possible
 INDEX_DTYPE = np.int32  # For bar_index, param_id (if within int32 range)
+
+

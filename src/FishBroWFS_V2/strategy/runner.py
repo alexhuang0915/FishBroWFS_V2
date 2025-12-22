@@ -1,3 +1,4 @@
+
 """Strategy runner - adapter between strategy and engine.
 
 Phase 7: Validates params, calls strategy function, returns intents.
@@ -111,3 +112,5 @@ def _validate_params(params: Dict[str, float], spec: StrategySpec) -> Dict[str, 
         validated[key] = float(value)
     
     return validated
+
+

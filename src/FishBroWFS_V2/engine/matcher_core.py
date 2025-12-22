@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -173,4 +174,6 @@ def simulate(
                 break  # at most one exit fill per bar in Phase 1 reference
 
     return fills
+
+
 

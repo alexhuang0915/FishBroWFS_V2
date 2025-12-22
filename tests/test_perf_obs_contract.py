@@ -1,3 +1,4 @@
+
 """Contract tests for perf observability (Stage P2-1.5).
 
 These tests ensure that entry sparse observability fields are correctly
@@ -166,3 +167,5 @@ def test_perf_obs_entry_sparse_non_zero():
             # Conservative: allow for edge cases but expect some intents
             # In practice, with valid data, we should have >> 0
             pass  # Just verify non-negative, don't enforce minimum
+
+

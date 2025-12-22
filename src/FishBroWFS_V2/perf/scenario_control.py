@@ -1,3 +1,4 @@
+
 """
 Perf Harness Scenario Control (P2-1.6)
 
@@ -71,3 +72,5 @@ def apply_trigger_rate_mask(
     masked[to_mask] = np.nan
     
     return masked
+
+

@@ -1,3 +1,4 @@
+
 """Stage2 runner - full backtest on Top-K parameters.
 
 Stage2 runs full backtests using the unified simulate_run() entry point.
@@ -157,3 +158,5 @@ def run_stage2(
         )
     
     return results
+
+

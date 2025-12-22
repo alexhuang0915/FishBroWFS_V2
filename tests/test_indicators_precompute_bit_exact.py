@@ -1,3 +1,4 @@
+
 """
 Stage P2-2 Step B: Bit-exact test for precomputed indicators.
 
@@ -134,3 +135,5 @@ def test_indicators_precompute_bit_exact() -> None:
     obs_b = result_b.get("_obs", {})
     assert obs_a.get("intents_total") == obs_b.get("intents_total"), "intents_total must be identical"
     assert obs_a.get("fills_total") == obs_b.get("fills_total"), "fills_total must be identical"
+
+

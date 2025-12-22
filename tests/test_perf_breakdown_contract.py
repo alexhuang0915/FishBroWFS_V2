@@ -1,3 +1,4 @@
+
 """
 Stage P2-1.8: Contract Tests for Granular Breakdown and Extended Observability
 
@@ -344,3 +345,5 @@ def test_run_grid_perf_contains_timing_keys(monkeypatch) -> None:
             os.environ.pop("FISHBRO_PROFILE_KERNEL", None)
         else:
             os.environ["FISHBRO_PROFILE_KERNEL"] = old_profile_kernel
+
+

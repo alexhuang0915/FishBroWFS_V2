@@ -1,3 +1,4 @@
+
 """Reference kernel - adapter for matcher_core (testing/debugging only).
 
 This kernel wraps matcher_core.simulate() and should only be used for:
@@ -39,3 +40,5 @@ def simulate_reference_matcher(
     """
     fills: List[Fill] = simulate_reference(bars, intents)
     return SimResult(fills=fills)
+
+

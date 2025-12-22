@@ -1,3 +1,4 @@
+
 """Phase 14: Artifacts module tests."""
 
 import json
@@ -83,3 +84,5 @@ def test_build_job_manifest():
     expected_hash = manifest_copy.pop("manifest_hash")
     computed = compute_sha256(canonical_json_bytes(manifest_copy))
     assert expected_hash == computed
+
+

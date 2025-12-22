@@ -1,3 +1,4 @@
+
 """Contract tests for governance schema.
 
 Tests that governance schema is JSON-serializable and follows contracts.
@@ -110,3 +111,5 @@ def test_evidence_ref_contains_subsample_fields() -> None:
     assert "stage_planned_subsample" in evidence.key_metrics
     assert "param_subsample_rate" in evidence.key_metrics
     assert "params_effective" in evidence.key_metrics
+
+

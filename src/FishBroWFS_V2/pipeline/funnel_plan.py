@@ -1,3 +1,4 @@
+
 """Funnel plan builder.
 
 Builds default funnel plan with three stages:
@@ -53,3 +54,5 @@ def build_default_funnel_plan(cfg: dict) -> FunnelPlan:
             notes={"rule": "default", "description": "Full confirmation"},
         ),
     ])
+
+

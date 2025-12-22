@@ -1,3 +1,4 @@
+
 """SMA Cross Strategy v1.
 
 Phase 7: Basic moving average crossover strategy.
@@ -118,3 +119,5 @@ SPEC = StrategySpec(
     },
     fn=sma_cross_strategy,
 )
+
+

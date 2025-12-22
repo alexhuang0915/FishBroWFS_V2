@@ -1,3 +1,4 @@
+
 """Test Stage0 contract: must NOT contain any PnL/metrics fields.
 
 Stage0 is a proxy ranking stage and must not compute any PnL-related metrics.
@@ -145,3 +146,5 @@ def test_stage0_result_string_representation():
         assert forbidden not in result_repr, (
             f"Stage0Result repr contains forbidden keyword '{forbidden}': {result_repr}"
         )
+
+

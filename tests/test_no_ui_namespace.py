@@ -1,3 +1,4 @@
+
 """Contract test: No ui namespace imports allowed.
 
 Ensures the entire FishBroWFS_V2 package does not import from ui namespace.
@@ -125,3 +126,5 @@ def test_makefile_no_ui_paths() -> None:
         # Check for ui/ path references
         if "ui/" in line or " ui." in line or "ui.app_streamlit" in line:
             pytest.fail(f"Makefile line {i} contains ui/ reference: {line.strip()}")
+
+

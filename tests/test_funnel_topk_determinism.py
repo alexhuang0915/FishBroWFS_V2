@@ -1,3 +1,4 @@
+
 """Test Top-K determinism - same input must produce same Top-K selection."""
 
 import numpy as np
@@ -128,3 +129,5 @@ def test_funnel_determinism():
     assert len(result_1.stage2_results) == len(result_2.stage2_results)
     for r1, r2 in zip(result_1.stage2_results, result_2.stage2_results):
         assert r1.param_id == r2.param_id
+
+

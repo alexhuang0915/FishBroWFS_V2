@@ -1,3 +1,4 @@
+
 """Strategy system.
 
 Phase 7: Strategy registry, runner, and built-in strategies.
@@ -21,3 +22,5 @@ __all__ = [
     "StrategySpec",
     "StrategyFn",
 ]
+
+

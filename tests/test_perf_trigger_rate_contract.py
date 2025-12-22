@@ -1,3 +1,4 @@
+
 """
 Stage P2-1.6: Contract Tests for Trigger Rate Masking
 
@@ -310,3 +311,5 @@ def test_trigger_rate_mask_integration_with_kernel() -> None:
             f"With trigger_rate=0.5, expected entry_intents ~50% of baseline, "
             f"got {ratio*100:.1f}% (baseline={entry_intents_1_0}, actual={entry_intents_0_5})"
         )
+
+

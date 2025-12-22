@@ -1,3 +1,4 @@
+
 """Preflight check - OOM gate and cost summary."""
 
 from __future__ import annotations
@@ -59,4 +60,6 @@ def run_preflight(cfg_snapshot: dict[str, Any]) -> PreflightResult:
         mem_limit_bytes=gate_result["mem_limit_bytes"],
         estimates=gate_result["estimates"],
     )
+
+
 

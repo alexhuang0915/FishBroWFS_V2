@@ -1,3 +1,4 @@
+
 """Contract tests for artifact system.
 
 Tests verify:
@@ -429,3 +430,5 @@ def test_json_files_have_sorted_keys():
         
         manifest_keys = list(manifest_data.keys())
         assert manifest_keys == sorted(manifest_keys), "Manifest keys should be sorted"
+
+

@@ -1,3 +1,4 @@
+
 """Phase 14: Batch index tests."""
 
 import json
@@ -82,3 +83,5 @@ def test_build_batch_index_writes_file():
         # Content matches returned index
         loaded = json.loads(index_file.read_text(encoding="utf-8"))
         assert loaded == index
+
+

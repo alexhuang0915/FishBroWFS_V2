@@ -1,3 +1,4 @@
+
 """Phase 14: API batch endpoints tests."""
 
 import tempfile
@@ -210,3 +211,5 @@ def test_batch_summary_not_implemented(client):
             response = client.get("/batches/batch1/summary")
             assert response.status_code == 404
             assert "summary.json not found" in response.json()["detail"]
+
+

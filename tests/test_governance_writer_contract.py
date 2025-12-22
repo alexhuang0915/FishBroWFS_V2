@@ -1,3 +1,4 @@
+
 """Contract tests for governance writer.
 
 Tests that governance writer creates expected directory structure and files.
@@ -207,3 +208,5 @@ def test_readme_contains_freeze_reasons() -> None:
         assert "FREEZE Reasons" in readme_text
         assert "donchian_atr:abc123def456" in readme_text
         assert "density" in readme_text
+
+

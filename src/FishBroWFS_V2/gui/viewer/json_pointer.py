@@ -1,3 +1,4 @@
+
 """JSON Pointer resolver (RFC 6901).
 
 Resolves JSON pointers in a defensive, never-raise manner.
@@ -75,3 +76,5 @@ def resolve_json_pointer(data: dict, pointer: str) -> tuple[bool, Any | None]:
     except Exception:
         # ❸ Viewer world final safety net
         return (False, None)
+
+

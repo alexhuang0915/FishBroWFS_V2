@@ -1,3 +1,4 @@
+
 """
 Stage P2-3A: Numba-accelerated Sparse Entry Intent Builder
 
@@ -344,3 +345,5 @@ def build_entry_intents_numba(
         "n_entry": n_entry,
         "obs": obs,
     }
+
+

@@ -1,3 +1,4 @@
+
 """Test portfolio writer outputs.
 
 Phase 11: Test that writer creates correct artifacts.
@@ -497,3 +498,5 @@ def test_empty_portfolio():
         
         assert manifest_data["counts"]["num_legs_final"] == 0
         assert manifest_data["counts"]["symbols_breakdown"] == {}
+
+

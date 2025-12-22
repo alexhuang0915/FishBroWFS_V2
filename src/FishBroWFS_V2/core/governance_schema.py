@@ -1,3 +1,4 @@
+
 """Governance schema for decision tracking and auditability.
 
 Single Source of Truth (SSOT) for governance decisions.
@@ -77,3 +78,5 @@ class GovernanceReport:
             ],
             "metadata": self.metadata,
         }
+
+

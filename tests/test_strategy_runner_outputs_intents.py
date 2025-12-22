@@ -1,3 +1,4 @@
+
 """Test strategy runner outputs valid intents.
 
 Phase 7: Test that runner returns valid OrderIntent schema.
@@ -138,3 +139,5 @@ def test_runner_invalid_output_raises() -> None:
     # Cleanup
     from FishBroWFS_V2.strategy.registry import unregister
     unregister("bad_strategy")
+
+

@@ -1,3 +1,4 @@
+
 import numpy as np
 
 from FishBroWFS_V2.data.layout import normalize_bars
@@ -71,4 +72,6 @@ def test_tc07_same_bar_entry_then_exit():
     assert len(fills) == 2
     assert fills[0].price == 105.0
     assert fills[1].price == 95.0
+
+
 

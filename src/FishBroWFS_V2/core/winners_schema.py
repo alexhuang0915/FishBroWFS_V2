@@ -1,3 +1,4 @@
+
 """Winners schema v2 (SSOT).
 
 Defines the v2 schema for winners.json with enhanced metadata.
@@ -121,3 +122,5 @@ def is_winners_legacy(winners: Dict[str, Any]) -> bool:
         return True
     
     return False
+
+

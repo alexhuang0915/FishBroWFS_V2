@@ -1,3 +1,4 @@
+
 """
 Phase 15.0: Season-level governance and index builder (Research OS).
 
@@ -210,3 +211,5 @@ class SeasonStore:
         }
         self.write_index(season, out)
         return out
+
+

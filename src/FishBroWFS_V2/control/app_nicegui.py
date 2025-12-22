@@ -1,3 +1,4 @@
+
 """NiceGUI app for B5-C Mission Control."""
 
 from __future__ import annotations
@@ -331,4 +332,6 @@ def main_page() -> None:
 
 if __name__ in {"__main__", "__mp_main__"}:
     ui.run(port=8080, title="B5-C Mission Control")
+
+
 

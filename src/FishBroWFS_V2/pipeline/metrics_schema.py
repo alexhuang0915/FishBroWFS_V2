@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 """
@@ -16,3 +17,5 @@ METRICS_COLUMN_NAMES = ["net_profit", "trades", "max_dd"]
 
 # Number of columns
 METRICS_N_COLUMNS = 3
+
+

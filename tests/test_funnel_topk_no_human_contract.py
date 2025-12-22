@@ -1,3 +1,4 @@
+
 """Funnel Top-K no-human contract tests - Phase 4 Stage D.
 
 These tests ensure that Top-K selection is purely automatic based on proxy_value,
@@ -220,3 +221,5 @@ def test_funnel_stage0_no_pnl_fields():
                     f"Stage0Result contains forbidden PnL field: {field_name} "
                     f"(contains '{forbidden}')"
                 )
+
+

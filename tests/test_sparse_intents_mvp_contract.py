@@ -1,3 +1,4 @@
+
 """Contract tests for sparse intents MVP (Stage P2-1).
 
 These tests ensure:
@@ -250,3 +251,5 @@ class TestSparseIntentsMVP:
         
         # Note: Full parity verification is done by test_vectorization_parity.py
         # This test just ensures the basic contract is met
+
+

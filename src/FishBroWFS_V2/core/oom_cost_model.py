@@ -1,3 +1,4 @@
+
 """OOM cost model for memory and computation estimation.
 
 Provides conservative estimates for memory usage and operations
@@ -148,3 +149,5 @@ def summarize_estimates(cfg: Dict[str, Any]) -> Dict[str, Any]:
         "ops_est": ops,
         "time_est_s": time_s,
     }
+
+

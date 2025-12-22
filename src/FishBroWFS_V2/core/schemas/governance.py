@@ -1,3 +1,4 @@
+
 """Pydantic schema for governance.json validation.
 
 Validates governance decisions with KEEP/DROP/FREEZE and evidence chain.
@@ -77,3 +78,5 @@ class GovernanceReport(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     
     model_config = ConfigDict(extra="allow")  # Allow extra fields for backward compatibility
+
+

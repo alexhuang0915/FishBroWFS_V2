@@ -1,3 +1,4 @@
+
 """
 Phase 17‑C: Portfolio Plan Constraints Tests.
 
@@ -374,3 +375,5 @@ def test_weight_renormalization():
         assert plan2.constraints_report.renormalization_factor is not None
         total2 = sum(w.weight for w in plan2.weights)
         assert abs(total2 - 1.0) < 1e-9
+
+

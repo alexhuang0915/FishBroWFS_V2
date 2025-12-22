@@ -1,3 +1,4 @@
+
 """
 Engine integer constants (hot-path friendly).
 
@@ -12,5 +13,7 @@ KIND_LIMIT = 1
 
 SIDE_SELL = -1
 SIDE_BUY = 1
+
+
 
 

@@ -1,3 +1,4 @@
+
 """Cursor kernel - main simulation path for Phase 4.
 
 This is the primary kernel implementation, optimized for performance.
@@ -36,3 +37,5 @@ def simulate_cursor_kernel(
     """
     fills: List[Fill] = simulate_jit(bars, intents)
     return SimResult(fills=fills)
+
+

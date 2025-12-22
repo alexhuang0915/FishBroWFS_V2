@@ -1,3 +1,4 @@
+
 """Report link generation for B5 viewer."""
 
 from __future__ import annotations
@@ -76,3 +77,5 @@ def build_report_link(*args: str) -> str:
         return f"/b5?season={season}&run_id={run_id}"
 
     return ""
+
+

@@ -1,3 +1,4 @@
+
 """
 Phase 17‑C: Portfolio Plan API End‑to‑End Tests.
 
@@ -233,3 +234,5 @@ def test_list_plans_returns_correct_structure():
             assert listed["plan_id"] == "plan_test123"
             assert listed["generated_at_utc"] == "2025-12-20T00:00:00Z"
             assert listed["source"]["season"] == "season1"
+
+

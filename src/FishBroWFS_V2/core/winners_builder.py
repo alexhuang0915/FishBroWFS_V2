@@ -1,3 +1,4 @@
+
 """Winners builder - converts legacy winners to v2 schema.
 
 Builds v2 winners.json from legacy topk format with fallback strategies.
@@ -217,3 +218,5 @@ def _extract_score(legacy_item: Dict[str, Any]) -> float:
             return float(val)
     
     return 0.0
+
+

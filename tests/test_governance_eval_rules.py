@@ -1,3 +1,4 @@
+
 """Contract tests for governance evaluation rules.
 
 Tests that governance rules (R1/R2/R3) are correctly applied using fixture artifacts.
@@ -347,3 +348,5 @@ def test_keep_when_all_rules_pass() -> None:
         assert len(report.items) == 1
         item = report.items[0]
         assert item.decision == Decision.KEEP
+
+

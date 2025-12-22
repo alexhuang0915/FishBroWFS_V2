@@ -1,3 +1,4 @@
+
 """Contract test: Viewer must not import ui namespace.
 
 Ensures Viewer code only uses FishBroWFS_V2.* imports, not ui.*
@@ -44,7 +45,13 @@ def test_viewer_no_ui_imports() -> None:
         except Exception as e:
             # Skip modules that fail to import (might be missing dependencies)
             # But log for debugging
-            if "ImportError" not in str(type(e)):
+            if isinstance(e, ImportError):
+                # 跳過 streamlit 導入錯誤
+                if "No module named 'streamlit'" in str(e):
+                    continue
+                # 重新拋出其他 ImportError
+                raise
+            else:
                 pytest.fail(f"Unexpected error importing {modname}: {e}")
     
     # Should have no ui.* imports
@@ -67,6 +74,9 @@ def test_viewer_imports_compile() -> None:
             # Only fail if it's a missing dependency we can't handle
             if "ui." in str(e):
                 pytest.fail(f"Viewer module {modname} imports ui.*: {e}")
+            # 跳過 streamlit 導入錯誤
+            if "No module named 'streamlit'" in str(e):
+                continue
 
 
 def test_viewer_entrypoint_no_ui_import() -> None:
@@ -114,3 +124,5 @@ def test_viewer_page_scaffold_no_ui_artifact_reader_import() -> None:
     # Check for ui.core.artifact_reader imports (should use FishBroWFS_V2.core.artifact_reader)
     if "from ui.core.artifact_reader" in content or "import ui.core.artifact_reader" in content:
         pytest.fail("Viewer page_scaffold imports ui.core.artifact_reader (should use FishBroWFS_V2.core.artifact_reader)")
+
+

@@ -1,3 +1,4 @@
+
 """Monkeypatch trap test: Ensure forbidden pandas methods are never called during raw ingest.
 
 This test uses monkeypatch to trap any calls to forbidden methods.
@@ -134,3 +135,5 @@ def test_raw_ingest_forbidden_methods_trap_with_24h_normalization(
     assert result.policy.normalized_24h == True  # Should have normalized 24:00:00
     # Verify 24:00:00 was normalized to next day 00:00:00
     assert "2013/1/2 00:00:00" in result.df["ts_str"].values
+
+

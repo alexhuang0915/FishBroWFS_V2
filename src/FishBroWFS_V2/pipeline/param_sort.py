@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -29,4 +30,6 @@ def sort_params_cache_friendly(params: np.ndarray) -> tuple[np.ndarray, np.ndarr
 
     order = np.lexsort((sm, atr, ch))
     return params[order], order
+
+
 

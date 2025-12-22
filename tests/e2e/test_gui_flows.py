@@ -1,3 +1,4 @@
+
 """
 E2E flow tests for GUI contracts.
 
@@ -244,3 +245,5 @@ def test_gui_contract_validation():
             season="2026Q1",
             top_k=101,  # must be ≤ 100
         )
+
+

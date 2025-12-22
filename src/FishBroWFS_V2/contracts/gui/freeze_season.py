@@ -1,3 +1,4 @@
+
 """
 Freeze season payload contract for GUI.
 
@@ -25,3 +26,5 @@ class FreezeSeasonPayload(BaseModel):
             note="Initial research season",
             tags=["research", "baseline"],
         )
+
+

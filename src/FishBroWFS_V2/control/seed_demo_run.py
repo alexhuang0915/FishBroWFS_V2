@@ -1,3 +1,4 @@
+
 """Seed demo run for Viewer validation.
 
 Creates a DONE job with minimal artifacts for Viewer testing.
@@ -185,3 +186,5 @@ if __name__ == "__main__":
     print(f"Demo job created: {run_id}")
     print(f"Outputs: outputs/seasons/2026Q1/runs/{run_id}/")
     print(f"Report link: /b5?season=2026Q1&run_id={run_id}")
+
+

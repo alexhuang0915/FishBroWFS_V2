@@ -1,3 +1,4 @@
+
 """Batch result aggregation for Phase 14.
 
 TopK selection, summary metrics, and deterministic ordering.
@@ -211,3 +212,5 @@ def compute_detailed_summary(
     
     index_with_scores = {**index, "jobs": augmented}
     return compute_batch_summary(index_with_scores, top_k=top_k)
+
+

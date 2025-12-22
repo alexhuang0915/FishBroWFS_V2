@@ -1,3 +1,4 @@
+
 """
 Phase 14.1: Read-only Batch API helpers.
 
@@ -289,3 +290,5 @@ def list_artifacts_tree(artifacts_root: Path, batch_id: str) -> dict[str, Any]:
         jobs.append({"job_id": job_id, "attempts": attempts})
 
     return {"batch_id": batch_id, "jobs": jobs}
+
+

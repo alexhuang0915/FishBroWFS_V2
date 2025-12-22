@@ -1,3 +1,4 @@
+
 """Governance lifecycle state transition logic.
 
 Pure functions for state transitions based on decisions.
@@ -57,3 +58,5 @@ def governance_transition(
     }
     
     return transitions.get((prev_state, decision), prev_state)
+
+

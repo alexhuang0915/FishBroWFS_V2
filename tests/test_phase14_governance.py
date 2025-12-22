@@ -1,3 +1,4 @@
+
 """Phase 14: Governance tests."""
 
 import tempfile
@@ -161,3 +162,5 @@ def test_batch_governance_store_list_batches():
         # Filter by frozen
         frozen_batches = store.list_batches(frozen=True)
         assert {m.batch_id for m in frozen_batches} == {"batch2"}
+
+

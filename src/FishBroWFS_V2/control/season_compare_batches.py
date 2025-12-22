@@ -1,3 +1,4 @@
+
 """
 Phase 15.2: Season compare batch cards + lightweight leaderboard.
 
@@ -274,3 +275,5 @@ def build_season_leaderboard(
         "groups": out_groups,
         "skipped_batches": sorted(set(skipped)),
     }
+
+

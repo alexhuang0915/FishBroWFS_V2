@@ -1,3 +1,4 @@
+
 """
 Compare request payload contract for GUI.
 
@@ -21,3 +22,5 @@ class CompareRequestPayload(BaseModel):
             season="2026Q1",
             top_k=20,
         )
+
+

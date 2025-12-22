@@ -1,3 +1,4 @@
+
 """Test: Delete parquet cache and rebuild - fingerprint must remain stable.
 
 Binding #4: Parquet is Cache, Not Truth.
@@ -142,3 +143,5 @@ def test_cache_rebuild_with_24h_normalization(temp_dir: Path) -> None:
     assert sha1_a == sha1_b, f"Fingerprint changed: {sha1_a} != {sha1_b}"
     assert result1.policy.normalized_24h == True  # Should have normalized 24:00:00
     assert result2.policy.normalized_24h == True
+
+

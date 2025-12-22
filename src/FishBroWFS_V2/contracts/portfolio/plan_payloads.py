@@ -1,3 +1,4 @@
+
 # src/FishBroWFS_V2/contracts/portfolio/plan_payloads.py
 from __future__ import annotations
 
@@ -38,3 +39,5 @@ class PlanCreatePayload(BaseModel):
         if self.min_weight > self.max_weight:
             raise ValueError("min_weight must be <= max_weight")
         return self
+
+

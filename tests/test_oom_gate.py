@@ -1,3 +1,4 @@
+
 """Tests for OOM gate decision maker.
 
 Tests verify:
@@ -231,3 +232,5 @@ def test_decide_oom_action_returns_dict_schema() -> None:
     assert "params_total" in res
     assert "params_effective" in res
     assert "reason" in res
+
+

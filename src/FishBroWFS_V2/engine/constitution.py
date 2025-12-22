@@ -1,3 +1,4 @@
+
 """
 Engine Constitution v1.1 (FROZEN)
 
@@ -35,4 +36,6 @@ NEXT_BAR_ACTIVE = True
 PRIORITY_STOP_OVER_LIMIT = True
 SAME_BAR_ENTRY_THEN_EXIT = True
 SAME_KIND_TIE_EXIT_FIRST = True
+
+
 

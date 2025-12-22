@@ -1,3 +1,4 @@
+
 """
 Phase 17‑C: Portfolio Plan Hash Chain Tests.
 
@@ -242,3 +243,5 @@ def test_plan_metadata_includes_source_sha256():
         # SHA256 values should be strings (could be fake in this test)
         assert isinstance(source["export_manifest_sha256"], str)
         assert isinstance(source["candidates_sha256"], str)
+
+

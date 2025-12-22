@@ -1,3 +1,4 @@
+
 """Test that fill buffer scales with n_intents and does not segfault."""
 
 from __future__ import annotations
@@ -146,3 +147,5 @@ def test_fill_buffer_minimum_size():
     fills = simulate_jit(bars, intents)
     assert len(fills) <= n_intents
     # Should not crash
+
+

@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import cProfile
@@ -54,3 +55,5 @@ def _format_profile_report(
 
     s.write("\n\n__PROFILE_END__\n")
     return s.getvalue()
+
+

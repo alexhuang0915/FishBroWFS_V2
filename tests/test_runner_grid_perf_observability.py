@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -38,5 +39,7 @@ def test_run_grid_perf_fields_present_and_non_negative(monkeypatch) -> None:
     assert "intent_mode" in perf
     if perf["intent_mode"] is not None:
         assert perf["intent_mode"] in ("arrays", "objects")
+
+
 
 

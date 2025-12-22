@@ -1,3 +1,4 @@
+
 """Contract tests for audit schema.
 
 Tests verify:
@@ -233,3 +234,5 @@ def test_audit_schema_is_frozen():
     # Verify frozen (cannot modify)
     with pytest.raises(Exception):  # dataclass.FrozenInstanceError
         audit.run_id = "new_id"
+
+

@@ -1,3 +1,4 @@
+
 """Contract tests for runner adapter.
 
 Tests verify:
@@ -143,3 +144,5 @@ def test_metrics_structure_is_consistent():
         
         # Verify stage_name matches
         assert metrics["stage_name"] == cfg["stage_name"]
+
+

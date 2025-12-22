@@ -1,3 +1,4 @@
+
 """KPI Viewer page.
 
 Displays KPIs with evidence drill-down capability.
@@ -127,3 +128,5 @@ def _extract_kpis(artifacts: dict[str, dict]) -> list[dict]:
         pass
     
     return kpi_rows
+
+

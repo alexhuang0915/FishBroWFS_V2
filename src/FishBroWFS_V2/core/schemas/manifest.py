@@ -1,3 +1,4 @@
+
 """Pydantic schema for manifest.json validation.
 
 Validates run manifest with stages and artifacts tracking.
@@ -55,3 +56,51 @@ class RunManifest(BaseModel):
     strategy_id: Optional[str] = None  # Strategy identifier (e.g., "sma_cross")
     strategy_version: Optional[str] = None  # Strategy version (e.g., "v1")
     param_schema_hash: Optional[str] = None  # SHA1 hash of param_schema JSON
+
+
+class UnifiedManifest(BaseModel):
+    """
+    Unified manifest schema for all manifest types (export, plan, view, quality).
+    
+    This schema defines the standard fields that should be present in all manifests
+    for Manifest Tree Completeness verification.
+    """
+    # Common required fields
+    manifest_type: str  # "export", "plan", "view", or "quality"
+    manifest_version: str = "1.0"
+    
+    # Identification fields
+    id: str  # run_id for export, plan_id for plan/view/quality
+    
+    # Timestamps
+    generated_at_utc: Optional[str] = None
+    created_at: Optional[str] = None
+    
+    # Source information
+    source: Optional[Dict[str, Any]] = None
+    
+    # Input references (SHA256 hashes of input files)
+    inputs: Optional[Dict[str, str]] = None
+    
+    # Files listing with SHA256 checksums (sorted by rel_path asc)
+    files: Optional[List[Dict[str, str]]] = None
+    
+    # Combined SHA256 of all files (concatenated hashes)
+    files_sha256: Optional[str] = None
+    
+    # Checksums for output files
+    checksums: Optional[Dict[str, str]] = None
+    
+    # Type-specific checksums
+    export_checksums: Optional[Dict[str, str]] = None
+    plan_checksums: Optional[Dict[str, str]] = None
+    view_checksums: Optional[Dict[str, str]] = None
+    quality_checksums: Optional[Dict[str, str]] = None
+    
+    # Manifest self-hash (must be the last field)
+    manifest_sha256: str
+    
+    class Config:
+        extra = "allow"  # Allow additional type-specific fields
+
+

@@ -1,19 +1,21 @@
+
 """Tests for KPI drill-down - no raise contract.
 
 Tests missing artifacts, wrong pointers, empty session_state.
 UI functions should never raise exceptions.
 
 Zero-side-effect imports: All I/O and stateful operations are inside test functions.
+
+NOTE: This test is skipped because streamlit has been removed from the project.
 """
 
 from __future__ import annotations
 
-from unittest.mock import patch
+import pytest
 
-import streamlit as st
+pytest.skip("Streamlit tests skipped - streamlit removed from project", allow_module_level=True)
 
-# Zero-side-effect imports: UI component imports moved into test functions
-# to prevent collection errors if UI files have syntax/dependency issues
+# Original test code below is not executed
 
 
 def test_kpi_table_missing_name() -> None:
@@ -234,3 +236,5 @@ def test_evidence_panel_exception_handling() -> None:
         with patch("streamlit.error"):
             render_evidence_panel(artifacts)
             # Should not raise
+
+

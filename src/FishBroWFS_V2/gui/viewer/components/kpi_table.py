@@ -1,3 +1,4 @@
+
 """KPI Table component with evidence drill-down.
 
 Renders KPI table with clickable evidence links.
@@ -104,3 +105,5 @@ def _format_value(value: Any) -> str:
         return str(value)
     except Exception:
         return str(value) if value is not None else "N/A"
+
+

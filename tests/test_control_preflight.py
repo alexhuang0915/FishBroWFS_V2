@@ -1,3 +1,4 @@
+
 """Tests for preflight check."""
 
 from __future__ import annotations
@@ -59,4 +60,6 @@ def test_preflight_pure_no_io() -> None:
     # Should be deterministic
     assert result1.action == result2.action
     assert result1.estimated_bytes == result2.estimated_bytes
+
+
 

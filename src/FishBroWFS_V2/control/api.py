@@ -1,3 +1,4 @@
+
 """FastAPI endpoints for B5-C Mission Control."""
 
 from __future__ import annotations
@@ -194,9 +195,26 @@ def load_strategy_registry() -> StrategyRegistryResponse:
     if current is not _LOAD_STRATEGY_REGISTRY_ORIGINAL:
         return current()
 
-    if _STRATEGY_REGISTRY is None:
-        raise RuntimeError("Strategy registry not preloaded")
-    return _STRATEGY_REGISTRY
+    # If cache is available, return it
+    global _STRATEGY_REGISTRY
+    if _STRATEGY_REGISTRY is not None:
+        return _STRATEGY_REGISTRY
+
+    # Load built-in strategies and convert to GUI format
+    from FishBroWFS_V2.strategy.registry import (
+        load_builtin_strategies,
+        get_strategy_registry,
+    )
+    
+    # Load built-in strategies into registry
+    load_builtin_strategies()
+    
+    # Get GUI-friendly registry
+    registry = get_strategy_registry()
+    
+    # Cache it
+    _STRATEGY_REGISTRY = registry
+    return registry
 
 
 # Original function references for monkeypatch detection (must be after function definitions)
@@ -213,6 +231,36 @@ def _try_prime_registries() -> None:
     except Exception:
         _DATASET_INDEX = None
         _STRATEGY_REGISTRY = None
+
+
+def _prime_registries_with_feedback() -> dict[str, Any]:
+    """Prime registries and return detailed feedback."""
+    global _DATASET_INDEX, _STRATEGY_REGISTRY
+    result = {
+        "dataset_loaded": False,
+        "strategy_loaded": False,
+        "dataset_error": None,
+        "strategy_error": None,
+    }
+    
+    # Try dataset
+    try:
+        _DATASET_INDEX = load_dataset_index()
+        result["dataset_loaded"] = True
+    except Exception as e:
+        _DATASET_INDEX = None
+        result["dataset_error"] = str(e)
+    
+    # Try strategy
+    try:
+        _STRATEGY_REGISTRY = load_strategy_registry()
+        result["strategy_loaded"] = True
+    except Exception as e:
+        _STRATEGY_REGISTRY = None
+        result["strategy_error"] = str(e)
+    
+    result["success"] = result["dataset_loaded"] and result["strategy_loaded"]
+    return result
 
 
 @asynccontextmanager
@@ -282,6 +330,19 @@ async def meta_strategies() -> StrategyRegistryResponse:
         # Preserve original param order to satisfy tests (no sorting here)
         strategies.append(type(s)(strategy_id=s.strategy_id, params=list(s.params)))
     return StrategyRegistryResponse(strategies=strategies)
+
+
+@app.post("/meta/prime")
+async def prime_registries() -> dict[str, Any]:
+    """
+    Prime registries cache (explicit trigger).
+    
+    This endpoint allows the UI to manually trigger registry loading
+    when the automatic startup preload fails (e.g., missing files).
+    
+    Returns detailed feedback about what succeeded/failed.
+    """
+    return _prime_registries_with_feedback()
 
 
 @app.get("/jobs")
@@ -1169,6 +1230,11 @@ from FishBroWFS_V2.portfolio.plan_builder import (
     write_plan_package,
 )
 
+# Phase PV.1: Plan Quality endpoints
+from FishBroWFS_V2.contracts.portfolio.plan_quality_models import PlanQualityReport
+from FishBroWFS_V2.portfolio.plan_quality import compute_quality_from_plan_dir
+from FishBroWFS_V2.portfolio.plan_quality_writer import write_plan_quality_files
+
 
 # Helper to get outputs root (where portfolio/plans/ will be written)
 def _get_outputs_root() -> Path:
@@ -1290,3 +1356,65 @@ async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read plan: {e}")
+
+
+# Phase PV.1: Plan Quality endpoints
+@app.get("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
+async def get_plan_quality(plan_id: str) -> PlanQualityReport:
+    """
+    Compute quality metrics for a portfolio plan (read‑only).
+
+    Contract:
+    - Zero‑write: only reads plan package files, never writes
+    - Deterministic: same plan → same quality report
+    - Returns PlanQualityReport with grade (GREEN/YELLOW/RED) and reasons
+    """
+    outputs_root = _get_outputs_root()
+    plan_dir = outputs_root / "portfolio" / "plans" / plan_id
+    if not plan_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
+
+    try:
+        report, inputs = compute_quality_from_plan_dir(plan_dir)
+        return report
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Plan package incomplete: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute quality: {e}")
+
+
+@app.post("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
+async def write_plan_quality(plan_id: str) -> PlanQualityReport:
+    """
+    Compute quality metrics and write quality files (controlled mutation).
+
+    Contract:
+    - Read‑only over plan package files
+    - Controlled mutation: writes only three files under plan_dir:
+        - plan_quality.json
+        - plan_quality_checksums.json
+        - plan_quality_manifest.json
+    - Idempotent: identical content → no mtime change
+    - Returns PlanQualityReport (same as GET endpoint)
+    """
+    outputs_root = _get_outputs_root()
+    plan_dir = outputs_root / "portfolio" / "plans" / plan_id
+    if not plan_dir.exists():
+        raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
+
+    try:
+        # Compute quality (read‑only)
+        report, inputs = compute_quality_from_plan_dir(plan_dir)
+        # Write quality files (controlled mutation, idempotent)
+        write_plan_quality_files(plan_dir, report)
+        return report
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=f"Plan package incomplete: {str(e)}")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to write quality: {e}")
+
+

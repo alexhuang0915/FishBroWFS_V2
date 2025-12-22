@@ -1,3 +1,4 @@
+
 """Portfolio specification loader.
 
 Phase 8: Load portfolio specs from YAML/JSON files.
@@ -121,3 +122,5 @@ def load_portfolio_spec(path: Path) -> PortfolioSpec:
         data_tz=data_tz,
         legs=legs,
     )
+
+

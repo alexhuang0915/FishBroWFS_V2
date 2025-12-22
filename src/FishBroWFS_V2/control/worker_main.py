@@ -1,3 +1,4 @@
+
 """Worker main entry point (for subprocess execution)."""
 
 from __future__ import annotations
@@ -14,4 +15,6 @@ if __name__ == "__main__":
     
     db_path = Path(sys.argv[1])
     worker_loop(db_path)
+
+
 

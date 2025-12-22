@@ -1,3 +1,4 @@
+
 """
 Governance abuse tests for GUI contracts.
 
@@ -237,3 +238,5 @@ def test_gui_contract_enforces_boundaries():
             jobs=[],  # empty list should fail
             outputs_root=Path("outputs"),
         )
+
+

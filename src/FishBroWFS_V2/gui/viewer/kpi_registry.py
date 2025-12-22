@@ -1,3 +1,4 @@
+
 """KPI Evidence Registry.
 
 Maps KPI names to EvidenceLink (artifact + JSON pointer).
@@ -74,3 +75,5 @@ def has_evidence(kpi_name: str) -> bool:
         return kpi_name in KPI_EVIDENCE_REGISTRY
     except Exception:
         return False
+
+

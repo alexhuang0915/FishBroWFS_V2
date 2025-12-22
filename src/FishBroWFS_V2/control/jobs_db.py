@@ -1,3 +1,4 @@
+
 """SQLite jobs database - CRUD and state machine."""
 
 from __future__ import annotations
@@ -922,3 +923,5 @@ def get_job_logs(db_path: Path, job_id: str, *, limit: int = 100) -> list[str]:
             return [row[0] for row in cursor.fetchall()]
     
     return _with_retry_locked(_op)
+
+

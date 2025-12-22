@@ -1,3 +1,4 @@
+
 """Test session classification for CME.MNQ."""
 
 from __future__ import annotations
@@ -51,3 +52,5 @@ def test_mnq_outside_session(mnq_profile: Path) -> None:
     # Between sessions
     assert classify_session("2013/1/1 14:00:00", profile) is None
     assert classify_session("2013/1/1 20:59:59", profile) is None
+
+

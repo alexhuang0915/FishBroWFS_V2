@@ -1,3 +1,4 @@
+
 """Portfolio compiler - compile PortfolioSpec to Funnel job configs.
 
 Phase 8: Convert portfolio specification to executable job configurations.
@@ -53,3 +54,5 @@ def compile_portfolio(spec: PortfolioSpec) -> List[Dict[str, any]]:
         jobs.append(job_cfg)
     
     return jobs
+
+

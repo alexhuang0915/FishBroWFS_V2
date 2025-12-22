@@ -1,3 +1,4 @@
+
 """
 Stage P2-3A: Contract Tests for Sparse Entry Intents (Grid Level)
 
@@ -336,3 +337,5 @@ def test_created_bar_sorted() -> None:
             os.environ.pop("FISHBRO_PERF_TRIGGER_RATE", None)
         else:
             os.environ["FISHBRO_PERF_TRIGGER_RATE"] = old_trigger_rate
+
+

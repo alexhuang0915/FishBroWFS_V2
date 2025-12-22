@@ -1,3 +1,4 @@
+
 """Batch Job Submission for Phase 13.
 
 Deterministic batch_id computation and batch submission.
@@ -171,3 +172,5 @@ def submit_batch(db_path: Path, req: BatchSubmitRequest) -> BatchSubmitResponse:
         total_jobs=len(job_ids),
         job_ids=job_ids
     )
+
+

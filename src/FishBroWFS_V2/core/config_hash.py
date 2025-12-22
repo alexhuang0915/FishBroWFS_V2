@@ -1,3 +1,4 @@
+
 """Stable config hash computation.
 
 Provides deterministic hash of configuration objects for reproducibility.
@@ -30,3 +31,5 @@ def stable_config_hash(obj: Any) -> str:
         ensure_ascii=False,
     )
     return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+

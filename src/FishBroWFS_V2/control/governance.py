@@ -1,3 +1,4 @@
+
 """Batch metadata and governance for Phase 14.
 
 Season/tags/note/frozen metadata with immutable rules.
@@ -206,3 +207,5 @@ class BatchGovernanceStore:
                 continue
             results.append(meta)
         return results
+
+

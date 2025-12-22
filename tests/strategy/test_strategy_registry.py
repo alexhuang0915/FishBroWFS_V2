@@ -1,3 +1,4 @@
+
 """Tests for Strategy Registry (Phase 12)."""
 
 from __future__ import annotations
@@ -331,3 +332,5 @@ def test_param_spec_validation() -> None:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+

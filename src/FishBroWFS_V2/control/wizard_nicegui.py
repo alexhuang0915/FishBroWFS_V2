@@ -1,3 +1,4 @@
+
 """Research Job Wizard (Phase 12) - NiceGUI interface.
 
 Phase 12: Config-only wizard that outputs JobSpec JSON.
@@ -635,5 +636,7 @@ def wizard_page() -> None:
             ui.label("✅ No worker calls, no filesystem access").classes("text-sm text-yellow-700")
             ui.label("✅ Strategy params from registry, not hardcoded").classes("text-sm text-yellow-700")
             ui.label("✅ Dataset selection from registry, not filesystem").classes("text-sm text-yellow-700")
+
+
 
 

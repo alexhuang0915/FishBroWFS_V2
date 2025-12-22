@@ -1,3 +1,4 @@
+
 """Viewer schema definitions.
 
 Public types for Viewer and Audit schema.
@@ -13,3 +14,5 @@ class EvidenceLink(BaseModel):
     artifact: str  # Artifact name (e.g., "winners_v2", "governance")
     json_pointer: str  # JSON pointer to the value (e.g., "/summary/net_profit")
     description: str | None = None  # Optional human-readable description
+
+

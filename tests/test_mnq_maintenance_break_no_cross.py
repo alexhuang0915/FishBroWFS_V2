@@ -1,3 +1,4 @@
+
 """Test MNQ maintenance break: no cross-session aggregation.
 
 Phase 6.6: Verify that MNQ bars before and after maintenance window
@@ -112,3 +113,5 @@ def test_mnq_maintenance_break_no_cross_60m(mnq_exchange_profile: Path) -> None:
         assert len(result) == len(trading_bars) + len(maintenance_bars), (
             "Total bars should equal sum of TRADING and MAINTENANCE bars"
         )
+
+

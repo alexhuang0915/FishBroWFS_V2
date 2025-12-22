@@ -1,3 +1,4 @@
+
 """Contract tests for OOM gate.
 
 Tests verify:
@@ -199,3 +200,5 @@ def test_oom_gate_result_schema():
     assert "mem_est_mb" in estimates
     assert "ops_est" in estimates
     assert "time_est_s" in estimates
+
+

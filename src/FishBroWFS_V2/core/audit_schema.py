@@ -1,3 +1,4 @@
+
 """Audit schema for run tracking and reproducibility.
 
 Single Source of Truth (SSOT) for audit data.
@@ -54,3 +55,5 @@ def compute_params_effective(params_total: int, param_subsample_rate: float) -> 
         raise ValueError(f"param_subsample_rate must be in [0.0, 1.0], got {param_subsample_rate}")
     
     return int(params_total * param_subsample_rate)
+
+

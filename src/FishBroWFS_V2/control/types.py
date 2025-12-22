@@ -1,3 +1,4 @@
+
 """Type definitions for B5-C Mission Control."""
 
 from __future__ import annotations
@@ -54,4 +55,6 @@ class JobRecord:
     last_error: Optional[str] = None
     tags: list[str] = field(default_factory=list)  # Tags for job categorization and search
     data_fingerprint_sha1: str = ""  # Data fingerprint SHA1 (empty if missing, marks DIRTY)
+
+
 

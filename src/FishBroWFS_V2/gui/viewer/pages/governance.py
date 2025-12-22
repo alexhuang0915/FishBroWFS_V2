@@ -1,3 +1,4 @@
+
 """Governance Viewer page.
 
 Displays governance decisions and evidence.
@@ -65,3 +66,5 @@ def render_page(bundle: Bundle) -> None:
     
     except Exception as e:
         st.error(f"Error rendering governance page: {e}")
+
+

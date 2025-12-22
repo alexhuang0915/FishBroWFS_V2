@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -70,5 +71,7 @@ def test_simulate_arrays_same_bar_entry_exit_parity() -> None:
     assert len(fills) == 2
     assert fills[0].role == OrderRole.ENTRY and fills[0].side == Side.BUY and fills[0].kind == OrderKind.STOP
     assert fills[1].role == OrderRole.EXIT and fills[1].side == Side.SELL and fills[1].kind == OrderKind.STOP
+
+
 
 

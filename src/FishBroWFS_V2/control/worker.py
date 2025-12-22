@@ -1,3 +1,4 @@
+
 """Worker - long-running task executor."""
 
 from __future__ import annotations
@@ -222,4 +223,6 @@ def _check_pause_stop(db_path: Path, job_id: str) -> None:
                     pass
             mark_killed(db_path, job_id, error="Killed while paused")
             raise SystemExit("Job killed while paused")
+
+
 

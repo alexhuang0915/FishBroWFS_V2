@@ -1,3 +1,4 @@
+
 """Pydantic schema for winners_v2.json validation.
 
 Validates winners v2 structure with KPI metrics.
@@ -62,3 +63,5 @@ class WinnersV2(BaseModel):
     notes: Optional[Dict[str, Any]] = None
     
     model_config = ConfigDict(extra="allow", populate_by_name=True)  # Allow extra fields and support alias
+
+

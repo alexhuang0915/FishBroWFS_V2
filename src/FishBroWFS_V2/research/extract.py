@@ -1,3 +1,4 @@
+
 """Result Extractor - extract canonical metrics from artifacts.
 
 Phase 9: Read-only extraction from existing artifacts.
@@ -178,3 +179,5 @@ def extract_canonical_metrics(run_dir: Path) -> CanonicalMetrics:
         start_date=start_date,
         end_date=end_date,
     )
+
+

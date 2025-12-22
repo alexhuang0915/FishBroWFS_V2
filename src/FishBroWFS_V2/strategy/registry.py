@@ -1,3 +1,4 @@
+
 """Strategy registry - single source of truth for strategies.
 
 Phase 7: Centralized strategy registration and lookup.
@@ -189,3 +190,5 @@ def get_strategy_registry() -> StrategyRegistryResponse:
         strategies.append(gui_spec)
     
     return StrategyRegistryResponse(strategies=strategies)
+
+

@@ -1,3 +1,4 @@
+
 """Integration tests for worker execution and job completion."""
 
 from __future__ import annotations
@@ -118,3 +119,5 @@ def test_worker_handles_empty_funnel_result(
     # run_id and report_link should be None if no stages
     assert job.run_id is None
     assert job.report_link is None
+
+

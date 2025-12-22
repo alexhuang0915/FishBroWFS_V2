@@ -1,3 +1,4 @@
+
 """
 Phase 17 rev2: Portfolio Plan Builder (deterministic, read‑only over exports).
 
@@ -40,6 +41,9 @@ from FishBroWFS_V2.control.artifacts import (
     compute_sha256,
     write_atomic_json,
 )
+
+# Write‑scope guard
+from FishBroWFS_V2.utils.write_scope import create_plan_scope
 
 getcontext().prec = 40
 
@@ -620,10 +624,18 @@ def write_plan_package(outputs_root: Path, plan) -> Path:
     # Ensure directory
     ensure_dir(pdir)
 
+    # Create write scope for this plan directory
+    scope = create_plan_scope(pdir)
+
+    # Helper to write a file with scope validation
+    def write_scoped(rel_path: str, content: str) -> None:
+        scope.assert_allowed_rel(rel_path)
+        write_text_atomic(pdir / rel_path, content)
+
     # 1) portfolio_plan.json (canonical)
     plan_obj = plan.model_dump() if hasattr(plan, "model_dump") else plan
     plan_json = canonical_json(plan_obj)
-    write_text_atomic(pdir / "portfolio_plan.json", plan_json)
+    write_scoped("portfolio_plan.json", plan_json)
 
     # 2) plan_metadata.json (minimal)
     meta = {
@@ -632,13 +644,14 @@ def write_plan_package(outputs_root: Path, plan) -> Path:
         "source": plan.source.model_dump() if hasattr(plan, "source") else None,
         "note": (plan.config.get("note") if hasattr(plan, "config") and isinstance(plan.config, dict) else None),
     }
-    write_text_atomic(pdir / "plan_metadata.json", canonical_json(meta))
+    write_scoped("plan_metadata.json", canonical_json(meta))
 
     # 3) plan_checksums.json (flat dict)
     checksums = {}
     for rel in ["plan_metadata.json", "portfolio_plan.json"]:
+        # Reading already‑written files is safe; they are inside the scope.
         checksums[rel] = sha256_bytes((pdir / rel).read_bytes())
-    write_text_atomic(pdir / "plan_checksums.json", canonical_json(checksums))
+    write_scoped("plan_checksums.json", canonical_json(checksums))
 
     # 4) plan_manifest.json (two-phase self hash)
     portfolio_plan_sha256 = sha256_bytes((pdir / "portfolio_plan.json").read_bytes())
@@ -650,8 +663,27 @@ def write_plan_package(outputs_root: Path, plan) -> Path:
     candidates_file_sha256 = getattr(plan.source, "candidates_file_sha256", None)
     candidates_items_sha256 = getattr(plan.source, "candidates_items_sha256", None)
 
+    # Build files listing (sorted by rel_path asc)
+    files = []
+    for rel_path in ["portfolio_plan.json", "plan_metadata.json", "plan_checksums.json"]:
+        file_path = pdir / rel_path
+        if file_path.exists():
+            files.append({
+                "rel_path": rel_path,
+                "sha256": sha256_bytes(file_path.read_bytes())
+            })
+    # Sort by rel_path
+    files.sort(key=lambda x: x["rel_path"])
+    
+    # Compute files_sha256 (concatenated hashes)
+    concatenated = "".join(f["sha256"] for f in files)
+    files_sha256 = sha256_bytes(concatenated.encode("utf-8"))
+
     # Build manifest with fields expected by tests
     manifest_base = {
+        "manifest_type": "plan",
+        "manifest_version": "1.0",
+        "id": plan.plan_id,
         "plan_id": plan.plan_id,
         "generated_at_utc": getattr(plan, "generated_at_utc", None),
         "source": plan.source.model_dump() if hasattr(plan.source, "model_dump") else plan.source,
@@ -663,16 +695,20 @@ def write_plan_package(outputs_root: Path, plan) -> Path:
         "candidates_items_sha256": candidates_items_sha256,
         "portfolio_plan_sha256": portfolio_plan_sha256,
         "checksums": checksums,
+        "files": files,
+        "files_sha256": files_sha256,
     }
 
     manifest_path = pdir / "plan_manifest.json"
     # phase-1
-    write_text_atomic(manifest_path, canonical_json(manifest_base))
+    write_scoped("plan_manifest.json", canonical_json(manifest_base))
     # self-hash of phase-1 canonical bytes
     manifest_sha256 = sha256_bytes(manifest_path.read_bytes())
     # phase-2
     manifest_final = dict(manifest_base)
     manifest_final["manifest_sha256"] = manifest_sha256
-    write_text_atomic(manifest_path, canonical_json(manifest_final))
+    write_scoped("plan_manifest.json", canonical_json(manifest_final))
 
     return pdir
+
+

@@ -1,3 +1,4 @@
+
 """Test portfolio validator.
 
 Phase 8: Test validation raises errors for invalid specs.
@@ -139,3 +140,5 @@ legs:
     
     with pytest.raises(FileNotFoundError):
         validate_portfolio_spec(spec)
+
+

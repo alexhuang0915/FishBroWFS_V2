@@ -1,3 +1,4 @@
+
 """Top-K selector - deterministic parameter selection.
 
 Selects top K parameters based on Stage0 proxy_value.
@@ -49,3 +50,5 @@ def select_topk(
     
     # Return param_id list
     return [r.param_id for r in topk_results]
+
+

@@ -1,3 +1,4 @@
+
 """Breakout Channel Strategy v1.
 
 Phase 7: Channel breakout strategy using high/low.
@@ -119,3 +120,5 @@ SPEC = StrategySpec(
     },
     fn=breakout_channel_strategy,
 )
+
+

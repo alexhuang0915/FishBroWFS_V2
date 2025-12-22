@@ -1,3 +1,4 @@
+
 """Evidence Panel component.
 
 Displays evidence for active KPI from artifacts.
@@ -104,3 +105,5 @@ def render_evidence_panel(artifacts: dict[str, dict]) -> None:
     
     except Exception as e:
         st.error(f"Error rendering evidence panel: {e}")
+
+

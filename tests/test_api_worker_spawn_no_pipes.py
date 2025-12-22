@@ -1,3 +1,4 @@
+
 """Test that API worker spawn does not use PIPE (prevents deadlock)."""
 
 from __future__ import annotations
@@ -32,3 +33,5 @@ def test_api_worker_spawn_no_pipes(monkeypatch, tmp_path: Path) -> None:
     assert seen["stdout"] is not subprocess.PIPE
     assert seen["stderr"] is not subprocess.PIPE
     assert seen.get("stdin") is subprocess.DEVNULL
+
+

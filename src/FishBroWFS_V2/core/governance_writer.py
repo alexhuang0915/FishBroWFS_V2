@@ -1,3 +1,4 @@
+
 """Governance writer for decision artifacts.
 
 Writes governance results to outputs directory with machine-readable JSON
@@ -139,3 +140,5 @@ def write_governance_artifacts(
             indent=2,
         )
         f.write("\n")
+
+

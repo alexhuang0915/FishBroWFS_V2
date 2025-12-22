@@ -1,3 +1,4 @@
+
 """Tests for research decision module."""
 
 from __future__ import annotations
@@ -111,3 +112,5 @@ def test_load_decisions_same_run_multiple_times(tmp_path: Path) -> None:
     assert decisions[0]["decision"] == "KEEP"
     assert decisions[1]["decision"] == "DROP"
     assert decisions[2]["decision"] == "ARCHIVE"
+
+

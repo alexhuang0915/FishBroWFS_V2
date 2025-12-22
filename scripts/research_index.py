@@ -1,3 +1,4 @@
+
 """Research Index CLI - generate research artifacts.
 
 Phase 9: Generate canonical_results.json and research_index.json.
@@ -48,4 +49,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
 

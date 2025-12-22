@@ -1,3 +1,4 @@
+
 """Tests for UI artifact validation.
 
 Tests verify:
@@ -536,3 +537,5 @@ def test_evidence_link_model_roundtrip() -> None:
     assert link_roundtrip.note == link.note
     assert link_roundtrip.render_hint == link.render_hint
     assert link_roundtrip.render_payload == link.render_payload
+
+

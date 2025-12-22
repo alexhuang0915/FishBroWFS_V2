@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 """
@@ -612,3 +613,5 @@ if nb is not None:
                 scores[i] = float(triggers)
 
         return scores
+
+

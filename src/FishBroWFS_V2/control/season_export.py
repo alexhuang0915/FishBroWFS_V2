@@ -1,3 +1,4 @@
+
 """
 Phase 15.3: Season freeze package / export pack.
 
@@ -25,6 +26,7 @@ from typing import Any, Optional
 from FishBroWFS_V2.control.artifacts import compute_sha256, write_atomic_json
 from FishBroWFS_V2.control.season_api import SeasonStore
 from FishBroWFS_V2.control.batch_api import read_summary, read_index
+from FishBroWFS_V2.utils.write_scope import WriteScope
 
 
 def get_exports_root() -> Path:
@@ -83,27 +85,29 @@ def export_season_package(
     season_dir.mkdir(parents=True, exist_ok=True)
     batches_dir.mkdir(parents=True, exist_ok=True)
 
+    # Build the set of allowed relative paths according to export‑pack spec.
+    # We'll collect them as we go, then create a WriteScope that permits exactly those paths.
+    allowed_rel_files: set[str] = set()
     exported_files: list[dict[str, Any]] = []
     missing: list[str] = []
+
+    # Helper to record an allowed file and copy it
+    def copy_and_allow(src: Path, dst: Path, rel: str) -> None:
+        _copy_file(src, dst)
+        allowed_rel_files.add(rel)
+        exported_files.append({"path": rel, "sha256": _file_sha256(dst)})
 
     # 1) copy season_index.json + season_metadata.json (metadata may not exist; if missing -> we still record missing)
     src_index = season_index_root / season / "season_index.json"
     dst_index = season_dir / "season_index.json"
-    _copy_file(src_index, dst_index)
-
-    exported_files.append(
-        {"path": str(Path("season_index.json")), "sha256": _file_sha256(dst_index)}
-    )
+    copy_and_allow(src_index, dst_index, "season_index.json")
 
     src_meta = season_index_root / season / "season_metadata.json"
     dst_meta = season_dir / "season_metadata.json"
     if src_meta.exists():
-        _copy_file(src_meta, dst_meta)
-        exported_files.append(
-            {"path": str(Path("season_metadata.json")), "sha256": _file_sha256(dst_meta)}
-        )
+        copy_and_allow(src_meta, dst_meta, "season_metadata.json")
     else:
-        missing.append(str(Path("season_metadata.json")))
+        missing.append("season_metadata.json")
 
     # 2) copy batch files referenced by season index
     batches = season_index.get("batches", [])
@@ -117,45 +121,30 @@ def export_season_package(
     for batch_id in batch_ids:
         # metadata.json is the anchor
         src_batch_meta = artifacts_root / batch_id / "metadata.json"
+        rel_meta = str(Path("batches") / batch_id / "metadata.json")
         dst_batch_meta = batches_dir / batch_id / "metadata.json"
         if src_batch_meta.exists():
-            _copy_file(src_batch_meta, dst_batch_meta)
-            exported_files.append(
-                {
-                    "path": str(Path("batches") / batch_id / "metadata.json"),
-                    "sha256": _file_sha256(dst_batch_meta),
-                }
-            )
+            copy_and_allow(src_batch_meta, dst_batch_meta, rel_meta)
         else:
-            missing.append(str(Path("batches") / batch_id / "metadata.json"))
+            missing.append(rel_meta)
 
         # index.json optional
         src_idx = artifacts_root / batch_id / "index.json"
+        rel_idx = str(Path("batches") / batch_id / "index.json")
         dst_idx = batches_dir / batch_id / "index.json"
         if src_idx.exists():
-            _copy_file(src_idx, dst_idx)
-            exported_files.append(
-                {
-                    "path": str(Path("batches") / batch_id / "index.json"),
-                    "sha256": _file_sha256(dst_idx),
-                }
-            )
+            copy_and_allow(src_idx, dst_idx, rel_idx)
         else:
-            missing.append(str(Path("batches") / batch_id / "index.json"))
+            missing.append(rel_idx)
 
         # summary.json optional
         src_sum = artifacts_root / batch_id / "summary.json"
+        rel_sum = str(Path("batches") / batch_id / "summary.json")
         dst_sum = batches_dir / batch_id / "summary.json"
         if src_sum.exists():
-            _copy_file(src_sum, dst_sum)
-            exported_files.append(
-                {
-                    "path": str(Path("batches") / batch_id / "summary.json"),
-                    "sha256": _file_sha256(dst_sum),
-                }
-            )
+            copy_and_allow(src_sum, dst_sum, rel_sum)
         else:
-            missing.append(str(Path("batches") / batch_id / "summary.json"))
+            missing.append(rel_sum)
 
     # 3) build deterministic manifest (sort by path)
     exported_files_sorted = sorted(exported_files, key=lambda x: x["path"])
@@ -176,6 +165,7 @@ def export_season_package(
     }
 
     manifest_path = season_dir / "package_manifest.json"
+    allowed_rel_files.add("package_manifest.json")
     write_atomic_json(manifest_path, manifest_obj)
 
     manifest_sha256 = compute_sha256(manifest_path.read_bytes())
@@ -188,6 +178,7 @@ def export_season_package(
 
     # 4) create replay_index.json for compare replay without artifacts
     replay_index_path = season_dir / "replay_index.json"
+    allowed_rel_files.add("replay_index.json")
     replay_index = _build_replay_index(
         season=season,
         season_index=season_index,
@@ -201,6 +192,18 @@ def export_season_package(
             "sha256": _file_sha256(replay_index_path),
         }
     )
+
+    # Now create a WriteScope that permits exactly the files we have written.
+    # This scope will be used to validate any future writes (none in this function).
+    # We also add a guard for the manifest write (already done) and replay_index write.
+    scope = WriteScope(
+        root_dir=season_dir,
+        allowed_rel_files=frozenset(allowed_rel_files),
+        allowed_rel_prefixes=(),
+    )
+    # Verify that all exported files are allowed (should be true by construction)
+    for ef in exported_files_sorted:
+        scope.assert_allowed_rel(ef["path"])
 
     return ExportResult(
         season=season,
@@ -275,3 +278,5 @@ def _build_replay_index(
             "files": "path asc",
         },
     }
+
+

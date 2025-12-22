@@ -1,3 +1,4 @@
+
 """Strict test for single Streamlit entrypoint.
 
 Phase 10.1: Prevent any new Streamlit entrypoints from being created.
@@ -231,3 +232,5 @@ def test_allowlist_files_have_correct_structure() -> None:
         "research/page.py must NOT have __name__ guard"
     assert "streamlit" in research_content.lower(), \
         "research/page.py must import streamlit"
+
+

@@ -1,3 +1,4 @@
+
 import json
 import tempfile
 from pathlib import Path
@@ -129,3 +130,5 @@ def test_season_compare_404_when_season_index_missing(client):
              patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
             r = client.get("/seasons/NOPE/compare/topk?k=20")
             assert r.status_code == 404
+
+

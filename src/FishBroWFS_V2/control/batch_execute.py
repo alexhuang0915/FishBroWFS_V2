@@ -1,3 +1,4 @@
+
 """Batch execution orchestration for Phase 14.
 
 State machine for batch execution, retry/resume, and progress aggregation.
@@ -395,3 +396,5 @@ def retry_failed(batch_id: str, artifacts_root: Path) -> BatchExecutor:
     executor = BatchExecutor(batch_id, [])
     executor.retry_failed(artifacts_root)
     return executor
+
+

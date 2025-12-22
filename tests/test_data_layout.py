@@ -1,3 +1,4 @@
+
 import numpy as np
 import pytest
 from FishBroWFS_V2.data.layout import normalize_bars
@@ -24,4 +25,6 @@ def test_normalize_bars_reject_nan():
 
     with pytest.raises(ValueError):
         normalize_bars(o, h, l, c)
+
+
 

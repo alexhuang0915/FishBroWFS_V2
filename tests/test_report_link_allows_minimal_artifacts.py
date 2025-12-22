@@ -1,3 +1,4 @@
+
 """Tests for report link allowing minimal artifacts.
 
 Tests that report readiness only checks file existence,
@@ -165,3 +166,5 @@ def test_ui_does_not_block_with_minimal_artifacts(tmp_path: Path, monkeypatch: p
     
     # is_report_ready should return True
     assert is_report_ready(run_id) is True
+
+

@@ -1,3 +1,4 @@
+
 """Research Decision - manage KEEP/DROP/ARCHIVE decisions.
 
 Phase 9: Append-only decision log with notes and timestamps.
@@ -79,3 +80,5 @@ def load_decisions(out_dir: Path) -> List[Dict[str, Any]]:
         pass
     
     return decisions
+
+

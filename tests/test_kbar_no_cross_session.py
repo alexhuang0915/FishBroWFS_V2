@@ -1,3 +1,4 @@
+
 """Test K-bar aggregation: no cross-session aggregation."""
 
 from __future__ import annotations
@@ -83,3 +84,5 @@ def test_no_cross_session_30m(mnq_profile: Path) -> None:
     # All bars should be in DAY session
     assert "session" in result.columns, "Result must include session column"
     assert all(result["session"] == "DAY"), f"All bars should be DAY session, got {result['session'].unique()}"
+
+

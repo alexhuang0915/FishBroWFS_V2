@@ -1,3 +1,4 @@
+
 """Contract tests for governance lifecycle state transitions.
 
 Tests transition matrix: prev_state × decision → next_state
@@ -78,3 +79,5 @@ def test_governance_transition_retired_terminal() -> None:
     assert governance_transition("RETIRED", Decision.KEEP) == "RETIRED"
     assert governance_transition("RETIRED", Decision.DROP) == "RETIRED"
     assert governance_transition("RETIRED", Decision.FREEZE) == "RETIRED"
+
+

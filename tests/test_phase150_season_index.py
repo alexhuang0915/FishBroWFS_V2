@@ -1,3 +1,4 @@
+
 import json
 import tempfile
 from pathlib import Path
@@ -126,3 +127,5 @@ def test_rebuild_index_forbidden_when_season_frozen(client):
             # rebuild should be forbidden
             r = client.post(f"/seasons/{season}/rebuild_index")
             assert r.status_code == 403
+
+

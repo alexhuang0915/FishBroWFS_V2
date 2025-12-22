@@ -1,3 +1,4 @@
+
 """Research Governance Layer main entry point.
 
 Phase 9: Generate canonical results and research index.
@@ -94,4 +95,6 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
+
 

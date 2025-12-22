@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import numpy as np
@@ -228,3 +229,5 @@ def test_proxies_reject_invalid_params() -> None:
     params_vol_invalid = np.array([[1000.0, 0.5], [500.0, -1.0]], dtype=np.float64)  # [atr_len, stop_mult]
     scores_vol = vol_proxy(open_, high, low, close, params_vol_invalid)
     assert np.all(np.isinf(scores_vol))
+
+

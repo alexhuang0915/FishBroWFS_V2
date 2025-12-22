@@ -1,3 +1,4 @@
+
 """
 Stage 0 Funnel (Vector/Proxy Filter)
 
@@ -9,5 +10,7 @@ Design goal:
 
 from .ma_proxy import stage0_score_ma_proxy
 from .proxies import trend_proxy, vol_proxy, activity_proxy
+
+
 
 

@@ -25,8 +25,8 @@ from FishBroWFS_V2.control.jobs_db import (
     mark_failed,
     mark_running,
 )
-from FishBroWFS_V2.control.job_spec import JobSpec as WizardJobSpec
-from FishBroWFS_V2.control.types import JobSpec as DbJobSpec
+from FishBroWFS_V2.control.job_spec import WizardJobSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 from FishBroWFS_V2.control.batch_submit import wizard_to_db_jobspec
 
 

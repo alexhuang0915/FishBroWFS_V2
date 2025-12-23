@@ -14,7 +14,7 @@ import pytest
 import os
 
 from FishBroWFS_V2.control.jobs_db import append_log, create_job, init_db, mark_done, update_running
-from FishBroWFS_V2.control.types import JobSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 
 
 def _worker(db_path: str, n: int) -> None:
@@ -22,7 +22,7 @@ def _worker(db_path: str, n: int) -> None:
     p = Path(db_path)
     pid = os.getpid()
     for i in range(n):
-        spec = JobSpec(
+        spec = DBJobSpec(
             season="2026Q1",
             dataset_id="test_dataset",
             outputs_root="/tmp/outputs",

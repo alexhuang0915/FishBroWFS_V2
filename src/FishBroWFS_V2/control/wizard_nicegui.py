@@ -1,8 +1,8 @@
 
 """Research Job Wizard (Phase 12) - NiceGUI interface.
 
-Phase 12: Config-only wizard that outputs JobSpec JSON.
-GUI → POST /jobs (JobSpec) only, no worker calls, no filesystem access.
+Phase 12: Config-only wizard that outputs WizardJobSpec JSON.
+GUI → POST /jobs (WizardJobSpec) only, no worker calls, no filesystem access.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 import requests
 from nicegui import ui
 
-from FishBroWFS_V2.control.job_spec import DataSpec, JobSpec, WFSSpec
+from FishBroWFS_V2.control.job_spec import DataSpec, WizardJobSpec, WFSSpec
 from FishBroWFS_V2.control.param_grid import GridMode, ParamGridSpec
 from FishBroWFS_V2.control.job_expand import JobTemplate, expand_job_template, estimate_total_jobs
 from FishBroWFS_V2.control.batch_submit import BatchSubmitRequest, BatchSubmitResponse
@@ -338,7 +338,7 @@ def create_batch_mode_section(state: WizardState) -> Dict[str, Any]:
             
             # Build a temporary JobTemplate to estimate total jobs
             try:
-                # Collect base JobSpec from current UI (simplified)
+                # Collect base WizardJobSpec from current UI (simplified)
                 # We'll just use dummy values for estimation
                 template = JobTemplate(
                     season=state.season,
@@ -413,14 +413,14 @@ def create_wfs_section(state: WizardState) -> Dict[str, Any]:
 
 
 def create_preview_section(state: WizardState) -> ui.textarea:
-    """Create JobSpec preview section."""
+    """Create WizardJobSpec preview section."""
     with ui.card().classes("w-full mb-4"):
-        ui.label("JobSpec Preview").classes("text-lg font-bold")
+        ui.label("WizardJobSpec Preview").classes("text-lg font-bold")
         
         preview = ui.textarea("").classes("w-full h-64 font-mono text-sm").props("readonly")
         
         def update_preview() -> None:
-            """Update JobSpec preview."""
+            """Update WizardJobSpec preview."""
             try:
                 # Collect data from UI
                 dataset_id = None
@@ -463,8 +463,8 @@ def create_preview_section(state: WizardState) -> ui.textarea:
                     # Update preview with template JSON
                     preview.value = template.model_dump_json(indent=2)
                 else:
-                    # Create single JobSpec
-                    jobspec = JobSpec(
+                    # Create single WizardJobSpec
+                    jobspec = WizardJobSpec(
                         season=state.season,
                         data1=state.data1,
                         data2=state.data2,
@@ -485,11 +485,11 @@ def create_preview_section(state: WizardState) -> ui.textarea:
 
 
 def submit_job(state: WizardState, preview: ui.textarea) -> None:
-    """Submit JobSpec to API."""
+    """Submit WizardJobSpec to API."""
     try:
-        # Parse JobSpec from preview
+        # Parse WizardJobSpec from preview
         jobspec_data = json.loads(preview.value)
-        jobspec = JobSpec.model_validate(jobspec_data)
+        jobspec = WizardJobSpec.model_validate(jobspec_data)
         
         # Submit to API
         resp = requests.post(
@@ -632,7 +632,7 @@ def wizard_page() -> None:
         # Phase 12 Rules reminder
         with ui.card().classes("w-full mt-8 bg-yellow-50"):
             ui.label("Phase 12 Rules").classes("font-bold text-yellow-800")
-            ui.label("✅ GUI only outputs JobSpec JSON").classes("text-sm text-yellow-700")
+            ui.label("✅ GUI only outputs WizardJobSpec JSON").classes("text-sm text-yellow-700")
             ui.label("✅ No worker calls, no filesystem access").classes("text-sm text-yellow-700")
             ui.label("✅ Strategy params from registry, not hardcoded").classes("text-sm text-yellow-700")
             ui.label("✅ Dataset selection from registry, not filesystem").classes("text-sm text-yellow-700")

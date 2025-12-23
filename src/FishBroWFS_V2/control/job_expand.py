@@ -13,7 +13,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from FishBroWFS_V2.control.job_spec import DataSpec, JobSpec, WFSSpec
+from FishBroWFS_V2.control.job_spec import DataSpec, WizardJobSpec, WFSSpec
 from FishBroWFS_V2.control.param_grid import ParamGridSpec, values_for_param
 
 
@@ -51,14 +51,14 @@ class JobTemplate(BaseModel):
     )
 
 
-def expand_job_template(template: JobTemplate) -> list[JobSpec]:
-    """Expand a JobTemplate into a deterministic list of JobSpec.
+def expand_job_template(template: JobTemplate) -> list[WizardJobSpec]:
+    """Expand a JobTemplate into a deterministic list of WizardJobSpec.
     
     Args:
         template: Job template with param grids
     
     Returns:
-        List of JobSpec in deterministic order.
+        List of WizardJobSpec in deterministic order.
     
     Raises:
         ValueError: if any param grid is invalid.
@@ -88,7 +88,7 @@ def expand_job_template(template: JobTemplate) -> list[JobSpec]:
     jobs = []
     for combo in itertools.product(*value_lists):
         params = dict(zip(param_names, combo))
-        job = JobSpec(
+        job = WizardJobSpec(
             season=template.season,
             data1=data1,
             data2=None,

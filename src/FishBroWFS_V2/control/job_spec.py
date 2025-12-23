@@ -1,7 +1,7 @@
 
-"""JobSpec Schema for Research Job Wizard.
+"""WizardJobSpec Schema for Research Job Wizard.
 
-Phase 12: JobSpec is the ONLY output from GUI.
+Phase 12: WizardJobSpec is the ONLY output from GUI.
 Contains all configuration needed to run a research job.
 Must NOT contain any worker/engine runtime state.
 """
@@ -52,10 +52,10 @@ class WFSSpec(BaseModel):
         return self
 
 
-class JobSpec(BaseModel):
+class WizardJobSpec(BaseModel):
     """Complete job specification for research.
     
-    Phase 12 Iron Rule: GUI's ONLY output = JobSpec JSON
+    Phase 12 Iron Rule: GUI's ONLY output = WizardJobSpec JSON
     Must NOT contain worker/engine runtime state.
     """
     
@@ -69,7 +69,7 @@ class JobSpec(BaseModel):
     wfs: WFSSpec = Field(default_factory=WFSSpec)
     
     @model_validator(mode="after")
-    def _freeze_params(self) -> "JobSpec":
+    def _freeze_params(self) -> "WizardJobSpec":
         # make params immutable so test_jobspec_immutability passes
         if not isinstance(self.params, MappingProxyType):
             object.__setattr__(self, "params", MappingProxyType(dict(self.params)))
@@ -85,8 +85,8 @@ class JobSpec(BaseModel):
         return self.data1.dataset_id
 
 
-# Example JobSpec for documentation
-EXAMPLE_JOBSPEC = JobSpec(
+# Example WizardJobSpec for documentation
+EXAMPLE_WIZARD_JOBSPEC = WizardJobSpec(
     season="2024Q1",
     data1=DataSpec(
         dataset_id="CME.MNQ.60m.2020-2024",

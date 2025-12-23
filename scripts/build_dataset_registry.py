@@ -50,17 +50,21 @@ def parse_filename_to_dates(filename: str) -> Optional[tuple[date, date]]:
     return None
 
 
-def compute_file_fingerprint(file_path: Path) -> str:
-    """Compute SHA1 hash of file content (binary).
+def compute_file_fingerprints(file_path: Path) -> tuple[str, str]:
+    """Compute SHA1 and SHA256 (first 40 chars) hashes of file content (binary).
     
     WARNING: Must use content hash, NOT mtime/size.
     """
     sha1 = hashlib.sha1()
+    sha256 = hashlib.sha256()
     with open(file_path, "rb") as f:
         # Read in chunks to handle large files
         for chunk in iter(lambda: f.read(8192), b""):
             sha1.update(chunk)
-    return sha1.hexdigest()
+            sha256.update(chunk)
+    sha1_digest = sha1.hexdigest()
+    sha256_digest = sha256.hexdigest()[:40]  # first 40 hex chars
+    return sha1_digest, sha256_digest
 
 
 def build_registry(derived_root: Path) -> DatasetIndex:
@@ -102,8 +106,8 @@ def build_registry(derived_root: Path) -> DatasetIndex:
                     print(f"Warning: Skipping {parquet_file} - start_date > end_date")
                     continue
                 
-                # Compute fingerprint
-                fingerprint = compute_file_fingerprint(parquet_file)
+                # Compute fingerprints
+                fingerprint_sha1, fingerprint_sha256_40 = compute_file_fingerprints(parquet_file)
                 
                 # Construct relative path
                 rel_path = parquet_file.relative_to(derived_root)
@@ -123,7 +127,8 @@ def build_registry(derived_root: Path) -> DatasetIndex:
                     path=str(rel_path),
                     start_date=start_date,
                     end_date=end_date,
-                    fingerprint_sha1=fingerprint,
+                    fingerprint_sha1=fingerprint_sha1,
+                    fingerprint_sha256_40=fingerprint_sha256_40,
                     tz_provider="IANA",
                     tz_version="unknown"
                 )

@@ -745,11 +745,13 @@ if nb is not None:
                         continue
 
                     s = np.int64(side[idx])
+                    # side encoding: 1=BUY, 255=SELL -> convert to sign: 1=BUY, -1=SELL
+                    side_sign = np.int64(1) if s == np.int64(1) else np.int64(-1)
                     # long exits are SELL(-1), short exits are BUY(1)
-                    if pos == np.int64(1) and s != np.int64(-1):
+                    if pos == np.int64(1) and side_sign != np.int64(-1):
                         k += np.int64(1)
                         continue
-                    if pos == np.int64(-1) and s != np.int64(1):
+                    if pos == np.int64(-1) and side_sign != np.int64(1):
                         k += np.int64(1)
                         continue
 

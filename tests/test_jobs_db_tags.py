@@ -22,7 +22,7 @@ from FishBroWFS_V2.control.jobs_db import (
     list_jobs,
     search_by_tag,
 )
-from FishBroWFS_V2.control.types import JobSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def temp_db(tmp_path: Path) -> Path:
 
 def test_create_job_with_tags(temp_db: Path) -> None:
     """Test creating a job with tags."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
@@ -52,7 +52,7 @@ def test_create_job_with_tags(temp_db: Path) -> None:
 
 def test_create_job_without_tags(temp_db: Path) -> None:
     """Test creating a job without tags (defaults to empty list)."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
@@ -69,7 +69,7 @@ def test_create_job_without_tags(temp_db: Path) -> None:
 
 def test_read_job_with_tags(temp_db: Path) -> None:
     """Test reading a job with tags."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
@@ -130,21 +130,21 @@ def test_old_rows_fallback_to_empty_tags(temp_db: Path) -> None:
 
 def test_search_by_tag(temp_db: Path) -> None:
     """Test search_by_tag query helper."""
-    spec1 = JobSpec(
+    spec1 = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
         config_snapshot={"test": "config1"},
         config_hash="abc123",
     )
-    spec2 = JobSpec(
+    spec2 = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
         config_snapshot={"test": "config2"},
         config_hash="def456",
     )
-    spec3 = JobSpec(
+    spec3 = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",
@@ -177,7 +177,7 @@ def test_search_by_tag(temp_db: Path) -> None:
 
 def test_list_jobs_includes_tags(temp_db: Path) -> None:
     """Test that list_jobs includes tags in records."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root="/tmp/outputs",

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, TypeVar
 from uuid import uuid4
 
-from FishBroWFS_V2.control.types import JobRecord, JobSpec, JobStatus, StopMode
+from FishBroWFS_V2.control.types import DBJobSpec, JobRecord, JobStatus, StopMode
 
 T = TypeVar("T")
 
@@ -121,9 +121,9 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
     if "tags_json" not in columns:
         conn.execute("ALTER TABLE jobs ADD COLUMN tags_json TEXT DEFAULT '[]'")
     
-    # Add data_fingerprint_sha1 column if missing
-    if "data_fingerprint_sha1" not in columns:
-        conn.execute("ALTER TABLE jobs ADD COLUMN data_fingerprint_sha1 TEXT DEFAULT ''")
+    # Add data_fingerprint_sha256_40 column if missing
+    if "data_fingerprint_sha256_40" not in columns:
+        conn.execute("ALTER TABLE jobs ADD COLUMN data_fingerprint_sha256_40 TEXT DEFAULT ''")
     
     # Create job_logs table if not exists
     conn.execute("""
@@ -196,7 +196,7 @@ def _validate_status_transition(old_status: JobStatus, new_status: JobStatus) ->
         raise ValueError(f"Cannot transition from terminal status: {old_status}")
 
 
-def create_job(db_path: Path, spec: JobSpec, *, tags: list[str] | None = None) -> str:
+def create_job(db_path: Path, spec: DBJobSpec, *, tags: list[str] | None = None) -> str:
     """
     Create a new job record.
     
@@ -219,7 +219,7 @@ def create_job(db_path: Path, spec: JobSpec, *, tags: list[str] | None = None) -
                 INSERT INTO jobs (
                     job_id, status, created_at, updated_at,
                     season, dataset_id, outputs_root, config_hash,
-                    config_snapshot_json, requested_pause, tags_json, data_fingerprint_sha1
+                    config_snapshot_json, requested_pause, tags_json, data_fingerprint_sha256_40
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 job_id,
@@ -233,7 +233,7 @@ def create_job(db_path: Path, spec: JobSpec, *, tags: list[str] | None = None) -
                 json.dumps(spec.config_snapshot),
                 0,
                 tags_json,
-                spec.data_fingerprint_sha1 if hasattr(spec, 'data_fingerprint_sha1') else '',
+                spec.data_fingerprint_sha256_40 if hasattr(spec, 'data_fingerprint_sha256_40') else '',
             ))
             conn.commit()
         return job_id
@@ -250,7 +250,7 @@ def _row_to_record(row: tuple) -> JobRecord:
     # - Latest: 15 columns (with tags_json)
     # - Phase 6.5: 16 columns (with data_fingerprint_sha1)
     if len(row) == 16:
-        # Phase 6.5 schema with data_fingerprint_sha1
+        # Phase 6.5 schema with data_fingerprint_sha256_40
         (
             job_id,
             status,
@@ -267,7 +267,7 @@ def _row_to_record(row: tuple) -> JobRecord:
             report_link,
             last_error,
             tags_json,
-            data_fingerprint_sha1,
+            data_fingerprint_sha256_40,
         ) = row
         # Parse tags_json, fallback to [] if None or invalid
         try:
@@ -276,9 +276,9 @@ def _row_to_record(row: tuple) -> JobRecord:
                 tags = []
         except (json.JSONDecodeError, TypeError):
             tags = []
-        fingerprint_sha1 = data_fingerprint_sha1 if data_fingerprint_sha1 else ""
+        fingerprint_sha256_40 = data_fingerprint_sha256_40 if data_fingerprint_sha256_40 else ""
     elif len(row) == 15:
-        # Latest schema with tags_json
+        # Latest schema with tags_json (without fingerprint column)
         (
             job_id,
             status,
@@ -303,7 +303,7 @@ def _row_to_record(row: tuple) -> JobRecord:
                 tags = []
         except (json.JSONDecodeError, TypeError):
             tags = []
-        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
+        fingerprint_sha256_40 = ""  # Fallback for schema without data_fingerprint_sha256_40
     elif len(row) == 14:
         # New schema with run_id and report_link
         # Order: job_id, status, created_at, updated_at, season, dataset_id, outputs_root,
@@ -325,7 +325,7 @@ def _row_to_record(row: tuple) -> JobRecord:
             last_error,
         ) = row
         tags = []  # Fallback for schema without tags_json
-        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
+        fingerprint_sha256_40 = ""  # Fallback for schema without data_fingerprint_sha256_40
     elif len(row) == 13:
         # Middle schema with report_link but no run_id
         (
@@ -345,7 +345,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         ) = row
         run_id = None
         tags = []  # Fallback for old schema
-        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
+        fingerprint_sha256_40 = ""  # Fallback for schema without data_fingerprint_sha256_40
     else:
         # Old schema (backward compatibility)
         (
@@ -365,15 +365,15 @@ def _row_to_record(row: tuple) -> JobRecord:
         run_id = None
         report_link = None
         tags = []  # Fallback for old schema
-        fingerprint_sha1 = ""  # Fallback for schema without data_fingerprint_sha1
+        fingerprint_sha256_40 = ""  # Fallback for schema without data_fingerprint_sha256_40
     
-    spec = JobSpec(
+    spec = DBJobSpec(
         season=season,
         dataset_id=dataset_id,
         outputs_root=outputs_root,
         config_snapshot=json.loads(config_snapshot_json),
         config_hash=config_hash,
-        data_fingerprint_sha1=fingerprint_sha1,
+        data_fingerprint_sha256_40=fingerprint_sha256_40,
     )
     
     return JobRecord(
@@ -388,7 +388,7 @@ def _row_to_record(row: tuple) -> JobRecord:
         report_link=report_link if report_link else None,
         last_error=last_error,
         tags=tags if tags else [],
-        data_fingerprint_sha1=fingerprint_sha1,
+        data_fingerprint_sha256_40=fingerprint_sha256_40,
     )
 
 
@@ -412,13 +412,13 @@ def get_job(db_path: Path, job_id: str) -> JobRecord:
             cursor = conn.execute("""
                 SELECT job_id, status, created_at, updated_at,
                        season, dataset_id, outputs_root, config_hash,
-                       config_snapshot_json, pid, 
+                       config_snapshot_json, pid,
                        COALESCE(run_id, NULL) as run_id,
                        run_link,
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
                        COALESCE(tags_json, '[]') as tags_json,
-                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
+                       COALESCE(data_fingerprint_sha256_40, '') as data_fingerprint_sha256_40
                 FROM jobs
                 WHERE job_id = ?
             """, (job_id,))
@@ -453,7 +453,7 @@ def list_jobs(db_path: Path, *, limit: int = 50) -> list[JobRecord]:
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
                        COALESCE(tags_json, '[]') as tags_json,
-                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
+                       COALESCE(data_fingerprint_sha256_40, '') as data_fingerprint_sha256_40
                 FROM jobs
                 ORDER BY created_at DESC
                 LIMIT ?
@@ -856,7 +856,7 @@ def search_by_tag(db_path: Path, tag: str, *, limit: int = 50) -> list[JobRecord
                        COALESCE(report_link, NULL) as report_link,
                        last_error,
                        COALESCE(tags_json, '[]') as tags_json,
-                       COALESCE(data_fingerprint_sha1, '') as data_fingerprint_sha1
+                       COALESCE(data_fingerprint_sha256_40, '') as data_fingerprint_sha256_40
                 FROM jobs
                 WHERE tags_json LIKE ?
                 ORDER BY created_at DESC

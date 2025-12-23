@@ -9,13 +9,13 @@ from typing import Any, Dict
 
 import pytest
 
-from FishBroWFS_V2.control.job_spec import DataSpec, JobSpec, WFSSpec
+from FishBroWFS_V2.control.job_spec import DataSpec, WizardJobSpec, WFSSpec
 
 
 def test_jobspec_schema_validation() -> None:
     """Test JobSpec schema validation."""
     # Valid JobSpec
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -44,7 +44,7 @@ def test_jobspec_required_fields() -> None:
     """Test that JobSpec requires all mandatory fields."""
     # Missing season
     with pytest.raises(ValueError):
-        JobSpec(
+        WizardJobSpec(
             season="",  # Empty season
             data1=DataSpec(
                 dataset_id="CME.MNQ.60m.2020-2024",
@@ -57,7 +57,7 @@ def test_jobspec_required_fields() -> None:
     
     # Missing data1
     with pytest.raises(ValueError):
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=None,  # type: ignore
             strategy_id="sma_cross_v1",
@@ -66,7 +66,7 @@ def test_jobspec_required_fields() -> None:
     
     # Missing strategy_id
     with pytest.raises(ValueError):
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(
                 dataset_id="CME.MNQ.60m.2020-2024",
@@ -136,7 +136,7 @@ def test_wfsspec_validation() -> None:
 
 def test_jobspec_json_serialization() -> None:
     """Test JobSpec JSON serialization (deterministic)."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -168,7 +168,7 @@ def test_jobspec_json_serialization() -> None:
 
 def test_jobspec_with_data2() -> None:
     """Test JobSpec with secondary dataset."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -197,7 +197,7 @@ def test_jobspec_with_data2() -> None:
 
 def test_jobspec_param_types() -> None:
     """Test JobSpec with various parameter types."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="TEST",
@@ -227,7 +227,7 @@ def test_jobspec_param_types() -> None:
 
 def test_jobspec_immutability() -> None:
     """Test that JobSpec is immutable (frozen)."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="TEST",
@@ -254,7 +254,7 @@ def test_jobspec_immutability() -> None:
 def test_wizard_generated_jobspec_structure() -> None:
     """Test that wizard-generated JobSpec matches CLI job structure."""
     # This is what the wizard would generate
-    wizard_jobspec = JobSpec(
+    wizard_jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -273,7 +273,7 @@ def test_wizard_generated_jobspec_structure() -> None:
     )
     
     # This is what CLI would generate (simplified)
-    cli_jobspec = JobSpec(
+    cli_jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -300,7 +300,7 @@ def test_wizard_generated_jobspec_structure() -> None:
 
 def test_jobspec_config_hash_compatibility() -> None:
     """Test that JobSpec can be used to generate config_hash."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="CME.MNQ.60m.2020-2024",
@@ -328,7 +328,7 @@ def test_jobspec_config_hash_compatibility() -> None:
 
 def test_empty_params_allowed() -> None:
     """Test that empty params dict is allowed."""
-    jobspec = JobSpec(
+    jobspec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(
             dataset_id="TEST",

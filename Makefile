@@ -1,7 +1,19 @@
 PROJECT_ROOT := $(CURDIR)
 CACHE_CLEANER := GM_Huang/clean_repo_caches.py
 RELEASE_TOOL := GM_Huang/release_tool.py
-VIEWER_APP := $(shell PYTHONPATH=src python3 -c "import FishBroWFS_V2.gui.viewer.app as m; import inspect; print(inspect.getsourcefile(m))")
+
+# --- SAFE MODE (WSL / pytest / numba stabilization) ---
+SAFE_ENV := NUMBA_DISABLE_CACHE=1 \
+            OMP_NUM_THREADS=1 \
+            MKL_NUM_THREADS=1 \
+            NUMEXPR_NUM_THREADS=1
+
+# Default: no xdist flags. User may override:
+#   make test SAFE_PYTEST_ADDOPTS="-n 1"
+SAFE_PYTEST_ADDOPTS ?=
+
+# pytest command using venv pytest (not python3 -m pytest)
+PYTEST := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/pytest
 
 .PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip gui demo contract
 
@@ -44,18 +56,21 @@ clean-data:
 # Testing (safe mode)
 # ---------------------------------------------------------
 test:
-	@echo "==> Running pytest (no bytecode, no numba cache)"
-	@PYTHONDONTWRITEBYTECODE=1 NUMBA_DISABLE_JIT=1 PYTHONPATH=src python3 -B -m pytest -q
+	@echo "==> Running pytest (SAFE MODE)"
+	@$(SAFE_ENV) $(PYTEST) -q $(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)
 
 check:
 	@echo "==> [0/2] Pre-cleaning bytecode caches (Constitution-enforced)"
 	@PYTHONDONTWRITEBYTECODE=1 python3 -B $(CACHE_CLEANER) || true
 	@echo ""
 	@echo "==> [1/2] Running pytest (no bytecode, no numba cache)"
-	@PYTHONDONTWRITEBYTECODE=1 NUMBA_DISABLE_JIT=1 PYTHONPATH=src python3 -B -m pytest -q
+	@$(SAFE_ENV) $(PYTEST) -q $(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)
 	@echo ""
 	@echo "==> [2/2] Post-cleaning bytecode caches (ensure no pollution)"
 	@PYTHONDONTWRITEBYTECODE=1 python3 -B $(CACHE_CLEANER) || true
+
+.PHONY: check-safe
+check-safe: check
 
 research:
 	@echo "==> Running research-grade tests (slow)"
@@ -96,22 +111,19 @@ release-zip:
 	@PYTHONDONTWRITEBYTECODE=1 python3 -B $(RELEASE_TOOL) zip
 
 # ---------------------------------------------------------
-# GUI stack (Mission Control + Viewer)
+# GUI stack (Mission Control only)
 # ---------------------------------------------------------
 gui:
 	@echo "==> Starting FishBroWFS_V2 GUI stack"
 	@echo " - Control API      : http://localhost:8000"
 	@echo " - Mission Control  : http://localhost:8080"
-	@echo " - Viewer (B5)      : http://localhost:8502"
 	@echo "Press Ctrl+C to stop all services"
 	@echo ""
 	@command -v uvicorn >/dev/null 2>&1 || { echo "ERROR: uvicorn not installed (pip install uvicorn fastapi)"; exit 1; }
 	@python3 -c "import nicegui" 2>/dev/null || { echo "ERROR: nicegui not installed (pip install nicegui)"; exit 1; }
-	@python3 -c "import streamlit" 2>/dev/null || { echo "ERROR: streamlit not installed (pip install streamlit)"; exit 1; }
 	@bash -c 'trap "kill %1 %2 2>/dev/null || true; exit" EXIT INT TERM; \
 		PYTHONPATH=src uvicorn FishBroWFS_V2.control.api:app --port 8000 & \
-		PYTHONPATH=src python3 -m FishBroWFS_V2.control.app_nicegui & \
-		PYTHONPATH=src streamlit run $(VIEWER_APP) --server.port 8502; \
+		PYTHONPATH=src python3 -m FishBroWFS_V2.control.app_nicegui; \
 		kill %1 %2 2>/dev/null || true'
 
 demo:

@@ -99,6 +99,8 @@ def register_snapshot_as_dataset(
     # Path relative to datasets root (snapshots/{snapshot_id}/normalized.json)
     rel_path = f"snapshots/{meta.snapshot_id}/normalized.json"
 
+    # Compute fingerprint (SHA256 first 40 chars)
+    fp40 = meta.normalized_sha256[:40]
     entry = DatasetRecord(
         id=dataset_id,
         symbol=meta.symbol,
@@ -107,7 +109,8 @@ def register_snapshot_as_dataset(
         path=rel_path,
         start_date=start_date,
         end_date=end_date,
-        fingerprint_sha1=meta.normalized_sha256[:40],  # SHA1 length is 40 hex chars
+        fingerprint_sha1=fp40,  # Keep for backward compatibility
+        fingerprint_sha256_40=fp40,  # New field
         tz_provider="UTC",
         tz_version="unknown",
     )

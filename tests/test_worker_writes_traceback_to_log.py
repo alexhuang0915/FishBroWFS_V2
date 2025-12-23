@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from FishBroWFS_V2.control.jobs_db import create_job, get_job, get_job_logs, init_db
-from FishBroWFS_V2.control.types import JobSpec, JobStatus
+from FishBroWFS_V2.control.types import DBJobSpec, JobStatus
 from FishBroWFS_V2.control.worker import run_one_job
 
 
@@ -29,7 +29,7 @@ def test_worker_writes_traceback_to_log(tmp_path: Path) -> None:
     init_db(db)
     
     # Create a job
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root=str(tmp_path / "outputs"),

@@ -8,9 +8,9 @@ Schema can only "add fields" in the future, cannot change semantics.
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List
+from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class DatasetRecord(BaseModel):
@@ -58,10 +58,26 @@ class DatasetRecord(BaseModel):
         description="Last date with data (inclusive)"
     )
     
-    fingerprint_sha1: str = Field(
-        ...,
-        description="SHA1 hash of file content (binary), deterministic fingerprint"
+    fingerprint_sha1: Optional[str] = Field(
+        default=None,
+        description="SHA1 hash of file content (binary), deterministic fingerprint (deprecated, use fingerprint_sha256_40)"
     )
+    
+    fingerprint_sha256_40: str = Field(
+        ...,
+        description="SHA256 hash of file content (binary), first 40 hex chars, deterministic fingerprint"
+    )
+    
+    @model_validator(mode="before")
+    @classmethod
+    def ensure_fingerprint_sha256_40(cls, data: dict) -> dict:
+        """Backward compatibility: if fingerprint_sha256_40 missing but fingerprint_sha1 present, copy it."""
+        if isinstance(data, dict):
+            if "fingerprint_sha256_40" not in data or not data["fingerprint_sha256_40"]:
+                if "fingerprint_sha1" in data and data["fingerprint_sha1"]:
+                    # Copy sha1 to sha256 field (note: this is semantically wrong but maintains compatibility)
+                    data["fingerprint_sha256_40"] = data["fingerprint_sha1"]
+        return data
     
     tz_provider: str = Field(
         default="IANA",

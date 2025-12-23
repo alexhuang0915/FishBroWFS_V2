@@ -39,11 +39,39 @@ def test_submit_batch_flow(client):
         artifacts_root = Path(tmp) / "artifacts"
         season_root = Path(tmp) / "season_index"
         exports_root = Path(tmp) / "exports"
+        datasets_root = Path(tmp) / "datasets"
 
-        # Mock the necessary roots
+        # Create a mock dataset index file
+        datasets_root.mkdir(parents=True, exist_ok=True)
+        dataset_index_path = datasets_root / "datasets_index.json"
+        dataset_index = {
+            "generated_at": "2025-12-23T00:00:00Z",
+            "datasets": [
+                {
+                    "id": "CME_MNQ_v2",
+                    "symbol": "CME.MNQ",
+                    "exchange": "CME",
+                    "timeframe": "60m",
+                    "path": "CME.MNQ/60m/2020-2024.parquet",
+                    "start_date": "2020-01-01",
+                    "end_date": "2024-12-31",
+                    "fingerprint_sha256_40": "abc123def456abc123def456abc123def456abc12",
+                    "fingerprint_sha1": "abc123def456abc123def456abc123def456abc12",  # optional
+                    "tz_provider": "IANA",
+                    "tz_version": "unknown"
+                }
+            ]
+        }
+        dataset_index_path.write_text(json.dumps(dataset_index, indent=2), encoding="utf-8")
+
+        # Mock the necessary roots and dataset index loading
         with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
              patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root):
+             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root), \
+             patch("FishBroWFS_V2.control.api._load_dataset_index_from_file") as mock_load:
+            # Make the mock return the dataset index we created
+            from FishBroWFS_V2.data.dataset_registry import DatasetIndex
+            mock_load.return_value = DatasetIndex.model_validate(dataset_index)
             
             # First, create a season index
             season = "2026Q1"
@@ -54,10 +82,10 @@ def test_submit_batch_flow(client):
 
             # Import the actual models used by the API
             from FishBroWFS_V2.control.batch_submit import BatchSubmitRequest
-            from FishBroWFS_V2.control.job_spec import JobSpec, DataSpec, WFSSpec
+            from FishBroWFS_V2.control.job_spec import WizardJobSpec, DataSpec, WFSSpec
             
             # Create a valid JobSpec using the actual schema
-            job = JobSpec(
+            job = WizardJobSpec(
                 season=season,
                 data1=DataSpec(dataset_id="CME_MNQ_v2", start_date="2024-01-01", end_date="2024-01-31"),
                 data2=None,

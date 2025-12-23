@@ -95,14 +95,24 @@ def replay_season_topk(
                 item_copy["_batch_id"] = batch_id
                 all_items.append(item_copy)
     
-    # Sort by score descending (best effort)
-    def _score_key(item: dict[str, Any]) -> float:
+    # Sort by (-score, batch_id, job_id) for deterministic ordering
+    def _sort_key(item: dict[str, Any]) -> tuple:
+        # Score (descending, so use negative)
         score = item.get("score")
         if isinstance(score, (int, float)):
-            return float(score)
-        return -float("inf")
+            score_val = -float(score)  # Negative for descending sort
+        else:
+            score_val = float("inf")  # Missing scores go last
+        
+        # Batch ID (from _batch_id added earlier)
+        batch_id = item.get("_batch_id", "")
+        
+        # Job ID
+        job_id = item.get("job_id", "")
+        
+        return (score_val, batch_id, job_id)
     
-    sorted_items = sorted(all_items, key=_score_key, reverse=True)
+    sorted_items = sorted(all_items, key=_sort_key)
     topk_items = sorted_items[:k] if k > 0 else sorted_items
     
     return ReplaySeasonTopkResult(
@@ -188,26 +198,40 @@ def replay_season_leaderboard(
             if not isinstance(item, dict):
                 continue
             
+            # Add batch_id for deterministic sorting
+            item_copy = dict(item)
+            item_copy["_batch_id"] = batch_info.get("batch_id", "")
+            
             # Extract grouping key
-            group_key = item.get(group_by, "")
+            group_key = item_copy.get(group_by, "")
             if not isinstance(group_key, str):
                 group_key = str(group_key)
             
             if group_key not in items_by_group:
                 items_by_group[group_key] = []
             
-            items_by_group[group_key].append(item)
+            items_by_group[group_key].append(item_copy)
     
-    # Sort items within each group by score descending
-    def _score_key(item: dict[str, Any]) -> float:
+    # Sort items within each group by (-score, batch_id, job_id) for deterministic ordering
+    def _sort_key(item: dict[str, Any]) -> tuple:
+        # Score (descending, so use negative)
         score = item.get("score")
         if isinstance(score, (int, float)):
-            return float(score)
-        return -float("inf")
+            score_val = -float(score)  # Negative for descending sort
+        else:
+            score_val = float("inf")  # Missing scores go last
+        
+        # Batch ID (item may not have _batch_id in leaderboard context)
+        batch_id = item.get("_batch_id", item.get("batch_id", ""))
+        
+        # Job ID
+        job_id = item.get("job_id", "")
+        
+        return (score_val, batch_id, job_id)
     
     groups: list[dict[str, Any]] = []
     for group_key, group_items in items_by_group.items():
-        sorted_items = sorted(group_items, key=_score_key, reverse=True)
+        sorted_items = sorted(group_items, key=_sort_key)
         top_items = sorted_items[:per_group] if per_group > 0 else sorted_items
         
         groups.append({

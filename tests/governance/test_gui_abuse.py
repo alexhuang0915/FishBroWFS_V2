@@ -41,8 +41,26 @@ def test_gui_cannot_inject_execution_semantics(client):
             {"season": season, "generated_at": "Z", "batches": []},
         )
 
+        # Mock dataset index
+        from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+        mock_dataset = DatasetRecord(
+            id="CME_MNQ_v2",
+            symbol="CME.MNQ",
+            exchange="CME",
+            timeframe="60m",
+            path="CME.MNQ/60m/2020-2024.parquet",
+            start_date="2020-01-01",
+            end_date="2024-12-31",
+            fingerprint_sha256_40="abc123def456abc123def456abc123def456abc12",
+            fingerprint_sha1="abc123def456abc123def456abc123def456abc12",
+            tz_provider="IANA",
+            tz_version="unknown"
+        )
+        mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[mock_dataset])
+
         with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
+             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index):
             
             # Attempt to submit batch with injected execution semantics
             # The API should reject or ignore fields that are not part of the contract
@@ -158,7 +176,25 @@ def test_gui_cannot_modify_frozen_season(client):
             },
         )
 
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        # Mock dataset index
+        from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+        mock_dataset = DatasetRecord(
+            id="CME_MNQ_v2",
+            symbol="CME.MNQ",
+            exchange="CME",
+            timeframe="60m",
+            path="CME.MNQ/60m/2020-2024.parquet",
+            start_date="2020-01-01",
+            end_date="2024-12-31",
+            fingerprint_sha256_40="abc123def456abc123def456abc123def456abc12",
+            fingerprint_sha1="abc123def456abc123def456abc123def456abc12",
+            tz_provider="IANA",
+            tz_version="unknown"
+        )
+        mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[mock_dataset])
+
+        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
+             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index):
             # Attempt to rebuild index (should fail)
             r = client.post(f"/seasons/{season}/rebuild_index")
             assert r.status_code == 403

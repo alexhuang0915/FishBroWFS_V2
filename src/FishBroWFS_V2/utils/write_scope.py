@@ -93,17 +93,21 @@ class WriteScope:
                     f"scope root {root_resolved}"
                 )
 
-        # 3. Check exact matches first.
+        # 3. Check for wildcard prefix "*" which allows any file under root_dir
+        if "*" in self.allowed_rel_prefixes:
+            return
+
+        # 4. Check exact matches first.
         if rel in self.allowed_rel_files:
             return
 
-        # 4. Check prefix matches on the basename.
+        # 5. Check prefix matches on the basename.
         basename = os.path.basename(rel)
         for prefix in self.allowed_rel_prefixes:
             if basename.startswith(prefix):
                 return
 
-        # 5. If we reach here, the path is forbidden.
+        # 6. If we reach here, the path is forbidden.
         raise ValueError(
             f"Relative path {rel!r} is not allowed by this write scope.\n"
             f"Allowed exact files: {sorted(self.allowed_rel_files)}\n"
@@ -187,31 +191,43 @@ def create_plan_quality_scope(quality_dir: Path) -> WriteScope:
 def create_season_export_scope(export_root: Path) -> WriteScope:
     """Create a WriteScope for season‑export outputs.
 
-    This scope is stricter: only files explicitly listed in the export‑pack
-    specification are allowed.  For now we reuse the same deterministic set
-    that `season_export.py` already writes.
+    This scope allows any file under exports_root / seasons / {season} / **
+    but forbids any path that would escape to outputs/artifacts/** or
+    outputs/season_index/** or any other repo root paths.
 
-    Exact allowed files (to be filled according to the actual spec):
-        season_export.json
-        season_export_manifest.json
-        season_export_checksums.json
-        (plus any other files defined by the export‑pack spec)
-
-    Because the export spec may vary per run, we currently allow only the
-    hard‑coded list below.  In a future refinement the allowed set could be
-    passed as a parameter.
+    The export_root parameter should be the season directory:
+        exports_root / seasons / {season}
 
     Allowed prefixes:
-        ()   (none – only exact matches are permitted)
+        ()   (none – we allow any file under the export_root)
     """
+    # Ensure export_root is under the exports tree
+    exports_root = Path(os.environ.get("FISHBRO_EXPORTS_ROOT", "outputs/exports"))
+    if not export_root.is_relative_to(exports_root):
+        raise ValueError(
+            f"export_root {export_root} must be under exports root {exports_root}"
+        )
+    
+    # Ensure export_root follows the pattern exports_root / seasons / {season}
+    try:
+        relative_to_exports = export_root.relative_to(exports_root)
+        parts = relative_to_exports.parts
+        if len(parts) < 2 or parts[0] != "seasons":
+            raise ValueError(
+                f"export_root must be under exports_root/seasons/{{season}}, got {relative_to_exports}"
+            )
+    except ValueError:
+        raise ValueError(
+            f"export_root {export_root} must be under exports root {exports_root}"
+        )
+    
+    # Allow any file under export_root (empty allowed_rel_files means no exact matches required,
+    # empty allowed_rel_prefixes means no prefix restriction, but we need to allow all files)
+    # We'll use a special prefix "*" to indicate allow all (handled in assert_allowed_rel)
     return WriteScope(
         root_dir=export_root,
-        allowed_rel_files=frozenset({
-            "season_export.json",
-            "season_export_manifest.json",
-            "season_export_checksums.json",
-        }),
-        allowed_rel_prefixes=(),
+        allowed_rel_files=frozenset(),  # No exact matches required
+        allowed_rel_prefixes=("*",),    # Allow any file under export_root
     )
 
 

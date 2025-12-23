@@ -9,22 +9,22 @@ from FishBroWFS_V2.control.batch_submit import (
     wizard_to_db_jobspec,
     submit_batch,
 )
-from FishBroWFS_V2.control.job_spec import JobSpec, DataSpec, WFSSpec
-from FishBroWFS_V2.control.types import JobSpec as DBJobSpec
+from FishBroWFS_V2.control.job_spec import WizardJobSpec, DataSpec, WFSSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 from datetime import date
 
 
 def test_batch_submit_request():
     """BatchSubmitRequest creation."""
     jobs = [
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
             params={"p": 1},
             wfs=WFSSpec()
         ),
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
@@ -53,14 +53,14 @@ def test_batch_submit_response():
 def test_compute_batch_id_deterministic():
     """Batch ID is deterministic based on sorted JobSpec JSON."""
     jobs = [
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
             params={"a": 1, "b": 2},
             wfs=WFSSpec()
         ),
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
@@ -81,14 +81,19 @@ def test_compute_batch_id_deterministic():
 
 def test_wizard_to_db_jobspec():
     """Convert Wizard JobSpec to DB JobSpec."""
-    wizard_spec = JobSpec(
+    wizard_spec = WizardJobSpec(
         season="2024Q1",
         data1=DataSpec(dataset_id="CME_MNQ_v2", start_date=date(2020,1,1), end_date=date(2020,12,31)),
         strategy_id="my_strategy",
         params={"param1": 42},
         wfs=WFSSpec(stage0_subsample=0.5, top_k=100, mem_limit_mb=2048, allow_auto_downsample=True)
     )
-    db_spec = wizard_to_db_jobspec(wizard_spec)
+    # Mock dataset record with fingerprint
+    dataset_record = {
+        "fingerprint_sha256_40": "abc123def456ghi789jkl012mno345pqr678stu901",
+        "normalized_sha256_40": "abc123def456ghi789jkl012mno345pqr678stu901"
+    }
+    db_spec = wizard_to_db_jobspec(wizard_spec, dataset_record)
     assert isinstance(db_spec, DBJobSpec)
     assert db_spec.season == "2024Q1"
     assert db_spec.dataset_id == "CME_MNQ_v2"
@@ -101,6 +106,8 @@ def test_wizard_to_db_jobspec():
     # config_hash should be non-empty
     assert db_spec.config_hash
     assert db_spec.created_by == "wizard_batch"
+    # fingerprint should be set
+    assert db_spec.data_fingerprint_sha256_40 == "abc123def456ghi789jkl012mno345pqr678stu901"
 
 
 def test_submit_batch_mocked(monkeypatch):
@@ -122,7 +129,7 @@ def test_submit_batch_mocked(monkeypatch):
     
     # Prepare request
     jobs = [
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
@@ -132,10 +139,18 @@ def test_submit_batch_mocked(monkeypatch):
     ]
     req = BatchSubmitRequest(jobs=jobs)
     
+    # Mock dataset index
+    dataset_index = {
+        "test": {
+            "fingerprint_sha256_40": "abc123def456ghi789jkl012mno345pqr678stu901",
+            "normalized_sha256_40": "abc123def456ghi789jkl012mno345pqr678stu901"
+        }
+    }
+    
     # Call submit_batch with dummy db_path
     from pathlib import Path
     db_path = Path("/tmp/test.db")
-    resp = submit_batch(db_path, req)
+    resp = submit_batch(db_path, req, dataset_index)
     
     assert resp.batch_id.startswith("batch-")
     assert resp.total_jobs == 3
@@ -148,14 +163,15 @@ def test_submit_batch_empty_jobs():
     req = BatchSubmitRequest(jobs=[])
     from pathlib import Path
     db_path = Path("/tmp/test.db")
+    dataset_index = {"test": {"fingerprint_sha256_40": "abc123"}}
     with pytest.raises(ValueError, match="jobs list cannot be empty"):
-        submit_batch(db_path, req)
+        submit_batch(db_path, req, dataset_index)
 
 
 def test_submit_batch_too_many_jobs():
     """Jobs exceed cap raises."""
     jobs = [
-        JobSpec(
+        WizardJobSpec(
             season="2024Q1",
             data1=DataSpec(dataset_id="test", start_date=date(2020,1,1), end_date=date(2020,12,31)),
             strategy_id="s1",
@@ -166,8 +182,9 @@ def test_submit_batch_too_many_jobs():
     req = BatchSubmitRequest(jobs=jobs)
     from pathlib import Path
     db_path = Path("/tmp/test.db")
+    dataset_index = {"test": {"fingerprint_sha256_40": "abc123"}}
     with pytest.raises(ValueError, match="exceeds maximum"):
-        submit_batch(db_path, req)
+        submit_batch(db_path, req, dataset_index)
 
 
 if __name__ == "__main__":

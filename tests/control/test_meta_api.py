@@ -39,6 +39,7 @@ def mock_dataset_index(tmp_path: Path) -> DatasetIndex:
                 start_date=date(2020, 1, 1),
                 end_date=date(2024, 12, 31),
                 fingerprint_sha1="a" * 40,
+                fingerprint_sha256_40="a" * 40,
                 tz_provider="IANA",
                 tz_version="2024a"
             ),
@@ -51,6 +52,7 @@ def mock_dataset_index(tmp_path: Path) -> DatasetIndex:
                 start_date=date(2018, 1, 1),
                 end_date=date(2023, 12, 31),
                 fingerprint_sha1="b" * 40,
+                fingerprint_sha256_40="b" * 40,
                 tz_provider="IANA",
                 tz_version="2024a"
             )
@@ -146,6 +148,8 @@ def test_meta_datasets_endpoint(
     assert dataset1["start_date"] == "2020-01-01"
     assert dataset1["end_date"] == "2024-12-31"
     assert len(dataset1["fingerprint_sha1"]) == 40
+    assert "fingerprint_sha256_40" in dataset1
+    assert len(dataset1["fingerprint_sha256_40"]) == 40
 
 
 def test_meta_strategies_endpoint(

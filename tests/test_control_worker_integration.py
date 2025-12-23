@@ -11,7 +11,7 @@ import pytest
 
 from FishBroWFS_V2.control.jobs_db import create_job, get_job, init_db
 from FishBroWFS_V2.control.report_links import make_report_link
-from FishBroWFS_V2.control.types import JobSpec, JobStatus
+from FishBroWFS_V2.control.types import DBJobSpec, JobStatus
 from FishBroWFS_V2.control.worker import run_one_job
 from FishBroWFS_V2.pipeline.funnel_schema import (
     FunnelPlan,
@@ -44,7 +44,7 @@ def test_worker_completes_job_with_run_id_and_report_link(
     """Test that worker completes job and sets run_id and report_link."""
     # Create a job
     season = "2026Q1"
-    spec = JobSpec(
+    spec = DBJobSpec(
         season=season,
         dataset_id="test_dataset",
         outputs_root=str(temp_outputs_root),
@@ -91,7 +91,7 @@ def test_worker_handles_empty_funnel_result(
     temp_db: Path, temp_outputs_root: Path
 ) -> None:
     """Test that worker handles empty funnel result gracefully."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="2026Q1",
         dataset_id="test_dataset",
         outputs_root=str(temp_outputs_root),

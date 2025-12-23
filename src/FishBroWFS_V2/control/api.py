@@ -26,7 +26,7 @@ from FishBroWFS_V2.control.jobs_db import (
 )
 from FishBroWFS_V2.control.paths import run_log_path
 from FishBroWFS_V2.control.preflight import PreflightResult, run_preflight
-from FishBroWFS_V2.control.types import JobRecord, JobSpec, StopMode
+from FishBroWFS_V2.control.types import DBJobSpec, JobRecord, StopMode
 
 # Phase 13: Batch submit
 from FishBroWFS_V2.control.batch_submit import (
@@ -159,6 +159,21 @@ def _load_dataset_index_from_file() -> DatasetIndex:
 
     data = json.loads(index_path.read_text())
     return DatasetIndex.model_validate(data)
+
+
+def _get_dataset_index() -> DatasetIndex:
+    """Return cached dataset index, loading if necessary."""
+    global _DATASET_INDEX
+    if _DATASET_INDEX is None:
+        _DATASET_INDEX = _load_dataset_index_from_file()
+    return _DATASET_INDEX
+
+
+def _reload_dataset_index() -> DatasetIndex:
+    """Force reload dataset index from file and update cache."""
+    global _DATASET_INDEX
+    _DATASET_INDEX = _load_dataset_index_from_file()
+    return _DATASET_INDEX
 
 
 def load_dataset_index() -> DatasetIndex:
@@ -320,10 +335,15 @@ async def meta_strategies() -> StrategyRegistryResponse:
     - If registries are not preloaded: return 503
     - Deterministic ordering: strategies sorted by strategy_id; params sorted by name
     """
-    try:
-        reg = load_strategy_registry()
-    except RuntimeError as e:
-        raise HTTPException(status_code=503, detail=str(e))
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_strategy_registry")
+
+    # Enforce no filesystem access during request handling
+    if _STRATEGY_REGISTRY is None and current is _LOAD_STRATEGY_REGISTRY_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Registry not loaded")
+
+    reg = load_strategy_registry()
 
     strategies = []
     for s in reg.strategies:  # preserve original strategy order
@@ -361,7 +381,7 @@ async def get_job_endpoint(job_id: str) -> JobRecord:
 
 
 class SubmitJobRequest(BaseModel):
-    spec: JobSpec
+    spec: DBJobSpec
 
 
 @app.post("/jobs")
@@ -383,7 +403,7 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
         spec_dict = payload
 
     try:
-        spec = JobSpec(**spec_dict)
+        spec = DBJobSpec(**spec_dict)
     except Exception as e:
         raise HTTPException(status_code=422, detail=f"Invalid JobSpec: {e}")
 
@@ -559,17 +579,63 @@ async def batch_submit_endpoint(req: BatchSubmitRequest) -> BatchSubmitResponse:
     Flow:
     1) Validate request jobs list not empty and <= cap
     2) Compute batch_id
-    3) For each JobSpec in order: call existing “submit_job” internal function used by POST /jobs
+    3) For each JobSpec in order: call existing "submit_job" internal function used by POST /jobs
     4) return response model (200)
     """
     db_path = get_db_path()
+    
+    # Prepare dataset index for fingerprint lookup with reload-once fallback
+    dataset_index = {}
     try:
-        response = submit_batch(db_path, req)
+        idx = load_dataset_index()
+        # Convert to dict mapping dataset_id -> record dict
+        for ds in idx.datasets:
+            # Convert to dict with fingerprint fields
+            ds_dict = ds.model_dump(mode="json")
+            dataset_index[ds.id] = ds_dict
+    except Exception as e:
+        # If dataset registry not available, raise 503
+        raise HTTPException(
+            status_code=503,
+            detail=f"Dataset registry not available: {str(e)}"
+        )
+    
+    # Collect all dataset_ids from jobs
+    dataset_ids = {job.data1.dataset_id for job in req.jobs}
+    missing_ids = [did for did in dataset_ids if did not in dataset_index]
+    
+    # If any dataset_id missing, reload index once and try again
+    if missing_ids:
+        try:
+            idx = _reload_dataset_index()
+            dataset_index.clear()
+            for ds in idx.datasets:
+                ds_dict = ds.model_dump(mode="json")
+                dataset_index[ds.id] = ds_dict
+        except Exception as e:
+            # If reload fails, raise 503
+            raise HTTPException(
+                status_code=503,
+                detail=f"Dataset registry reload failed: {str(e)}"
+            )
+        # Check again after reload
+        missing_ids = [did for did in dataset_ids if did not in dataset_index]
+        if missing_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Dataset(s) not found in registry: {', '.join(missing_ids)}"
+            )
+    
+    try:
+        response = submit_batch(db_path, req, dataset_index)
         return response
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        # Catch any other unexpected errors and return 500
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # Phase 14: Batch execution & governance endpoints

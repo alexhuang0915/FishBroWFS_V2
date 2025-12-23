@@ -13,8 +13,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from FishBroWFS_V2.control.job_spec import JobSpec as WizardJobSpec
-from FishBroWFS_V2.control.types import JobSpec as DbJobSpec
+from FishBroWFS_V2.control.job_spec import WizardJobSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 
 # Import create_job for monkeypatching by tests
 from FishBroWFS_V2.control.jobs_db import create_job
@@ -90,15 +90,18 @@ def compute_batch_id(jobs: list[WizardJobSpec]) -> str:
     return f"batch-{sha1[:12]}"
 
 
-def wizard_to_db_jobspec(wizard_spec: WizardJobSpec) -> DbJobSpec:
+def wizard_to_db_jobspec(wizard_spec: WizardJobSpec, dataset_record: dict) -> DBJobSpec:
     """Convert Wizard JobSpec to DB JobSpec.
     
-    This is a placeholder conversion; you must adapt based on actual mapping.
-    The DB JobSpec expects fields like dataset_id, outputs_root, config_snapshot, config_hash.
-    The Wizard JobSpec has data1, data2, season, strategy_id, params, wfs.
-    
-    Since Phase 13 is about research UX, we need to decide how to map.
-    For now, we'll create a minimal mapping that passes validation.
+    Args:
+        wizard_spec: Wizard JobSpec (config-only wizard output)
+        dataset_record: Dataset registry record containing fingerprint
+        
+    Returns:
+        DBJobSpec for DB/worker runtime
+        
+    Raises:
+        ValueError: if data_fingerprint_sha256_40 is missing (DIRTY jobs are forbidden)
     """
     # Use data1.dataset_id as dataset_id
     dataset_id = wizard_spec.data1.dataset_id
@@ -123,29 +126,41 @@ def wizard_to_db_jobspec(wizard_spec: WizardJobSpec) -> DbJobSpec:
         json.dumps(config_snapshot, sort_keys=True, separators=(",", ":")).encode("utf-8")
     ).hexdigest()[:16]
     
-    return DbJobSpec(
+    # Get fingerprint from dataset registry
+    # Try fingerprint_sha256_40 first, then normalized_sha256_40
+    fp = dataset_record.get("fingerprint_sha256_40") or dataset_record.get("normalized_sha256_40")
+    if not fp:
+        raise ValueError("data_fingerprint_sha256_40 is required; DIRTY jobs are forbidden")
+    
+    return DBJobSpec(
         season=wizard_spec.season,
         dataset_id=dataset_id,
         outputs_root=outputs_root,
         config_snapshot=config_snapshot,
         config_hash=config_hash,
-        data_fingerprint_sha1="",  # placeholder
+        data_fingerprint_sha256_40=fp,
         created_by="wizard_batch",
     )
 
 
-def submit_batch(db_path: Path, req: BatchSubmitRequest) -> BatchSubmitResponse:
+def submit_batch(
+    db_path: Path,
+    req: BatchSubmitRequest,
+    dataset_index: dict | None = None
+) -> BatchSubmitResponse:
     """Submit a batch of jobs.
     
     Args:
         db_path: Path to SQLite database
         req: Batch submit request
+        dataset_index: Optional dataset index dict mapping dataset_id to record.
+                      If not provided, will attempt to load from cache.
     
     Returns:
         BatchSubmitResponse with batch_id and job_ids
     
     Raises:
-        ValueError: if any job fails validation
+        ValueError: if any job fails validation or fingerprint missing
         RuntimeError: if DB submission fails
     """
     # Validate jobs list not empty
@@ -163,7 +178,30 @@ def submit_batch(db_path: Path, req: BatchSubmitRequest) -> BatchSubmitResponse:
     # Convert each job to DB JobSpec and submit
     job_ids = []
     for job in req.jobs:
-        db_spec = wizard_to_db_jobspec(job)
+        # Get dataset record for fingerprint
+        dataset_id = job.data1.dataset_id
+        dataset_record = None
+        
+        if dataset_index and dataset_id in dataset_index:
+            dataset_record = dataset_index[dataset_id]
+        else:
+            # Try to load from cache
+            try:
+                from FishBroWFS_V2.control.api import load_dataset_index
+                idx = load_dataset_index()
+                # Find dataset by id
+                for ds in idx.datasets:
+                    if ds.id == dataset_id:
+                        dataset_record = ds.model_dump(mode="json")
+                        break
+            except Exception:
+                # If cannot load dataset index, raise error
+                raise ValueError(f"Cannot load dataset record for {dataset_id}; fingerprint required")
+        
+        if not dataset_record:
+            raise ValueError(f"Dataset {dataset_id} not found in registry; fingerprint required")
+        
+        db_spec = wizard_to_db_jobspec(job, dataset_record)
         job_id = create_job(db_path, db_spec)
         job_ids.append(job_id)
     

@@ -16,14 +16,14 @@ from FishBroWFS_V2.control.jobs_db import (
     mark_done,
     mark_running,
 )
-from FishBroWFS_V2.control.types import JobSpec
+from FishBroWFS_V2.control.types import DBJobSpec
 
 
 def _proc(db_path: str, n: int) -> None:
     """Worker process: create n jobs and complete them."""
     p = Path(db_path)
     for i in range(n):
-        spec = JobSpec(
+        spec = DBJobSpec(
             season="test",
             dataset_id="test",
             outputs_root="outputs",

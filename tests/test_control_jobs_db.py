@@ -22,7 +22,7 @@ from FishBroWFS_V2.control.jobs_db import (
     request_stop,
     update_running,
 )
-from FishBroWFS_V2.control.types import JobSpec, JobStatus, StopMode
+from FishBroWFS_V2.control.types import DBJobSpec, JobStatus, StopMode
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def test_init_db_creates_table(temp_db: Path) -> None:
 
 def test_create_job_and_get(temp_db: Path) -> None:
     """Test creating and retrieving a job."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test_season",
         dataset_id="test_dataset",
         outputs_root="outputs",
@@ -69,7 +69,7 @@ def test_create_job_and_get(temp_db: Path) -> None:
 
 def test_list_jobs(temp_db: Path) -> None:
     """Test listing jobs."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",
@@ -91,7 +91,7 @@ def test_list_jobs(temp_db: Path) -> None:
 
 def test_request_pause(temp_db: Path) -> None:
     """Test pause request."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",
@@ -109,7 +109,7 @@ def test_request_pause(temp_db: Path) -> None:
 
 def test_request_stop(temp_db: Path) -> None:
     """Test stop request."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",
@@ -131,7 +131,7 @@ def test_request_stop(temp_db: Path) -> None:
 
 def test_status_transitions(temp_db: Path) -> None:
     """Test status transitions."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",
@@ -158,7 +158,7 @@ def test_status_transitions(temp_db: Path) -> None:
 
 def test_mark_failed(temp_db: Path) -> None:
     """Test marking job as failed."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",
@@ -176,7 +176,7 @@ def test_mark_failed(temp_db: Path) -> None:
 
 def test_mark_killed(temp_db: Path) -> None:
     """Test marking job as killed."""
-    spec = JobSpec(
+    spec = DBJobSpec(
         season="test",
         dataset_id="test",
         outputs_root="outputs",

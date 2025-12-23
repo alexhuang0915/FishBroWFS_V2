@@ -1,0 +1,83 @@
+{
+  "by_dataset_id": {
+    "CME.MNQ.60m.2020-2024": {
+      "instrument_id": "MNQ",
+      "exchange": "CME",
+      "market": "電子盤",
+      "currency": "USD",
+      "tick_size": 0.25,
+      "session": {
+        "tz": "Asia/Taipei",
+        "open_taipei": "07:00",
+        "close_taipei": "06:00",
+        "breaks_taipei": [
+          ["16:15", "16:30"],
+          ["22:00", "22:15"]
+        ],
+        "notes": "CME MNQ 電子盤 (E-mini Nasdaq-100)"
+      },
+      "source": "manual",
+      "source_updated_at": "2025-12-22T00:00:00Z",
+      "version": "v1"
+    }
+  },
+  "by_symbol": {
+    "CME.MNQ": {
+      "instrument_id": "MNQ",
+      "exchange": "CME",
+      "market": "電子盤",
+      "currency": "USD",
+      "tick_size": 0.25,
+      "session": {
+        "tz": "Asia/Taipei",
+        "open_taipei": "07:00",
+        "close_taipei": "06:00",
+        "breaks_taipei": [
+          ["16:15", "16:30"],
+          ["22:00", "22:15"]
+        ],
+        "notes": "CME MNQ 電子盤 (E-mini Nasdaq-100)"
+      },
+      "source": "manual",
+      "source_updated_at": "2025-12-22T00:00:00Z",
+      "version": "v1"
+    },
+    "CME.MES": {
+      "instrument_id": "MES",
+      "exchange": "CME",
+      "market": "電子盤",
+      "currency": "USD",
+      "tick_size": 0.25,
+      "session": {
+        "tz": "Asia/Taipei",
+        "open_taipei": "07:00",
+        "close_taipei": "06:00",
+        "breaks_taipei": [
+          ["16:15", "16:30"],
+          ["22:00", "22:15"]
+        ],
+        "notes": "CME MES 電子盤 (E-mini S&P 500)"
+      },
+      "source": "manual",
+      "source_updated_at": "2025-12-22T00:00:00Z",
+      "version": "v1"
+    },
+    "TWF.MXF": {
+      "instrument_id": "MXF",
+      "exchange": "TWF",
+      "market": "日盤",
+      "currency": "TWD",
+      "tick_size": 1.0,
+      "session": {
+        "tz": "Asia/Taipei",
+        "open_taipei": "08:45",
+        "close_taipei": "13:45",
+        "breaks_taipei": [],
+        "notes": "台灣期貨交易所 小型台指期貨"
+      },
+      "source": "manual",
+      "source_updated_at": "2025-12-22T00:00:00Z",
+      "version": "v1"
+    }
+  }
+}

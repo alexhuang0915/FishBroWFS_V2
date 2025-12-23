@@ -32,6 +32,7 @@ from FishBroWFS_V2.control.research_runner import (
     ResearchRunError,
 )
 from FishBroWFS_V2.control.build_context import BuildContext
+from FishBroWFS_V2.strategy.registry import load_builtin_strategies
 
 
 def main() -> int:
@@ -131,8 +132,24 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def ensure_builtin_strategies_loaded() -> None:
+    """Ensure built-in strategies are loaded (idempotent).
+    
+    This function can be called multiple times without crashing.
+    """
+    try:
+        load_builtin_strategies()
+    except ValueError as e:
+        # registry is process-local; re-entry may raise duplicate register
+        if "already registered" not in str(e):
+            raise
+
+
 def run_research_cli(args) -> int:
     """執行研究邏輯"""
+    # 0. 確保 built-in strategies 已載入
+    ensure_builtin_strategies_loaded()
+    
     # 1. 準備 build_ctx（如果需要）
     build_ctx = prepare_build_context(args)
     

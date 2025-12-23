@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from FishBroWFS_V2.research.registry import build_research_index
+from FishBroWFS_V2.research.extract import extract_canonical_metrics, ExtractionError
 
 
 def generate_canonical_results(outputs_root: Path, research_dir: Path) -> Path:

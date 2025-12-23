@@ -1,0 +1,12 @@
+{
+  "strategy_id": "sma_cross",
+  "required": [
+    {"name": "atr_14", "timeframe_min": 60},
+    {"name": "ret_z_200", "timeframe_min": 60}
+  ],
+  "optional": [
+    {"name": "session_vwap", "timeframe_min": 60}
+  ],
+  "min_schema_version": "v1",
+  "notes": "bootstrap for first research run"
+}

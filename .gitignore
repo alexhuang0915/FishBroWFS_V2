@@ -22,3 +22,8 @@ numba_cache/
 # Local scratch
 scratch/
 tmp/
+
+# --- Generated artifacts (never commit) ---
+outputs/
+outputs/**
+

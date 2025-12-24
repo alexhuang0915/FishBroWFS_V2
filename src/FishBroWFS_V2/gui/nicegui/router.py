@@ -13,6 +13,11 @@ def register_pages() -> None:
         register_results,
         register_charts,
         register_deploy,
+        register_history,
+        register_candidates,
+        register_wizard,
+        register_portfolio,
+        register_run_detail,
     )
     
     # 註冊所有頁面
@@ -22,5 +27,10 @@ def register_pages() -> None:
     register_results()
     register_charts()
     register_deploy()
+    register_history()
+    register_candidates()
+    register_wizard()
+    register_portfolio()
+    register_run_detail()
 
 

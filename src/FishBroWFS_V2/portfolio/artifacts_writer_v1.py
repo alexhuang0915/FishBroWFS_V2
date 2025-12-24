@@ -55,7 +55,7 @@ def write_portfolio_artifacts(
     
     # 1. Write portfolio_admission.parquet
     if decisions:
-        admission_df = pd.DataFrame([d.dict() for d in decisions])
+        admission_df = pd.DataFrame([d.model_dump() for d in decisions])
         admission_path = output_dir / "portfolio_admission.parquet"
         admission_df.to_parquet(admission_path, index=False)
         
@@ -68,7 +68,7 @@ def write_portfolio_artifacts(
         # Convert bar_states to list of dicts
         states_list = []
         for state in bar_states.values():
-            state_dict = state.dict()
+            state_dict = state.model_dump()
             # Convert open_positions to count for simplicity
             state_dict["open_positions_count"] = len(state.open_positions)
             # Remove the actual positions to keep file size manageable
@@ -83,7 +83,7 @@ def write_portfolio_artifacts(
         hashes["portfolio_state_timeseries.parquet"] = sha256_bytes(states_bytes)
     
     # 3. Write portfolio_summary.json
-    summary_dict = summary.dict()
+    summary_dict = summary.model_dump()
     summary_path = output_dir / "portfolio_summary.json"
     write_json_atomic(summary_path, summary_dict)
     
@@ -91,11 +91,11 @@ def write_portfolio_artifacts(
     hashes["portfolio_summary.json"] = sha256_bytes(summary_bytes)
     
     # 4. Write policy and spec for audit
-    policy_dict = policy.dict()
+    policy_dict = policy.model_dump()
     policy_path = output_dir / "portfolio_policy.json"
     write_json_atomic(policy_path, policy_dict)
     
-    spec_dict = spec.dict()
+    spec_dict = spec.model_dump()
     spec_path = output_dir / "portfolio_spec.json"
     write_json_atomic(spec_path, spec_dict)
     
@@ -151,7 +151,7 @@ def compute_spec_sha256(spec: PortfolioSpecV1) -> str:
         SHA256 hex digest
     """
     # Create dict without spec_sha256 field
-    spec_dict = spec.dict()
+    spec_dict = spec.model_dump()
     spec_dict.pop("spec_sha256", None)
     
     # Canonicalize and hash
@@ -169,7 +169,7 @@ def compute_policy_sha256(policy: PortfolioPolicyV1) -> str:
     Returns:
         SHA256 hex digest
     """
-    policy_dict = policy.dict()
+    policy_dict = policy.model_dump()
     canonical = canonical_json_bytes(policy_dict)
     return sha256_bytes(canonical)
 

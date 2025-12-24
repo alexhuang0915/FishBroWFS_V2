@@ -15,7 +15,7 @@ SAFE_PYTEST_ADDOPTS ?=
 # pytest command using venv pytest (not python3 -m pytest)
 PYTEST := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/pytest
 
-.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip gui demo contract
+.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip dashboard gui demo contract research-season portfolio-season phase3 phase4
 
 help:
 	@echo ""
@@ -34,9 +34,14 @@ help:
 	@echo "  make compile           Safe syntax check (no repo pollution)"
 	@echo "  make release-txt       Generate release TXT (structure + code)"
 	@echo "  make release-zip       Generate release ZIP (excludes .git)"
-	@echo "  make gui               Start GUI stack (Control API + Mission UI)"
+	@echo "  make dashboard         Start FishBroWFS_V2 Dashboard (Official Entry Point)"
 	@echo "  make demo              Create demo job for Viewer validation"
 	@echo "  make contract          Run critical contract tests (regression prevention)"
+	@echo "  make research-season   Generate research artifacts for season 2026Q1"
+	@echo "  make portfolio-season  Generate portfolio from 2026Q1 research results"
+	@echo "  make phase3            Run research-season → portfolio-season → smoke check"
+	@echo "  make phase4            Validate Phase 4: Operational closed loop (UI Actions + Governance)"
+	@echo "  make phase5            Validate Phase 5: Deterministic Governance & Reproducibility Lock"
 	@echo ""
 
 # ---------------------------------------------------------
@@ -111,21 +116,238 @@ release-zip:
 	@PYTHONDONTWRITEBYTECODE=1 python3 -B $(RELEASE_TOOL) zip
 
 # ---------------------------------------------------------
-# GUI stack (Mission Control only)
+# Dashboard stack (Official Dashboard Entry Point)
 # ---------------------------------------------------------
-gui:
-	@echo "==> Starting FishBroWFS_V2 GUI stack"
-	@echo " - Control API      : http://localhost:8000"
-	@echo " - Mission Control  : http://localhost:8080"
-	@echo "Press Ctrl+C to stop all services"
-	@echo ""
-	@command -v uvicorn >/dev/null 2>&1 || { echo "ERROR: uvicorn not installed (pip install uvicorn fastapi)"; exit 1; }
-	@python3 -c "import nicegui" 2>/dev/null || { echo "ERROR: nicegui not installed (pip install nicegui)"; exit 1; }
-	@bash -c 'trap "kill %1 %2 2>/dev/null || true; exit" EXIT INT TERM; \
-		PYTHONPATH=src uvicorn FishBroWFS_V2.control.api:app --port 8000 & \
-		PYTHONPATH=src python3 -m FishBroWFS_V2.control.app_nicegui; \
-		kill %1 %2 2>/dev/null || true'
+dashboard:
+	@echo "==> Starting FishBroWFS_V2 Dashboard (Official Entry Point)"
+	@echo " - URL            : http://localhost:8080"
+	@echo " - Health endpoint: http://localhost:8080/health"
+	@echo "Press Ctrl+C to stop"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@.venv/bin/python -c "import nicegui" 2>/dev/null || { echo "ERROR: nicegui not installed in venv (pip install nicegui)"; exit 1; }
+	@PYTHONPATH=src .venv/bin/python -m FishBroWFS_V2.gui.nicegui.app
+
+gui: dashboard
+	@# Alias for dashboard (not advertised in help)
 
 demo:
 	@echo "==> Creating demo job for Viewer validation"
 	@PYTHONPATH=src python3 -m FishBroWFS_V2.control.seed_demo_run
+
+# ---------------------------------------------------------
+# Phase 3: Reproducible closed loop (Research → Portfolio → UI)
+# ---------------------------------------------------------
+research-season:
+	@echo "==> Generating research artifacts for season 2026Q1"
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/generate_research.py --season 2026Q1
+
+portfolio-season:
+	@echo "==> Generating portfolio from 2026Q1 research results"
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/build_portfolio_from_research.py --season 2026Q1
+
+phase3: research-season portfolio-season
+	@echo "==> Phase 3 completed: research → portfolio artifacts generated"
+	@echo " - Research artifacts: outputs/seasons/2026Q1/research/"
+	@echo " - Portfolio artifacts: outputs/seasons/2026Q1/portfolio/"
+	@echo " - Run 'make dashboard' to verify UI pages"
+
+# ---------------------------------------------------------
+# Phase 4: Operational closed loop (UI Actions + Governance)
+# ---------------------------------------------------------
+phase4:
+	@echo "==> Phase 4: Operational closed loop validation"
+	@echo " [1/5] Checking Makefile governance..."
+	@if grep -q "^gui: dashboard" Makefile; then \
+		echo "  ✓ gui is alias to dashboard"; \
+	else \
+		echo "  ✗ gui not properly aliased"; exit 1; \
+	fi
+	@if make help 2>/dev/null | grep -q "^  make gui"; then \
+		echo "  ✗ gui appears in help"; exit 1; \
+	else \
+		echo "  ✓ gui not advertised in help"; \
+	fi
+	@echo " [2/5] Checking Season Context SSOT..."
+	@if [ -f "src/FishBroWFS_V2/core/season_context.py" ]; then \
+		echo "  ✓ season_context.py exists"; \
+	else \
+		echo "  ✗ season_context.py missing"; exit 1; \
+	fi
+	@echo " [3/5] Checking UI Actions Service..."
+	@if [ -f "src/FishBroWFS_V2/gui/services/actions.py" ]; then \
+		echo "  ✓ actions.py exists"; \
+	else \
+		echo "  ✗ actions.py missing"; exit 1; \
+	fi
+	@if [ -f "src/FishBroWFS_V2/gui/services/audit_log.py" ]; then \
+		echo "  ✓ audit_log.py exists"; \
+	else \
+		echo "  ✗ audit_log.py missing"; exit 1; \
+	fi
+	@echo " [4/5] Checking UI wiring (Candidates → Portfolio)..."
+	@if [ -f "src/FishBroWFS_V2/gui/nicegui/pages/candidates.py" ]; then \
+		if grep -q "Generate Research" src/FishBroWFS_V2/gui/nicegui/pages/candidates.py; then \
+			echo "  ✓ candidates.py has Generate Research button"; \
+		else \
+			echo "  ✗ candidates.py missing Generate Research button"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ candidates.py missing"; exit 1; \
+	fi
+	@if [ -f "src/FishBroWFS_V2/gui/nicegui/pages/portfolio.py" ]; then \
+		if grep -q "Build Portfolio" src/FishBroWFS_V2/gui/nicegui/pages/portfolio.py; then \
+			echo "  ✓ portfolio.py has Build Portfolio button"; \
+		else \
+			echo "  ✗ portfolio.py missing Build Portfolio button"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ portfolio.py missing"; exit 1; \
+	fi
+	@echo " [5/5] Checking History/Run Detail enhancements..."
+	@if [ -f "src/FishBroWFS_V2/gui/nicegui/pages/run_detail.py" ]; then \
+		echo "  ✓ run_detail.py exists"; \
+	else \
+		echo "  ✗ run_detail.py missing"; exit 1; \
+	fi
+	@if [ -f "src/FishBroWFS_V2/gui/nicegui/pages/history.py" ]; then \
+		if grep -q "Audit Trail" src/FishBroWFS_V2/gui/nicegui/pages/history.py; then \
+			echo "  ✓ history.py has Audit Trail section"; \
+		else \
+			echo "  ✗ history.py missing Audit Trail section"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ history.py missing"; exit 1; \
+	fi
+	@echo ""
+	@echo "==> Phase 4 validation PASSED"
+	@echo " - Makefile governance: gui→dashboard alias, clean help"
+	@echo " - Season Context SSOT: single source of truth for season"
+	@echo " - UI Actions Service: actions.py + audit_log.py"
+	@echo " - UI wiring: Candidates → Portfolio buttons"
+	@echo " - History/Run Detail: Audit trail + enhanced governance"
+	@echo ""
+	@echo "Next steps:"
+	@echo " 1. Run 'make dashboard' to start UI"
+	@echo " 2. Navigate to /candidates → Generate Research"
+	@echo " 3. Navigate to /portfolio → Build Portfolio"
+	@echo " 4. Navigate to /history → View audit trail"
+	@echo " 5. Check outputs/seasons/2026Q1/governance/ui_audit.jsonl"
+
+# ---------------------------------------------------------
+# Phase 5: Deterministic Governance & Reproducibility Lock
+# ---------------------------------------------------------
+phase5:
+	@echo "==> Phase 5: Deterministic Governance & Reproducibility Lock validation"
+	@echo " [1/6] Checking Season Freeze (治理鎖)..."
+	@if [ -f "src/FishBroWFS_V2/core/season_state.py" ]; then \
+		echo "  ✓ season_state.py exists"; \
+	else \
+		echo "  ✗ season_state.py missing"; exit 1; \
+	fi
+	@if grep -q "class SeasonState" src/FishBroWFS_V2/core/season_state.py; then \
+		echo "  ✓ SeasonState class defined"; \
+	else \
+		echo "  ✗ SeasonState class missing"; exit 1; \
+	fi
+	@if grep -q "def freeze_season" src/FishBroWFS_V2/core/season_state.py; then \
+		echo "  ✓ freeze_season function exists"; \
+	else \
+		echo "  ✗ freeze_season function missing"; exit 1; \
+	fi
+	@echo " [2/6] Checking UI/CLI freeze state respect..."
+	@if [ -f "src/FishBroWFS_V2/gui/services/actions.py" ]; then \
+		if grep -q "check_season_not_frozen" src/FishBroWFS_V2/gui/services/actions.py; then \
+			echo "  ✓ actions.py checks season freeze state"; \
+		else \
+			echo "  ✗ actions.py missing freeze check"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ actions.py missing"; exit 1; \
+	fi
+	@if [ -f "scripts/generate_research.py" ]; then \
+		if grep -q "check_season_not_frozen\|load_season_state" scripts/generate_research.py; then \
+			echo "  ✓ generate_research.py respects freeze state"; \
+		else \
+			echo "  ✗ generate_research.py missing freeze check"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ generate_research.py missing"; exit 1; \
+	fi
+	@if [ -f "scripts/build_portfolio_from_research.py" ]; then \
+		if grep -q "check_season_not_frozen\|load_season_state" scripts/build_portfolio_from_research.py; then \
+			echo "  ✓ build_portfolio_from_research.py respects freeze state"; \
+		else \
+			echo "  ✗ build_portfolio_from_research.py missing freeze check"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ build_portfolio_from_research.py missing"; exit 1; \
+	fi
+	@echo " [3/6] Checking Deterministic Snapshot (可重現封印)..."
+	@if [ -f "src/FishBroWFS_V2/core/snapshot.py" ]; then \
+		echo "  ✓ snapshot.py exists"; \
+	else \
+		echo "  ✗ snapshot.py missing"; exit 1; \
+	fi
+	@if grep -q "def create_freeze_snapshot" src/FishBroWFS_V2/core/snapshot.py; then \
+		echo "  ✓ create_freeze_snapshot function exists"; \
+	else \
+		echo "  ✗ create_freeze_snapshot function missing"; exit 1; \
+	fi
+	@if grep -q "def verify_snapshot_integrity" src/FishBroWFS_V2/core/snapshot.py; then \
+		echo "  ✓ verify_snapshot_integrity function exists"; \
+	else \
+		echo "  ✗ verify_snapshot_integrity function missing"; exit 1; \
+	fi
+	@echo " [4/6] Checking Artifact Diff Guard (防偷改)..."
+	@if [ -f "scripts/verify_season_integrity.py" ]; then \
+		echo "  ✓ verify_season_integrity.py exists"; \
+	else \
+		echo "  ✗ verify_season_integrity.py missing"; exit 1; \
+	fi
+	@if [ -f "src/FishBroWFS_V2/gui/services/archive.py" ]; then \
+		if grep -q "load_season_state" src/FishBroWFS_V2/gui/services/archive.py; then \
+			echo "  ✓ archive.py checks freeze state"; \
+		else \
+			echo "  ✗ archive.py missing freeze check"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ archive.py missing"; exit 1; \
+	fi
+	@echo " [5/6] Checking UI History upgrade (治理真相頁)..."
+	@if [ -f "src/FishBroWFS_V2/gui/nicegui/pages/history.py" ]; then \
+		if grep -q "Season Frozen" src/FishBroWFS_V2/gui/nicegui/pages/history.py; then \
+			echo "  ✓ history.py shows freeze status"; \
+		else \
+			echo "  ✗ history.py missing freeze status display"; exit 1; \
+		fi; \
+		if grep -q "Check Integrity" src/FishBroWFS_V2/gui/nicegui/pages/history.py; then \
+			echo "  ✓ history.py has integrity check button"; \
+		else \
+			echo "  ✗ history.py missing integrity check button"; exit 1; \
+		fi; \
+	else \
+		echo "  ✗ history.py missing"; exit 1; \
+	fi
+	@echo " [6/6] Testing freeze/snapshot functionality..."
+	@echo "  Running test_freeze_snapshot.py..."
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/test_freeze_snapshot.py > /tmp/phase5_test.log 2>&1 || { echo "  ✗ Freeze snapshot test failed"; cat /tmp/phase5_test.log; exit 1; }
+	@echo "  ✓ Freeze snapshot test passed"
+	@echo ""
+	@echo "==> Phase 5 validation PASSED"
+	@echo " - Season Freeze (治理鎖): season_state.py with freeze/unfreeze"
+	@echo " - UI/CLI freeze respect: actions.py + CLI scripts block on frozen"
+	@echo " - Deterministic Snapshot: snapshot.py creates freeze_snapshot.json"
+	@echo " - Artifact Diff Guard: verify_season_integrity.py detects changes"
+	@echo " - UI History upgrade: History page shows freeze status + integrity check"
+	@echo " - Functional test: freeze/unfreeze + snapshot creation works"
+	@echo ""
+	@echo "Next steps:"
+	@echo " 1. Run 'make dashboard' to start UI"
+	@echo " 2. Navigate to /history → Check freeze status"
+	@echo " 3. Test freeze: python3 -c \"from FishBroWFS_V2.core.season_state import freeze_season; freeze_season('2026Q1', by='cli', reason='test')\""
+	@echo " 4. Verify UI actions are blocked on frozen season"
+	@echo " 5. Check integrity: python3 scripts/verify_season_integrity.py --season 2026Q1"
+	@echo " 6. Unfreeze: python3 -c \"from FishBroWFS_V2.core.season_state import unfreeze_season; unfreeze_season('2026Q1', by='cli')\""

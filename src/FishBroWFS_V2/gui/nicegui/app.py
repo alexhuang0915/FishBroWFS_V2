@@ -3,6 +3,7 @@
 
 from nicegui import ui
 from .router import register_pages
+from ..theme import inject_global_styles
 
 
 @ui.page('/health')
@@ -14,13 +15,38 @@ def health_page():
 
 def main() -> None:
     """啟動 NiceGUI 應用程式"""
-    register_pages()  # 只負責註冊 @ui.page，不能建任何 ui 元件
+    # 注入全域樣式（必須在 register_pages 之前）
+    inject_global_styles()
+    
+    # 註冊頁面路由
+    register_pages()
+    
+    # 啟動伺服器
     ui.run(
         host="0.0.0.0",
         port=8080,
         reload=False,
         show=False,  # 避免 gio: Operation not supported
     )
+
+
+# 以下函數簽名符合 P0-0 要求，實際實作在 layout.py 中
+def render_header(season: str) -> None:
+    """渲染頁面頂部 header（包含 season 顯示）"""
+    from .layout import render_header as _render_header
+    _render_header(season)
+
+
+def render_nav(active_path: str) -> None:
+    """渲染側邊導航欄（用於需要側邊導航的頁面）"""
+    from .layout import render_nav as _render_nav
+    _render_nav(active_path)
+
+
+def render_shell(active_path: str, season: str = "2026Q1"):
+    """渲染完整 shell（header + 主內容區）"""
+    from .layout import render_shell as _render_shell
+    return _render_shell(active_path, season)
 
 
 if __name__ == "__main__":

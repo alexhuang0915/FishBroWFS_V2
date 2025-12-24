@@ -6,7 +6,7 @@ Validates run manifest with stages and artifacts tracking.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Any, Dict, List, Optional
 
 
@@ -100,7 +100,6 @@ class UnifiedManifest(BaseModel):
     # Manifest self-hash (must be the last field)
     manifest_sha256: str
     
-    class Config:
-        extra = "allow"  # Allow additional type-specific fields
+    model_config = ConfigDict(extra="allow")  # Allow additional type-specific fields
 
 

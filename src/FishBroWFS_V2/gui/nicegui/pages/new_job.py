@@ -1,5 +1,5 @@
 
-"""新增任務頁面 - New Job (Setup)"""
+"""新增任務頁面 - New Job (Setup) - 已過渡到 Wizard，保留相容性"""
 
 from pathlib import Path
 from nicegui import ui
@@ -7,19 +7,31 @@ import httpx
 
 from ..api import JobSubmitRequest, list_datasets, list_strategies, submit_job
 from ..state import app_state
-from ..layout import render_topbar
 
 
 def register() -> None:
-    """註冊新增任務頁面路由"""
+    """註冊新增任務頁面路由（重定向到 Wizard）"""
     
     @ui.page("/new-job")
     def new_job_page() -> None:
-        """渲染新增任務頁面"""
+        """渲染新增任務頁面（過渡頁面）"""
         ui.page_title("FishBroWFS V2 - 新增研究任務")
-        render_topbar("New Job")
         
         with ui.column().classes("w-full max-w-4xl mx-auto p-6"):
+            # 過渡訊息
+            with ui.card().classes("fish-card w-full p-6 mb-6 border-cyber-500/50"):
+                ui.label("⚠️ 頁面已遷移").classes("text-xl font-bold text-yellow-400 mb-2")
+                ui.label("此頁面已過渡到新的 Wizard 介面。").classes("text-slate-300 mb-4")
+                
+                with ui.row().classes("w-full gap-4"):
+                    ui.button("前往 Wizard", on_click=lambda: ui.navigate.to("/wizard")) \
+                        .classes("btn-cyber px-6 py-3")
+                    ui.button("留在舊版", color="gray") \
+                        .classes("px-6 py-3")
+            
+            # 原始表單容器（保持相容性）
+            with ui.card().classes("w-full p-6 opacity-80"):
+                ui.label("舊版任務設定").classes("text-xl font-bold mb-6 text-slate-400")
             # 表單容器
             with ui.card().classes("w-full p-6"):
                 ui.label("任務設定").classes("text-xl font-bold mb-6")

@@ -5,7 +5,6 @@ from nicegui import ui
 
 from ..api import list_chart_artifacts, load_chart_artifact
 from ..state import app_state
-from ..layout import render_topbar
 
 
 def register() -> None:
@@ -15,7 +14,6 @@ def register() -> None:
     def charts_page(job_id: str) -> None:
         """圖表頁面"""
         ui.page_title(f"FishBroWFS V2 - Charts {job_id[:8]}...")
-        render_topbar(f"Charts: {job_id[:8]}...")
         
         with ui.column().classes("w-full max-w-6xl mx-auto p-6"):
             # DEV MODE banner - 更醒目的誠實化標示

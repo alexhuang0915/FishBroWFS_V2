@@ -1,6 +1,6 @@
 """Portfolio-related schemas for signal series and instrument configuration."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Literal, Dict
 
 
@@ -14,7 +14,12 @@ class InstrumentsConfigV1(BaseModel):
 
 class SignalSeriesMetaV1(BaseModel):
     """Metadata for signal series (bar-based position/margin/notional)."""
-    schema: Literal["SIGNAL_SERIES_V1"] = "SIGNAL_SERIES_V1"
+    model_config = ConfigDict(populate_by_name=True)
+    
+    schema_id: Literal["SIGNAL_SERIES_V1"] = Field(
+        default="SIGNAL_SERIES_V1",
+        alias="schema"
+    )
     instrument: str
     timeframe: str
     tz: str

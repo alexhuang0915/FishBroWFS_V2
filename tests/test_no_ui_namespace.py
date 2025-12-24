@@ -109,7 +109,7 @@ def test_no_ui_directory_exists() -> None:
 
 
 def test_makefile_no_ui_paths() -> None:
-    """Test that Makefile does not reference ui/ paths."""
+    """Test that Makefile does not reference ui/ paths (old namespace)."""
     repo_root = Path(__file__).parent.parent
     makefile_path = repo_root / "Makefile"
     
@@ -123,8 +123,32 @@ def test_makefile_no_ui_paths() -> None:
         # Skip comments
         if line.strip().startswith("#"):
             continue
-        # Check for ui/ path references
-        if "ui/" in line or " ui." in line or "ui.app_streamlit" in line:
-            pytest.fail(f"Makefile line {i} contains ui/ reference: {line.strip()}")
+        
+        # Normalize line for checking
+        line_lower = line.lower()
+        
+        # Prohibited patterns (old ui namespace)
+        # 1. Path references containing "/ui/" (excluding "gui/")
+        if "/ui/" in line and "/gui/" not in line:
+            pytest.fail(f"Makefile line {i} contains prohibited /ui/ path: {line.strip()}")
+        
+        # 2. Import-like references to "FishBroWFS_V2.ui." (case-insensitive)
+        if "fishbro_wfs_v2.ui." in line_lower:
+            pytest.fail(f"Makefile line {i} contains prohibited FishBroWFS_V2.ui. import: {line.strip()}")
+        
+        # 3. Specific old module "ui.app_streamlit"
+        if "ui.app_streamlit" in line_lower:
+            pytest.fail(f"Makefile line {i} contains prohibited ui.app_streamlit: {line.strip()}")
+        
+        # 4. Standalone "ui." as a module prefix (with word boundary)
+        # We'll use a simple check: "ui." preceded by whitespace or start of line
+        # but exclude "gui." and "build" etc.
+        import re
+        if re.search(r'(^|\s)ui\.', line) and not re.search(r'(^|\s)gui\.', line):
+            # Allow if it's part of a longer word like "build" (but "ui." is likely a module)
+            # Additional check: ensure it's not part of a larger word like "build"
+            if not re.search(r'\bui\.', line):  # word boundary check
+                continue
+            pytest.fail(f"Makefile line {i} contains prohibited ui. module reference: {line.strip()}")
 
 

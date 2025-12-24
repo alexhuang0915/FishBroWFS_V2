@@ -5,7 +5,6 @@ from nicegui import ui
 
 from ..api import list_recent_jobs, get_job
 from ..state import app_state
-from ..layout import render_topbar
 
 
 def register() -> None:
@@ -15,7 +14,6 @@ def register() -> None:
     def jobs_page() -> None:
         """渲染任務列表頁面"""
         ui.page_title("FishBroWFS V2 - 任務監控")
-        render_topbar("Job Monitor")
         
         with ui.column().classes("w-full max-w-6xl mx-auto p-6"):
             # 任務列表容器
@@ -75,7 +73,6 @@ def register() -> None:
     def job_page(job_id: str) -> None:
         """渲染單一任務詳細頁面"""
         ui.page_title(f"FishBroWFS V2 - 任務 {job_id[:8]}...")
-        render_topbar(f"Job Details: {job_id[:8]}...")
         
         with ui.column().classes("w-full max-w-6xl mx-auto p-6"):
             # 任務詳細資訊容器

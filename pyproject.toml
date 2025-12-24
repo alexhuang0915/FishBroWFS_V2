@@ -18,6 +18,9 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
-markers = ["slow: research-grade tests"]
+markers = [
+    "slow: research-grade tests",
+    "integration: integration tests requiring external services"
+]
 addopts = "-m 'not slow'"
 

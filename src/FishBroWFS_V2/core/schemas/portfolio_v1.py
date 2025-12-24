@@ -2,7 +2,7 @@
 
 from pydantic import BaseModel, Field
 from typing import Literal, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 class PortfolioPolicyV1(BaseModel):
@@ -107,7 +107,7 @@ class AdmissionDecisionV1(BaseModel):
     margin_after_base: float  # TWD
     
     # Timestamp of decision
-    decision_ts: datetime = Field(default_factory=datetime.utcnow)
+    decision_ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class PortfolioStateV1(BaseModel):

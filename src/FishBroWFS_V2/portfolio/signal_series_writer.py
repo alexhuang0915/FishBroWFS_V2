@@ -88,7 +88,7 @@ def write_signal_series_artifacts(
     
     # Write signal_series_meta.json
     meta_path = run_dir / "signal_series_meta.json"
-    meta_dict = meta.dict()
+    meta_dict = meta.model_dump(by_alias=True)
     meta_path.write_text(
         json.dumps(meta_dict, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
         encoding="utf-8",

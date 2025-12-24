@@ -5,7 +5,6 @@ from nicegui import ui
 
 from ..api import get_season_report, generate_deploy_zip
 from ..state import app_state
-from ..layout import render_topbar
 
 
 def register() -> None:
@@ -15,7 +14,6 @@ def register() -> None:
     def results_page(job_id: str) -> None:
         """渲染結果頁面"""
         ui.page_title(f"FishBroWFS V2 - 任務結果 {job_id[:8]}...")
-        render_topbar(f"Results: {job_id[:8]}...")
         
         with ui.column().classes("w-full max-w-6xl mx-auto p-6"):
             # 結果容器

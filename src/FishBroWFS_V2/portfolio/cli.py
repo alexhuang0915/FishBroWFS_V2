@@ -79,7 +79,7 @@ def validate_command(args):
         
         # If --save flag, update spec with SHA256
         if args.save:
-            spec_dict = spec.dict()
+            spec_dict = spec.model_dump()
             spec_dict["spec_sha256"] = spec_sha256
             save_yaml_or_json(args.spec, spec_dict)
             print(f"✓ Updated {args.spec} with spec_sha256")
@@ -167,7 +167,7 @@ def run_command(args):
             "spec_sha256": spec_sha256,
             "policy_sha256": policy_sha256,
             "output_dir": str(output_dir),
-            "summary": summary.dict(),
+            "summary": summary.model_dump(),
         }
         run_info_path = output_dir / "run_info.json"
         run_info_path.write_text(json.dumps(run_info, indent=2), encoding="utf-8")

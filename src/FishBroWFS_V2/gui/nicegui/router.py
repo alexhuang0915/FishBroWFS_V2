@@ -18,6 +18,7 @@ def register_pages() -> None:
         register_wizard,
         register_portfolio,
         register_run_detail,
+        register_settings,
     )
     
     # 註冊所有頁面
@@ -32,5 +33,6 @@ def register_pages() -> None:
     register_wizard()
     register_portfolio()
     register_run_detail()
+    register_settings()
 
 

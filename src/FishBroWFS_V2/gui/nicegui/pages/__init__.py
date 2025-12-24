@@ -7,11 +7,13 @@ from .job import register as register_job
 from .results import register as register_results
 from .charts import register as register_charts
 from .deploy import register as register_deploy
+from .artifacts import register as register_artifacts
 from .history import register as register_history
 from .candidates import register as register_candidates
 from .wizard import register as register_wizard
 from .portfolio import register as register_portfolio
 from .run_detail import register as register_run_detail
+from .settings import register as register_settings
 
 __all__ = [
     "register_home",
@@ -20,11 +22,13 @@ __all__ = [
     "register_results",
     "register_charts",
     "register_deploy",
+    "register_artifacts",
     "register_history",
     "register_candidates",
     "register_wizard",
     "register_portfolio",
     "register_run_detail",
+    "register_settings",
 ]
 
 

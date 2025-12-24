@@ -616,12 +616,6 @@ def wizard_page() -> None:
             ui.link("Dashboard", "/").classes("ml-4 text-blue-500 hover:text-blue-700")
 
 
-def register() -> None:
-    """Register wizard page routes."""
-    # The @ui.page decorator already registers the routes
-    # This function exists for compatibility with pages/__init__.py
-    pass
-
 # Also register at /wizard/m1 for testing
 @ui.page("/wizard/m1")
 def wizard_m1_page() -> None:

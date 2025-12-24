@@ -9,63 +9,61 @@ from pathlib import Path
 # Module-level integration marker
 pytestmark = pytest.mark.integration
 
-# Skip entire module if integration flag not set
-if os.getenv("FISHBRO_RUN_INTEGRATION") != "1":
-    pytest.skip("integration test requires FISHBRO_RUN_INTEGRATION=1", allow_module_level=True)
-
 # 添加 src 到路徑
 sys.path.insert(0, str(Path(__file__).parent / "src"))
+
+from ._integration_gate import require_integration, require_dashboard_health, require_control_api_health
 
 
 def test_nicegui_api_imports():
     """測試 NiceGUI API 導入"""
+    require_integration()
+    
     try:
-        from FishBroWFS_V2.gui.nicegui.api import (
-            JobSubmitRequest,
-            list_datasets,
-            list_strategies,
-            submit_job
+        from src.FishBroWFS_V2.gui.nicegui.api import (
+            JobSubmitRequest, JobRecord, submit_job, list_datasets, list_strategies
         )
-        
-        # 檢查類別和函數是否存在
+        # 檢查類型
         assert JobSubmitRequest is not None
+        assert JobRecord is not None
+        assert callable(submit_job)
         assert callable(list_datasets)
         assert callable(list_strategies)
-        assert callable(submit_job)
-        
     except Exception as e:
         pytest.fail(f"NiceGUI API 導入失敗: {e}")
 
 
 def test_list_datasets_and_strategies():
     """測試 datasets 和 strategies 列表功能"""
-    try:
-        from FishBroWFS_V2.gui.nicegui.api import list_datasets, list_strategies
-        
-        # 測試 datasets
-        datasets = list_datasets(Path("outputs"))
-        assert isinstance(datasets, list)
-        
-        # 測試 strategies
-        strategies = list_strategies()
-        assert isinstance(strategies, list)
-        
-    except Exception as e:
-        pytest.fail(f"datasets/strategies 列表測試失敗: {e}")
+    # 需要 Control API 和 dashboard
+    require_dashboard_health()
+    require_control_api_health()
+    
+    from src.FishBroWFS_V2.gui.nicegui.api import list_datasets, list_strategies
+
+    # 測試 datasets
+    datasets = list_datasets(Path("outputs"))
+    assert isinstance(datasets, list)
+
+    # 測試 strategies
+    strategies = list_strategies()
+    assert isinstance(strategies, list)
 
 
 def test_job_submit_request_structure():
     """測試 JobSubmitRequest 結構"""
+    require_integration()
+    
     try:
-        from FishBroWFS_V2.gui.nicegui.api import JobSubmitRequest
+        from src.FishBroWFS_V2.gui.nicegui.api import JobSubmitRequest
         from pathlib import Path
-        
-        # 建立請求物件
+
+        # 建立一個範例請求
         req = JobSubmitRequest(
             outputs_root=Path("outputs"),
             dataset_id="test_dataset",
-            symbols=["MNQ", "MES", "MXF"],
-            timeframe_min=60,
+            symbols=["ES"],
+            timeframe_min=5,
             strategy_name="test_strategy",
             data2_feed=None,
             rolling=True,
@@ -76,22 +74,27 @@ def test_job_submit_request_structure():
             gate_level="S2",
             stress_level="S3",
             topk=20,
-            season="2026Q1"
+            season="2026Q1",
         )
-        
+
         # 檢查屬性
         assert req.dataset_id == "test_dataset"
+        assert req.symbols == ["ES"]
+        assert req.timeframe_min == 5
         assert req.strategy_name == "test_strategy"
-        assert req.symbols == ["MNQ", "MES", "MXF"]
-        assert req.timeframe_min == 60
+        assert req.train_years == 3
+        assert req.test_unit == "quarter"
         assert req.season == "2026Q1"
-        
+
     except Exception as e:
         pytest.fail(f"JobSubmitRequest 結構測試失敗: {e}")
 
 
 def test_api_health():
     """測試 API 健康狀態"""
+    # 需要 dashboard
+    require_dashboard_health()
+    
     import requests
     
     # 測試 Control API (如果運行中)

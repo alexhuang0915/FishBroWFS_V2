@@ -3,6 +3,7 @@ UI Actions Service - Single entry point for UI-triggered actions.
 
 Phase 4: UI must trigger actions via this service, not direct subprocess calls.
 Phase 5: Respect season freeze state - actions cannot run on frozen seasons.
+Phase 6: Live-safety lock - enforce action risk levels via policy engine.
 """
 
 import json
@@ -19,6 +20,7 @@ from typing import List, Literal, Optional, Dict, Any
 
 from FishBroWFS_V2.core.season_context import current_season, outputs_root
 from FishBroWFS_V2.core.season_state import check_season_not_frozen
+from FishBroWFS_V2.core.policy_engine import enforce_action_policy
 from .audit_log import append_audit_event
 
 
@@ -26,6 +28,10 @@ ActionName = Literal[
     "generate_research",
     "build_portfolio_from_research",
     "export_season_package",
+    "deploy_live",
+    "send_orders",
+    "broker_connect",
+    "promote_to_live",
 ]
 
 
@@ -124,6 +130,13 @@ def _build_action_command(action: ActionName, season: str, legacy_copy: bool = F
             "-c", "print('Export season package not yet implemented')"
         ])
     
+    elif action in ["deploy_live", "send_orders", "broker_connect", "promote_to_live"]:
+        # LIVE_EXECUTE actions are blocked by policy engine
+        # This command should never be reached if policy enforcement works correctly
+        cmd.extend([
+            "-c", f"raise RuntimeError('LIVE_EXECUTE action {action} should have been blocked by policy engine')"
+        ])
+    
     else:
         raise ValueError(f"Unknown action: {action}")
     
@@ -158,6 +171,15 @@ def _collect_artifacts(action: ActionName, season: str) -> List[str]:
                         if spec_path.exists():
                             artifacts.append(str(spec_path))
     
+    # LIVE_EXECUTE actions don't produce artifacts in the same way
+    # They might produce deployment logs or order confirmations
+    elif action in ["deploy_live", "send_orders", "broker_connect", "promote_to_live"]:
+        live_dir = season_dir / "live"
+        if live_dir.exists():
+            for file in live_dir.iterdir():
+                if file.is_file():
+                    artifacts.append(str(file))
+    
     return artifacts
 
 
@@ -177,6 +199,7 @@ def run_action(
     
     Phase 5: First line checks season freeze state - cannot run on frozen seasons.
     Phase 5: Optional integrity check for frozen seasons.
+    Phase 6: Live-safety lock - enforce action risk levels via policy engine.
     
     Args:
         action: Action name.
@@ -188,6 +211,11 @@ def run_action(
     Returns:
         ActionResult with execution details.
     """
+    # Phase 6: Live-safety lock - enforce action policy
+    policy_decision = enforce_action_policy(action, season)
+    if not policy_decision.allowed:
+        raise PermissionError(f"Action blocked by policy: {policy_decision.reason}")
+    
     # Phase 5: Check season freeze state before any action
     check_season_not_frozen(season, action=action)
     

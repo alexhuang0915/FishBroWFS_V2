@@ -35,7 +35,8 @@ def test_no_streamlit_imports():
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:
-                print(f"找到 streamlit 導入（非排除檔案）:\n{'\n'.join(non_excluded_lines)}")
+                joined = "\n".join(non_excluded_lines)
+                print(f"找到 streamlit 導入（非排除檔案）:\n{joined}")
                 assert False, f"發現 streamlit 導入在非排除檔案: {len(non_excluded_lines)} 處"
             else:
                 # 只有排除檔案中有 streamlit 導入，這是可以接受的
@@ -95,7 +96,8 @@ def test_no_streamlit_run():
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:
-                print(f"找到 streamlit run 指令（非排除檔案）:\n{'\n'.join(non_excluded_lines)}")
+                joined = "\n".join(non_excluded_lines)
+                print(f"找到 streamlit run 指令（非排除檔案）:\n{joined}")
                 assert False, "發現 streamlit run 指令在非排除檔案"
             else:
                 # 只有排除檔案中有 streamlit run 指令，這是可以接受的
@@ -150,7 +152,8 @@ def test_no_viewer_module():
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:
-                print(f"找到 viewer 模組參考（非排除檔案）:\n{'\n'.join(non_excluded_lines)}")
+                joined = "\n".join(non_excluded_lines)
+                print(f"找到 viewer 模組參考（非排除檔案）:\n{joined}")
                 assert False, f"發現 viewer 模組參考在非排除檔案: {len(non_excluded_lines)} 處"
             else:
                 # 只有排除檔案中有 viewer 參考，這是可以接受的

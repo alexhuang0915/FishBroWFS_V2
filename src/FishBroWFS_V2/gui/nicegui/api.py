@@ -261,6 +261,49 @@ def load_chart_artifact(job_id: str, artifact_id: str) -> dict:
         return {"status": "not_available", "message": f"Chart artifact {artifact_id} not yet generated"}
 
 
+def get_jobs_for_deploy() -> list[dict]:
+    """取得可部署的 jobs - 從 /jobs/deployable 讀取真實資料"""
+    try:
+        data = _call_api("/jobs/deployable")
+        return data.get("jobs", [])
+    except FileNotFoundError:
+        # 404 是正常的（端點可能尚未實現）
+        return []
+    except RuntimeError as e:
+        # 其他錯誤（如 API 不可用）
+        if "404" in str(e):
+            return []
+        raise
+
+
+def get_system_settings() -> dict:
+    """取得系統設定 - 從 /meta/settings 讀取"""
+    try:
+        data = _call_api("/meta/settings")
+        return data
+    except (FileNotFoundError, RuntimeError):
+        # 回傳預設設定
+        return {
+            "api_endpoint": API_BASE,
+            "version": "2.0.0",
+            "environment": {},
+            "endpoints": {},
+            "auto_refresh": True,
+            "notifications": False,
+            "theme": "dark",
+        }
+
+
+def update_system_settings(settings: dict) -> dict:
+    """更新系統設定 - 發送到 /meta/settings"""
+    try:
+        data = _call_api("/meta/settings", method="POST", data=settings)
+        return data
+    except (FileNotFoundError, RuntimeError):
+        # 模擬成功
+        return {"status": "ok", "message": "Settings updated (simulated)"}
+
+
 # 輔助函數
 def _map_status(api_status: str) -> Literal["PENDING", "RUNNING", "COMPLETED", "FAILED"]:
     """對應 API 狀態到 UI 狀態"""

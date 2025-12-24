@@ -9,17 +9,24 @@ from pathlib import Path
 # Module-level integration marker
 pytestmark = pytest.mark.integration
 
-# Skip entire module if integration flag not set
-if os.getenv("FISHBRO_RUN_INTEGRATION") != "1":
-    pytest.skip("integration test requires FISHBRO_RUN_INTEGRATION=1", allow_module_level=True)
-
 # 添加專案路徑
 project_root = Path(__file__).parent
 sys.path.insert(0, str(project_root))
 
+# Import from same directory
+try:
+    from ._integration_gate import require_integration
+except ImportError:
+    # Fallback for direct execution
+    import sys
+    sys.path.insert(0, os.path.dirname(__file__))
+    from _integration_gate import require_integration
+
 
 def test_app_import():
     """測試應用程式導入"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.nicegui.app import main
         # 如果導入成功，則通過測試
@@ -30,6 +37,8 @@ def test_app_import():
 
 def test_theme_injection():
     """測試主題注入"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.theme import inject_global_styles
         from nicegui import ui
@@ -48,6 +57,8 @@ def test_theme_injection():
 
 def test_layout_functions():
     """測試佈局函數"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.nicegui.layout import (
             render_header, render_nav, render_shell
@@ -73,6 +84,8 @@ def test_layout_functions():
 
 def test_history_page():
     """測試 History 頁面"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.nicegui.pages.history import register
         
@@ -85,6 +98,8 @@ def test_history_page():
 
 def test_nav_structure():
     """測試導航結構"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.nicegui.layout import NAV
         

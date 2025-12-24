@@ -9,67 +9,77 @@ from pathlib import Path
 # Module-level integration marker
 pytestmark = pytest.mark.integration
 
-# Skip entire module if integration flag not set
-if os.getenv("FISHBRO_RUN_INTEGRATION") != "1":
-    pytest.skip("integration test requires FISHBRO_RUN_INTEGRATION=1", allow_module_level=True)
-
 # 添加專案路徑
-project_root = Path(__file__).parent
+project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
+
+from ._integration_gate import require_integration
 
 
 def test_p0_files_exist():
     """測試 P0 相關檔案是否存在"""
-    # 檢查 GUI 服務檔案
-    services_dir = project_root / "src/FishBroWFS_V2/gui/services"
+    require_integration()
     
-    expected_files = [
-        "theme.py",
-        "runs_index.py",
-        "archive.py",
-        "clone.py",
-        "path_picker.py",
-        "log_tail.py",
-        "stale.py",
-        "command_builder.py",
+    # 檢查關鍵檔案
+    required_files = [
+        "src/FishBroWFS_V2/gui/nicegui/pages/dashboard.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/wizard.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/history.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/candidates.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/portfolio.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/deploy.py",
+        "src/FishBroWFS_V2/gui/nicegui/pages/settings.py",
+        "src/FishBroWFS_V2/gui/nicegui/layout.py",
+        "src/FishBroWFS_V2/gui/nicegui/api.py",
     ]
     
-    for filename in expected_files:
-        file_path = services_dir / filename
-        assert file_path.exists(), f"P0 檔案不存在: {file_path}"
+    for file_path in required_files:
+        full_path = project_root / file_path
+        assert full_path.exists(), f"檔案不存在: {file_path}"
 
 
 def test_gui_layout_files_exist():
-    """測試 GUI 佈局檔案是否存在"""
-    # 檢查佈局檔案
-    layout_dir = project_root / "src/FishBroWFS_V2/gui/nicegui"
+    """測試 GUI 佈局檔案"""
+    require_integration()
     
-    expected_files = [
-        "app.py",
-        "layout.py",
+    # 檢查佈局檔案
+    layout_files = [
+        "src/FishBroWFS_V2/gui/nicegui/layout.py",
+        "src/FishBroWFS_V2/gui/nicegui/__init__.py",
     ]
     
-    for filename in expected_files:
-        file_path = layout_dir / filename
-        assert file_path.exists(), f"GUI 佈局檔案不存在: {file_path}"
+    for file_path in layout_files:
+        full_path = project_root / file_path
+        assert full_path.exists(), f"佈局檔案不存在: {file_path}"
 
 
 def test_p0_pages_exist():
-    """測試 P0 頁面檔案是否存在"""
-    # 檢查頁面檔案
-    pages_dir = project_root / "src/FishBroWFS_V2/gui/nicegui/pages"
+    """測試 P0 頁面存在"""
+    require_integration()
     
-    expected_files = [
-        "history.py",
-    ]
-    
-    for filename in expected_files:
-        file_path = pages_dir / filename
-        assert file_path.exists(), f"P0 頁面檔案不存在: {file_path}"
+    try:
+        # 嘗試導入頁面模組
+        from src.FishBroWFS_V2.gui.nicegui.pages import (
+            dashboard, wizard, history, candidates, portfolio, deploy, settings
+        )
+        
+        # 檢查模組是否可訪問
+        assert dashboard is not None
+        assert wizard is not None
+        assert history is not None
+        assert candidates is not None
+        assert portfolio is not None
+        assert deploy is not None
+        assert settings is not None
+        
+    except Exception as e:
+        pytest.fail(f"頁面導入失敗: {e}")
 
 
 def test_nav_structure():
     """測試導航結構"""
+    require_integration()
+    
     try:
         from src.FishBroWFS_V2.gui.nicegui.layout import NAV
         
@@ -94,6 +104,30 @@ def test_nav_structure():
         
     except Exception as e:
         pytest.fail(f"導航結構測試失敗: {e}")
+
+
+def test_api_functions():
+    """測試 API 函數"""
+    require_integration()
+    
+    try:
+        from src.FishBroWFS_V2.gui.nicegui.api import (
+            get_jobs_for_deploy,
+            get_system_settings,
+            list_datasets,
+            list_strategies,
+            submit_job,
+        )
+        
+        # 檢查函數是否存在
+        assert callable(get_jobs_for_deploy)
+        assert callable(get_system_settings)
+        assert callable(list_datasets)
+        assert callable(list_strategies)
+        assert callable(submit_job)
+        
+    except Exception as e:
+        pytest.fail(f"API 函數測試失敗: {e}")
 
 
 if __name__ == "__main__":

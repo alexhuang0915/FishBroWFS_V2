@@ -1,43 +1,77 @@
-
 """Strategy registry - single source of truth for strategies.
 
 Phase 7: Centralized strategy registration and lookup.
 Phase 12: Enhanced for GUI introspection with ParamSchema.
+Phase 13: Content-addressed identity (Attack #5).
 """
 
 from __future__ import annotations
 
-from typing import Dict, List
+from typing import Dict, List, Optional
+import hashlib
 
 from pydantic import BaseModel, ConfigDict
 
 from FishBroWFS_V2.strategy.param_schema import ParamSpec
 from FishBroWFS_V2.strategy.spec import StrategySpec
+from FishBroWFS_V2.strategy.identity_models import (
+    StrategyIdentityModel,
+    StrategyRegistryEntry,
+    StrategyManifest,
+)
 
 
-# Global registry (module-level, mutable)
-_registry: Dict[str, StrategySpec] = {}
+# Global registries (module-level, mutable)
+_registry_by_id: Dict[str, StrategySpec] = {}  # By human-readable ID
+_registry_by_content_id: Dict[str, StrategySpec] = {}  # By content-addressed ID
 
 
 def register(spec: StrategySpec) -> None:
-    """Register a strategy.
+    """Register a strategy with content-addressed identity.
     
     Args:
         spec: Strategy specification
         
     Raises:
-        ValueError: If strategy_id already registered
+        ValueError: If strategy_id already registered with different content
+        ValueError: If content_id already registered with different strategy_id
     """
-    if spec.strategy_id in _registry:
-        raise ValueError(
-            f"Strategy '{spec.strategy_id}' already registered. "
-            f"Use different strategy_id or unregister first."
-        )
-    _registry[spec.strategy_id] = spec
+    strategy_id = spec.strategy_id
+    content_id = spec.immutable_id
+    
+    # Check for duplicate human-readable ID
+    if strategy_id in _registry_by_id:
+        existing = _registry_by_id[strategy_id]
+        if existing.immutable_id != content_id:
+            raise ValueError(
+                f"Strategy '{strategy_id}' already registered with different content. "
+                f"Existing content_id: {existing.immutable_id[:16]}..., "
+                f"New content_id: {content_id[:16]}... "
+                f"Content-addressed identity mismatch indicates different strategy logic."
+            )
+        # Same content, already registered
+        return
+    
+    # Check for duplicate content-addressed ID (different human-readable ID)
+    if content_id in _registry_by_content_id:
+        existing = _registry_by_content_id[content_id]
+        if existing.strategy_id != strategy_id:
+            raise ValueError(
+                f"Strategy content already registered with different ID. "
+                f"Existing: '{existing.strategy_id}' (content_id: {content_id[:16]}...), "
+                f"New: '{strategy_id}'. "
+                f"This indicates duplicate strategy logic with different names."
+            )
+        # Same content, already registered with same human-readable ID
+        return
+    
+    # Register in both indices
+    _registry_by_id[strategy_id] = spec
+    _registry_by_content_id[content_id] = spec
 
 
 def get(strategy_id: str) -> StrategySpec:
-    """Get strategy by ID.
+    """Get strategy by human-readable ID.
     
     Args:
         strategy_id: Strategy identifier
@@ -48,9 +82,30 @@ def get(strategy_id: str) -> StrategySpec:
     Raises:
         KeyError: If strategy not found
     """
-    if strategy_id not in _registry:
+    if strategy_id not in _registry_by_id:
         raise KeyError(f"Strategy '{strategy_id}' not found in registry")
-    return _registry[strategy_id]
+    return _registry_by_id[strategy_id]
+
+
+def get_by_content_id(content_id: str) -> StrategySpec:
+    """Get strategy by content-addressed ID.
+    
+    Args:
+        content_id: Content-addressed strategy ID (64-char hex)
+        
+    Returns:
+        StrategySpec
+        
+    Raises:
+        KeyError: If strategy not found
+        ValueError: If content_id format is invalid
+    """
+    if len(content_id) != 64:
+        raise ValueError(f"content_id must be 64-character hex string, got {content_id}")
+    
+    if content_id not in _registry_by_content_id:
+        raise KeyError(f"Strategy with content_id '{content_id[:16]}...' not found in registry")
+    return _registry_by_content_id[content_id]
 
 
 def list_strategies() -> List[StrategySpec]:
@@ -59,7 +114,16 @@ def list_strategies() -> List[StrategySpec]:
     Returns:
         List of StrategySpec, sorted by strategy_id
     """
-    return sorted(_registry.values(), key=lambda s: s.strategy_id)
+    return sorted(_registry_by_id.values(), key=lambda s: s.strategy_id)
+
+
+def list_strategies_by_content_id() -> List[StrategySpec]:
+    """List all registered strategies sorted by content_id.
+    
+    Returns:
+        List of StrategySpec, sorted by content_id
+    """
+    return sorted(_registry_by_content_id.values(), key=lambda s: s.immutable_id)
 
 
 def unregister(strategy_id: str) -> None:
@@ -71,14 +135,22 @@ def unregister(strategy_id: str) -> None:
     Raises:
         KeyError: If strategy not found
     """
-    if strategy_id not in _registry:
+    if strategy_id not in _registry_by_id:
         raise KeyError(f"Strategy '{strategy_id}' not found in registry")
-    del _registry[strategy_id]
+    
+    spec = _registry_by_id[strategy_id]
+    content_id = spec.immutable_id
+    
+    # Remove from both indices
+    del _registry_by_id[strategy_id]
+    if content_id in _registry_by_content_id:
+        del _registry_by_content_id[content_id]
 
 
 def clear() -> None:
     """Clear all registered strategies (mainly for testing)."""
-    _registry.clear()
+    _registry_by_id.clear()
+    _registry_by_content_id.clear()
 
 
 def load_builtin_strategies() -> None:
@@ -98,7 +170,71 @@ def load_builtin_strategies() -> None:
     register(mean_revert_zscore_v1.SPEC)
 
 
-# Phase 12: Enhanced registry for GUI introspection
+def generate_manifest() -> StrategyManifest:
+    """Generate strategy manifest with content-addressed identity.
+    
+    Returns:
+        StrategyManifest containing all registered strategies
+    """
+    entries = []
+    
+    for spec in list_strategies():
+        # Create identity model
+        identity = StrategyIdentityModel.from_core_identity(spec.get_identity())
+        
+        # Create metadata
+        from FishBroWFS_V2.strategy.identity_models import StrategyMetadata
+        metadata = StrategyMetadata(
+            name=spec.strategy_id,
+            version=spec.version,
+            description=f"{spec.strategy_id} strategy version {spec.version}",
+            author="FishBroWFS_V2",
+            tags=["builtin"] if "builtin" in spec.strategy_id else []
+        )
+        
+        # Create param schema
+        from FishBroWFS_V2.strategy.identity_models import StrategyParamSchema
+        param_schema = StrategyParamSchema(
+            param_schema=spec.param_schema,
+            defaults=spec.defaults
+        )
+        
+        # Create registry entry
+        entry = StrategyRegistryEntry(
+            identity=identity,
+            metadata=metadata,
+            param_schema=param_schema,
+            fn=spec.fn
+        )
+        
+        entries.append(entry)
+    
+    return StrategyManifest(strategies=entries)
+
+
+def save_manifest(filepath: str) -> None:
+    """Save strategy manifest to file.
+    
+    Args:
+        filepath: Path to save StrategyManifest.json
+    """
+    manifest = generate_manifest()
+    manifest.save(filepath)
+
+
+def load_manifest(filepath: str) -> StrategyManifest:
+    """Load strategy manifest from file.
+    
+    Args:
+        filepath: Path to StrategyManifest.json
+        
+    Returns:
+        StrategyManifest
+    """
+    return StrategyManifest.load(filepath)
+
+
+# Phase 12: Enhanced registry for GUI introspection (backward compatible)
 class StrategySpecForGUI(BaseModel):
     """Strategy specification for GUI consumption.
     
@@ -110,6 +246,7 @@ class StrategySpecForGUI(BaseModel):
     
     strategy_id: str
     params: list[ParamSpec]
+    content_id: Optional[str] = None  # Added for Phase 13
 
 
 class StrategyRegistryResponse(BaseModel):
@@ -174,7 +311,13 @@ def convert_to_gui_spec(spec: StrategySpec) -> StrategySpecForGUI:
         )
     
     params.sort(key=lambda p: p.name)
-    return StrategySpecForGUI(strategy_id=spec.strategy_id, params=params)
+    
+    # Include content_id in GUI spec
+    return StrategySpecForGUI(
+        strategy_id=spec.strategy_id,
+        params=params,
+        content_id=spec.immutable_id
+    )
 
 
 def get_strategy_registry() -> StrategyRegistryResponse:
@@ -190,5 +333,3 @@ def get_strategy_registry() -> StrategyRegistryResponse:
         strategies.append(gui_spec)
     
     return StrategyRegistryResponse(strategies=strategies)
-
-

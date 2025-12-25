@@ -27,5 +27,6 @@ tmp/
 outputs/
 outputs/**
 
-# .txt
+# Raw.txt
+FishBroData/
 *.txt

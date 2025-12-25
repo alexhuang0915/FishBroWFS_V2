@@ -1,0 +1,123 @@
+name: No-Fog Gate
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  # Manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip core contract tests'
+        required: false
+        default: false
+        type: boolean
+      no_regenerate:
+        description: 'Skip snapshot regeneration'
+        required: false
+        default: false
+        type: boolean
+
+# Cancel previous runs on the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  no-fog-gate:
+    name: No-Fog Gate (Core Contracts + Snapshot)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Fail if gate takes too long
+    
+    strategy:
+      matrix:
+        python-version: ["3.8", "3.9", "3.10"]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for snapshot
+    
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+    
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+          # Install project dependencies if requirements.txt exists
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+    
+      - name: Cache snapshot directory
+        uses: actions/cache@v4
+        with:
+          path: SYSTEM_FULL_SNAPSHOT
+          key: ${{ runner.os }}-snapshot-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-snapshot-
+    
+      - name: Run No-Fog Gate
+        id: no_fog_gate
+        run: |
+          # Make shell script executable
+          chmod +x scripts/no_fog/no_fog_gate.sh
+          
+          # Build arguments based on workflow inputs
+          ARGS=""
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ github.event.inputs.skip_tests }}" == "true" ]]; then
+              ARGS="$ARGS --skip-tests"
+            fi
+            if [[ "${{ github.event.inputs.no_regenerate }}" == "true" ]]; then
+              ARGS="$ARGS --no-regenerate"
+            fi
+          fi
+          
+          # For PRs, we might want to skip regeneration to save time
+          # but for safety, we always regenerate in CI
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "Running full gate for PR validation"
+          fi
+          
+          # Run the gate with timeout
+          timeout 300 bash scripts/no_fog/no_fog_gate.sh $ARGS --timeout 30
+        env:
+          PYTHONPATH: src
+    
+      - name: Upload snapshot artifacts (on failure)
+        if: failure() && steps.no_fog_gate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-full-snapshot-${{ github.sha }}
+          path: SYSTEM_FULL_SNAPSHOT/
+          retention-days: 7
+    
+      - name: Upload test logs (on failure)
+        if: failure() && steps.no_fog_gate.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ github.sha }}
+          path: |
+            **/pytest*.log
+            **/test*.log
+          retention-days: 7
+    
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ No-Fog Gate failed!"
+          echo "Check the logs above for details."
+          echo ""
+          echo "Common issues:"
+          echo "1. Core contract tests failed"
+          echo "2. Snapshot generation failed"
+          echo "3. Timeout exceeded (gate took >30s)"
+          echo ""
+          echo "Run locally with: bash scripts/no_fog/no_fog_gate.sh"

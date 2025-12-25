@@ -15,7 +15,7 @@ SAFE_PYTEST_ADDOPTS ?=
 # pytest command using venv pytest (not python3 -m pytest)
 PYTEST := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/pytest
 
-.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip dashboard gui demo contract research-season portfolio-season phase3 phase4
+.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip dashboard gui demo contract research-season portfolio-season phase3 phase4 full-snapshot no-fog
 
 help:
 	@echo ""
@@ -42,6 +42,8 @@ help:
 	@echo "  make phase3            Run research-season → portfolio-season → smoke check"
 	@echo "  make phase4            Validate Phase 4: Operational closed loop (UI Actions + Governance)"
 	@echo "  make phase5            Validate Phase 5: Deterministic Governance & Reproducibility Lock"
+	@echo "  make full-snapshot     Generate full repository snapshot (SYSTEM_FULL_SNAPSHOT/)"
+	@echo "  make no-fog            Run No-Fog Gate (core contracts + snapshot integrity)"
 	@echo ""
 
 # ---------------------------------------------------------
@@ -235,6 +237,40 @@ phase4:
 	@echo " 3. Navigate to /portfolio → Build Portfolio"
 	@echo " 4. Navigate to /history → View audit trail"
 	@echo " 5. Check outputs/seasons/2026Q1/governance/ui_audit.jsonl"
+
+# ---------------------------------------------------------
+# Full repository snapshot
+# ---------------------------------------------------------
+full-snapshot:
+	@echo "==> Generating full repository snapshot (SYSTEM_FULL_SNAPSHOT/)"
+	@echo " - Deterministic file traversal"
+	@echo " - Hard excludes: outputs/, FishBroData/, .venv/, binaries, etc."
+	@echo " - Secret redaction: TOKEN/SECRET/PASSWORD/API_KEY"
+	@echo " - SHA256 per file + per chunk"
+	@echo " - Output: SYSTEM_FULL_SNAPSHOT/{MANIFEST.json, REPO_TREE.txt, SNAPSHOT_*.md}"
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/no_fog/generate_full_snapshot.py --output-dir SYSTEM_FULL_SNAPSHOT --force
+
+# ---------------------------------------------------------
+# No-Fog Gate (Core Contracts + Snapshot Integrity)
+# ---------------------------------------------------------
+no-fog:
+	@echo "==> Running No-Fog Gate (Core Contracts + Snapshot Integrity)"
+	@echo " - Regenerates full repository snapshot"
+	@echo " - Runs core contract tests:"
+	@echo "   • tests/strategy/test_ast_identity.py"
+	@echo "   • tests/test_ui_race_condition_headless.py"
+	@echo "   • tests/features/test_feature_causality.py"
+	@echo "   • tests/features/test_feature_lookahead_rejection.py"
+	@echo "   • tests/features/test_feature_window_honesty.py"
+	@echo " - Verifies snapshot is up-to-date"
+	@echo " - Must complete in <30s for CI compatibility"
+	@echo ""
+	@if [ ! -f "scripts/no_fog/no_fog_gate.sh" ]; then \
+		echo "❌ No-Fog Gate script not found: scripts/no_fog/no_fog_gate.sh"; \
+		exit 1; \
+	fi
+	@chmod +x scripts/no_fog/no_fog_gate.sh
+	@PYTHONPATH=src bash scripts/no_fog/no_fog_gate.sh --timeout 30
 
 # ---------------------------------------------------------
 # Phase 5: Deterministic Governance & Reproducibility Lock

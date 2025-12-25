@@ -1,3 +1,1987 @@
+FILE src/FishBroWFS_V2/core/artifacts.py
+sha256(source_bytes) = c0fc02244344ffeaffdb53ad43a1e0f6a22d6f70cd0922c6b5458b59058813bc
+bytes = 5493
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Artifact writer for unified run output.
+
+Provides consistent artifact structure for all runs, with mandatory
+subsample rate visibility.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+from FishBroWFS_V2.core.winners_builder import build_winners_v2
+from FishBroWFS_V2.core.winners_schema import is_winners_legacy, is_winners_v2
+
+
+def _write_json(path: Path, obj: Any) -> None:
+    """
+    Write object to JSON file with fixed format.
+    
+    Uses sort_keys=True and fixed separators for reproducibility.
+    
+    Args:
+        path: Path to JSON file
+        obj: Object to serialize
+    """
+    path.write_text(
+        json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+
+def write_run_artifacts(
+    run_dir: Path,
+    manifest: Dict[str, Any],
+    config_snapshot: Dict[str, Any],
+    metrics: Dict[str, Any],
+    winners: Dict[str, Any] | None = None,
+) -> None:
+    """
+    Write all standard artifacts for a run.
+    
+    Creates the following files:
+    - manifest.json: Full AuditSchema data
+    - config_snapshot.json: Original/normalized config
+    - metrics.json: Performance metrics
+    - winners.json: Top-K results (fixed schema)
+    - README.md: Human-readable summary
+    - logs.txt: Execution logs (empty initially)
+    
+    Args:
+        run_dir: Run directory path (will be created if needed)
+        manifest: Manifest data (AuditSchema as dict)
+        config_snapshot: Configuration snapshot
+        metrics: Performance metrics (must include param_subsample_rate visibility)
+        winners: Optional winners dict. If None, uses empty schema.
+            Must follow schema: {"topk": [...], "notes": {"schema": "v1", ...}}
+    """
+    run_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Write manifest.json (full AuditSchema)
+    _write_json(run_dir / "manifest.json", manifest)
+    
+    # Write config_snapshot.json
+    _write_json(run_dir / "config_snapshot.json", config_snapshot)
+    
+    # Write metrics.json (must include param_subsample_rate visibility)
+    _write_json(run_dir / "metrics.json", metrics)
+    
+    # Write winners.json (always output v2 schema)
+    if winners is None:
+        winners = {"topk": [], "notes": {"schema": "v1"}}
+    
+    # Auto-upgrade legacy winners to v2
+    if is_winners_legacy(winners):
+        # Convert legacy to v2
+        legacy_topk = winners.get("topk", [])
+        run_id = manifest.get("run_id", "unknown")
+        stage_name = metrics.get("stage_name", "unknown")
+        
+        winners = build_winners_v2(
+            stage_name=stage_name,
+            run_id=run_id,
+            manifest=manifest,
+            config_snapshot=config_snapshot,
+            legacy_topk=legacy_topk,
+        )
+    elif not is_winners_v2(winners):
+        # Unknown format - try to upgrade anyway (defensive)
+        legacy_topk = winners.get("topk", [])
+        if legacy_topk:
+            run_id = manifest.get("run_id", "unknown")
+            stage_name = metrics.get("stage_name", "unknown")
+            
+            winners = build_winners_v2(
+                stage_name=stage_name,
+                run_id=run_id,
+                manifest=manifest,
+                config_snapshot=config_snapshot,
+                legacy_topk=legacy_topk,
+            )
+        else:
+            # Empty topk - create minimal v2 structure
+            from FishBroWFS_V2.core.winners_schema import build_winners_v2_dict
+            winners = build_winners_v2_dict(
+                stage_name=metrics.get("stage_name", "unknown"),
+                run_id=manifest.get("run_id", "unknown"),
+                topk=[],
+            )
+    
+    _write_json(run_dir / "winners.json", winners)
+    
+    # Write README.md (human-readable summary)
+    # Must prominently display param_subsample_rate
+    readme_lines = [
+        "# FishBroWFS_V2 Run",
+        "",
+        f"- run_id: {manifest.get('run_id')}",
+        f"- git_sha: {manifest.get('git_sha')}",
+        f"- param_subsample_rate: {manifest.get('param_subsample_rate')}",
+        f"- season: {manifest.get('season')}",
+        f"- dataset_id: {manifest.get('dataset_id')}",
+        f"- bars: {manifest.get('bars')}",
+        f"- params_total: {manifest.get('params_total')}",
+        f"- params_effective: {manifest.get('params_effective')}",
+        f"- config_hash: {manifest.get('config_hash')}",
+    ]
+    
+    # Add OOM gate information if present in metrics
+    if "oom_gate_action" in metrics:
+        readme_lines.extend([
+            "",
+            "## OOM Gate",
+            "",
+            f"- action: {metrics.get('oom_gate_action')}",
+            f"- reason: {metrics.get('oom_gate_reason')}",
+            f"- mem_est_mb: {metrics.get('mem_est_mb', 0):.1f}",
+            f"- mem_limit_mb: {metrics.get('mem_limit_mb', 0):.1f}",
+            f"- ops_est: {metrics.get('ops_est', 0)}",
+        ])
+        
+        # If auto-downsample occurred, show original and final
+        if metrics.get("oom_gate_action") == "AUTO_DOWNSAMPLE":
+            readme_lines.extend([
+                f"- original_subsample: {metrics.get('oom_gate_original_subsample', 0)}",
+                f"- final_subsample: {metrics.get('oom_gate_final_subsample', 0)}",
+            ])
+    
+    readme = "\n".join(readme_lines)
+    (run_dir / "README.md").write_text(readme, encoding="utf-8")
+    
+    # Write logs.txt (empty initially)
+    (run_dir / "logs.txt").write_text("", encoding="utf-8")
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/ast_identity.py
+sha256(source_bytes) = a7368f674044cfe0366917ff438ff947a5083ab3fcbbe304268c40d819d9a7fb
+bytes = 16991
+redacted = False
+--------------------------------------------------------------------------------
+"""AST-based canonical identity for strategies.
+
+Implements content-addressed, deterministic StrategyID derived from strategy's
+canonical AST (ast-c14n-v1). This replaces filesystem iteration order, Python
+import order, list index/enumerate/incremental counters, filename or class name
+as primary key.
+
+Key properties:
+1. Deterministic: Same AST → same hash regardless of file location, import order
+2. Content-addressed: Hash derived from canonical AST representation
+3. Immutable: Strategy identity cannot change without changing its logic
+4. Collision-resistant: SHA-256 provides sufficient collision resistance
+5. No hash() usage: Uses hashlib.sha256 for deterministic hashing
+
+Algorithm (ast-c14n-v1):
+1. Parse source code to AST
+2. Canonicalize AST (normalize whitespace, sort dict keys, etc.)
+3. Serialize to canonical string representation
+4. Compute SHA-256 hash
+5. Encode as hex string (StrategyID)
+"""
+
+from __future__ import annotations
+
+import ast
+import hashlib
+import json
+import textwrap
+from typing import Any, Dict, List, Optional, Union
+from pathlib import Path
+import inspect
+
+
+class ASTCanonicalizer:
+    """Canonical AST representation for deterministic hashing."""
+    
+    @staticmethod
+    def canonicalize(node: ast.AST) -> Any:
+        """Convert AST node to canonical JSON-serializable representation.
+        
+        Follows ast-c14n-v1 specification:
+        1. Sort dictionary keys alphabetically
+        2. Normalize numeric literals (float precision)
+        3. Remove location information (lineno, col_offset)
+        4. Handle special AST nodes consistently
+        5. Preserve only semantically relevant information
+        """
+        if isinstance(node, ast.Module):
+            return {
+                "type": "Module",
+                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body]
+            }
+        
+        elif isinstance(node, ast.FunctionDef):
+            return {
+                "type": "FunctionDef",
+                "name": node.name,
+                "args": ASTCanonicalizer.canonicalize(node.args),
+                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
+                "decorator_list": [
+                    ASTCanonicalizer.canonicalize(decorator) 
+                    for decorator in node.decorator_list
+                ],
+                "returns": (
+                    ASTCanonicalizer.canonicalize(node.returns) 
+                    if node.returns else None
+                )
+            }
+        
+        elif isinstance(node, ast.ClassDef):
+            return {
+                "type": "ClassDef",
+                "name": node.name,
+                "bases": [ASTCanonicalizer.canonicalize(base) for base in node.bases],
+                "keywords": [
+                    ASTCanonicalizer.canonicalize(keyword) 
+                    for keyword in node.keywords
+                ],
+                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
+                "decorator_list": [
+                    ASTCanonicalizer.canonicalize(decorator) 
+                    for decorator in node.decorator_list
+                ]
+            }
+        
+        elif isinstance(node, ast.arguments):
+            return {
+                "type": "arguments",
+                "args": [ASTCanonicalizer.canonicalize(arg) for arg in node.args],
+                "defaults": [
+                    ASTCanonicalizer.canonicalize(default) 
+                    for default in node.defaults
+                ],
+                "vararg": (
+                    ASTCanonicalizer.canonicalize(node.vararg) 
+                    if node.vararg else None
+                ),
+                "kwarg": (
+                    ASTCanonicalizer.canonicalize(node.kwarg) 
+                    if node.kwarg else None
+                )
+            }
+        
+        elif isinstance(node, ast.arg):
+            return {
+                "type": "arg",
+                "arg": node.arg,
+                "annotation": (
+                    ASTCanonicalizer.canonicalize(node.annotation) 
+                    if node.annotation else None
+                )
+            }
+        
+        elif isinstance(node, ast.Name):
+            return {
+                "type": "Name",
+                "id": node.id,
+                "ctx": node.ctx.__class__.__name__
+            }
+        
+        elif isinstance(node, ast.Attribute):
+            return {
+                "type": "Attribute",
+                "value": ASTCanonicalizer.canonicalize(node.value),
+                "attr": node.attr,
+                "ctx": node.ctx.__class__.__name__
+            }
+        
+        elif isinstance(node, ast.Constant):
+            value = node.value
+            # Normalize numeric values
+            if isinstance(value, float):
+                # Use repr to preserve precision but normalize -0.0
+                value = float(repr(value))
+            elif isinstance(value, complex):
+                value = complex(repr(value))
+            return {
+                "type": "Constant",
+                "value": value,
+                "kind": getattr(node, 'kind', None)
+            }
+        
+        elif isinstance(node, ast.Dict):
+            # Sort dictionary keys for determinism
+            keys = [ASTCanonicalizer.canonicalize(k) for k in node.keys]
+            values = [ASTCanonicalizer.canonicalize(v) for v in node.values]
+            
+            # Create list of key-value pairs for sorting
+            pairs = list(zip(keys, values))
+            # Sort by key representation
+            pairs.sort(key=lambda x: json.dumps(x[0], sort_keys=True))
+            
+            sorted_keys = [k for k, _ in pairs]
+            sorted_values = [v for _, v in pairs]
+            
+            return {
+                "type": "Dict",
+                "keys": sorted_keys,
+                "values": sorted_values
+            }
+        
+        elif isinstance(node, ast.List):
+            return {
+                "type": "List",
+                "elts": [ASTCanonicalizer.canonicalize(elt) for elt in node.elts],
+                "ctx": node.ctx.__class__.__name__
+            }
+        
+        elif isinstance(node, ast.Tuple):
+            return {
+                "type": "Tuple",
+                "elts": [ASTCanonicalizer.canonicalize(elt) for elt in node.elts],
+                "ctx": node.ctx.__class__.__name__
+            }
+        
+        elif isinstance(node, ast.Set):
+            # Sets need special handling for determinism
+            elts = [ASTCanonicalizer.canonicalize(elt) for elt in node.elts]
+            # Sort by JSON representation
+            elts.sort(key=lambda x: json.dumps(x, sort_keys=True))
+            return {
+                "type": "Set",
+                "elts": elts
+            }
+        
+        elif isinstance(node, ast.Call):
+            # Sort keywords by argument name for determinism
+            keywords = [
+                {
+                    "arg": kw.arg,
+                    "value": ASTCanonicalizer.canonicalize(kw.value)
+                }
+                for kw in node.keywords
+            ]
+            keywords.sort(key=lambda x: x["arg"] if x["arg"] else "")
+            
+            return {
+                "type": "Call",
+                "func": ASTCanonicalizer.canonicalize(node.func),
+                "args": [ASTCanonicalizer.canonicalize(arg) for arg in node.args],
+                "keywords": keywords
+            }
+        
+        elif isinstance(node, ast.keyword):
+            return {
+                "type": "keyword",
+                "arg": node.arg,
+                "value": ASTCanonicalizer.canonicalize(node.value)
+            }
+        
+        elif isinstance(node, ast.Import):
+            # Sort imports by name for determinism
+            names = [
+                {"name": alias.name, "asname": alias.asname}
+                for alias in node.names
+            ]
+            names.sort(key=lambda x: x["name"])
+            return {
+                "type": "Import",
+                "names": names
+            }
+        
+        elif isinstance(node, ast.ImportFrom):
+            # Sort imports by name for determinism
+            names = [
+                {"name": alias.name, "asname": alias.asname}
+                for alias in node.names
+            ]
+            names.sort(key=lambda x: x["name"])
+            return {
+                "type": "ImportFrom",
+                "module": node.module,
+                "names": names,
+                "level": node.level
+            }
+        
+        elif isinstance(node, ast.Assign):
+            return {
+                "type": "Assign",
+                "targets": [
+                    ASTCanonicalizer.canonicalize(target) 
+                    for target in node.targets
+                ],
+                "value": ASTCanonicalizer.canonicalize(node.value)
+            }
+        
+        elif isinstance(node, ast.Return):
+            return {
+                "type": "Return",
+                "value": (
+                    ASTCanonicalizer.canonicalize(node.value) 
+                    if node.value else None
+                )
+            }
+        
+        elif isinstance(node, ast.If):
+            return {
+                "type": "If",
+                "test": ASTCanonicalizer.canonicalize(node.test),
+                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
+                "orelse": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.orelse]
+            }
+        
+        elif isinstance(node, ast.BinOp):
+            return {
+                "type": "BinOp",
+                "left": ASTCanonicalizer.canonicalize(node.left),
+                "op": node.op.__class__.__name__,
+                "right": ASTCanonicalizer.canonicalize(node.right)
+            }
+        
+        elif isinstance(node, ast.UnaryOp):
+            return {
+                "type": "UnaryOp",
+                "op": node.op.__class__.__name__,
+                "operand": ASTCanonicalizer.canonicalize(node.operand)
+            }
+        
+        elif isinstance(node, ast.Compare):
+            return {
+                "type": "Compare",
+                "left": ASTCanonicalizer.canonicalize(node.left),
+                "ops": [op.__class__.__name__ for op in node.ops],
+                "comparators": [
+                    ASTCanonicalizer.canonicalize(comp) 
+                    for comp in node.comparators
+                ]
+            }
+        
+        # Handle expression contexts
+        elif isinstance(node, (ast.Load, ast.Store, ast.Del)):
+            return {"type": node.__class__.__name__}
+        
+        # Default fallback: convert node attributes to dict
+        else:
+            node_type = node.__class__.__name__
+            result = {"type": node_type}
+            
+            # Get public attributes
+            for attr_name in dir(node):
+                if attr_name.startswith('_'):
+                    continue
+                if attr_name in ('lineno', 'col_offset', 'end_lineno', 'end_col_offset'):
+                    continue
+                
+                try:
+                    attr_value = getattr(node, attr_name)
+                except AttributeError:
+                    continue
+                
+                # Skip None values and empty lists
+                if attr_value is None:
+                    continue
+                if isinstance(attr_value, list) and len(attr_value) == 0:
+                    continue
+                
+                # Recursively canonicalize if it's an AST node
+                if isinstance(attr_value, ast.AST):
+                    result[attr_name] = ASTCanonicalizer.canonicalize(attr_value)
+                elif isinstance(attr_value, list) and attr_value and isinstance(attr_value[0], ast.AST):
+                    result[attr_name] = [
+                        ASTCanonicalizer.canonicalize(item) for item in attr_value
+                    ]
+                elif isinstance(attr_value, (str, int, float, bool)):
+                    result[attr_name] = attr_value
+            
+            return result
+    
+    @staticmethod
+    def canonical_ast_hash(source_code: str) -> str:
+        """Compute canonical hash of source code AST.
+        
+        Args:
+            source_code: Python source code as string
+            
+        Returns:
+            SHA-256 hash hex string (64 characters)
+        """
+        try:
+            tree = ast.parse(source_code)
+            canonical = ASTCanonicalizer.canonicalize(tree)
+            
+            # Convert to canonical JSON string with sorted keys
+            canonical_json = json.dumps(
+                canonical,
+                sort_keys=True,
+                separators=(',', ':'),  # No whitespace
+                ensure_ascii=False
+            )
+            
+            # Compute SHA-256 hash
+            hash_obj = hashlib.sha256(canonical_json.encode('utf-8'))
+            return hash_obj.hexdigest()
+        
+        except (SyntaxError, ValueError) as e:
+            raise ValueError(f"Failed to parse or canonicalize source code: {e}")
+
+
+def compute_strategy_id_from_source(source_code: str) -> str:
+    """Compute StrategyID from strategy source code.
+    
+    Args:
+        source_code: Strategy function source code
+        
+    Returns:
+        StrategyID (hex string, 64 characters)
+    """
+    return ASTCanonicalizer.canonical_ast_hash(source_code)
+
+
+def compute_strategy_id_from_function(func) -> str:
+    """Compute StrategyID from strategy function object.
+    
+    Args:
+        func: Strategy function (callable)
+        
+    Returns:
+        StrategyID (hex string, 64 characters)
+    """
+    try:
+        source_code = inspect.getsource(func)
+        # Dedent the source code to handle indentation from nested definitions
+        dedented_source = textwrap.dedent(source_code)
+        return compute_strategy_id_from_source(dedented_source)
+    except (OSError, TypeError) as e:
+        raise ValueError(f"Failed to get source code for function: {e}")
+
+
+def compute_strategy_id_from_file(filepath: Union[str, Path]) -> str:
+    """Compute StrategyID from strategy source file.
+    
+    Args:
+        filepath: Path to Python source file
+        
+    Returns:
+        StrategyID (hex string, 64 characters)
+    """
+    path = Path(filepath)
+    if not path.exists():
+        raise FileNotFoundError(f"Strategy file not found: {filepath}")
+    
+    source_code = path.read_text(encoding='utf-8')
+    return compute_strategy_id_from_source(source_code)
+
+
+class StrategyIdentity:
+    """Immutable strategy identity based on canonical AST hash."""
+    
+    def __init__(self, strategy_id: str, source_hash: Optional[str] = None):
+        """Initialize strategy identity.
+        
+        Args:
+            strategy_id: Content-addressed strategy ID (hex string)
+            source_hash: Optional source hash for verification
+        """
+        if not isinstance(strategy_id, str) or len(strategy_id) != 64:
+            raise ValueError(
+                f"Invalid strategy_id: must be 64-character hex string, got {strategy_id}"
+            )
+        
+        # Validate hex format
+        try:
+            int(strategy_id, 16)
+        except ValueError:
+            raise ValueError(f"Invalid strategy_id: not a valid hex string: {strategy_id}")
+        
+        self._strategy_id = strategy_id
+        self._source_hash = source_hash
+    
+    @property
+    def strategy_id(self) -> str:
+        """Get the content-addressed strategy ID."""
+        return self._strategy_id
+    
+    @property
+    def source_hash(self) -> Optional[str]:
+        """Get the source hash (if available)."""
+        return self._source_hash
+    
+    @classmethod
+    def from_source(cls, source_code: str) -> StrategyIdentity:
+        """Create StrategyIdentity from source code."""
+        strategy_id = compute_strategy_id_from_source(source_code)
+        return cls(strategy_id, source_hash=strategy_id)
+    
+    @classmethod
+    def from_function(cls, func) -> StrategyIdentity:
+        """Create StrategyIdentity from function."""
+        strategy_id = compute_strategy_id_from_function(func)
+        return cls(strategy_id, source_hash=strategy_id)
+    
+    @classmethod
+    def from_file(cls, filepath: Union[str, Path]) -> StrategyIdentity:
+        """Create StrategyIdentity from file."""
+        strategy_id = compute_strategy_id_from_file(filepath)
+        return cls(strategy_id, source_hash=strategy_id)
+    
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, StrategyIdentity):
+            return False
+        return self._strategy_id == other._strategy_id
+    
+    def __hash__(self) -> int:
+        # Use integer representation of first 16 chars for hash
+        return int(self._strategy_id[:16], 16)
+    
+    def __repr__(self) -> str:
+        return f"StrategyIdentity(strategy_id={self._strategy_id[:16]}...)"
+    
+    def __str__(self) -> str:
+        return self._strategy_id
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/audit_schema.py
+sha256(source_bytes) = 9bec8723373b6e4906c9cf3ea1adf507853d7f5d9393462b561a911fac4c6929
+bytes = 1919
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Audit schema for run tracking and reproducibility.
+
+Single Source of Truth (SSOT) for audit data.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
+from typing import Any, Dict
+
+
+@dataclass(frozen=True)
+class AuditSchema:
+    """
+    Audit schema for run tracking.
+    
+    All fields are required and must be JSON-serializable.
+    This is the Single Source of Truth (SSOT) for audit data.
+    """
+    run_id: str
+    created_at: str  # ISO8601 with Z suffix (UTC)
+    git_sha: str  # At least 12 chars
+    dirty_repo: bool  # Whether repo has uncommitted changes
+    param_subsample_rate: float  # Required, must be in [0.0, 1.0]
+    config_hash: str  # Stable hash of config
+    season: str  # Season identifier
+    dataset_id: str  # Dataset identifier
+    bars: int  # Number of bars processed
+    params_total: int  # Total parameters before subsample
+    params_effective: int  # Effective parameters after subsample (= int(params_total * param_subsample_rate))
+    artifact_version: str = "v1"  # Artifact version
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return asdict(self)
+
+
+def compute_params_effective(params_total: int, param_subsample_rate: float) -> int:
+    """
+    Compute effective parameters after subsample.
+    
+    Rounding rule: int(params_total * param_subsample_rate)
+    This is locked in code/docs/tests - do not change.
+    
+    Args:
+        params_total: Total parameters before subsample
+        param_subsample_rate: Subsample rate in [0.0, 1.0]
+        
+    Returns:
+        Effective parameters (integer, rounded down)
+    """
+    if not (0.0 <= param_subsample_rate <= 1.0):
+        raise ValueError(f"param_subsample_rate must be in [0.0, 1.0], got {param_subsample_rate}")
+    
+    return int(params_total * param_subsample_rate)
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/config_hash.py
+sha256(source_bytes) = e1bf5e812460f3215e7d661d0f56b905d60323f9264ee9a930b0d4e35f466abb
+bytes = 737
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Stable config hash computation.
+
+Provides deterministic hash of configuration objects for reproducibility.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from typing import Any
+
+
+def stable_config_hash(obj: Any) -> str:
+    """
+    Compute stable hash of configuration object.
+    
+    Uses JSON serialization with sorted keys and fixed separators
+    to ensure cross-platform consistency.
+    
+    Args:
+        obj: Configuration object (dict, list, etc.)
+        
+    Returns:
+        Hex string hash (64 chars, SHA256)
+    """
+    s = json.dumps(
+        obj,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    )
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/config_snapshot.py
+sha256(source_bytes) = 64533c2ba5a5f3b06a0ebb9fb4b491ba59223911faff4ba50363ef2abc4d081b
+bytes = 2862
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Config snapshot sanitizer.
+
+Creates JSON-serializable config snapshots by excluding large ndarrays
+and converting numpy types to Python native types.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Dict
+
+import numpy as np
+
+# These keys will make artifacts garbage or directly crash JSON serialization
+_DEFAULT_DROP_KEYS = {
+    "open_",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "params_matrix",
+}
+
+
+def _ndarray_meta(x: np.ndarray) -> Dict[str, Any]:
+    """
+    Create metadata dict for ndarray (shape and dtype only).
+    
+    Args:
+        x: numpy array
+        
+    Returns:
+        Metadata dictionary with shape and dtype
+    """
+    return {
+        "__ndarray__": True,
+        "shape": list(x.shape),
+        "dtype": str(x.dtype),
+    }
+
+
+def make_config_snapshot(
+    cfg: Dict[str, Any],
+    drop_keys: set[str] | None = None,
+) -> Dict[str, Any]:
+    """
+    Create sanitized config snapshot for JSON serialization and hashing.
+    
+    Rules (locked):
+    - Must include: season, dataset_id, bars, params_total, param_subsample_rate,
+      stage_name, topk, commission, slip, order_qty, config knobs...
+    - Must exclude/replace: open_, high, low, close, params_matrix (ndarrays)
+    - If metadata needed, only keep shape/dtype (no bytes hash to avoid cost)
+    
+    Args:
+        cfg: Configuration dictionary (may contain ndarrays)
+        drop_keys: Optional set of keys to drop. If None, uses default.
+        
+    Returns:
+        Sanitized config dictionary (JSON-serializable)
+    """
+    drop = _DEFAULT_DROP_KEYS if drop_keys is None else drop_keys
+    out: Dict[str, Any] = {}
+    
+    for k, v in cfg.items():
+        if k in drop:
+            # Don't keep raw data, only metadata (optional)
+            if isinstance(v, np.ndarray):
+                out[k + "_meta"] = _ndarray_meta(v)
+            continue
+        
+        # numpy scalar -> python scalar
+        if isinstance(v, (np.floating, np.integer)):
+            out[k] = v.item()
+        # ndarray (if slipped through) -> meta
+        elif isinstance(v, np.ndarray):
+            out[k + "_meta"] = _ndarray_meta(v)
+        # Basic types: keep as-is
+        elif isinstance(v, (str, int, float, bool)) or v is None:
+            out[k] = v
+        # list/tuple: conservative handling (avoid strange objects)
+        elif isinstance(v, (list, tuple)):
+            # Check if list contains only serializable types
+            try:
+                # Try to serialize to verify
+                import json
+                json.dumps(v)
+                out[k] = v
+            except (TypeError, ValueError):
+                # If not serializable, convert to string representation
+                out[k] = str(v)
+        # Other types: convert to string (avoid JSON crash)
+        else:
+            out[k] = str(v)
+    
+    return out
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/dimensions.py
+sha256(source_bytes) = f2f49c27a7dc66ec2167acbfe66297e2e492184c5b2a0ac28be4f6dbb8e0076d
+bytes = 1680
+redacted = False
+--------------------------------------------------------------------------------
+
+# src/FishBroWFS_V2/core/dimensions.py
+"""
+穩定的維度查詢介面
+
+提供 get_dimension_for_dataset() 函數，用於查詢商品的維度定義（交易時段、交易所等）。
+此模組使用 lazy loading 避免 import-time IO，並提供 deterministic 結果。
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from typing import Optional
+
+from FishBroWFS_V2.contracts.dimensions import InstrumentDimension
+from FishBroWFS_V2.contracts.dimensions_loader import load_dimension_registry
+
+
+@lru_cache(maxsize=1)
+def _get_cached_registry():
+    """
+    快取註冊表，避免重複讀取檔案
+    
+    使用 lru_cache(maxsize=1) 確保：
+    1. 第一次呼叫時讀取檔案
+    2. 後續呼叫重用快取
+    3. 避免 import-time IO
+    """
+    return load_dimension_registry()
+
+
+def get_dimension_for_dataset(
+    dataset_id: str, 
+    *, 
+    symbol: str | None = None
+) -> InstrumentDimension | None:
+    """
+    查詢資料集的維度定義
+    
+    Args:
+        dataset_id: 資料集 ID，例如 "CME.MNQ.60m.2020-2024"
+        symbol: 可選的商品符號，例如 "CME.MNQ"
+    
+    Returns:
+        InstrumentDimension 或 None（如果找不到）
+    
+    Note:
+        - 純讀取操作，無副作用（除了第一次呼叫時的檔案讀取）
+        - 結果是 deterministic 的
+        - 使用 lazy loading，避免 import-time IO
+    """
+    registry = _get_cached_registry()
+    return registry.get(dataset_id, symbol)
+
+
+def clear_dimension_cache() -> None:
+    """
+    清除維度快取
+    
+    主要用於測試，或需要強制重新讀取註冊表的情況
+    """
+    _get_cached_registry.cache_clear()
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/feature_bundle.py
+sha256(source_bytes) = 47e8e6692b9fcf5f4729436194674d64c021158221adfb48a25fcbaeff8c8d08
+bytes = 5840
+redacted = False
+--------------------------------------------------------------------------------
+
+# src/FishBroWFS_V2/core/feature_bundle.py
+"""
+FeatureBundle：engine/wfs 的統一輸入
+
+提供 frozen dataclass 結構，確保特徵資料的不可變性與型別安全。
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Dict, Tuple, Any
+import numpy as np
+
+
+@dataclass(frozen=True)
+class FeatureSeries:
+    """
+    單一特徵時間序列
+    
+    Attributes:
+        ts: 時間戳記陣列，dtype 必須是 datetime64[s]
+        values: 特徵值陣列，dtype 必須是 float64
+        name: 特徵名稱
+        timeframe_min: timeframe 分鐘數
+    """
+    ts: np.ndarray  # datetime64[s]
+    values: np.ndarray  # float64
+    name: str
+    timeframe_min: int
+    
+    def __post_init__(self):
+        """驗證資料型別與一致性"""
+        # 驗證 ts dtype
+        if not np.issubdtype(self.ts.dtype, np.datetime64):
+            raise TypeError(f"ts 必須是 datetime64，實際為 {self.ts.dtype}")
+        
+        # 驗證 values dtype
+        if not np.issubdtype(self.values.dtype, np.floating):
+            raise TypeError(f"values 必須是浮點數，實際為 {self.values.dtype}")
+        
+        # 驗證長度一致
+        if len(self.ts) != len(self.values):
+            raise ValueError(
+                f"ts 與 values 長度不一致: ts={len(self.ts)}, values={len(self.values)}"
+            )
+        
+        # 驗證 timeframe 為正整數
+        if not isinstance(self.timeframe_min, int) or self.timeframe_min <= 0:
+            raise ValueError(f"timeframe_min 必須為正整數: {self.timeframe_min}")
+        
+        # 驗證名稱非空
+        if not self.name:
+            raise ValueError("name 不能為空")
+
+
+@dataclass(frozen=True)
+class FeatureBundle:
+    """
+    特徵資料包
+    
+    包含一個資料集的所有特徵時間序列，以及相關 metadata。
+    
+    Attributes:
+        dataset_id: 資料集 ID
+        season: 季節標記
+        series: 特徵序列字典，key 為 (name, timeframe_min)
+        meta: metadata 字典，包含 manifest hashes, breaks_policy, ts_dtype 等
+    """
+    dataset_id: str
+    season: str
+    series: Dict[Tuple[str, int], FeatureSeries]
+    meta: Dict[str, Any]
+    
+    def __post_init__(self):
+        """驗證 bundle 一致性"""
+        # 驗證 dataset_id 與 season 非空
+        if not self.dataset_id:
+            raise ValueError("dataset_id 不能為空")
+        if not self.season:
+            raise ValueError("season 不能為空")
+        
+        # 驗證 meta 包含必要欄位
+        required_meta_keys = {"ts_dtype", "breaks_policy"}
+        missing_keys = required_meta_keys - set(self.meta.keys())
+        if missing_keys:
+            raise ValueError(f"meta 缺少必要欄位: {missing_keys}")
+        
+        # 驗證 ts_dtype
+        if self.meta["ts_dtype"] != "datetime64[s]":
+            raise ValueError(f"ts_dtype 必須為 'datetime64[s]'，實際為 {self.meta['ts_dtype']}")
+        
+        # 驗證 breaks_policy
+        if self.meta["breaks_policy"] != "drop":
+            raise ValueError(f"breaks_policy 必須為 'drop'，實際為 {self.meta['breaks_policy']}")
+        
+        # 驗證所有 series 的 ts dtype 一致
+        for (name, tf), series in self.series.items():
+            if not np.issubdtype(series.ts.dtype, np.datetime64):
+                raise TypeError(
+                    f"series ({name}, {tf}) 的 ts dtype 必須為 datetime64，實際為 {series.ts.dtype}"
+                )
+    
+    def get_series(self, name: str, timeframe_min: int) -> FeatureSeries:
+        """
+        取得特定特徵序列
+        
+        Args:
+            name: 特徵名稱
+            timeframe_min: timeframe 分鐘數
+        
+        Returns:
+            FeatureSeries 實例
+        
+        Raises:
+            KeyError: 特徵不存在
+        """
+        key = (name, timeframe_min)
+        if key not in self.series:
+            raise KeyError(f"特徵不存在: {name}@{timeframe_min}m")
+        return self.series[key]
+    
+    def has_series(self, name: str, timeframe_min: int) -> bool:
+        """
+        檢查是否包含特定特徵序列
+        
+        Args:
+            name: 特徵名稱
+            timeframe_min: timeframe 分鐘數
+        
+        Returns:
+            bool
+        """
+        return (name, timeframe_min) in self.series
+    
+    def list_series(self) -> list[Tuple[str, int]]:
+        """
+        列出所有特徵序列的 (name, timeframe) 對
+        
+        Returns:
+            排序後的 (name, timeframe) 列表
+        """
+        return sorted(self.series.keys())
+    
+    def validate_against_requirements(
+        self,
+        required: list[Tuple[str, int]],
+        optional: list[Tuple[str, int]] = None,
+    ) -> bool:
+        """
+        驗證 bundle 是否滿足需求
+        
+        Args:
+            required: 必需的特徵列表，每個元素為 (name, timeframe)
+            optional: 可選的特徵列表（預設為空）
+        
+        Returns:
+            bool: 是否滿足所有必需特徵
+        
+        Raises:
+            ValueError: 參數無效
+        """
+        if optional is None:
+            optional = []
+        
+        # 檢查必需特徵
+        for name, tf in required:
+            if not self.has_series(name, tf):
+                return False
+        
+        return True
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """
+        轉換為字典表示（僅 metadata，不包含大型陣列）
+        
+        Returns:
+            字典包含 bundle 的基本資訊
+        """
+        return {
+            "dataset_id": self.dataset_id,
+            "season": self.season,
+            "series_count": len(self.series),
+            "series_keys": self.list_series(),
+            "meta": self.meta,
+        }
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/features.py
+sha256(source_bytes) = e74ba47846cb09880a0e38d9c7635647b3cfc22af8dc5f4e6365fadec76ac409
+bytes = 8459
+redacted = False
+--------------------------------------------------------------------------------
+
+# src/FishBroWFS_V2/core/features.py
+"""
+Feature 計算核心
+
+提供 deterministic numpy 實作，禁止 pandas rolling。
+所有計算必須與 FULL/INCREMENTAL 模式完全一致。
+"""
+
+from __future__ import annotations
+
+import numpy as np
+from typing import Dict, Literal, Optional
+from datetime import datetime
+
+from FishBroWFS_V2.contracts.features import FeatureRegistry, FeatureSpec
+from FishBroWFS_V2.core.resampler import SessionSpecTaipei
+
+
+def compute_atr_14(
+    o: np.ndarray,
+    h: np.ndarray,
+    l: np.ndarray,
+    c: np.ndarray,
+) -> np.ndarray:
+    """
+    計算 ATR(14)（Average True Range）
+    
+    公式：
+    TR = max(high - low, abs(high - prev_close), abs(low - prev_close))
+    ATR = rolling mean of TR with window=14 (population std, ddof=0)
+    
+    前 13 根 bar 的 ATR 為 NaN（因為 window 不足）
+    
+    Args:
+        o: open 價格（未使用）
+        h: high 價格
+        l: low 價格
+        c: close 價格
+        
+    Returns:
+        ATR(14) 陣列，與輸入長度相同
+    """
+    n = len(c)
+    if n == 0:
+        return np.array([], dtype=np.float64)
+    
+    # 計算 True Range
+    tr = np.empty(n, dtype=np.float64)
+    
+    # 第一根 bar 的 TR = high - low
+    tr[0] = h[0] - l[0]
+    
+    # 後續 bar 的 TR
+    for i in range(1, n):
+        hl = h[i] - l[i]
+        hc = abs(h[i] - c[i-1])
+        lc = abs(l[i] - c[i-1])
+        tr[i] = max(hl, hc, lc)
+    
+    # 計算 rolling mean with window=14 (population std, ddof=0)
+    # 使用 cumulative sums 確保 deterministic
+    atr = np.full(n, np.nan, dtype=np.float64)
+    
+    if n >= 14:
+        # 計算 cumulative sum of TR
+        cumsum = np.cumsum(tr, dtype=np.float64)
+        
+        # 計算 rolling mean
+        for i in range(13, n):
+            if i == 13:
+                window_sum = cumsum[i]
+            else:
+                window_sum = cumsum[i] - cumsum[i-14]
+            
+            atr[i] = window_sum / 14.0
+    
+    return atr
+
+
+def compute_returns(
+    c: np.ndarray,
+    method: str = "log",
+) -> np.ndarray:
+    """
+    計算 returns
+    
+    公式：
+    - log: r = log(close).diff()
+    - simple: r = (close - prev_close) / prev_close
+    
+    第一根 bar 的 return 為 NaN
+    
+    Args:
+        c: close 價格
+        method: 計算方法，"log" 或 "simple"
+        
+    Returns:
+        returns 陣列，與輸入長度相同
+    """
+    n = len(c)
+    if n <= 1:
+        return np.full(n, np.nan, dtype=np.float64)
+    
+    ret = np.full(n, np.nan, dtype=np.float64)
+    
+    if method == "log":
+        # log returns: r = log(close).diff()
+        log_c = np.log(c)
+        ret[1:] = np.diff(log_c)
+    else:
+        # simple returns: r = (close - prev_close) / prev_close
+        ret[1:] = (c[1:] - c[:-1]) / c[:-1]
+    
+    return ret
+
+
+def compute_rolling_z(
+    x: np.ndarray,
+    window: int,
+) -> np.ndarray:
+    """
+    計算 rolling z-score（population std, ddof=0）
+    
+    公式：
+    mean = (sum_x[i] - sum_x[i-window]) / window
+    var = (sum_x2[i] - sum_x2[i-window]) / window - mean^2
+    std = sqrt(max(var, 0))  # 防浮點負數
+    z = (x - mean) / std
+    
+    前 window-1 根 bar 的 z-score 為 NaN
+    std == 0 時，z = NaN（而不是 0）
+    
+    Args:
+        x: 輸入數值陣列
+        window: 滾動視窗大小
+        
+    Returns:
+        z-score 陣列，與輸入長度相同
+    """
+    n = len(x)
+    if n == 0 or window <= 1:
+        return np.full(n, np.nan, dtype=np.float64)
+    
+    # 初始化結果為 NaN
+    z = np.full(n, np.nan, dtype=np.float64)
+    
+    # 計算 cumulative sums
+    cumsum = np.cumsum(x, dtype=np.float64)
+    cumsum2 = np.cumsum(x * x, dtype=np.float64)
+    
+    # 計算 rolling z-score
+    for i in range(window - 1, n):
+        # 計算視窗內的 sum 和 sum of squares
+        if i == window - 1:
+            sum_x = cumsum[i]
+            sum_x2 = cumsum2[i]
+        else:
+            sum_x = cumsum[i] - cumsum[i - window]
+            sum_x2 = cumsum2[i] - cumsum2[i - window]
+        
+        # 計算 mean 和 variance
+        mean = sum_x / window
+        var = (sum_x2 / window) - (mean * mean)
+        
+        # 防浮點負數
+        if var < 0:
+            var = 0.0
+        
+        std = np.sqrt(var)
+        
+        # 計算 z-score
+        if std == 0:
+            # std == 0 時，z = NaN（而不是 0）
+            z[i] = np.nan
+        else:
+            z[i] = (x[i] - mean) / std
+    
+    return z
+
+
+def compute_session_vwap(
+    ts: np.ndarray,
+    c: np.ndarray,
+    v: np.ndarray,
+    session_spec: SessionSpecTaipei,
+    breaks_policy: str = "drop",
+) -> np.ndarray:
+    """
+    計算 session VWAP（Volume Weighted Average Price）
+    
+    每個 session 獨立計算 VWAP，並將該 session 內的所有 bar 賦予相同的 VWAP 值。
+    
+    Args:
+        ts: 時間戳記陣列（datetime64[s]）
+        c: close 價格陣列
+        v: volume 陣列
+        session_spec: session 規格
+        breaks_policy: break 處理策略（目前只支援 "drop"）
+        
+    Returns:
+        session VWAP 陣列，與輸入長度相同
+    """
+    n = len(ts)
+    if n == 0:
+        return np.array([], dtype=np.float64)
+    
+    # 初始化結果為 NaN
+    vwap = np.full(n, np.nan, dtype=np.float64)
+    
+    # 將 datetime64[s] 轉換為 pandas Timestamp 以便進行日期時間操作
+    # 我們需要判斷每個 bar 屬於哪個 session
+    # 由於這是 MVP，我們先實作簡單版本：假設所有 bar 都在同一個 session
+    # 實際實作需要根據 session_spec 進行 session 分類
+    # 但根據 Phase 3B 要求，我們先提供固定實作
+    
+    # 簡單實作：計算整個時間範圍的 VWAP（所有 bar 視為同一個 session）
+    # 這不是正確的 session VWAP，但符合 MVP 要求
+    total_volume = np.sum(v)
+    if total_volume > 0:
+        weighted_sum = np.sum(c * v)
+        overall_vwap = weighted_sum / total_volume
+        vwap[:] = overall_vwap
+    else:
+        vwap[:] = np.nan
+    
+    return vwap
+
+
+def compute_features_for_tf(
+    ts: np.ndarray,
+    o: np.ndarray,
+    h: np.ndarray,
+    l: np.ndarray,
+    c: np.ndarray,
+    v: np.ndarray,
+    tf_min: int,
+    registry: FeatureRegistry,
+    session_spec: SessionSpecTaipei,
+    breaks_policy: str = "drop",
+) -> Dict[str, np.ndarray]:
+    """
+    計算指定 timeframe 的所有特徵
+    
+    Args:
+        ts: 時間戳記陣列（datetime64[s]），必須與 resampled bars 完全一致
+        o: open 價格陣列
+        h: high 價格陣列
+        l: low 價格陣列
+        c: close 價格陣列
+        v: volume 陣列
+        tf_min: timeframe 分鐘數
+        registry: 特徵註冊表
+        session_spec: session 規格
+        breaks_policy: break 處理策略
+        
+    Returns:
+        特徵字典，keys 必須為：
+        - ts: 與輸入 ts 相同的物件/值（datetime64[s]）
+        - atr_14: float64
+        - ret_z_200: float64
+        - session_vwap: float64
+        
+    Raises:
+        ValueError: 輸入陣列長度不一致或 registry 缺少必要特徵
+    """
+    # 驗證輸入長度
+    n = len(ts)
+    for arr, name in [(o, "open"), (h, "high"), (l, "low"), (c, "close"), (v, "volume")]:
+        if len(arr) != n:
+            raise ValueError(f"輸入陣列長度不一致: {name} 長度為 {len(arr)}，但 ts 長度為 {n}")
+    
+    # 取得該 timeframe 的特徵規格
+    specs = registry.specs_for_tf(tf_min)
+    
+    # 建立結果字典
+    result = {"ts": ts}  # ts 必須是相同的物件/值
+    
+    # 計算每個特徵
+    for spec in specs:
+        if spec.name == "atr_14":
+            result["atr_14"] = compute_atr_14(o, h, l, c)
+        elif spec.name == "ret_z_200":
+            # 先計算 returns
+            returns = compute_returns(c, method="log")
+            # 再計算 z-score
+            result["ret_z_200"] = compute_rolling_z(returns, window=200)
+        elif spec.name == "session_vwap":
+            result["session_vwap"] = compute_session_vwap(
+                ts, c, v, session_spec, breaks_policy
+            )
+        else:
+            raise ValueError(f"不支援的特徵名稱: {spec.name}")
+    
+    # 確保所有必要特徵都存在
+    required_features = ["atr_14", "ret_z_200", "session_vwap"]
+    for feat in required_features:
+        if feat not in result:
+            raise ValueError(f"registry 缺少必要特徵: {feat}")
+    
+    return result
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/fingerprint.py
+sha256(source_bytes) = 441ddd041b5bd8650c71eaae4a303f0cc5465f8abf56d5f0617a9ea79ce8a77e
+bytes = 7761
+redacted = False
+--------------------------------------------------------------------------------
+
+# src/FishBroWFS_V2/core/fingerprint.py
+"""
+Fingerprint 計算核心
+
+提供 canonical bytes 規則與指紋計算函數，確保 deterministic 結果。
+"""
+
+from __future__ import annotations
+
+import hashlib
+from datetime import datetime
+from typing import Any, Dict, Iterable, List, Tuple
+
+import numpy as np
+import pandas as pd
+
+from FishBroWFS_V2.contracts.fingerprint import FingerprintIndex
+from FishBroWFS_V2.data.raw_ingest import RawIngestResult
+
+
+def canonical_bar_line(
+    ts: datetime,
+    o: float,
+    h: float,
+    l: float,
+    c: float,
+    v: float
+) -> str:
+    """
+    將單一 bar 轉換為標準化字串
+    
+    格式固定：YYYY-MM-DDTHH:MM:SS|{o:.4f}|{h:.4f}|{l:.4f}|{c:.4f}|{v:.0f}
+    
+    Args:
+        ts: 時間戳記
+        o: 開盤價
+        h: 最高價
+        l: 最低價
+        c: 收盤價
+        v: 成交量
+    
+    Returns:
+        標準化字串
+    """
+    # 格式化時間戳記
+    ts_str = ts.strftime("%Y-%m-%dT%H:%M:%S")
+    
+    # 格式化價格（固定小數位數）
+    # 使用 round 確保 deterministic，避免浮點數表示差異
+    o_fmt = f"{o:.4f}"
+    h_fmt = f"{h:.4f}"
+    l_fmt = f"{l:.4f}"
+    c_fmt = f"{c:.4f}"
+    
+    # 格式化成交量（整數）
+    v_fmt = f"{v:.0f}"
+    
+    return f"{ts_str}|{o_fmt}|{h_fmt}|{l_fmt}|{c_fmt}|{v_fmt}"
+
+
+def compute_day_hash(lines: List[str]) -> str:
+    """
+    計算一日的 hash
+    
+    將該日所有 bar 的標準化字串排序後連接，計算 SHA256。
+    
+    Args:
+        lines: 該日所有 bar 的標準化字串列表
+    
+    Returns:
+        SHA256 hex 字串
+    """
+    if not lines:
+        # 空日的 hash（理論上不應該發生）
+        return hashlib.sha256(b"").hexdigest()
+    
+    # 排序確保 deterministic
+    sorted_lines = sorted(lines)
+    
+    # 連接所有字串，以換行分隔
+    content = "\n".join(sorted_lines)
+    
+    # 計算 SHA256
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _parse_ts_str(ts_str: str) -> datetime:
+    """
+    解析時間戳記字串
+    
+    支援多種格式：
+    - "YYYY-MM-DD HH:MM:SS"
+    - "YYYY/MM/DD HH:MM:SS"
+    - "YYYY-MM-DDTHH:MM:SS"
+    """
+    # 嘗試常見格式
+    formats = [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y/%m/%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y/%m/%dT%H:%M:%S",
+    ]
+    
+    for fmt in formats:
+        try:
+            return datetime.strptime(ts_str, fmt)
+        except ValueError:
+            continue
+    
+    # 如果都不匹配，嘗試使用 pandas 解析
+    try:
+        return pd.to_datetime(ts_str).to_pydatetime()
+    except Exception as e:
+        raise ValueError(f"無法解析時間戳記: {ts_str}") from e
+
+
+def _group_bars_by_day(
+    bars: Iterable[Tuple[datetime, float, float, float, float, float]]
+) -> Dict[str, List[str]]:
+    """
+    將 bars 按日期分組
+    
+    Args:
+        bars: (ts, o, h, l, c, v) 的迭代器
+    
+    Returns:
+        字典：日期字串 (YYYY-MM-DD) -> 該日所有 bar 的標準化字串列表
+    """
+    day_groups: Dict[str, List[str]] = {}
+    
+    for ts, o, h, l, c, v in bars:
+        # 取得日期字串
+        day_str = ts.strftime("%Y-%m-%d")
+        
+        # 建立標準化字串
+        line = canonical_bar_line(ts, o, h, l, c, v)
+        
+        # 加入對應日期的群組
+        if day_str not in day_groups:
+            day_groups[day_str] = []
+        day_groups[day_str].append(line)
+    
+    return day_groups
+
+
+def build_fingerprint_index_from_bars(
+    dataset_id: str,
+    bars: Iterable[Tuple[datetime, float, float, float, float, float]],
+    dataset_timezone: str = "Asia/Taipei",
+    build_notes: str = ""
+) -> FingerprintIndex:
+    """
+    從 bars 建立指紋索引
+    
+    Args:
+        dataset_id: 資料集 ID
+        bars: (ts, o, h, l, c, v) 的迭代器
+        dataset_timezone: 時區
+        build_notes: 建置備註
+    
+    Returns:
+        FingerprintIndex
+    """
+    # 按日期分組
+    day_groups = _group_bars_by_day(bars)
+    
+    if not day_groups:
+        raise ValueError("沒有 bars 資料")
+    
+    # 計算每日 hash
+    day_hashes: Dict[str, str] = {}
+    for day_str, lines in day_groups.items():
+        day_hashes[day_str] = compute_day_hash(lines)
+    
+    # 找出日期範圍
+    sorted_days = sorted(day_hashes.keys())
+    range_start = sorted_days[0]
+    range_end = sorted_days[-1]
+    
+    # 建立指紋索引
+    return FingerprintIndex.create(
+        dataset_id=dataset_id,
+        range_start=range_start,
+        range_end=range_end,
+        day_hashes=day_hashes,
+        dataset_timezone=dataset_timezone,
+        build_notes=build_notes
+    )
+
+
+def build_fingerprint_index_from_raw_ingest(
+    dataset_id: str,
+    raw_ingest_result: RawIngestResult,
+    dataset_timezone: str = "Asia/Taipei",
+    build_notes: str = ""
+) -> FingerprintIndex:
+    """
+    從 RawIngestResult 建立指紋索引（便利函數）
+    
+    Args:
+        dataset_id: 資料集 ID
+        raw_ingest_result: RawIngestResult
+        dataset_timezone: 時區
+        build_notes: 建置備註
+    
+    Returns:
+        FingerprintIndex
+    """
+    df = raw_ingest_result.df
+    
+    # 準備 bars 迭代器
+    bars = []
+    for _, row in df.iterrows():
+        try:
+            ts = _parse_ts_str(row["ts_str"])
+            bars.append((
+                ts,
+                float(row["open"]),
+                float(row["high"]),
+                float(row["low"]),
+                float(row["close"]),
+                float(row["volume"])
+            ))
+        except Exception as e:
+            raise ValueError(f"解析 bar 資料失敗: {e}") from e
+    
+    return build_fingerprint_index_from_bars(
+        dataset_id=dataset_id,
+        bars=bars,
+        dataset_timezone=dataset_timezone,
+        build_notes=build_notes
+    )
+
+
+def compare_fingerprint_indices(
+    old_index: FingerprintIndex | None,
+    new_index: FingerprintIndex
+) -> Dict[str, Any]:
+    """
+    比較兩個指紋索引，產生 diff 報告
+    
+    Args:
+        old_index: 舊索引（可為 None）
+        new_index: 新索引
+    
+    Returns:
+        diff 報告字典
+    """
+    if old_index is None:
+        return {
+            "old_range_start": None,
+            "old_range_end": None,
+            "new_range_start": new_index.range_start,
+            "new_range_end": new_index.range_end,
+            "append_only": False,
+            "append_range": None,
+            "earliest_changed_day": None,
+            "no_change": False,
+            "is_new": True,
+        }
+    
+    # 檢查是否完全相同
+    if old_index.index_sha256 == new_index.index_sha256:
+        return {
+            "old_range_start": old_index.range_start,
+            "old_range_end": old_index.range_end,
+            "new_range_start": new_index.range_start,
+            "new_range_end": new_index.range_end,
+            "append_only": False,
+            "append_range": None,
+            "earliest_changed_day": None,
+            "no_change": True,
+            "is_new": False,
+        }
+    
+    # 檢查是否為 append-only
+    append_only = old_index.is_append_only(new_index)
+    append_range = old_index.get_append_range(new_index) if append_only else None
+    
+    # 找出最早變更的日期
+    earliest_changed_day = old_index.get_earliest_changed_day(new_index)
+    
+    return {
+        "old_range_start": old_index.range_start,
+        "old_range_end": old_index.range_end,
+        "new_range_start": new_index.range_start,
+        "new_range_end": new_index.range_end,
+        "append_only": append_only,
+        "append_range": append_range,
+        "earliest_changed_day": earliest_changed_day,
+        "no_change": False,
+        "is_new": False,
+    }
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/governance_schema.py
+sha256(source_bytes) = c3eaa60d25152eaa39bff142e32237a840615eb166ea0eed79c2b20694e58f74
+bytes = 2629
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Governance schema for decision tracking and auditability.
+
+Single Source of Truth (SSOT) for governance decisions.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, asdict
+from typing import Any, Dict, List
+
+from FishBroWFS_V2.core.schemas.governance import Decision
+
+
+@dataclass(frozen=True)
+class EvidenceRef:
+    """
+    Reference to evidence used in governance decision.
+    
+    Points to specific artifacts (run_id, stage, artifact paths, key metrics)
+    that support the decision.
+    """
+    run_id: str
+    stage_name: str
+    artifact_paths: List[str]  # Relative paths to artifacts (manifest.json, metrics.json, etc.)
+    key_metrics: Dict[str, Any]  # Key metrics extracted from artifacts
+
+
+@dataclass(frozen=True)
+class GovernanceItem:
+    """
+    Governance decision for a single candidate.
+    
+    Each item represents a decision (KEEP/FREEZE/DROP) for one candidate
+    parameter set, with reasons and evidence chain.
+    """
+    candidate_id: str  # Stable identifier: strategy_id:params_hash[:12]
+    decision: Decision
+    reasons: List[str]  # Human-readable reasons for decision
+    evidence: List[EvidenceRef]  # Evidence chain supporting decision
+    created_at: str  # ISO8601 with Z suffix (UTC)
+    git_sha: str  # Git SHA at time of governance evaluation
+
+
+@dataclass(frozen=True)
+class GovernanceReport:
+    """
+    Complete governance report for a set of candidates.
+    
+    Contains:
+    - items: List of governance decisions for each candidate
+    - metadata: Report-level metadata (governance_id, season, etc.)
+    """
+    items: List[GovernanceItem]
+    metadata: Dict[str, Any]  # Report metadata (governance_id, season, created_at, etc.)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "items": [
+                {
+                    "candidate_id": item.candidate_id,
+                    "decision": item.decision.value,
+                    "reasons": item.reasons,
+                    "evidence": [
+                        {
+                            "run_id": ev.run_id,
+                            "stage_name": ev.stage_name,
+                            "artifact_paths": ev.artifact_paths,
+                            "key_metrics": ev.key_metrics,
+                        }
+                        for ev in item.evidence
+                    ],
+                    "created_at": item.created_at,
+                    "git_sha": item.git_sha,
+                }
+                for item in self.items
+            ],
+            "metadata": self.metadata,
+        }
+
+
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/core/governance_writer.py
+sha256(source_bytes) = 7ac1f8b05cbbb86cffa6e8134615c0a561e1e0266fef75befe7ad790a9f4bf31
+bytes = 4810
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Governance writer for decision artifacts.
+
+Writes governance results to outputs directory with machine-readable JSON
+and human-readable README.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Dict
+
+from FishBroWFS_V2.core.governance_schema import GovernanceReport
+from FishBroWFS_V2.core.schemas.governance import Decision
+from FishBroWFS_V2.core.run_id import make_run_id
+
+
+def write_governance_artifacts(
+    governance_dir: Path,
+    report: GovernanceReport,
+) -> None:
+    """
+    Write governance artifacts to directory.
+    
+    Creates:
+    - governance.json: Machine-readable governance report
+    - README.md: Human-readable summary
+    - evidence_index.json: Optional evidence index (recommended)
+    
+    Args:
+        governance_dir: Path to governance directory (will be created if needed)
+        report: GovernanceReport to write
+    """
+    governance_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Write governance.json (machine-readable SSOT)
+    governance_dict = report.to_dict()
+    governance_path = governance_dir / "governance.json"
+    with governance_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            governance_dict,
+            f,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        f.write("\n")
+    
+    # Write README.md (human-readable summary)
+    readme_lines = [
+        "# Governance Report",
+        "",
+        f"- governance_id: {report.metadata.get('governance_id')}",
+        f"- season: {report.metadata.get('season')}",
+        f"- created_at: {report.metadata.get('created_at')}",
+        f"- git_sha: {report.metadata.get('git_sha')}",
+        "",
+        "## Decision Summary",
+        "",
+    ]
+    
+    decisions = report.metadata.get("decisions", {})
+    readme_lines.extend([
+        f"- KEEP: {decisions.get('KEEP', 0)}",
+        f"- FREEZE: {decisions.get('FREEZE', 0)}",
+        f"- DROP: {decisions.get('DROP', 0)}",
+        "",
+    ])
+    
+    # List FREEZE reasons (concise)
+    freeze_items = [item for item in report.items if item.decision is Decision.FREEZE]
+    if freeze_items:
+        readme_lines.extend([
+            "## FREEZE Reasons",
+            "",
+        ])
+        for item in freeze_items:
+            reasons_str = "; ".join(item.reasons)
+            readme_lines.append(f"- {item.candidate_id}: {reasons_str}")
+        readme_lines.append("")
+    
+    # Subsample/params_effective summary
+    readme_lines.extend([
+        "## Subsample & Params Effective",
+        "",
+    ])
+    
+    # Extract subsample info from evidence
+    subsample_info: Dict[str, Any] = {}
+    for item in report.items:
+        for ev in item.evidence:
+            stage = ev.stage_name
+            if stage not in subsample_info:
+                subsample_info[stage] = {}
+            metrics = ev.key_metrics
+            if "stage_planned_subsample" in metrics:
+                subsample_info[stage]["stage_planned_subsample"] = metrics["stage_planned_subsample"]
+            if "param_subsample_rate" in metrics:
+                subsample_info[stage]["param_subsample_rate"] = metrics["param_subsample_rate"]
+            if "params_effective" in metrics:
+                subsample_info[stage]["params_effective"] = metrics["params_effective"]
+    
+    for stage, info in subsample_info.items():
+        readme_lines.append(f"### {stage}")
+        if "stage_planned_subsample" in info:
+            readme_lines.append(f"- stage_planned_subsample: {info['stage_planned_subsample']}")
+        if "param_subsample_rate" in info:
+            readme_lines.append(f"- param_subsample_rate: {info['param_subsample_rate']}")
+        if "params_effective" in info:
+            readme_lines.append(f"- params_effective: {info['params_effective']}")
+        readme_lines.append("")
+    
+    readme = "\n".join(readme_lines)
+    readme_path = governance_dir / "README.md"
+    readme_path.write_text(readme, encoding="utf-8")
+    
+    # Write evidence_index.json (optional but recommended)
+    evidence_index = {
+        "governance_id": report.metadata.get("governance_id"),
+        "evidence_by_candidate": {
+            item.candidate_id: [
+                {
+                    "run_id": ev.run_id,
+                    "stage_name": ev.stage_name,
+                    "artifact_paths": ev.artifact_paths,
+                }
+                for ev in item.evidence
+            ]
+            for item in report.items
+        },
+    }
+    evidence_index_path = governance_dir / "evidence_index.json"
+    with evidence_index_path.open("w", encoding="utf-8") as f:
+        json.dump(
+            evidence_index,
+            f,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=2,
+        )
+        f.write("\n")
+
+
+
+--------------------------------------------------------------------------------
+
 FILE src/FishBroWFS_V2/core/intents.py
 sha256(source_bytes) = 3388690af563a3b85f83a4a4b2cf775e212da3ecc33d4dc9dfd5d834b32f1f19
 bytes = 12266
@@ -1167,8 +3151,8 @@ def enforce_action_policy(action: str, season: Optional[str] = None) -> ActionPo
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/core/processor.py
-sha256(source_bytes) = 9a4b2341efd5b5832c32894f56383c8687c35b3fa0c07291470faf808518dbd9
-bytes = 17813
+sha256(source_bytes) = 5a2061eeeb5959378f8fa51060e16bd88509a449aa5e96de5ef8ba4649e39341
+bytes = 22696
 redacted = False
 --------------------------------------------------------------------------------
 """StateProcessor - single executor for Attack #9 – Headless Intent-State Contract.
@@ -1523,15 +3507,60 @@ class StateProcessor:
         self.logger.info("StateProcessor started")
     
     async def stop(self) -> None:
-        """Stop the processor."""
-        self.is_running = False
-        if self.processing_task:
-            self.processing_task.cancel()
+        """Stop the processor safely without deadlock.
+
+        Contract:
+        - Never block the asyncio loop.
+        - Idempotent.
+        - Always returns promptly.
+        """
+        # (A) flip running flag
+        try:
+            self.is_running = False
+        except Exception:
+            pass
+
+        # (B) cancel and await worker task
+        task = self.processing_task
+        if task is not None:
             try:
-                await self.processing_task
-            except asyncio.CancelledError:
+                if not task.done():
+                    task.cancel()
+                # IMPORTANT: wait_for only works if loop is not frozen.
+                # This must return quickly after we remove blocking calls.
+                await asyncio.wait_for(task, timeout=1.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
-        self.executor.shutdown(wait=True)
+            except Exception:
+                pass
+            finally:
+                try:
+                    self.processing_task = None
+                except Exception:
+                    pass
+
+        # (C) shutdown executor without blocking event loop
+        ex = self.executor
+        if ex is not None:
+            try:
+                ex.shutdown(wait=False, cancel_futures=True)  # py3.9+
+            except TypeError:
+                try:
+                    ex.shutdown(wait=False)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            finally:
+                # If the class stores it, clear it to be idempotent
+                try:
+                    # Note: we don't set self.executor = None because
+                    # it's used in _process_intent. But we could create
+                    # a new executor on next start() if needed.
+                    pass
+                except Exception:
+                    pass
+        
         self.logger.info("StateProcessor stopped")
     
     async def _process_loop(self) -> None:
@@ -1539,7 +3568,9 @@ class StateProcessor:
         while self.is_running:
             try:
                 # Get next intent from queue (non-blocking)
-                intent = await self.action_queue.get_next()
+                # Note: get_next() is synchronous but we call it without await
+                # because it returns Optional[UserIntent], not a coroutine
+                intent = self.action_queue.get_next(block=False)
                 if intent is None:
                     # No intents in queue, sleep a bit
                     await asyncio.sleep(0.1)
@@ -1568,12 +3599,26 @@ class StateProcessor:
             if not handler:
                 raise ProcessingError(f"No handler for intent type: {intent.intent_type}")
             
-            # Process intent (run in thread pool to keep async loop responsive)
+            # Process intent with timeout to prevent indefinite hanging
+            # Use asyncio.wait_for on the handler execution
             loop = asyncio.get_event_loop()
-            new_state, result = await loop.run_in_executor(
-                self.executor,
-                lambda: asyncio.run(handler.handle(intent, self.current_state))
-            )
+            
+            # Define the handler execution function with timeout
+            async def execute_handler_with_timeout():
+                # Run handler in thread pool with its own event loop
+                return await loop.run_in_executor(
+                    self.executor,
+                    lambda: asyncio.run(handler.handle(intent, self.current_state))
+                )
+            
+            # Execute with timeout (30 seconds should be plenty for any handler)
+            try:
+                new_state, result = await asyncio.wait_for(
+                    execute_handler_with_timeout(),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                raise ProcessingError(f"Handler timed out after 30 seconds for intent {intent.intent_id}")
             
             # Update state
             self.current_state = new_state
@@ -1581,6 +3626,9 @@ class StateProcessor:
             # Update intent status
             intent.status = IntentStatus.COMPLETED
             intent.result = result
+            
+            # Notify queue that intent is completed
+            self.action_queue.mark_completed(intent.intent_id, result)
             
             processing_time_ms = (time.time() - start_time) * 1000
             self.logger.info(f"Processed intent {intent.intent_id} ({intent.intent_type}) in {processing_time_ms:.1f}ms")
@@ -1591,13 +3639,15 @@ class StateProcessor:
             intent.error_message = str(e)
             self.logger.error(f"Failed to process intent {intent.intent_id}: {e}", exc_info=True)
             
+            # Notify queue that intent failed
+            self.action_queue.mark_failed(intent.intent_id, str(e))
+            
             # Update metrics
+            intent_queue_dict = self.current_state.intent_queue.model_dump()
+            intent_queue_dict['failed_count'] = self.current_state.intent_queue.failed_count + 1
             self.current_state = create_state_snapshot(
                 self.current_state,
-                intent_queue=IntentQueueStatus(
-                    **self.current_state.intent_queue.model_dump(),
-                    failed_count=self.current_state.intent_queue.failed_count + 1
-                )
+                intent_queue=IntentQueueStatus(**intent_queue_dict)
             )
     
     def get_state(self) -> SystemState:
@@ -1615,9 +3665,24 @@ class StateProcessor:
         """Get intent status by ID."""
         return self.action_queue.get_intent(intent_id)
     
-    async def wait_for_intent(self, intent_id: str, timeout: float = 30.0) -> Optional[UserIntent]:
-        """Wait for an intent to complete."""
-        return await self.action_queue.wait_for_intent(intent_id, timeout)
+    async def wait_for_intent(self, intent_id: str, timeout: Optional[float] = 30.0) -> Optional[UserIntent]:
+        """Wait for an intent to complete.
+        
+        Hard guarantee: never hang forever.
+        If timeout is None, uses default 30.0 seconds.
+        Returns None on timeout or any exception (UI contract wants "no hang").
+        """
+        # Enforce a default hard cap in production
+        if timeout is None:
+            timeout = 30.0
+        
+        try:
+            return await self.action_queue.wait_for_intent_async(intent_id, timeout=timeout)
+        except Exception:
+            # No propagation; UI contract wants "no hang"
+            # Log at debug level to avoid noise in tests
+            self.logger.debug(f"wait_for_intent timed out or errored for intent {intent_id}", exc_info=True)
+            return None
     
     def get_queue_status(self) -> IntentQueueStatus:
         """Get queue status."""
@@ -1645,10 +3710,51 @@ async def start_processor() -> None:
 
 
 async def stop_processor() -> None:
-    """Stop the singleton processor."""
+    """Stop the singleton processor.
+    
+    Hard guarantee: never hang forever.
+    Uses asyncio.wait_for with timeout to ensure we don't block.
+    """
     global _processor_instance
     if _processor_instance:
-        await _processor_instance.stop()
+        try:
+            # Use timeout to prevent hanging
+            await asyncio.wait_for(_processor_instance.stop(), timeout=2.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            # If timeout, log and continue - we must not hang
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("stop_processor timed out after 2 seconds, forcing cleanup")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error stopping processor: {e}")
+        finally:
+            _processor_instance = None
+
+
+def reset_processor() -> None:
+    """Reset the singleton processor (for testing).
+    
+    This stops the processor if it's running and clears the singleton.
+    """
+    global _processor_instance
+    if _processor_instance:
+        # Try to stop synchronously (not ideal but works for tests)
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, we can't call stop_processor synchronously
+                # Just clear the reference and let garbage collection handle it
+                _processor_instance = None
+            else:
+                # Run stop_processor in the event loop
+                loop.run_until_complete(stop_processor())
+        except (RuntimeError, Exception):
+            # No event loop or other error, just clear the reference
+            _processor_instance = None
+    else:
         _processor_instance = None
 --------------------------------------------------------------------------------
 
@@ -8946,8 +11052,8 @@ def inject_global_styles() -> None:
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/gui/adapters/intent_bridge.py
-sha256(source_bytes) = 77806c3872e95a1c5e1ae4cf70c100cf1b1704ec829b0b694c33b0527345eef1
-bytes = 21726
+sha256(source_bytes) = 38dc3e2df0c32e13efbc6687fbfab420c2e142df7edd5a20edb98833440e8845
+bytes = 22196
 redacted = False
 --------------------------------------------------------------------------------
 """IntentBridge - UI adapter for Attack #9 – Headless Intent-State Contract.
@@ -8975,6 +11081,19 @@ from FishBroWFS_V2.core.intents import (
 from FishBroWFS_V2.control.action_queue import get_action_queue, IntentSubmitter
 from FishBroWFS_V2.core.processor import get_processor, start_processor, stop_processor
 from FishBroWFS_V2.core.state import SystemState
+
+# Import SeasonFrozenError and ValidationError from job_api for compatibility
+try:
+    from FishBroWFS_V2.control.job_api import SeasonFrozenError, ValidationError
+except ImportError:
+    # Fallback definitions if job_api doesn't have them
+    class SeasonFrozenError(RuntimeError):
+        """Raised when an operation would mutate a frozen season."""
+        pass
+    
+    class ValidationError(Exception):
+        """Raised when job validation fails."""
+        pass
 
 
 class IntentBridge:
@@ -16461,2248 +18580,5 @@ def get_audit_events_for_run_id(run_id: str, season: Optional[str] = None, max_l
                     break
     
     return filtered
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/candidates_reader.py
-sha256(source_bytes) = d728be4fd30c46c2930fa8c2aab85871dfbdbd8261e3330c814073fa7ec6a442
-bytes = 9938
-redacted = False
---------------------------------------------------------------------------------
-"""
-Candidates Reader - 讀取 outputs/seasons/{season}/research/ 下的 canonical_results.json 和 research_index.json
-Phase 4: 使用 season_context 作為單一真相來源
-"""
-
-import json
-import logging
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-
-from FishBroWFS_V2.core.season_context import (
-    current_season,
-    canonical_results_path,
-    research_index_path,
-)
-
-logger = logging.getLogger(__name__)
-
-# 官方路徑契約 - 使用 season_context
-def get_canonical_results_path(season: Optional[str] = None) -> Path:
-    """返回 canonical_results.json 的路徑"""
-    return canonical_results_path(season)
-
-def get_research_index_path(season: Optional[str] = None) -> Path:
-    """返回 research_index.json 的路徑"""
-    return research_index_path(season)
-
-@dataclass
-class CanonicalResult:
-    """Canonical Results 的單一項目"""
-    run_id: str
-    strategy_id: str
-    symbol: str
-    bars: int
-    net_profit: float
-    max_drawdown: float
-    score_final: float
-    score_net_mdd: float
-    trades: int
-    start_date: str
-    end_date: str
-    sharpe: Optional[float] = None
-    profit_factor: Optional[float] = None
-    portfolio_id: Optional[str] = None
-    portfolio_version: Optional[str] = None
-    strategy_version: Optional[str] = None
-    timeframe_min: Optional[int] = None
-
-@dataclass
-class ResearchIndexEntry:
-    """Research Index 的單一項目"""
-    run_id: str
-    season: str
-    stage: str
-    mode: str
-    strategy_id: str
-    dataset_id: str
-    created_at: str
-    status: str
-    manifest_path: Optional[str] = None
-
-def load_canonical_results(season: Optional[str] = None) -> List[CanonicalResult]:
-    """
-    載入 canonical_results.json
-    
-    Args:
-        season: Season identifier (e.g., "2026Q1")
-    
-    Returns:
-        List[CanonicalResult]: 解析後的 canonical results 列表
-        
-    Raises:
-        FileNotFoundError: 如果檔案不存在
-        json.JSONDecodeError: 如果 JSON 格式錯誤
-    """
-    canonical_path = get_canonical_results_path(season)
-    
-    if not canonical_path.exists():
-        logger.warning(f"Canonical results file not found: {canonical_path}")
-        return []
-    
-    try:
-        with open(canonical_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        if not isinstance(data, list):
-            logger.error(f"Canonical results should be a list, got {type(data)}")
-            return []
-        
-        results = []
-        for item in data:
-            try:
-                result = CanonicalResult(
-                    run_id=item.get("run_id", ""),
-                    strategy_id=item.get("strategy_id", ""),
-                    symbol=item.get("symbol", "UNKNOWN"),
-                    bars=item.get("bars", 0),
-                    net_profit=item.get("net_profit", 0.0),
-                    max_drawdown=item.get("max_drawdown", 0.0),
-                    score_final=item.get("score_final", 0.0),
-                    score_net_mdd=item.get("score_net_mdd", 0.0),
-                    trades=item.get("trades", 0),
-                    start_date=item.get("start_date", ""),
-                    end_date=item.get("end_date", ""),
-                    sharpe=item.get("sharpe"),
-                    profit_factor=item.get("profit_factor"),
-                    portfolio_id=item.get("portfolio_id"),
-                    portfolio_version=item.get("portfolio_version"),
-                    strategy_version=item.get("strategy_version"),
-                    timeframe_min=item.get("timeframe_min"),
-                )
-                results.append(result)
-            except Exception as e:
-                logger.warning(f"Failed to parse canonical result item: {item}, error: {e}")
-                continue
-        
-        logger.info(f"Loaded {len(results)} canonical results from {canonical_path}")
-        return results
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse canonical_results.json: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error loading canonical results: {e}")
-        return []
-
-def load_research_index(season: Optional[str] = None) -> List[ResearchIndexEntry]:
-    """
-    載入 research_index.json
-    
-    Args:
-        season: Season identifier (e.g., "2026Q1")
-    
-    Returns:
-        List[ResearchIndexEntry]: 解析後的 research index 列表
-        
-    Raises:
-        FileNotFoundError: 如果檔案不存在
-        json.JSONDecodeError: 如果 JSON 格式錯誤
-    """
-    research_path = get_research_index_path(season)
-    
-    if not research_path.exists():
-        logger.warning(f"Research index file not found: {research_path}")
-        return []
-    
-    try:
-        with open(research_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        if not isinstance(data, list):
-            logger.error(f"Research index should be a list, got {type(data)}")
-            return []
-        
-        entries = []
-        for item in data:
-            try:
-                entry = ResearchIndexEntry(
-                    run_id=item.get("run_id", ""),
-                    season=item.get("season", ""),
-                    stage=item.get("stage", ""),
-                    mode=item.get("mode", ""),
-                    strategy_id=item.get("strategy_id", ""),
-                    dataset_id=item.get("dataset_id", ""),
-                    created_at=item.get("created_at", ""),
-                    status=item.get("status", ""),
-                    manifest_path=item.get("manifest_path"),
-                )
-                entries.append(entry)
-            except Exception as e:
-                logger.warning(f"Failed to parse research index item: {item}, error: {e}")
-                continue
-        
-        logger.info(f"Loaded {len(entries)} research index entries from {research_path}")
-        return entries
-        
-    except json.JSONDecodeError as e:
-        logger.error(f"Failed to parse research_index.json: {e}")
-        return []
-    except Exception as e:
-        logger.error(f"Unexpected error loading research index: {e}")
-        return []
-
-def get_canonical_results_by_strategy(strategy_id: str, season: Optional[str] = None) -> List[CanonicalResult]:
-    """
-    根據 strategy_id 篩選 canonical results
-    
-    Args:
-        strategy_id: 策略 ID
-        season: Season identifier (e.g., "2026Q1")
-        
-    Returns:
-        List[CanonicalResult]: 符合條件的結果列表
-    """
-    results = load_canonical_results(season)
-    return [r for r in results if r.strategy_id == strategy_id]
-
-def get_canonical_results_by_run_id(run_id: str, season: Optional[str] = None) -> Optional[CanonicalResult]:
-    """
-    根據 run_id 查找 canonical result
-    
-    Args:
-        run_id: Run ID
-        season: Season identifier (e.g., "2026Q1")
-        
-    Returns:
-        Optional[CanonicalResult]: 找到的結果，如果沒有則返回 None
-    """
-    results = load_canonical_results(season)
-    for result in results:
-        if result.run_id == run_id:
-            return result
-    return None
-
-def get_research_index_by_run_id(run_id: str, season: Optional[str] = None) -> Optional[ResearchIndexEntry]:
-    """
-    根據 run_id 查找 research index entry
-    
-    Args:
-        run_id: Run ID
-        season: Season identifier (e.g., "2026Q1")
-        
-    Returns:
-        Optional[ResearchIndexEntry]: 找到的項目，如果沒有則返回 None
-    """
-    entries = load_research_index(season)
-    for entry in entries:
-        if entry.run_id == run_id:
-            return entry
-    return None
-
-def get_research_index_by_season(season: str) -> List[ResearchIndexEntry]:
-    """
-    根據 season 篩選 research index
-    
-    Args:
-        season: Season ID
-        
-    Returns:
-        List[ResearchIndexEntry]: 符合條件的項目列表
-    """
-    entries = load_research_index(season)
-    return [e for e in entries if e.season == season]
-
-def get_combined_candidate_info(run_id: str, season: Optional[str] = None) -> Dict[str, Any]:
-    """
-    結合 canonical results 和 research index 的資訊
-    
-    Args:
-        run_id: Run ID
-        season: Season identifier (e.g., "2026Q1")
-        
-    Returns:
-        Dict[str, Any]: 合併後的候選人資訊
-    """
-    canonical = get_canonical_results_by_run_id(run_id, season)
-    research = get_research_index_by_run_id(run_id, season)
-    
-    result = {
-        "run_id": run_id,
-        "canonical": canonical.__dict__ if canonical else None,
-        "research": research.__dict__ if research else None,
-    }
-    
-    return result
-
-def refresh_canonical_results(season: Optional[str] = None) -> bool:
-    """
-    刷新 canonical results（目前只是重新讀取檔案）
-    
-    Args:
-        season: Season identifier (e.g., "2026Q1")
-    
-    Returns:
-        bool: 是否成功刷新
-    """
-    try:
-        # 目前只是重新讀取檔案，未來可以加入重新生成邏輯
-        results = load_canonical_results(season)
-        logger.info(f"Refreshed canonical results, found {len(results)} entries")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to refresh canonical results: {e}")
-        return False
-
-def refresh_research_index(season: Optional[str] = None) -> bool:
-    """
-    刷新 research index（目前只是重新讀取檔案）
-    
-    Args:
-        season: Season identifier (e.g., "2026Q1")
-    
-    Returns:
-        bool: 是否成功刷新
-    """
-    try:
-        # 目前只是重新讀取檔案，未來可以加入重新生成邏輯
-        entries = load_research_index(season)
-        logger.info(f"Refreshed research index, found {len(entries)} entries")
-        return True
-    except Exception as e:
-        logger.error(f"Failed to refresh research index: {e}")
-        return False
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/clone.py
-sha256(source_bytes) = ce9e3bb3966670ce4e504a071da1d05e2db608c108b218171b3e803ed530c7fe
-bytes = 5487
-redacted = False
---------------------------------------------------------------------------------
-"""Clone to Wizard 服務 - 從現有 run 預填 Wizard 欄位"""
-
-import json
-from pathlib import Path
-from typing import Dict, Any, Optional
-
-
-def load_config_snapshot(run_dir: Path) -> Optional[Dict[str, Any]]:
-    """
-    從 run_dir 載入 config snapshot
-    
-    Args:
-        run_dir: run 目錄路徑
-    
-    Returns:
-        Optional[Dict[str, Any]]: config snapshot 字典，如果不存在則返回 None
-    """
-    # 嘗試讀取 config_snapshot.json
-    config_path = run_dir / "config_snapshot.json"
-    if config_path.exists():
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, OSError):
-            pass
-    
-    # 嘗試讀取 manifest.json
-    manifest_path = run_dir / "manifest.json"
-    if manifest_path.exists():
-        try:
-            with open(manifest_path, 'r', encoding='utf-8') as f:
-                manifest = json.load(f)
-            
-            # 從 manifest 提取 config 相關欄位
-            config_snapshot = {
-                "season": manifest.get("season"),
-                "dataset_id": manifest.get("dataset_id"),
-                "strategy_id": manifest.get("strategy_id"),
-                "mode": manifest.get("mode"),
-                "stage": manifest.get("stage"),
-                "timestamp": manifest.get("timestamp"),
-                "run_id": manifest.get("run_id"),
-            }
-            
-            # 嘗試提取 wfs_config
-            if "wfs_config" in manifest:
-                config_snapshot["wfs_config"] = manifest["wfs_config"]
-            
-            return config_snapshot
-        except (json.JSONDecodeError, OSError, KeyError):
-            pass
-    
-    return None
-
-
-def build_wizard_prefill(run_dir: Path) -> Dict[str, Any]:
-    """
-    建立 Wizard 預填資料
-    
-    Args:
-        run_dir: run 目錄路徑
-    
-    Returns:
-        Dict[str, Any]: Wizard 預填資料
-    """
-    # 載入 config snapshot
-    config = load_config_snapshot(run_dir)
-    
-    if config is None:
-        # 如果無法載入 config，返回基本資訊
-        return {
-            "season": "2026Q1",
-            "dataset_id": None,
-            "strategy_id": None,
-            "mode": "smoke",
-            "note": f"Cloned from {run_dir.name}",
-        }
-    
-    # 建立預填資料
-    prefill: Dict[str, Any] = {
-        "season": config.get("season", "2026Q1"),
-        "dataset_id": config.get("dataset_id"),
-        "strategy_id": config.get("strategy_id"),
-        "mode": _map_mode(config.get("mode")),
-        "note": f"Cloned from {run_dir.name}",
-    }
-    
-    # 添加 wfs_config（如果存在）
-    if "wfs_config" in config:
-        prefill["wfs_config"] = config["wfs_config"]
-    
-    # 添加 grid preset（如果可推斷）
-    grid_preset = _infer_grid_preset(config)
-    if grid_preset:
-        prefill["grid_preset"] = grid_preset
-    
-    # 添加 stage 資訊
-    stage = config.get("stage")
-    if stage:
-        prefill["stage"] = stage
-    
-    return prefill
-
-
-def _map_mode(mode: Optional[str]) -> str:
-    """
-    映射 mode 到 Wizard 可用的選項
-    
-    Args:
-        mode: 原始 mode
-    
-    Returns:
-        str: 映射後的 mode
-    """
-    if not mode:
-        return "smoke"
-    
-    mode_lower = mode.lower()
-    
-    # 映射規則
-    if "smoke" in mode_lower:
-        return "smoke"
-    elif "lite" in mode_lower:
-        return "lite"
-    elif "full" in mode_lower:
-        return "full"
-    elif "incremental" in mode_lower:
-        return "incremental"
-    else:
-        # 預設回退
-        return "smoke"
-
-
-def _infer_grid_preset(config: Dict[str, Any]) -> Optional[str]:
-    """
-    從 config 推斷 grid preset
-    
-    Args:
-        config: config snapshot
-    
-    Returns:
-        Optional[str]: grid preset 名稱
-    """
-    # 檢查是否有 wfs_config
-    wfs_config = config.get("wfs_config")
-    if isinstance(wfs_config, dict):
-        # 檢查是否有 grid 相關設定
-        if "grid" in wfs_config or "param_grid" in wfs_config:
-            return "custom"
-    
-    # 檢查 stage
-    stage = config.get("stage")
-    if stage:
-        if "stage0" in stage:
-            return "coarse"
-        elif "stage1" in stage:
-            return "topk"
-        elif "stage2" in stage:
-            return "confirm"
-    
-    # 檢查 mode
-    mode = config.get("mode", "").lower()
-    if "full" in mode:
-        return "full_grid"
-    elif "lite" in mode:
-        return "lite_grid"
-    
-    return None
-
-
-def get_clone_summary(run_dir: Path) -> Dict[str, Any]:
-    """
-    獲取 clone 摘要資訊（用於 UI 顯示）
-    
-    Args:
-        run_dir: run 目錄路徑
-    
-    Returns:
-        Dict[str, Any]: 摘要資訊
-    """
-    config = load_config_snapshot(run_dir)
-    
-    if config is None:
-        return {
-            "success": False,
-            "error": "無法載入 config snapshot 或 manifest",
-            "run_id": run_dir.name,
-        }
-    
-    prefill = build_wizard_prefill(run_dir)
-    
-    return {
-        "success": True,
-        "run_id": run_dir.name,
-        "season": prefill.get("season"),
-        "dataset_id": prefill.get("dataset_id"),
-        "strategy_id": prefill.get("strategy_id"),
-        "mode": prefill.get("mode"),
-        "stage": prefill.get("stage"),
-        "grid_preset": prefill.get("grid_preset"),
-        "has_wfs_config": "wfs_config" in prefill,
-        "note": prefill.get("note"),
-    }
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/command_builder.py
-sha256(source_bytes) = ff3c3d002b133d7049c8416d830dc25184ed23815aa27032f127cabc362bc9e2
-bytes = 8737
-redacted = False
---------------------------------------------------------------------------------
-"""Generate Command 與 ui_command_snapshot.json 服務"""
-
-import json
-import time
-import hashlib
-from dataclasses import dataclass
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from datetime import datetime
-
-
-@dataclass(frozen=True)
-class CommandBuildResult:
-    """命令建構結果"""
-    argv: List[str]
-    shell: str
-    snapshot: Dict[str, Any]
-
-
-def build_research_command(snapshot: Dict[str, Any]) -> CommandBuildResult:
-    """
-    從 UI snapshot 建構可重現的 CLI command
-    
-    Args:
-        snapshot: UI 設定 snapshot
-    
-    Returns:
-        CommandBuildResult: 命令建構結果
-    """
-    # 基礎命令
-    argv = ["python", "-m", "src.FishBroWFS_V2.research"]
-    
-    # 添加必要參數
-    required_fields = ["season", "dataset_id", "strategy_id", "mode"]
-    for field in required_fields:
-        if field in snapshot and snapshot[field]:
-            argv.extend([f"--{field}", str(snapshot[field])])
-    
-    # 添加可選參數
-    optional_fields = [
-        "stage", "grid_preset", "note", "wfs_config_path",
-        "param_grid", "max_workers", "timeout_hours"
-    ]
-    for field in optional_fields:
-        if field in snapshot and snapshot[field]:
-            argv.extend([f"--{field}", str(snapshot[field])])
-    
-    # 添加 wfs_config（如果是檔案路徑）
-    if "wfs_config" in snapshot and isinstance(snapshot["wfs_config"], str):
-        argv.extend(["--wfs-config", snapshot["wfs_config"]])
-    
-    # 構建 shell 命令字串
-    shell_parts = []
-    for arg in argv:
-        if " " in arg or any(c in arg for c in ["'", '"', "\\", "$", "`"]):
-            # 需要引號
-            shell_parts.append(json.dumps(arg))
-        else:
-            shell_parts.append(arg)
-    
-    shell = " ".join(shell_parts)
-    
-    return CommandBuildResult(
-        argv=argv,
-        shell=shell,
-        snapshot=snapshot
-    )
-
-
-def write_ui_snapshot(outputs_root: Path, season: str, snapshot: Dict[str, Any]) -> str:
-    """
-    將 UI snapshot 寫入檔案（append-only，不覆寫）
-    
-    Args:
-        outputs_root: outputs 根目錄
-        season: season 名稱
-        snapshot: UI snapshot 資料
-    
-    Returns:
-        str: 寫入的檔案路徑
-    """
-    # 建立目錄結構
-    snapshots_dir = outputs_root / "seasons" / season / "ui_snapshots"
-    snapshots_dir.mkdir(parents=True, exist_ok=True)
-    
-    # 產生時間戳和 hash
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    snapshot_str = json.dumps(snapshot, sort_keys=True, ensure_ascii=False)
-    snapshot_hash = hashlib.sha256(snapshot_str.encode()).hexdigest()[:8]
-    
-    # 檔案名稱
-    filename = f"{timestamp}-{snapshot_hash}.json"
-    filepath = snapshots_dir / filename
-    
-    # 確保不覆寫現有檔案（如果存在，添加計數器）
-    counter = 1
-    while filepath.exists():
-        filename = f"{timestamp}-{snapshot_hash}-{counter}.json"
-        filepath = snapshots_dir / filename
-        counter += 1
-    
-    # 添加 metadata
-    full_snapshot = {
-        "_metadata": {
-            "created_at": time.time(),
-            "created_at_iso": datetime.now().isoformat(),
-            "version": "1.0",
-            "source": "ui_wizard",
-            "snapshot_hash": snapshot_hash,
-            "filename": filename,
-        },
-        "data": snapshot
-    }
-    
-    # 寫入檔案
-    with open(filepath, 'w', encoding='utf-8') as f:
-        json.dump(full_snapshot, f, indent=2, ensure_ascii=False)
-    
-    return str(filepath)
-
-
-def load_ui_snapshot(filepath: Path) -> Optional[Dict[str, Any]]:
-    """
-    載入 UI snapshot 檔案
-    
-    Args:
-        filepath: snapshot 檔案路徑
-    
-    Returns:
-        Optional[Dict[str, Any]]: snapshot 資料，如果載入失敗則返回 None
-    """
-    try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        
-        # 返回實際資料（不含 metadata）
-        if "data" in data:
-            return data["data"]
-        else:
-            return data
-    except (json.JSONDecodeError, OSError):
-        return None
-
-
-def list_ui_snapshots(outputs_root: Path, season: str, limit: int = 50) -> List[dict]:
-    """
-    列出指定 season 的 UI snapshots
-    
-    Args:
-        outputs_root: outputs 根目錄
-        season: season 名稱
-        limit: 返回的數量限制
-    
-    Returns:
-        List[dict]: snapshot 資訊清單
-    """
-    snapshots_dir = outputs_root / "seasons" / season / "ui_snapshots"
-    
-    if not snapshots_dir.exists():
-        return []
-    
-    snapshots = []
-    
-    for filepath in sorted(snapshots_dir.iterdir(), key=lambda p: p.name, reverse=True):
-        if not filepath.is_file() or not filepath.name.endswith('.json'):
-            continue
-        
-        try:
-            stat = filepath.stat()
-            
-            # 讀取 metadata（不讀取完整資料以提高效能）
-            with open(filepath, 'r', encoding='utf-8') as f:
-                metadata = json.load(f).get("_metadata", {})
-            
-            snapshots.append({
-                "filename": filepath.name,
-                "path": str(filepath),
-                "size": stat.st_size,
-                "mtime": stat.st_mtime,
-                "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                "created_at": metadata.get("created_at", stat.st_mtime),
-                "created_at_iso": metadata.get("created_at_iso"),
-                "snapshot_hash": metadata.get("snapshot_hash"),
-                "source": metadata.get("source", "unknown"),
-            })
-            
-            if len(snapshots) >= limit:
-                break
-        except (json.JSONDecodeError, OSError):
-            continue
-    
-    return snapshots
-
-
-def create_snapshot_from_wizard(wizard_data: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    從 Wizard 資料建立標準化的 snapshot
-    
-    Args:
-        wizard_data: Wizard 表單資料
-    
-    Returns:
-        Dict[str, Any]: 標準化的 snapshot
-    """
-    # 基礎欄位
-    snapshot = {
-        "season": wizard_data.get("season", "2026Q1"),
-        "dataset_id": wizard_data.get("dataset_id"),
-        "strategy_id": wizard_data.get("strategy_id"),
-        "mode": wizard_data.get("mode", "smoke"),
-        "note": wizard_data.get("note", ""),
-        "created_from": "wizard",
-        "created_at": time.time(),
-        "created_at_iso": datetime.now().isoformat(),
-    }
-    
-    # 可選欄位
-    optional_fields = [
-        "stage", "grid_preset", "wfs_config_path",
-        "param_grid", "max_workers", "timeout_hours"
-    ]
-    for field in optional_fields:
-        if field in wizard_data and wizard_data[field]:
-            snapshot[field] = wizard_data[field]
-    
-    # wfs_config（如果是字典）
-    if "wfs_config" in wizard_data and isinstance(wizard_data["wfs_config"], dict):
-        snapshot["wfs_config"] = wizard_data["wfs_config"]
-    
-    # txt_paths（如果是清單）
-    if "txt_paths" in wizard_data and isinstance(wizard_data["txt_paths"], list):
-        snapshot["txt_paths"] = wizard_data["txt_paths"]
-    
-    return snapshot
-
-
-def validate_snapshot_for_command(snapshot: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    驗證 snapshot 是否可用於建構命令
-    
-    Args:
-        snapshot: 要驗證的 snapshot
-    
-    Returns:
-        Dict[str, Any]: 驗證結果
-    """
-    errors = []
-    warnings = []
-    
-    # 檢查必要欄位
-    required_fields = ["season", "dataset_id", "strategy_id", "mode"]
-    for field in required_fields:
-        if field not in snapshot or not snapshot[field]:
-            errors.append(f"缺少必要欄位: {field}")
-    
-    # 檢查 season 格式
-    if "season" in snapshot:
-        season = snapshot["season"]
-        if not isinstance(season, str) or len(season) < 4:
-            warnings.append(f"season 格式可能不正確: {season}")
-    
-    # 檢查 mode 有效性
-    valid_modes = ["smoke", "lite", "full", "incremental"]
-    if "mode" in snapshot and snapshot["mode"] not in valid_modes:
-        warnings.append(f"mode 可能無效: {snapshot['mode']}，有效值: {valid_modes}")
-    
-    # 檢查 wfs_config_path 是否存在（如果是檔案路徑）
-    if "wfs_config_path" in snapshot and snapshot["wfs_config_path"]:
-        path = Path(snapshot["wfs_config_path"])
-        if not path.exists():
-            warnings.append(f"wfs_config_path 不存在: {path}")
-    
-    return {
-        "valid": len(errors) == 0,
-        "errors": errors,
-        "warnings": warnings,
-        "has_warnings": len(warnings) > 0,
-        "required_fields_present": all(field in snapshot and snapshot[field] for field in required_fields),
-    }
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/log_tail.py
-sha256(source_bytes) = a5b616fb1bd93b1013ced101272e7bea18072dc794bdef596564923e9f3a6b6a
-bytes = 7233
-redacted = False
---------------------------------------------------------------------------------
-"""Logs Viewer 服務 - Lazy + Polling（禁止 push）"""
-
-import os
-import time
-from pathlib import Path
-from typing import List, Optional, Tuple
-from datetime import datetime
-
-
-def tail_lines(path: Path, n: int = 200) -> List[str]:
-    """
-    讀取檔案的最後 n 行
-    
-    Args:
-        path: 檔案路徑
-        n: 要讀取的行數
-    
-    Returns:
-        List[str]: 最後 n 行的清單（如果檔案不存在則返回空清單）
-    """
-    if not path.exists():
-        return []
-    
-    try:
-        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-            # 簡單實現：讀取所有行然後取最後 n 行
-            lines = f.readlines()
-            return lines[-n:] if len(lines) > n else lines
-    except (OSError, UnicodeDecodeError):
-        return []
-
-
-def tail_lines_with_stats(path: Path, n: int = 200) -> Tuple[List[str], dict]:
-    """
-    讀取檔案的最後 n 行並返回統計資訊
-    
-    Args:
-        path: 檔案路徑
-        n: 要讀取的行數
-    
-    Returns:
-        Tuple[List[str], dict]: (行清單, 統計資訊)
-    """
-    lines = tail_lines(path, n)
-    
-    stats = {
-        "file_exists": path.exists(),
-        "file_size": path.stat().st_size if path.exists() else 0,
-        "file_mtime": path.stat().st_mtime if path.exists() else 0,
-        "lines_returned": len(lines),
-        "timestamp": time.time(),
-        "timestamp_iso": datetime.now().isoformat(),
-    }
-    
-    return lines, stats
-
-
-class LogTailer:
-    """Log tailer 類別，支援 lazy polling"""
-    
-    def __init__(self, log_path: Path, max_lines: int = 200, poll_interval: float = 2.0):
-        """
-        初始化 LogTailer
-        
-        Args:
-            log_path: log 檔案路徑
-            max_lines: 最大行數
-            poll_interval: polling 間隔（秒）
-        """
-        self.log_path = Path(log_path)
-        self.max_lines = max_lines
-        self.poll_interval = poll_interval
-        self._last_read_position = 0
-        self._last_read_time = 0.0
-        self._is_active = False
-        self._timer = None
-    
-    def start(self) -> None:
-        """啟動 polling"""
-        self._is_active = True
-        self._last_read_position = 0
-        self._last_read_time = time.time()
-    
-    def stop(self) -> None:
-        """停止 polling"""
-        self._is_active = False
-        if self._timer:
-            self._timer.cancel()
-    
-    def read_new_lines(self) -> List[str]:
-        """
-        讀取新的行（從上次讀取位置開始）
-        
-        Returns:
-            List[str]: 新的行清單
-        """
-        if not self.log_path.exists():
-            return []
-        
-        try:
-            with open(self.log_path, 'r', encoding='utf-8', errors='ignore') as f:
-                # 移動到上次讀取的位置
-                if self._last_read_position > 0:
-                    try:
-                        f.seek(self._last_read_position)
-                    except (OSError, ValueError):
-                        # 如果 seek 失敗，從頭開始讀取
-                        self._last_read_position = 0
-                
-                # 讀取新行
-                new_lines = f.readlines()
-                
-                # 更新位置
-                self._last_read_position = f.tell()
-                self._last_read_time = time.time()
-                
-                return new_lines
-        except (OSError, UnicodeDecodeError):
-            return []
-    
-    def get_status(self) -> dict:
-        """獲取 tailer 狀態"""
-        return {
-            "is_active": self._is_active,
-            "log_path": str(self.log_path),
-            "log_exists": self.log_path.exists(),
-            "last_read_position": self._last_read_position,
-            "last_read_time": self._last_read_time,
-            "last_read_time_iso": datetime.fromtimestamp(self._last_read_time).isoformat() if self._last_read_time > 0 else None,
-            "poll_interval": self.poll_interval,
-            "max_lines": self.max_lines,
-        }
-
-
-def find_log_files(run_dir: Path) -> List[dict]:
-    """
-    在 run_dir 中尋找 log 檔案
-    
-    Args:
-        run_dir: run 目錄
-    
-    Returns:
-        List[dict]: log 檔案資訊
-    """
-    if not run_dir.exists():
-        return []
-    
-    log_files = []
-    
-    # 常見的 log 檔案名稱
-    common_log_names = [
-        "worker.log",
-        "run.log",
-        "output.log",
-        "error.log",
-        "stdout.log",
-        "stderr.log",
-        "log.txt",
-    ]
-    
-    for log_name in common_log_names:
-        log_path = run_dir / log_name
-        if log_path.exists() and log_path.is_file():
-            try:
-                stat = log_path.stat()
-                log_files.append({
-                    "name": log_name,
-                    "path": str(log_path),
-                    "size": stat.st_size,
-                    "mtime": stat.st_mtime,
-                    "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                })
-            except OSError:
-                continue
-    
-    # 也尋找 logs 目錄
-    logs_dir = run_dir / "logs"
-    if logs_dir.exists() and logs_dir.is_dir():
-        try:
-            for log_file in logs_dir.iterdir():
-                if log_file.is_file() and log_file.suffix in ['.log', '.txt']:
-                    try:
-                        stat = log_file.stat()
-                        log_files.append({
-                            "name": f"logs/{log_file.name}",
-                            "path": str(log_file),
-                            "size": stat.st_size,
-                            "mtime": stat.st_mtime,
-                            "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-                        })
-                    except OSError:
-                        continue
-        except OSError:
-            pass
-    
-    return log_files
-
-
-def get_log_preview(log_path: Path, preview_lines: int = 50) -> dict:
-    """
-    獲取 log 檔案預覽
-    
-    Args:
-        log_path: log 檔案路徑
-        preview_lines: 預覽行數
-    
-    Returns:
-        dict: log 預覽資訊
-    """
-    if not log_path.exists():
-        return {
-            "exists": False,
-            "error": "Log 檔案不存在",
-            "preview": [],
-            "total_lines": 0,
-        }
-    
-    try:
-        # 計算總行數
-        total_lines = 0
-        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
-            for _ in f:
-                total_lines += 1
-        
-        # 讀取預覽
-        preview = tail_lines(log_path, preview_lines)
-        
-        stat = log_path.stat()
-        return {
-            "exists": True,
-            "path": str(log_path),
-            "size": stat.st_size,
-            "mtime": stat.st_mtime,
-            "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
-            "total_lines": total_lines,
-            "preview_lines": len(preview),
-            "preview": preview,
-        }
-    except (OSError, UnicodeDecodeError) as e:
-        return {
-            "exists": True,
-            "error": str(e),
-            "preview": [],
-            "total_lines": 0,
-        }
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/path_picker.py
-sha256(source_bytes) = 49e64d5f85e788f475a00ffc97a288c2922253e40f6383a9a1c293cd8288a535
-bytes = 5951
-redacted = False
---------------------------------------------------------------------------------
-"""Server-side path selector - 禁止 file upload，只允許伺服器端路徑"""
-
-import os
-import glob
-from pathlib import Path
-from typing import List, Optional
-
-
-# 允許的根目錄（根據 HUMAN TASKS 要求）
-ALLOWED_ROOTS = [
-    Path("/home/fishbro/FishBroData/raw"),
-    Path("/home/fishbro/FishBroData/normalized"),  # 如果未來有
-    Path(__file__).parent.parent.parent.parent / "data",  # 專案內的 data 目錄
-]
-
-
-def list_txt_candidates(base_dir: Path, pattern: str = "*.txt", limit: int = 200) -> List[str]:
-    """
-    列出指定目錄下的 txt 檔案候選
-    
-    Args:
-        base_dir: 基礎目錄
-        pattern: 檔案模式（預設 *.txt）
-        limit: 返回的檔案數量限制
-    
-    Returns:
-        List[str]: 檔案路徑清單（相對路徑或絕對路徑）
-    
-    Raises:
-        ValueError: 如果 base_dir 不在 allowed roots 內
-    """
-    # 驗證 base_dir 是否在 allowed roots 內
-    if not _is_allowed_path(base_dir):
-        raise ValueError(f"base_dir 不在允許的根目錄內: {base_dir}")
-    
-    if not base_dir.exists():
-        return []
-    
-    # 使用 glob 尋找檔案
-    search_pattern = str(base_dir / "**" / pattern)
-    files = []
-    
-    try:
-        for file_path in glob.glob(search_pattern, recursive=True):
-            if os.path.isfile(file_path):
-                # 返回相對路徑（相對於 base_dir）
-                rel_path = os.path.relpath(file_path, base_dir)
-                files.append(rel_path)
-                
-                if len(files) >= limit:
-                    break
-    except (OSError, PermissionError):
-        pass
-    
-    # 排序（按修改時間或名稱）
-    files.sort()
-    return files
-
-
-def validate_server_path(p: str, allowed_roots: Optional[List[Path]] = None) -> str:
-    """
-    驗證伺服器端路徑是否在允許的根目錄內
-    
-    Args:
-        p: 要驗證的路徑
-        allowed_roots: 允許的根目錄清單（預設使用 ALLOWED_ROOTS）
-    
-    Returns:
-        str: 驗證後的路徑（絕對路徑）
-    
-    Raises:
-        ValueError: 如果路徑不在 allowed roots 內
-        FileNotFoundError: 如果路徑不存在
-    """
-    if allowed_roots is None:
-        allowed_roots = ALLOWED_ROOTS
-    
-    # 轉換為 Path 物件
-    path = Path(p)
-    
-    # 如果是相對路徑，嘗試解析為絕對路徑
-    if not path.is_absolute():
-        # 嘗試在每個 allowed root 下尋找
-        for root in allowed_roots:
-            candidate = root / path
-            if candidate.exists():
-                path = candidate
-                break
-        else:
-            # 如果找不到，使用第一個 allowed root 作為基礎
-            path = allowed_roots[0] / path
-    
-    # 確保路徑是絕對路徑
-    path = path.resolve()
-    
-    # 檢查是否在 allowed roots 內
-    if not _is_allowed_path(path, allowed_roots):
-        raise ValueError(f"路徑不在允許的根目錄內: {path}")
-    
-    # 檢查路徑是否存在
-    if not path.exists():
-        raise FileNotFoundError(f"路徑不存在: {path}")
-    
-    return str(path)
-
-
-def _is_allowed_path(path: Path, allowed_roots: Optional[List[Path]] = None) -> bool:
-    """
-    檢查路徑是否在 allowed roots 內
-    
-    Args:
-        path: 要檢查的路徑
-        allowed_roots: 允許的根目錄清單
-    
-    Returns:
-        bool: 是否允許
-    """
-    if allowed_roots is None:
-        allowed_roots = ALLOWED_ROOTS
-    
-    path = path.resolve()
-    
-    for root in allowed_roots:
-        root = root.resolve()
-        try:
-            # 檢查 path 是否是 root 的子目錄
-            if path.is_relative_to(root):
-                return True
-        except (AttributeError, ValueError):
-            # Python 3.8 兼容性：使用 str 比較
-            if str(path).startswith(str(root) + os.sep):
-                return True
-    
-    return False
-
-
-def get_allowed_roots_info() -> List[dict]:
-    """
-    獲取 allowed roots 的資訊
-    
-    Returns:
-        List[dict]: 每個 root 的資訊
-    """
-    info = []
-    for root in ALLOWED_ROOTS:
-        exists = root.exists()
-        info.append({
-            "path": str(root),
-            "exists": exists,
-            "readable": os.access(root, os.R_OK) if exists else False,
-            "files_count": _count_files(root) if exists else 0,
-        })
-    return info
-
-
-def _count_files(directory: Path) -> int:
-    """計算目錄下的檔案數量"""
-    if not directory.exists() or not directory.is_dir():
-        return 0
-    
-    try:
-        return sum(1 for _ in directory.rglob("*") if _.is_file())
-    except (OSError, PermissionError):
-        return 0
-
-
-def browse_directory(directory: Path, pattern: str = "*") -> List[dict]:
-    """
-    瀏覽目錄內容
-    
-    Args:
-        directory: 要瀏覽的目錄
-        pattern: 檔案模式
-    
-    Returns:
-        List[dict]: 目錄內容
-    """
-    if not _is_allowed_path(directory):
-        raise ValueError(f"目錄不在允許的根目錄內: {directory}")
-    
-    if not directory.exists() or not directory.is_dir():
-        return []
-    
-    contents = []
-    try:
-        for item in directory.iterdir():
-            try:
-                stat = item.stat()
-                contents.append({
-                    "name": item.name,
-                    "path": str(item),
-                    "is_dir": item.is_dir(),
-                    "is_file": item.is_file(),
-                    "size": stat.st_size if item.is_file() else 0,
-                    "mtime": stat.st_mtime,
-                    "readable": os.access(item, os.R_OK),
-                })
-            except (OSError, PermissionError):
-                continue
-        
-        # 排序：目錄在前，檔案在後
-        contents.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
-    except (OSError, PermissionError):
-        pass
-    
-    return contents
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/reload_service.py
-sha256(source_bytes) = b80fcc1e996552f0c1ba3458a3155eaee88a1b9dc604419459ea6ab542964fb3
-bytes = 16858
-redacted = False
---------------------------------------------------------------------------------
-"""Reload Service for System Status and Cache Invalidation.
-
-Provides functions to:
-1. Get system snapshot (datasets, strategies, caches)
-2. Invalidate caches and reload registries
-3. Compute file signatures for validation
-4. TXT → Parquet build functionality
-"""
-
-from __future__ import annotations
-
-import hashlib
-import json
-import time
-from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
-
-from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog, DatasetCatalog
-from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog, StrategyCatalog
-from FishBroWFS_V2.control.feature_resolver import invalidate_feature_cache as invalidate_feature_cache_impl
-from FishBroWFS_V2.control.data_build import BuildParquetRequest, BuildParquetResult, build_parquet_from_txt
-from FishBroWFS_V2.control.dataset_descriptor import DatasetDescriptor, get_descriptor, list_descriptors
-from FishBroWFS_V2.data.dataset_registry import DatasetRecord
-from FishBroWFS_V2.strategy.registry import StrategySpecForGUI
-
-
-@dataclass
-class FileStatus:
-    """Status of a file or directory."""
-    path: str
-    exists: bool
-    size: int = 0
-    mtime: float = 0.0
-    signature: str = ""
-    error: Optional[str] = None
-
-
-@dataclass
-class DatasetStatus:
-    """Status of a dataset with TXT and Parquet information."""
-    # Required fields (no defaults) first
-    dataset_id: str
-    kind: str
-    txt_root: str
-    txt_required_paths: List[str]
-    parquet_root: str
-    parquet_expected_paths: List[str]
-    
-    # Optional fields with defaults
-    descriptor: Optional[DatasetDescriptor] = None
-    txt_present: bool = False
-    txt_missing: List[str] = field(default_factory=list)
-    txt_latest_mtime_utc: Optional[str] = None
-    txt_total_size_bytes: int = 0
-    txt_signature: str = ""
-    parquet_present: bool = False
-    parquet_missing: List[str] = field(default_factory=list)
-    parquet_latest_mtime_utc: Optional[str] = None
-    parquet_total_size_bytes: int = 0
-    parquet_signature: str = ""
-    up_to_date: bool = False
-    bars_count: Optional[int] = None
-    schema_ok: Optional[bool] = None
-    error: Optional[str] = None
-
-
-@dataclass
-class StrategyStatus:
-    """Status of a strategy."""
-    id: str
-    spec: Optional[StrategySpecForGUI] = None
-    can_import: bool = False
-    can_build_spec: bool = False
-    mtime: float = 0.0
-    signature: str = ""
-    feature_requirements_count: int = 0
-    error: Optional[str] = None
-
-
-@dataclass
-class SystemSnapshot:
-    """System snapshot with status of all components."""
-    created_at: datetime = field(default_factory=datetime.now)
-    total_datasets: int = 0
-    total_strategies: int = 0
-    dataset_statuses: List[DatasetStatus] = field(default_factory=list)
-    strategy_statuses: List[StrategyStatus] = field(default_factory=list)
-    notes: List[str] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
-
-
-@dataclass
-class ReloadResult:
-    """Result of a reload operation."""
-    ok: bool
-    error: Optional[str] = None
-    datasets_reloaded: int = 0
-    strategies_reloaded: int = 0
-    caches_invalidated: List[str] = field(default_factory=list)
-    duration_seconds: float = 0.0
-
-
-def compute_file_signature(file_path: Path, max_size_mb: int = 50) -> str:
-    """Compute signature for a file.
-    
-    For small files (< max_size_mb): compute sha256
-    For large files: use stat-hash (path + size + mtime)
-    """
-    try:
-        if not file_path.exists():
-            return "missing"
-        
-        stat = file_path.stat()
-        file_size_mb = stat.st_size / (1024 * 1024)
-        
-        if file_size_mb < max_size_mb:
-            # Small file: compute actual hash
-            hasher = hashlib.sha256()
-            with open(file_path, 'rb') as f:
-                # Read in chunks to handle large files
-                chunk_size = 8192
-                while chunk := f.read(chunk_size):
-                    hasher.update(chunk)
-            return f"sha256:{hasher.hexdigest()[:16]}"
-        else:
-            # Large file: use stat-hash
-            return f"stat:{file_path.name}:{stat.st_size}:{stat.st_mtime}"
-    except Exception as e:
-        return f"error:{str(e)[:50]}"
-
-
-def check_txt_files(txt_root: str, txt_required_paths: List[str]) -> Tuple[bool, List[str], Optional[str], int, str]:
-    """Check TXT files for a dataset.
-    
-    Returns:
-        Tuple of (present, missing_paths, latest_mtime_utc, total_size_bytes, signature)
-    """
-    missing = []
-    latest_mtime = 0.0
-    total_size = 0
-    signatures = []
-    
-    for txt_path_str in txt_required_paths:
-        txt_path = Path(txt_path_str)
-        if txt_path.exists():
-            stat = txt_path.stat()
-            latest_mtime = max(latest_mtime, stat.st_mtime)
-            total_size += stat.st_size
-            sig = compute_file_signature(txt_path)
-            signatures.append(f"{txt_path.name}:{sig}")
-        else:
-            missing.append(txt_path_str)
-    
-    present = len(missing) == 0
-    signature = "|".join(signatures) if signatures else "none"
-    
-    # Convert latest mtime to UTC string
-    latest_mtime_utc = None
-    if latest_mtime > 0:
-        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
-    
-    return present, missing, latest_mtime_utc, total_size, signature
-
-
-def check_parquet_files(parquet_root: str, parquet_expected_paths: List[str]) -> Tuple[bool, List[str], Optional[str], int, str]:
-    """Check Parquet files for a dataset.
-    
-    Returns:
-        Tuple of (present, missing_paths, latest_mtime_utc, total_size_bytes, signature)
-    """
-    missing = []
-    latest_mtime = 0.0
-    total_size = 0
-    signatures = []
-    
-    for parquet_path_str in parquet_expected_paths:
-        parquet_path = Path(parquet_path_str)
-        if parquet_path.exists():
-            stat = parquet_path.stat()
-            latest_mtime = max(latest_mtime, stat.st_mtime)
-            total_size += stat.st_size
-            sig = compute_file_signature(parquet_path)
-            signatures.append(f"{parquet_path.name}:{sig}")
-        else:
-            missing.append(parquet_path_str)
-    
-    present = len(missing) == 0
-    signature = "|".join(signatures) if signatures else "none"
-    
-    # Convert latest mtime to UTC string
-    latest_mtime_utc = None
-    if latest_mtime > 0:
-        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
-    
-    return present, missing, latest_mtime_utc, total_size, signature
-
-
-def get_dataset_status(dataset_id: str) -> DatasetStatus:
-    """Get status for a single dataset with TXT and Parquet information."""
-    try:
-        # Get dataset descriptor
-        descriptor = get_descriptor(dataset_id)
-        if descriptor is None:
-            return DatasetStatus(
-                dataset_id=dataset_id,
-                kind="unknown",
-                txt_root="",
-                txt_required_paths=[],
-                parquet_root="",
-                parquet_expected_paths=[],
-                error=f"Dataset not found: {dataset_id}"
-            )
-        
-        # Check TXT files
-        txt_present, txt_missing, txt_latest_mtime_utc, txt_total_size, txt_signature = check_txt_files(
-            descriptor.txt_root, descriptor.txt_required_paths
-        )
-        
-        # Check Parquet files
-        parquet_present, parquet_missing, parquet_latest_mtime_utc, parquet_total_size, parquet_signature = check_parquet_files(
-            descriptor.parquet_root, descriptor.parquet_expected_paths
-        )
-        
-        # Determine if up-to-date
-        up_to_date = False
-        if txt_present and parquet_present:
-            # Simple up-to-date check: compare signatures
-            # In a real implementation, this would compare content hashes
-            up_to_date = True  # Placeholder
-        
-        # Try to get bars count (lazy, can be expensive)
-        bars_count = None
-        schema_ok = None
-        
-        # Simple schema check for Parquet files
-        if parquet_present and descriptor.parquet_expected_paths:
-            try:
-                parquet_path = Path(descriptor.parquet_expected_paths[0])
-                if parquet_path.exists():
-                    # Quick check: try to read first few rows
-                    import pandas as pd
-                    df_sample = pd.read_parquet(parquet_path, nrows=1)
-                    schema_ok = True
-                    bars_count = len(pd.read_parquet(parquet_path)) if parquet_path.stat().st_size < 1000000 else None
-            except Exception:
-                schema_ok = False
-        
-        return DatasetStatus(
-            dataset_id=dataset_id,
-            kind=descriptor.kind,
-            descriptor=descriptor,
-            txt_root=descriptor.txt_root,
-            txt_required_paths=descriptor.txt_required_paths,
-            txt_present=txt_present,
-            txt_missing=txt_missing,
-            txt_latest_mtime_utc=txt_latest_mtime_utc,
-            txt_total_size_bytes=txt_total_size,
-            txt_signature=txt_signature,
-            parquet_root=descriptor.parquet_root,
-            parquet_expected_paths=descriptor.parquet_expected_paths,
-            parquet_present=parquet_present,
-            parquet_missing=parquet_missing,
-            parquet_latest_mtime_utc=parquet_latest_mtime_utc,
-            parquet_total_size_bytes=parquet_total_size,
-            parquet_signature=parquet_signature,
-            up_to_date=up_to_date,
-            bars_count=bars_count,
-            schema_ok=schema_ok
-        )
-    except Exception as e:
-        return DatasetStatus(
-            dataset_id=dataset_id,
-            kind="unknown",
-            txt_root="",
-            txt_required_paths=[],
-            parquet_root="",
-            parquet_expected_paths=[],
-            error=str(e)
-        )
-
-
-def get_strategy_status(strategy: StrategySpecForGUI) -> StrategyStatus:
-    """Get status for a single strategy."""
-    try:
-        # Check if strategy can be imported
-        can_import = True  # Assume yes for now
-        can_build_spec = True  # Assume yes for now
-        
-        # Get feature requirements count
-        feature_requirements_count = 0
-        if hasattr(strategy, 'feature_requirements'):
-            feature_requirements_count = len(strategy.feature_requirements)
-        
-        # Try to get file info if path is available
-        mtime = 0.0
-        signature = ""
-        if hasattr(strategy, 'file_path') and strategy.file_path:
-            file_path = Path(strategy.file_path)
-            if file_path.exists():
-                stat = file_path.stat()
-                mtime = stat.st_mtime
-                signature = compute_file_signature(file_path)
-        
-        return StrategyStatus(
-            id=strategy.strategy_id,
-            spec=strategy,
-            can_import=can_import,
-            can_build_spec=can_build_spec,
-            mtime=mtime,
-            signature=signature,
-            feature_requirements_count=feature_requirements_count
-        )
-    except Exception as e:
-        return StrategyStatus(
-            id=strategy.strategy_id if hasattr(strategy, 'strategy_id') else 'unknown',
-            error=str(e),
-            can_import=False,
-            can_build_spec=False
-        )
-
-
-def get_system_snapshot() -> SystemSnapshot:
-    """Get current system snapshot with TXT and Parquet status."""
-    snapshot = SystemSnapshot()
-    
-    try:
-        # Get dataset descriptors
-        descriptors = list_descriptors()
-        snapshot.total_datasets = len(descriptors)
-        
-        for descriptor in descriptors:
-            status = get_dataset_status(descriptor.dataset_id)
-            snapshot.dataset_statuses.append(status)
-            if status.error:
-                snapshot.errors.append(f"Dataset {descriptor.dataset_id}: {status.error}")
-        
-        # Get strategies
-        strategy_catalog = get_strategy_catalog()
-        strategies = strategy_catalog.list_strategies()
-        snapshot.total_strategies = len(strategies)
-        
-        for strategy in strategies:
-            status = get_strategy_status(strategy)
-            snapshot.strategy_statuses.append(status)
-            if status.error:
-                snapshot.errors.append(f"Strategy {strategy.strategy_id}: {status.error}")
-        
-        # Add notes
-        if snapshot.errors:
-            snapshot.notes.append(f"Found {len(snapshot.errors)} errors")
-        
-        # Count TXT/Parquet status
-        txt_present_count = sum(1 for ds in snapshot.dataset_statuses if ds.txt_present)
-        parquet_present_count = sum(1 for ds in snapshot.dataset_statuses if ds.parquet_present)
-        up_to_date_count = sum(1 for ds in snapshot.dataset_statuses if ds.up_to_date)
-        
-        snapshot.notes.append(f"TXT present: {txt_present_count}/{snapshot.total_datasets}")
-        snapshot.notes.append(f"Parquet present: {parquet_present_count}/{snapshot.total_datasets}")
-        snapshot.notes.append(f"Up-to-date: {up_to_date_count}/{snapshot.total_datasets}")
-        snapshot.notes.append(f"Snapshot created at {snapshot.created_at.isoformat()}")
-        
-    except Exception as e:
-        snapshot.errors.append(f"Failed to get system snapshot: {str(e)}")
-    
-    return snapshot
-
-
-def invalidate_feature_cache() -> bool:
-    """Invalidate feature resolver cache."""
-    try:
-        return invalidate_feature_cache_impl()
-    except Exception as e:
-        return False
-
-
-def reload_dataset_registry() -> bool:
-    """Reload dataset registry."""
-    try:
-        catalog = get_dataset_catalog()
-        # Force reload by calling load_index
-        catalog.load_index()  # Force load
-        return True
-    except Exception as e:
-        return False
-
-
-def reload_strategy_registry() -> bool:
-    """Reload strategy registry."""
-    try:
-        catalog = get_strategy_catalog()
-        # Force reload by calling load_registry
-        catalog.load_registry()  # Force load
-        return True
-    except Exception as e:
-        return False
-
-
-def reload_everything(reason: str = "manual") -> ReloadResult:
-    """Reload all caches and registries."""
-    start_time = time.time()
-    result = ReloadResult(ok=True)
-    caches_invalidated = []
-    
-    try:
-        # 1. Invalidate feature cache
-        if invalidate_feature_cache():
-            caches_invalidated.append("feature_cache")
-        else:
-            result.ok = False
-            result.error = "Failed to invalidate feature cache"
-        
-        # 2. Reload dataset registry
-        if reload_dataset_registry():
-            result.datasets_reloaded += 1
-        else:
-            result.ok = False
-            result.error = "Failed to reload dataset registry"
-        
-        # 3. Reload strategy registry
-        if reload_strategy_registry():
-            result.strategies_reloaded += 1
-        else:
-            result.ok = False
-            result.error = "Failed to reload strategy registry"
-        
-        # 4. Rebuild snapshot (implicitly done by get_system_snapshot)
-        
-        result.caches_invalidated = caches_invalidated
-        result.duration_seconds = time.time() - start_time
-        
-        if result.ok:
-            result.error = None
-        
-    except Exception as e:
-        result.ok = False
-        result.error = f"Reload failed: {str(e)}"
-        result.duration_seconds = time.time() - start_time
-    
-    return result
-
-
-def build_parquet(
-    dataset_id: str,
-    force: bool = False,
-    deep_validate: bool = False,
-    reason: str = "manual"
-) -> BuildParquetResult:
-    """Build Parquet from TXT for a dataset.
-    
-    Args:
-        dataset_id: Dataset ID to build
-        force: Rebuild even if up-to-date
-        deep_validate: Perform schema validation after build
-        reason: Reason for build (for audit/logging)
-        
-    Returns:
-        BuildParquetResult with build status
-    """
-    req = BuildParquetRequest(
-        dataset_id=dataset_id,
-        force=force,
-        deep_validate=deep_validate,
-        reason=reason
-    )
-    
-    return build_parquet_from_txt(req)
-
-
-def build_all_parquet(force: bool = False, reason: str = "manual") -> List[BuildParquetResult]:
-    """Build Parquet for all datasets.
-    
-    Args:
-        force: Rebuild even if up-to-date
-        reason: Reason for build (for audit/logging)
-        
-    Returns:
-        List of BuildParquetResult for each dataset
-    """
-    results = []
-    descriptors = list_descriptors()
-    
-    for descriptor in descriptors:
-        result = build_parquet(
-            dataset_id=descriptor.dataset_id,
-            force=force,
-            deep_validate=False,
-            reason=f"{reason}_batch"
-        )
-        results.append(result)
-    
-    return results
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/runs_index.py
-sha256(source_bytes) = eef1021b4bd992d1eb48c399a1a3cd60cdcbf68e3465d3732379482e5f17aa0d
-bytes = 7518
-redacted = False
---------------------------------------------------------------------------------
-"""Runs Index 服務 - 禁止全量掃描，只讀最新 N 個 run"""
-
-import json
-import os
-import time
-from dataclasses import dataclass
-from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime
-
-
-@dataclass(frozen=True)
-class RunIndexRow:
-    """Run 索引行，包含必要 metadata"""
-    run_id: str
-    run_dir: str
-    mtime: float
-    season: str
-    status: str
-    mode: str
-    strategy_id: Optional[str]
-    dataset_id: Optional[str]
-    stage: Optional[str]
-    manifest_path: Optional[str]
-    
-    @property
-    def mtime_iso(self) -> str:
-        """返回 ISO 格式的修改時間"""
-        return datetime.fromtimestamp(self.mtime).isoformat()
-    
-    @property
-    def is_archived(self) -> bool:
-        """檢查是否已歸檔（路徑包含 .archive）"""
-        return ".archive" in self.run_dir
-
-
-class RunsIndex:
-    """Runs Index 管理器 - 只掃最新 N 個 run，避免全量掃描"""
-    
-    def __init__(self, outputs_root: Path, limit: int = 50) -> None:
-        self.outputs_root = Path(outputs_root)
-        self.limit = limit
-        self._cache: List[RunIndexRow] = []
-        self._cache_time: float = 0.0
-        self._cache_ttl: float = 30.0  # 快取 30 秒
-        
-    def build(self) -> None:
-        """建立索引（掃描 seasons/<season>/runs 目錄）"""
-        rows: List[RunIndexRow] = []
-        
-        # 掃描所有 season 目錄
-        seasons_dir = self.outputs_root / "seasons"
-        if not seasons_dir.exists():
-            self._cache = []
-            self._cache_time = time.time()
-            return
-        
-        for season_dir in seasons_dir.iterdir():
-            if not season_dir.is_dir():
-                continue
-                
-            season = season_dir.name
-            runs_dir = season_dir / "runs"
-            
-            if not runs_dir.exists():
-                continue
-                
-            # 只掃描 runs 目錄下的直接子目錄
-            run_dirs = []
-            for run_path in runs_dir.iterdir():
-                if run_path.is_dir():
-                    try:
-                        mtime = run_path.stat().st_mtime
-                        run_dirs.append((run_path, mtime, season))
-                    except OSError:
-                        continue
-            
-            # 按修改時間排序，取最新的
-            run_dirs.sort(key=lambda x: x[1], reverse=True)
-            
-            for run_path, mtime, season in run_dirs[:self.limit]:
-                row = self._parse_run_dir(run_path, mtime, season)
-                if row:
-                    rows.append(row)
-        
-        # 按修改時間全局排序
-        rows.sort(key=lambda x: x.mtime, reverse=True)
-        rows = rows[:self.limit]
-        
-        self._cache = rows
-        self._cache_time = time.time()
-    
-    def _parse_run_dir(self, run_path: Path, mtime: float, season: str) -> Optional[RunIndexRow]:
-        """解析單個 run 目錄，讀取 manifest.json（如果存在）"""
-        run_id = run_path.name
-        manifest_path = run_path / "manifest.json"
-        
-        # 預設值
-        status = "unknown"
-        mode = "unknown"
-        strategy_id = None
-        dataset_id = None
-        stage = None
-        
-        # 嘗試讀取 manifest.json
-        if manifest_path.exists():
-            try:
-                with open(manifest_path, 'r', encoding='utf-8') as f:
-                    manifest = json.load(f)
-                
-                # 從 manifest 提取資訊
-                status = manifest.get("status", "unknown")
-                mode = manifest.get("mode", "unknown")
-                strategy_id = manifest.get("strategy_id")
-                dataset_id = manifest.get("dataset_id")
-                stage = manifest.get("stage")
-                
-                # 如果 stage 不存在，嘗試從 run_id 推斷
-                if stage is None and "stage" in run_id:
-                    for stage_name in ["stage0", "stage1", "stage2", "stage3"]:
-                        if stage_name in run_id:
-                            stage = stage_name
-                            break
-            except (json.JSONDecodeError, OSError):
-                # 如果讀取失敗，使用預設值
-                pass
-        
-        # 從 run_id 推斷 stage（如果尚未設定）
-        if stage is None:
-            if "stage0" in run_id:
-                stage = "stage0"
-            elif "stage1" in run_id:
-                stage = "stage1"
-            elif "stage2" in run_id:
-                stage = "stage2"
-            elif "demo" in run_id:
-                stage = "demo"
-        
-        return RunIndexRow(
-            run_id=run_id,
-            run_dir=str(run_path),
-            mtime=mtime,
-            season=season,
-            status=status,
-            mode=mode,
-            strategy_id=strategy_id,
-            dataset_id=dataset_id,
-            stage=stage,
-            manifest_path=str(manifest_path) if manifest_path.exists() else None
-        )
-    
-    def refresh(self) -> None:
-        """刷新索引（重建快取）"""
-        self.build()
-    
-    def list(self, season: Optional[str] = None, include_archived: bool = False) -> List[RunIndexRow]:
-        """列出 runs（可選按 season 過濾）"""
-        # 如果快取過期，重新建立
-        if time.time() - self._cache_time > self._cache_ttl:
-            self.build()
-        
-        rows = self._cache
-        
-        # 按 season 過濾
-        if season is not None:
-            rows = [r for r in rows if r.season == season]
-        
-        # 過濾歸檔的 runs
-        if not include_archived:
-            rows = [r for r in rows if not r.is_archived]
-        
-        return rows
-    
-    def get(self, run_id: str) -> Optional[RunIndexRow]:
-        """根據 run_id 獲取單個 run"""
-        # 如果快取過期，重新建立
-        if time.time() - self._cache_time > self._cache_ttl:
-            self.build()
-        
-        for row in self._cache:
-            if row.run_id == run_id:
-                return row
-        
-        # 如果不在快取中，嘗試直接查找
-        # 掃描所有 season 目錄尋找該 run_id
-        seasons_dir = self.outputs_root / "seasons"
-        if seasons_dir.exists():
-            for season_dir in seasons_dir.iterdir():
-                if not season_dir.is_dir():
-                    continue
-                    
-                runs_dir = season_dir / "runs"
-                if not runs_dir.exists():
-                    continue
-                
-                run_path = runs_dir / run_id
-                if run_path.exists() and run_path.is_dir():
-                    try:
-                        mtime = run_path.stat().st_mtime
-                        return self._parse_run_dir(run_path, mtime, season_dir.name)
-                    except OSError:
-                        pass
-        
-        return None
-
-
-# Singleton instance for app-level caching
-_global_index: Optional[RunsIndex] = None
-
-def get_global_index(outputs_root: Optional[Path] = None) -> RunsIndex:
-    """獲取全域 RunsIndex 實例（singleton）"""
-    global _global_index
-    
-    if _global_index is None:
-        if outputs_root is None:
-            # 預設使用專案根目錄下的 outputs
-            outputs_root = Path(__file__).parent.parent.parent.parent / "outputs"
-        _global_index = RunsIndex(outputs_root)
-        _global_index.build()
-    
-    return _global_index
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/services/stale.py
-sha256(source_bytes) = 33e0a537d8b49a98dece00c3b6769a3b04d9d2a7d86b26931c1c7616e468cc06
-bytes = 6340
-redacted = False
---------------------------------------------------------------------------------
-"""Stale Warning 服務 - UI 開著超過 10 分鐘顯示警告"""
-
-import time
-from dataclasses import dataclass
-from typing import Optional
-
-
-@dataclass
-class StaleState:
-    """Stale 狀態"""
-    opened_at: float
-    warned: bool = False
-    last_check: float = 0.0
-    warning_shown_at: Optional[float] = None
-
-
-def should_warn_stale(state: StaleState, seconds: int = 600) -> bool:
-    """
-    檢查是否應該顯示 stale warning
-    
-    Args:
-        state: StaleState 物件
-        seconds: 警告閾值（秒），預設 600 秒（10 分鐘）
-    
-    Returns:
-        bool: 是否應該顯示警告
-    """
-    if state.warned:
-        return False
-    
-    elapsed = time.time() - state.opened_at
-    return elapsed >= seconds
-
-
-def update_stale_state(state: StaleState) -> dict:
-    """
-    更新 stale 狀態並返回狀態資訊
-    
-    Args:
-        state: StaleState 物件
-    
-    Returns:
-        dict: 狀態資訊
-    """
-    current_time = time.time()
-    elapsed = current_time - state.opened_at
-    
-    state.last_check = current_time
-    
-    # 檢查是否應該警告
-    should_warn = should_warn_stale(state)
-    
-    if should_warn and not state.warned:
-        state.warned = True
-        state.warning_shown_at = current_time
-    
-    return {
-        "opened_at": state.opened_at,
-        "opened_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.opened_at)),
-        "elapsed_seconds": elapsed,
-        "elapsed_minutes": elapsed / 60,
-        "elapsed_hours": elapsed / 3600,
-        "should_warn": should_warn,
-        "warned": state.warned,
-        "warning_shown_at": state.warning_shown_at,
-        "warning_shown_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.warning_shown_at)) if state.warning_shown_at else None,
-        "last_check": state.last_check,
-    }
-
-
-class StaleMonitor:
-    """Stale 監視器"""
-    
-    def __init__(self, warning_threshold_seconds: int = 600):
-        """
-        初始化 StaleMonitor
-        
-        Args:
-            warning_threshold_seconds: 警告閾值（秒）
-        """
-        self.warning_threshold = warning_threshold_seconds
-        self._states = {}  # client_id -> StaleState
-        self._start_time = time.time()
-    
-    def register_client(self, client_id: str) -> StaleState:
-        """
-        註冊客戶端
-        
-        Args:
-            client_id: 客戶端 ID
-        
-        Returns:
-            StaleState: 新建立的狀態
-        """
-        state = StaleState(opened_at=time.time())
-        self._states[client_id] = state
-        return state
-    
-    def unregister_client(self, client_id: str) -> None:
-        """取消註冊客戶端"""
-        if client_id in self._states:
-            del self._states[client_id]
-    
-    def get_client_state(self, client_id: str) -> Optional[StaleState]:
-        """獲取客戶端狀態"""
-        return self._states.get(client_id)
-    
-    def update_client(self, client_id: str) -> Optional[dict]:
-        """
-        更新客戶端狀態
-        
-        Args:
-            client_id: 客戶端 ID
-        
-        Returns:
-            Optional[dict]: 狀態資訊，如果客戶端不存在則返回 None
-        """
-        state = self.get_client_state(client_id)
-        if state is None:
-            return None
-        
-        return update_stale_state(state)
-    
-    def check_all_clients(self) -> dict:
-        """
-        檢查所有客戶端
-        
-        Returns:
-            dict: 所有客戶端的狀態摘要
-        """
-        results = {}
-        warnings = []
-        
-        for client_id, state in self._states.items():
-            info = update_stale_state(state)
-            results[client_id] = info
-            
-            if info["should_warn"] and not state.warned:
-                warnings.append({
-                    "client_id": client_id,
-                    "elapsed_minutes": info["elapsed_minutes"],
-                    "opened_at": info["opened_at_iso"],
-                })
-        
-        return {
-            "total_clients": len(self._states),
-            "clients": results,
-            "warnings": warnings,
-            "has_warnings": len(warnings) > 0,
-            "monitor_uptime": time.time() - self._start_time,
-        }
-    
-    def reset_client(self, client_id: str) -> Optional[StaleState]:
-        """
-        重置客戶端狀態（重新計時）
-        
-        Args:
-            client_id: 客戶端 ID
-        
-        Returns:
-            Optional[StaleState]: 新的狀態，如果客戶端不存在則返回 None
-        """
-        if client_id not in self._states:
-            return None
-        
-        self._states[client_id] = StaleState(opened_at=time.time())
-        return self._states[client_id]
-
-
-# 全域監視器實例
-_global_monitor: Optional[StaleMonitor] = None
-
-def get_global_monitor() -> StaleMonitor:
-    """獲取全域 StaleMonitor 實例"""
-    global _global_monitor
-    if _global_monitor is None:
-        _global_monitor = StaleMonitor()
-    return _global_monitor
-
-
-def create_stale_warning_message(state_info: dict) -> str:
-    """
-    建立 stale warning 訊息
-    
-    Args:
-        state_info: 狀態資訊
-    
-    Returns:
-        str: 警告訊息
-    """
-    elapsed_minutes = state_info["elapsed_minutes"]
-    
-    if elapsed_minutes < 60:
-        time_str = f"{elapsed_minutes:.1f} 分鐘"
-    else:
-        time_str = f"{elapsed_minutes/60:.1f} 小時"
-    
-    return (
-        f"⚠️  UI 已開啟 {time_str}，資料可能已過期。\n"
-        f"建議重新整理頁面以獲取最新資料。\n"
-        f"（開啟時間: {state_info['opened_at_iso']})"
-    )
-
-
-def create_stale_warning_ui_state(state_info: dict) -> dict:
-    """
-    建立 stale warning UI 狀態
-    
-    Args:
-        state_info: 狀態資訊
-    
-    Returns:
-        dict: UI 狀態
-    """
-    return {
-        "show_warning": state_info["should_warn"],
-        "message": create_stale_warning_message(state_info) if state_info["should_warn"] else "",
-        "severity": "warning",
-        "elapsed_minutes": state_info["elapsed_minutes"],
-        "opened_at": state_info["opened_at_iso"],
-        "can_dismiss": True,
-        "auto_refresh_suggested": state_info["elapsed_minutes"] > 20,  # 超過 20 分鐘建議自動重新整理
-    }
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/gui/viewer/__init__.py
-sha256(source_bytes) = 2f52538f216f07d0e68d4bdb192cccd19072506ea5fcce09b2d87dcc9d05f4d6
-bytes = 39
-redacted = False
---------------------------------------------------------------------------------
-
-"""Viewer package for Phase 6.0."""
-
-
-
 --------------------------------------------------------------------------------
 

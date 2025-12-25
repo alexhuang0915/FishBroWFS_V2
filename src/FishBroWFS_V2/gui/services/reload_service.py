@@ -131,6 +131,51 @@ def compute_file_signature(file_path: Path, max_size_mb: int = 50) -> str:
         return f"error:{str(e)[:50]}"
 
 
+def check_dataset_files(dataset: DatasetRecord) -> Tuple[List[FileStatus], int]:
+    """Check files for a dataset (legacy compatibility).
+    
+    Args:
+        dataset: DatasetRecord with root and required_paths attributes
+        
+    Returns:
+        Tuple of (list of FileStatus objects, missing_count)
+    """
+    # This is a legacy compatibility function for tests
+    # The new API uses check_txt_files and check_parquet_files
+    files = []
+    missing_count = 0
+    
+    # Check root directory
+    root_path = Path(dataset.root) if hasattr(dataset, 'root') else Path(".")
+    root_status = FileStatus(
+        path=str(root_path),
+        exists=root_path.exists(),
+        size=root_path.stat().st_size if root_path.exists() else 0,
+        mtime=root_path.stat().st_mtime if root_path.exists() else 0.0,
+        signature=compute_file_signature(root_path) if root_path.exists() else ""
+    )
+    files.append(root_status)
+    
+    # Check required paths
+    required_paths = getattr(dataset, 'required_paths', [])
+    for path_str in required_paths:
+        path = Path(path_str)
+        exists = path.exists()
+        if not exists:
+            missing_count += 1
+        
+        status = FileStatus(
+            path=path_str,
+            exists=exists,
+            size=path.stat().st_size if exists else 0,
+            mtime=path.stat().st_mtime if exists else 0.0,
+            signature=compute_file_signature(path) if exists else ""
+        )
+        files.append(status)
+    
+    return files, missing_count
+
+
 def check_txt_files(txt_root: str, txt_required_paths: List[str]) -> Tuple[bool, List[str], Optional[str], int, str]:
     """Check TXT files for a dataset.
     

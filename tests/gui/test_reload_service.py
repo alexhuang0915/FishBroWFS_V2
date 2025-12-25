@@ -218,12 +218,22 @@ def test_compute_file_signature_small_file():
     mock_path.exists.return_value = True
     mock_path.stat.return_value = Mock(st_size=1000)  # < 50MB
     
-    # Mock file reading
+    # Mock file reading - create a mock that supports context manager
     mock_file_content = b"test content"
-    mock_path.open.return_value.__enter__.return_value.read.side_effect = [mock_file_content, b""]
     
-    result = compute_file_signature(mock_path)
-    assert result.startswith("sha256:")
+    # Create a mock file object
+    mock_file = Mock()
+    mock_file.read.side_effect = [mock_file_content, b""]  # First read returns content, second returns empty
+    
+    # Create a mock context manager
+    mock_context = Mock()
+    mock_context.__enter__ = Mock(return_value=mock_file)
+    mock_context.__exit__ = Mock(return_value=None)
+    
+    # Mock open to return the context manager
+    with patch('builtins.open', return_value=mock_context):
+        result = compute_file_signature(mock_path)
+        assert result.startswith("sha256:")
 
 
 def test_compute_file_signature_large_file():
@@ -263,12 +273,36 @@ def test_check_txt_files_missing():
     txt_root = "/data/txt"
     txt_paths = ["/data/txt/file1.txt", "/data/txt/file2.txt"]
     
-    def mock_exists(path):
-        return str(path) == "/data/txt/file1.txt"
-    
-    with patch('pathlib.Path.exists', side_effect=mock_exists):
-        with patch('pathlib.Path.stat') as mock_stat:
-            mock_stat.return_value = Mock(st_size=1000, st_mtime=1234567890)
+    # Mock Path class in the module where it's imported
+    with patch('FishBroWFS_V2.gui.services.reload_service.Path') as MockPath:
+        # Create mock for file1 (exists)
+        mock_path1 = Mock()
+        mock_path1.exists.return_value = True
+        mock_path1.stat.return_value = Mock(st_size=1000, st_mtime=1234567890)
+        mock_path1.name = "file1.txt"
+        
+        # Create mock for file2 (doesn't exist)
+        mock_path2 = Mock()
+        mock_path2.exists.return_value = False
+        mock_path2.name = "file2.txt"
+        
+        # Make Path constructor return appropriate mock based on input string
+        def path_constructor(path_str):
+            if isinstance(path_str, str):
+                if path_str == "/data/txt/file1.txt":
+                    return mock_path1
+                elif path_str == "/data/txt/file2.txt":
+                    return mock_path2
+            # For other cases (like Path() called without args), return a default mock
+            mock = Mock()
+            mock.exists.return_value = False
+            return mock
+        
+        MockPath.side_effect = path_constructor
+        
+        # Also need to mock compute_file_signature for the existing file
+        with patch('FishBroWFS_V2.gui.services.reload_service.compute_file_signature') as mock_compute_sig:
+            mock_compute_sig.return_value = "mock_sig"
             
             present, missing, latest_mtime, total_size, signature = check_txt_files(txt_root, txt_paths)
             

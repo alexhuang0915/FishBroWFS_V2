@@ -24,6 +24,19 @@ from FishBroWFS_V2.control.action_queue import get_action_queue, IntentSubmitter
 from FishBroWFS_V2.core.processor import get_processor, start_processor, stop_processor
 from FishBroWFS_V2.core.state import SystemState
 
+# Import SeasonFrozenError and ValidationError from job_api for compatibility
+try:
+    from FishBroWFS_V2.control.job_api import SeasonFrozenError, ValidationError
+except ImportError:
+    # Fallback definitions if job_api doesn't have them
+    class SeasonFrozenError(RuntimeError):
+        """Raised when an operation would mutate a frozen season."""
+        pass
+    
+    class ValidationError(Exception):
+        """Raised when job validation fails."""
+        pass
+
 
 class IntentBridge:
     """Bridge between UI and intent-based backend.

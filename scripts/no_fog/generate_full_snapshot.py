@@ -49,6 +49,7 @@ EXCLUDE_DIRS: Set[str] = {
     ".venv",
     "outputs",
     "FishBroData",
+    "legacy",
 }
 
 # Hard excludes: exact filenames

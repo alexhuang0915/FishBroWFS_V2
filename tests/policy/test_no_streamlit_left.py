@@ -19,7 +19,9 @@ def test_no_streamlit_imports():
              "--glob", "!*.release",
              "--glob", "!*release*",
              "--glob", "!src/FishBroWFS_V2/gui/viewer/*",
-             "--glob", "!tests/*"],  # 排除測試檔案
+             "--glob", "!tests/*",  # 排除測試檔案
+             "--glob", "!**/*.md",  # 排除 markdown 檔案
+             "--glob", "!**/*snapshot*/*"],  # 排除 snapshot 目錄
             capture_output=True,
             text=True,
             cwd=repo_root
@@ -31,7 +33,7 @@ def test_no_streamlit_imports():
             lines = result.stdout.strip().split('\n')
             non_excluded_lines = []
             for line in lines:
-                if line and not any(exclude in line for exclude in ['release', '.txt', 'FishBroWFS_V2_release', 'gui/viewer', 'tests/']):
+                if line and not any(exclude in line for exclude in ['release', '.txt', 'FishBroWFS_V2_release', 'gui/viewer', 'tests/', '.md', 'snapshot']):
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:
@@ -58,6 +60,9 @@ def test_no_streamlit_imports():
                 continue
             if 'tests/' in file_str:
                 continue
+            # 跳過 markdown 和 snapshot 檔案
+            if '.md' in file_str.lower() or 'snapshot' in file_str.lower():
+                continue
             try:
                 content = py_file.read_text()
                 if "import streamlit" in content or "from streamlit" in content:
@@ -81,7 +86,9 @@ def test_no_streamlit_run():
              "--glob", "!*release*",
              "--glob", "!tests/*",  # 排除測試檔案
              "--glob", "!src/FishBroWFS_V2/gui/viewer/*",  # 排除 viewer 目錄
-             "--glob", "!scripts/launch_b5.sh"],  # 排除舊啟動腳本
+             "--glob", "!scripts/launch_b5.sh",  # 排除舊啟動腳本
+             "--glob", "!**/*.md",  # 排除 markdown 檔案
+             "--glob", "!**/*snapshot*/*"],  # 排除 snapshot 目錄
             capture_output=True,
             text=True,
             cwd=repo_root
@@ -92,7 +99,7 @@ def test_no_streamlit_run():
             lines = result.stdout.strip().split('\n')
             non_excluded_lines = []
             for line in lines:
-                if line and not any(exclude in line for exclude in ['tests/', 'gui/viewer', 'scripts/launch_b5.sh']):
+                if line and not any(exclude in line for exclude in ['tests/', 'gui/viewer', 'scripts/launch_b5.sh', '.md', 'snapshot']):
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:
@@ -114,6 +121,9 @@ def test_no_streamlit_run():
                 file_str = str(file)
                 # 跳過測試檔案、viewer 目錄和舊腳本
                 if 'tests/' in file_str or 'gui/viewer' in file_str or 'scripts/launch_b5.sh' in file_str:
+                    continue
+                # 跳過 markdown 和 snapshot 檔案
+                if '.md' in file_str.lower() or 'snapshot' in file_str.lower():
                     continue
                 try:
                     content = file.read_text()
@@ -137,7 +147,9 @@ def test_no_viewer_module():
              "--glob", "!*.release",
              "--glob", "!*release*",
              "--glob", "!tests/*",  # 排除測試檔案
-             "--glob", "!src/FishBroWFS_V2/gui/viewer/*"],  # 排除 viewer 目錄本身
+             "--glob", "!src/FishBroWFS_V2/gui/viewer/*",  # 排除 viewer 目錄本身
+             "--glob", "!**/*.md",  # 排除 markdown 檔案
+             "--glob", "!**/*snapshot*/*"],  # 排除 snapshot 目錄
             capture_output=True,
             text=True,
             cwd=repo_root
@@ -148,7 +160,7 @@ def test_no_viewer_module():
             lines = result.stdout.strip().split('\n')
             non_excluded_lines = []
             for line in lines:
-                if line and not any(exclude in line for exclude in ['release', '.txt', 'FishBroWFS_V2_release', 'tests/', 'gui/viewer']):
+                if line and not any(exclude in line for exclude in ['release', '.txt', 'FishBroWFS_V2_release', 'tests/', 'gui/viewer', '.md', 'snapshot']):
                     non_excluded_lines.append(line)
             
             if non_excluded_lines:

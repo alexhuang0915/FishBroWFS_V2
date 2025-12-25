@@ -51,15 +51,18 @@ def test_register_duplicate_raises() -> None:
     """Test registering duplicate strategy_id raises ValueError."""
     clear()
     
-    def test_fn(context: dict, params: dict) -> dict:
+    def test_fn1(context: dict, params: dict) -> dict:
         return {"intents": [], "debug": {}}
+    
+    def test_fn2(context: dict, params: dict) -> dict:
+        return {"intents": [], "debug": {"different": True}}
     
     spec1 = StrategySpec(
         strategy_id="duplicate",
         version="v1",
         param_schema={},
         defaults={},
-        fn=test_fn,
+        fn=test_fn1,
     )
     
     spec2 = StrategySpec(
@@ -67,7 +70,7 @@ def test_register_duplicate_raises() -> None:
         version="v2",
         param_schema={},
         defaults={},
-        fn=test_fn,
+        fn=test_fn2,
     )
     
     register(spec1)
@@ -91,16 +94,22 @@ def test_list_strategies() -> None:
     """Test list_strategies returns sorted list."""
     clear()
     
-    def test_fn(context: dict, params: dict) -> dict:
-        return {"intents": [], "debug": {}}
+    def test_fn_a(context: dict, params: dict) -> dict:
+        return {"intents": [], "debug": {"fn": "a"}}
     
-    # Register multiple strategies
+    def test_fn_b(context: dict, params: dict) -> dict:
+        return {"intents": [], "debug": {"fn": "b"}}
+    
+    def test_fn_c(context: dict, params: dict) -> dict:
+        return {"intents": [], "debug": {"fn": "c"}}
+    
+    # Register multiple strategies with different functions
     spec_b = StrategySpec(
         strategy_id="b_strategy",
         version="v1",
         param_schema={},
         defaults={},
-        fn=test_fn,
+        fn=test_fn_b,
     )
     
     spec_a = StrategySpec(
@@ -108,7 +117,7 @@ def test_list_strategies() -> None:
         version="v1",
         param_schema={},
         defaults={},
-        fn=test_fn,
+        fn=test_fn_a,
     )
     
     spec_c = StrategySpec(
@@ -116,7 +125,7 @@ def test_list_strategies() -> None:
         version="v1",
         param_schema={},
         defaults={},
-        fn=test_fn,
+        fn=test_fn_c,
     )
     
     register(spec_b)

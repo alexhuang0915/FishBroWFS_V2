@@ -1,6 +1,6 @@
 PROJECT_ROOT := $(CURDIR)
-CACHE_CLEANER := GM_Huang/clean_repo_caches.py
-RELEASE_TOOL := GM_Huang/release_tool.py
+CACHE_CLEANER := scripts/tools/GM_Huang/clean_repo_caches.py
+RELEASE_TOOL := scripts/tools/GM_Huang/release_tool.py
 
 # --- SAFE MODE (WSL / pytest / numba stabilization) ---
 SAFE_ENV := NUMBA_DISABLE_CACHE=1 \

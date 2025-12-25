@@ -1,3 +1,2291 @@
+FILE src/FishBroWFS_V2/gui/services/candidates_reader.py
+sha256(source_bytes) = d728be4fd30c46c2930fa8c2aab85871dfbdbd8261e3330c814073fa7ec6a442
+bytes = 9938
+redacted = False
+--------------------------------------------------------------------------------
+"""
+Candidates Reader - 讀取 outputs/seasons/{season}/research/ 下的 canonical_results.json 和 research_index.json
+Phase 4: 使用 season_context 作為單一真相來源
+"""
+
+import json
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Dict, Any, Optional
+
+from FishBroWFS_V2.core.season_context import (
+    current_season,
+    canonical_results_path,
+    research_index_path,
+)
+
+logger = logging.getLogger(__name__)
+
+# 官方路徑契約 - 使用 season_context
+def get_canonical_results_path(season: Optional[str] = None) -> Path:
+    """返回 canonical_results.json 的路徑"""
+    return canonical_results_path(season)
+
+def get_research_index_path(season: Optional[str] = None) -> Path:
+    """返回 research_index.json 的路徑"""
+    return research_index_path(season)
+
+@dataclass
+class CanonicalResult:
+    """Canonical Results 的單一項目"""
+    run_id: str
+    strategy_id: str
+    symbol: str
+    bars: int
+    net_profit: float
+    max_drawdown: float
+    score_final: float
+    score_net_mdd: float
+    trades: int
+    start_date: str
+    end_date: str
+    sharpe: Optional[float] = None
+    profit_factor: Optional[float] = None
+    portfolio_id: Optional[str] = None
+    portfolio_version: Optional[str] = None
+    strategy_version: Optional[str] = None
+    timeframe_min: Optional[int] = None
+
+@dataclass
+class ResearchIndexEntry:
+    """Research Index 的單一項目"""
+    run_id: str
+    season: str
+    stage: str
+    mode: str
+    strategy_id: str
+    dataset_id: str
+    created_at: str
+    status: str
+    manifest_path: Optional[str] = None
+
+def load_canonical_results(season: Optional[str] = None) -> List[CanonicalResult]:
+    """
+    載入 canonical_results.json
+    
+    Args:
+        season: Season identifier (e.g., "2026Q1")
+    
+    Returns:
+        List[CanonicalResult]: 解析後的 canonical results 列表
+        
+    Raises:
+        FileNotFoundError: 如果檔案不存在
+        json.JSONDecodeError: 如果 JSON 格式錯誤
+    """
+    canonical_path = get_canonical_results_path(season)
+    
+    if not canonical_path.exists():
+        logger.warning(f"Canonical results file not found: {canonical_path}")
+        return []
+    
+    try:
+        with open(canonical_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            logger.error(f"Canonical results should be a list, got {type(data)}")
+            return []
+        
+        results = []
+        for item in data:
+            try:
+                result = CanonicalResult(
+                    run_id=item.get("run_id", ""),
+                    strategy_id=item.get("strategy_id", ""),
+                    symbol=item.get("symbol", "UNKNOWN"),
+                    bars=item.get("bars", 0),
+                    net_profit=item.get("net_profit", 0.0),
+                    max_drawdown=item.get("max_drawdown", 0.0),
+                    score_final=item.get("score_final", 0.0),
+                    score_net_mdd=item.get("score_net_mdd", 0.0),
+                    trades=item.get("trades", 0),
+                    start_date=item.get("start_date", ""),
+                    end_date=item.get("end_date", ""),
+                    sharpe=item.get("sharpe"),
+                    profit_factor=item.get("profit_factor"),
+                    portfolio_id=item.get("portfolio_id"),
+                    portfolio_version=item.get("portfolio_version"),
+                    strategy_version=item.get("strategy_version"),
+                    timeframe_min=item.get("timeframe_min"),
+                )
+                results.append(result)
+            except Exception as e:
+                logger.warning(f"Failed to parse canonical result item: {item}, error: {e}")
+                continue
+        
+        logger.info(f"Loaded {len(results)} canonical results from {canonical_path}")
+        return results
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse canonical_results.json: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error loading canonical results: {e}")
+        return []
+
+def load_research_index(season: Optional[str] = None) -> List[ResearchIndexEntry]:
+    """
+    載入 research_index.json
+    
+    Args:
+        season: Season identifier (e.g., "2026Q1")
+    
+    Returns:
+        List[ResearchIndexEntry]: 解析後的 research index 列表
+        
+    Raises:
+        FileNotFoundError: 如果檔案不存在
+        json.JSONDecodeError: 如果 JSON 格式錯誤
+    """
+    research_path = get_research_index_path(season)
+    
+    if not research_path.exists():
+        logger.warning(f"Research index file not found: {research_path}")
+        return []
+    
+    try:
+        with open(research_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        if not isinstance(data, list):
+            logger.error(f"Research index should be a list, got {type(data)}")
+            return []
+        
+        entries = []
+        for item in data:
+            try:
+                entry = ResearchIndexEntry(
+                    run_id=item.get("run_id", ""),
+                    season=item.get("season", ""),
+                    stage=item.get("stage", ""),
+                    mode=item.get("mode", ""),
+                    strategy_id=item.get("strategy_id", ""),
+                    dataset_id=item.get("dataset_id", ""),
+                    created_at=item.get("created_at", ""),
+                    status=item.get("status", ""),
+                    manifest_path=item.get("manifest_path"),
+                )
+                entries.append(entry)
+            except Exception as e:
+                logger.warning(f"Failed to parse research index item: {item}, error: {e}")
+                continue
+        
+        logger.info(f"Loaded {len(entries)} research index entries from {research_path}")
+        return entries
+        
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse research_index.json: {e}")
+        return []
+    except Exception as e:
+        logger.error(f"Unexpected error loading research index: {e}")
+        return []
+
+def get_canonical_results_by_strategy(strategy_id: str, season: Optional[str] = None) -> List[CanonicalResult]:
+    """
+    根據 strategy_id 篩選 canonical results
+    
+    Args:
+        strategy_id: 策略 ID
+        season: Season identifier (e.g., "2026Q1")
+        
+    Returns:
+        List[CanonicalResult]: 符合條件的結果列表
+    """
+    results = load_canonical_results(season)
+    return [r for r in results if r.strategy_id == strategy_id]
+
+def get_canonical_results_by_run_id(run_id: str, season: Optional[str] = None) -> Optional[CanonicalResult]:
+    """
+    根據 run_id 查找 canonical result
+    
+    Args:
+        run_id: Run ID
+        season: Season identifier (e.g., "2026Q1")
+        
+    Returns:
+        Optional[CanonicalResult]: 找到的結果，如果沒有則返回 None
+    """
+    results = load_canonical_results(season)
+    for result in results:
+        if result.run_id == run_id:
+            return result
+    return None
+
+def get_research_index_by_run_id(run_id: str, season: Optional[str] = None) -> Optional[ResearchIndexEntry]:
+    """
+    根據 run_id 查找 research index entry
+    
+    Args:
+        run_id: Run ID
+        season: Season identifier (e.g., "2026Q1")
+        
+    Returns:
+        Optional[ResearchIndexEntry]: 找到的項目，如果沒有則返回 None
+    """
+    entries = load_research_index(season)
+    for entry in entries:
+        if entry.run_id == run_id:
+            return entry
+    return None
+
+def get_research_index_by_season(season: str) -> List[ResearchIndexEntry]:
+    """
+    根據 season 篩選 research index
+    
+    Args:
+        season: Season ID
+        
+    Returns:
+        List[ResearchIndexEntry]: 符合條件的項目列表
+    """
+    entries = load_research_index(season)
+    return [e for e in entries if e.season == season]
+
+def get_combined_candidate_info(run_id: str, season: Optional[str] = None) -> Dict[str, Any]:
+    """
+    結合 canonical results 和 research index 的資訊
+    
+    Args:
+        run_id: Run ID
+        season: Season identifier (e.g., "2026Q1")
+        
+    Returns:
+        Dict[str, Any]: 合併後的候選人資訊
+    """
+    canonical = get_canonical_results_by_run_id(run_id, season)
+    research = get_research_index_by_run_id(run_id, season)
+    
+    result = {
+        "run_id": run_id,
+        "canonical": canonical.__dict__ if canonical else None,
+        "research": research.__dict__ if research else None,
+    }
+    
+    return result
+
+def refresh_canonical_results(season: Optional[str] = None) -> bool:
+    """
+    刷新 canonical results（目前只是重新讀取檔案）
+    
+    Args:
+        season: Season identifier (e.g., "2026Q1")
+    
+    Returns:
+        bool: 是否成功刷新
+    """
+    try:
+        # 目前只是重新讀取檔案，未來可以加入重新生成邏輯
+        results = load_canonical_results(season)
+        logger.info(f"Refreshed canonical results, found {len(results)} entries")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to refresh canonical results: {e}")
+        return False
+
+def refresh_research_index(season: Optional[str] = None) -> bool:
+    """
+    刷新 research index（目前只是重新讀取檔案）
+    
+    Args:
+        season: Season identifier (e.g., "2026Q1")
+    
+    Returns:
+        bool: 是否成功刷新
+    """
+    try:
+        # 目前只是重新讀取檔案，未來可以加入重新生成邏輯
+        entries = load_research_index(season)
+        logger.info(f"Refreshed research index, found {len(entries)} entries")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to refresh research index: {e}")
+        return False
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/clone.py
+sha256(source_bytes) = ce9e3bb3966670ce4e504a071da1d05e2db608c108b218171b3e803ed530c7fe
+bytes = 5487
+redacted = False
+--------------------------------------------------------------------------------
+"""Clone to Wizard 服務 - 從現有 run 預填 Wizard 欄位"""
+
+import json
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+
+def load_config_snapshot(run_dir: Path) -> Optional[Dict[str, Any]]:
+    """
+    從 run_dir 載入 config snapshot
+    
+    Args:
+        run_dir: run 目錄路徑
+    
+    Returns:
+        Optional[Dict[str, Any]]: config snapshot 字典，如果不存在則返回 None
+    """
+    # 嘗試讀取 config_snapshot.json
+    config_path = run_dir / "config_snapshot.json"
+    if config_path.exists():
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, OSError):
+            pass
+    
+    # 嘗試讀取 manifest.json
+    manifest_path = run_dir / "manifest.json"
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, 'r', encoding='utf-8') as f:
+                manifest = json.load(f)
+            
+            # 從 manifest 提取 config 相關欄位
+            config_snapshot = {
+                "season": manifest.get("season"),
+                "dataset_id": manifest.get("dataset_id"),
+                "strategy_id": manifest.get("strategy_id"),
+                "mode": manifest.get("mode"),
+                "stage": manifest.get("stage"),
+                "timestamp": manifest.get("timestamp"),
+                "run_id": manifest.get("run_id"),
+            }
+            
+            # 嘗試提取 wfs_config
+            if "wfs_config" in manifest:
+                config_snapshot["wfs_config"] = manifest["wfs_config"]
+            
+            return config_snapshot
+        except (json.JSONDecodeError, OSError, KeyError):
+            pass
+    
+    return None
+
+
+def build_wizard_prefill(run_dir: Path) -> Dict[str, Any]:
+    """
+    建立 Wizard 預填資料
+    
+    Args:
+        run_dir: run 目錄路徑
+    
+    Returns:
+        Dict[str, Any]: Wizard 預填資料
+    """
+    # 載入 config snapshot
+    config = load_config_snapshot(run_dir)
+    
+    if config is None:
+        # 如果無法載入 config，返回基本資訊
+        return {
+            "season": "2026Q1",
+            "dataset_id": None,
+            "strategy_id": None,
+            "mode": "smoke",
+            "note": f"Cloned from {run_dir.name}",
+        }
+    
+    # 建立預填資料
+    prefill: Dict[str, Any] = {
+        "season": config.get("season", "2026Q1"),
+        "dataset_id": config.get("dataset_id"),
+        "strategy_id": config.get("strategy_id"),
+        "mode": _map_mode(config.get("mode")),
+        "note": f"Cloned from {run_dir.name}",
+    }
+    
+    # 添加 wfs_config（如果存在）
+    if "wfs_config" in config:
+        prefill["wfs_config"] = config["wfs_config"]
+    
+    # 添加 grid preset（如果可推斷）
+    grid_preset = _infer_grid_preset(config)
+    if grid_preset:
+        prefill["grid_preset"] = grid_preset
+    
+    # 添加 stage 資訊
+    stage = config.get("stage")
+    if stage:
+        prefill["stage"] = stage
+    
+    return prefill
+
+
+def _map_mode(mode: Optional[str]) -> str:
+    """
+    映射 mode 到 Wizard 可用的選項
+    
+    Args:
+        mode: 原始 mode
+    
+    Returns:
+        str: 映射後的 mode
+    """
+    if not mode:
+        return "smoke"
+    
+    mode_lower = mode.lower()
+    
+    # 映射規則
+    if "smoke" in mode_lower:
+        return "smoke"
+    elif "lite" in mode_lower:
+        return "lite"
+    elif "full" in mode_lower:
+        return "full"
+    elif "incremental" in mode_lower:
+        return "incremental"
+    else:
+        # 預設回退
+        return "smoke"
+
+
+def _infer_grid_preset(config: Dict[str, Any]) -> Optional[str]:
+    """
+    從 config 推斷 grid preset
+    
+    Args:
+        config: config snapshot
+    
+    Returns:
+        Optional[str]: grid preset 名稱
+    """
+    # 檢查是否有 wfs_config
+    wfs_config = config.get("wfs_config")
+    if isinstance(wfs_config, dict):
+        # 檢查是否有 grid 相關設定
+        if "grid" in wfs_config or "param_grid" in wfs_config:
+            return "custom"
+    
+    # 檢查 stage
+    stage = config.get("stage")
+    if stage:
+        if "stage0" in stage:
+            return "coarse"
+        elif "stage1" in stage:
+            return "topk"
+        elif "stage2" in stage:
+            return "confirm"
+    
+    # 檢查 mode
+    mode = config.get("mode", "").lower()
+    if "full" in mode:
+        return "full_grid"
+    elif "lite" in mode:
+        return "lite_grid"
+    
+    return None
+
+
+def get_clone_summary(run_dir: Path) -> Dict[str, Any]:
+    """
+    獲取 clone 摘要資訊（用於 UI 顯示）
+    
+    Args:
+        run_dir: run 目錄路徑
+    
+    Returns:
+        Dict[str, Any]: 摘要資訊
+    """
+    config = load_config_snapshot(run_dir)
+    
+    if config is None:
+        return {
+            "success": False,
+            "error": "無法載入 config snapshot 或 manifest",
+            "run_id": run_dir.name,
+        }
+    
+    prefill = build_wizard_prefill(run_dir)
+    
+    return {
+        "success": True,
+        "run_id": run_dir.name,
+        "season": prefill.get("season"),
+        "dataset_id": prefill.get("dataset_id"),
+        "strategy_id": prefill.get("strategy_id"),
+        "mode": prefill.get("mode"),
+        "stage": prefill.get("stage"),
+        "grid_preset": prefill.get("grid_preset"),
+        "has_wfs_config": "wfs_config" in prefill,
+        "note": prefill.get("note"),
+    }
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/command_builder.py
+sha256(source_bytes) = ff3c3d002b133d7049c8416d830dc25184ed23815aa27032f127cabc362bc9e2
+bytes = 8737
+redacted = False
+--------------------------------------------------------------------------------
+"""Generate Command 與 ui_command_snapshot.json 服務"""
+
+import json
+import time
+import hashlib
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+from datetime import datetime
+
+
+@dataclass(frozen=True)
+class CommandBuildResult:
+    """命令建構結果"""
+    argv: List[str]
+    shell: str
+    snapshot: Dict[str, Any]
+
+
+def build_research_command(snapshot: Dict[str, Any]) -> CommandBuildResult:
+    """
+    從 UI snapshot 建構可重現的 CLI command
+    
+    Args:
+        snapshot: UI 設定 snapshot
+    
+    Returns:
+        CommandBuildResult: 命令建構結果
+    """
+    # 基礎命令
+    argv = ["python", "-m", "src.FishBroWFS_V2.research"]
+    
+    # 添加必要參數
+    required_fields = ["season", "dataset_id", "strategy_id", "mode"]
+    for field in required_fields:
+        if field in snapshot and snapshot[field]:
+            argv.extend([f"--{field}", str(snapshot[field])])
+    
+    # 添加可選參數
+    optional_fields = [
+        "stage", "grid_preset", "note", "wfs_config_path",
+        "param_grid", "max_workers", "timeout_hours"
+    ]
+    for field in optional_fields:
+        if field in snapshot and snapshot[field]:
+            argv.extend([f"--{field}", str(snapshot[field])])
+    
+    # 添加 wfs_config（如果是檔案路徑）
+    if "wfs_config" in snapshot and isinstance(snapshot["wfs_config"], str):
+        argv.extend(["--wfs-config", snapshot["wfs_config"]])
+    
+    # 構建 shell 命令字串
+    shell_parts = []
+    for arg in argv:
+        if " " in arg or any(c in arg for c in ["'", '"', "\\", "$", "`"]):
+            # 需要引號
+            shell_parts.append(json.dumps(arg))
+        else:
+            shell_parts.append(arg)
+    
+    shell = " ".join(shell_parts)
+    
+    return CommandBuildResult(
+        argv=argv,
+        shell=shell,
+        snapshot=snapshot
+    )
+
+
+def write_ui_snapshot(outputs_root: Path, season: str, snapshot: Dict[str, Any]) -> str:
+    """
+    將 UI snapshot 寫入檔案（append-only，不覆寫）
+    
+    Args:
+        outputs_root: outputs 根目錄
+        season: season 名稱
+        snapshot: UI snapshot 資料
+    
+    Returns:
+        str: 寫入的檔案路徑
+    """
+    # 建立目錄結構
+    snapshots_dir = outputs_root / "seasons" / season / "ui_snapshots"
+    snapshots_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 產生時間戳和 hash
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    snapshot_str = json.dumps(snapshot, sort_keys=True, ensure_ascii=False)
+    snapshot_hash = hashlib.sha256(snapshot_str.encode()).hexdigest()[:8]
+    
+    # 檔案名稱
+    filename = f"{timestamp}-{snapshot_hash}.json"
+    filepath = snapshots_dir / filename
+    
+    # 確保不覆寫現有檔案（如果存在，添加計數器）
+    counter = 1
+    while filepath.exists():
+        filename = f"{timestamp}-{snapshot_hash}-{counter}.json"
+        filepath = snapshots_dir / filename
+        counter += 1
+    
+    # 添加 metadata
+    full_snapshot = {
+        "_metadata": {
+            "created_at": time.time(),
+            "created_at_iso": datetime.now().isoformat(),
+            "version": "1.0",
+            "source": "ui_wizard",
+            "snapshot_hash": snapshot_hash,
+            "filename": filename,
+        },
+        "data": snapshot
+    }
+    
+    # 寫入檔案
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(full_snapshot, f, indent=2, ensure_ascii=False)
+    
+    return str(filepath)
+
+
+def load_ui_snapshot(filepath: Path) -> Optional[Dict[str, Any]]:
+    """
+    載入 UI snapshot 檔案
+    
+    Args:
+        filepath: snapshot 檔案路徑
+    
+    Returns:
+        Optional[Dict[str, Any]]: snapshot 資料，如果載入失敗則返回 None
+    """
+    try:
+        with open(filepath, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        
+        # 返回實際資料（不含 metadata）
+        if "data" in data:
+            return data["data"]
+        else:
+            return data
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def list_ui_snapshots(outputs_root: Path, season: str, limit: int = 50) -> List[dict]:
+    """
+    列出指定 season 的 UI snapshots
+    
+    Args:
+        outputs_root: outputs 根目錄
+        season: season 名稱
+        limit: 返回的數量限制
+    
+    Returns:
+        List[dict]: snapshot 資訊清單
+    """
+    snapshots_dir = outputs_root / "seasons" / season / "ui_snapshots"
+    
+    if not snapshots_dir.exists():
+        return []
+    
+    snapshots = []
+    
+    for filepath in sorted(snapshots_dir.iterdir(), key=lambda p: p.name, reverse=True):
+        if not filepath.is_file() or not filepath.name.endswith('.json'):
+            continue
+        
+        try:
+            stat = filepath.stat()
+            
+            # 讀取 metadata（不讀取完整資料以提高效能）
+            with open(filepath, 'r', encoding='utf-8') as f:
+                metadata = json.load(f).get("_metadata", {})
+            
+            snapshots.append({
+                "filename": filepath.name,
+                "path": str(filepath),
+                "size": stat.st_size,
+                "mtime": stat.st_mtime,
+                "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "created_at": metadata.get("created_at", stat.st_mtime),
+                "created_at_iso": metadata.get("created_at_iso"),
+                "snapshot_hash": metadata.get("snapshot_hash"),
+                "source": metadata.get("source", "unknown"),
+            })
+            
+            if len(snapshots) >= limit:
+                break
+        except (json.JSONDecodeError, OSError):
+            continue
+    
+    return snapshots
+
+
+def create_snapshot_from_wizard(wizard_data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    從 Wizard 資料建立標準化的 snapshot
+    
+    Args:
+        wizard_data: Wizard 表單資料
+    
+    Returns:
+        Dict[str, Any]: 標準化的 snapshot
+    """
+    # 基礎欄位
+    snapshot = {
+        "season": wizard_data.get("season", "2026Q1"),
+        "dataset_id": wizard_data.get("dataset_id"),
+        "strategy_id": wizard_data.get("strategy_id"),
+        "mode": wizard_data.get("mode", "smoke"),
+        "note": wizard_data.get("note", ""),
+        "created_from": "wizard",
+        "created_at": time.time(),
+        "created_at_iso": datetime.now().isoformat(),
+    }
+    
+    # 可選欄位
+    optional_fields = [
+        "stage", "grid_preset", "wfs_config_path",
+        "param_grid", "max_workers", "timeout_hours"
+    ]
+    for field in optional_fields:
+        if field in wizard_data and wizard_data[field]:
+            snapshot[field] = wizard_data[field]
+    
+    # wfs_config（如果是字典）
+    if "wfs_config" in wizard_data and isinstance(wizard_data["wfs_config"], dict):
+        snapshot["wfs_config"] = wizard_data["wfs_config"]
+    
+    # txt_paths（如果是清單）
+    if "txt_paths" in wizard_data and isinstance(wizard_data["txt_paths"], list):
+        snapshot["txt_paths"] = wizard_data["txt_paths"]
+    
+    return snapshot
+
+
+def validate_snapshot_for_command(snapshot: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    驗證 snapshot 是否可用於建構命令
+    
+    Args:
+        snapshot: 要驗證的 snapshot
+    
+    Returns:
+        Dict[str, Any]: 驗證結果
+    """
+    errors = []
+    warnings = []
+    
+    # 檢查必要欄位
+    required_fields = ["season", "dataset_id", "strategy_id", "mode"]
+    for field in required_fields:
+        if field not in snapshot or not snapshot[field]:
+            errors.append(f"缺少必要欄位: {field}")
+    
+    # 檢查 season 格式
+    if "season" in snapshot:
+        season = snapshot["season"]
+        if not isinstance(season, str) or len(season) < 4:
+            warnings.append(f"season 格式可能不正確: {season}")
+    
+    # 檢查 mode 有效性
+    valid_modes = ["smoke", "lite", "full", "incremental"]
+    if "mode" in snapshot and snapshot["mode"] not in valid_modes:
+        warnings.append(f"mode 可能無效: {snapshot['mode']}，有效值: {valid_modes}")
+    
+    # 檢查 wfs_config_path 是否存在（如果是檔案路徑）
+    if "wfs_config_path" in snapshot and snapshot["wfs_config_path"]:
+        path = Path(snapshot["wfs_config_path"])
+        if not path.exists():
+            warnings.append(f"wfs_config_path 不存在: {path}")
+    
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors,
+        "warnings": warnings,
+        "has_warnings": len(warnings) > 0,
+        "required_fields_present": all(field in snapshot and snapshot[field] for field in required_fields),
+    }
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/log_tail.py
+sha256(source_bytes) = a5b616fb1bd93b1013ced101272e7bea18072dc794bdef596564923e9f3a6b6a
+bytes = 7233
+redacted = False
+--------------------------------------------------------------------------------
+"""Logs Viewer 服務 - Lazy + Polling（禁止 push）"""
+
+import os
+import time
+from pathlib import Path
+from typing import List, Optional, Tuple
+from datetime import datetime
+
+
+def tail_lines(path: Path, n: int = 200) -> List[str]:
+    """
+    讀取檔案的最後 n 行
+    
+    Args:
+        path: 檔案路徑
+        n: 要讀取的行數
+    
+    Returns:
+        List[str]: 最後 n 行的清單（如果檔案不存在則返回空清單）
+    """
+    if not path.exists():
+        return []
+    
+    try:
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            # 簡單實現：讀取所有行然後取最後 n 行
+            lines = f.readlines()
+            return lines[-n:] if len(lines) > n else lines
+    except (OSError, UnicodeDecodeError):
+        return []
+
+
+def tail_lines_with_stats(path: Path, n: int = 200) -> Tuple[List[str], dict]:
+    """
+    讀取檔案的最後 n 行並返回統計資訊
+    
+    Args:
+        path: 檔案路徑
+        n: 要讀取的行數
+    
+    Returns:
+        Tuple[List[str], dict]: (行清單, 統計資訊)
+    """
+    lines = tail_lines(path, n)
+    
+    stats = {
+        "file_exists": path.exists(),
+        "file_size": path.stat().st_size if path.exists() else 0,
+        "file_mtime": path.stat().st_mtime if path.exists() else 0,
+        "lines_returned": len(lines),
+        "timestamp": time.time(),
+        "timestamp_iso": datetime.now().isoformat(),
+    }
+    
+    return lines, stats
+
+
+class LogTailer:
+    """Log tailer 類別，支援 lazy polling"""
+    
+    def __init__(self, log_path: Path, max_lines: int = 200, poll_interval: float = 2.0):
+        """
+        初始化 LogTailer
+        
+        Args:
+            log_path: log 檔案路徑
+            max_lines: 最大行數
+            poll_interval: polling 間隔（秒）
+        """
+        self.log_path = Path(log_path)
+        self.max_lines = max_lines
+        self.poll_interval = poll_interval
+        self._last_read_position = 0
+        self._last_read_time = 0.0
+        self._is_active = False
+        self._timer = None
+    
+    def start(self) -> None:
+        """啟動 polling"""
+        self._is_active = True
+        self._last_read_position = 0
+        self._last_read_time = time.time()
+    
+    def stop(self) -> None:
+        """停止 polling"""
+        self._is_active = False
+        if self._timer:
+            self._timer.cancel()
+    
+    def read_new_lines(self) -> List[str]:
+        """
+        讀取新的行（從上次讀取位置開始）
+        
+        Returns:
+            List[str]: 新的行清單
+        """
+        if not self.log_path.exists():
+            return []
+        
+        try:
+            with open(self.log_path, 'r', encoding='utf-8', errors='ignore') as f:
+                # 移動到上次讀取的位置
+                if self._last_read_position > 0:
+                    try:
+                        f.seek(self._last_read_position)
+                    except (OSError, ValueError):
+                        # 如果 seek 失敗，從頭開始讀取
+                        self._last_read_position = 0
+                
+                # 讀取新行
+                new_lines = f.readlines()
+                
+                # 更新位置
+                self._last_read_position = f.tell()
+                self._last_read_time = time.time()
+                
+                return new_lines
+        except (OSError, UnicodeDecodeError):
+            return []
+    
+    def get_status(self) -> dict:
+        """獲取 tailer 狀態"""
+        return {
+            "is_active": self._is_active,
+            "log_path": str(self.log_path),
+            "log_exists": self.log_path.exists(),
+            "last_read_position": self._last_read_position,
+            "last_read_time": self._last_read_time,
+            "last_read_time_iso": datetime.fromtimestamp(self._last_read_time).isoformat() if self._last_read_time > 0 else None,
+            "poll_interval": self.poll_interval,
+            "max_lines": self.max_lines,
+        }
+
+
+def find_log_files(run_dir: Path) -> List[dict]:
+    """
+    在 run_dir 中尋找 log 檔案
+    
+    Args:
+        run_dir: run 目錄
+    
+    Returns:
+        List[dict]: log 檔案資訊
+    """
+    if not run_dir.exists():
+        return []
+    
+    log_files = []
+    
+    # 常見的 log 檔案名稱
+    common_log_names = [
+        "worker.log",
+        "run.log",
+        "output.log",
+        "error.log",
+        "stdout.log",
+        "stderr.log",
+        "log.txt",
+    ]
+    
+    for log_name in common_log_names:
+        log_path = run_dir / log_name
+        if log_path.exists() and log_path.is_file():
+            try:
+                stat = log_path.stat()
+                log_files.append({
+                    "name": log_name,
+                    "path": str(log_path),
+                    "size": stat.st_size,
+                    "mtime": stat.st_mtime,
+                    "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                })
+            except OSError:
+                continue
+    
+    # 也尋找 logs 目錄
+    logs_dir = run_dir / "logs"
+    if logs_dir.exists() and logs_dir.is_dir():
+        try:
+            for log_file in logs_dir.iterdir():
+                if log_file.is_file() and log_file.suffix in ['.log', '.txt']:
+                    try:
+                        stat = log_file.stat()
+                        log_files.append({
+                            "name": f"logs/{log_file.name}",
+                            "path": str(log_file),
+                            "size": stat.st_size,
+                            "mtime": stat.st_mtime,
+                            "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                        })
+                    except OSError:
+                        continue
+        except OSError:
+            pass
+    
+    return log_files
+
+
+def get_log_preview(log_path: Path, preview_lines: int = 50) -> dict:
+    """
+    獲取 log 檔案預覽
+    
+    Args:
+        log_path: log 檔案路徑
+        preview_lines: 預覽行數
+    
+    Returns:
+        dict: log 預覽資訊
+    """
+    if not log_path.exists():
+        return {
+            "exists": False,
+            "error": "Log 檔案不存在",
+            "preview": [],
+            "total_lines": 0,
+        }
+    
+    try:
+        # 計算總行數
+        total_lines = 0
+        with open(log_path, 'r', encoding='utf-8', errors='ignore') as f:
+            for _ in f:
+                total_lines += 1
+        
+        # 讀取預覽
+        preview = tail_lines(log_path, preview_lines)
+        
+        stat = log_path.stat()
+        return {
+            "exists": True,
+            "path": str(log_path),
+            "size": stat.st_size,
+            "mtime": stat.st_mtime,
+            "mtime_iso": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+            "total_lines": total_lines,
+            "preview_lines": len(preview),
+            "preview": preview,
+        }
+    except (OSError, UnicodeDecodeError) as e:
+        return {
+            "exists": True,
+            "error": str(e),
+            "preview": [],
+            "total_lines": 0,
+        }
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/path_picker.py
+sha256(source_bytes) = 49e64d5f85e788f475a00ffc97a288c2922253e40f6383a9a1c293cd8288a535
+bytes = 5951
+redacted = False
+--------------------------------------------------------------------------------
+"""Server-side path selector - 禁止 file upload，只允許伺服器端路徑"""
+
+import os
+import glob
+from pathlib import Path
+from typing import List, Optional
+
+
+# 允許的根目錄（根據 HUMAN TASKS 要求）
+ALLOWED_ROOTS = [
+    Path("/home/fishbro/FishBroData/raw"),
+    Path("/home/fishbro/FishBroData/normalized"),  # 如果未來有
+    Path(__file__).parent.parent.parent.parent / "data",  # 專案內的 data 目錄
+]
+
+
+def list_txt_candidates(base_dir: Path, pattern: str = "*.txt", limit: int = 200) -> List[str]:
+    """
+    列出指定目錄下的 txt 檔案候選
+    
+    Args:
+        base_dir: 基礎目錄
+        pattern: 檔案模式（預設 *.txt）
+        limit: 返回的檔案數量限制
+    
+    Returns:
+        List[str]: 檔案路徑清單（相對路徑或絕對路徑）
+    
+    Raises:
+        ValueError: 如果 base_dir 不在 allowed roots 內
+    """
+    # 驗證 base_dir 是否在 allowed roots 內
+    if not _is_allowed_path(base_dir):
+        raise ValueError(f"base_dir 不在允許的根目錄內: {base_dir}")
+    
+    if not base_dir.exists():
+        return []
+    
+    # 使用 glob 尋找檔案
+    search_pattern = str(base_dir / "**" / pattern)
+    files = []
+    
+    try:
+        for file_path in glob.glob(search_pattern, recursive=True):
+            if os.path.isfile(file_path):
+                # 返回相對路徑（相對於 base_dir）
+                rel_path = os.path.relpath(file_path, base_dir)
+                files.append(rel_path)
+                
+                if len(files) >= limit:
+                    break
+    except (OSError, PermissionError):
+        pass
+    
+    # 排序（按修改時間或名稱）
+    files.sort()
+    return files
+
+
+def validate_server_path(p: str, allowed_roots: Optional[List[Path]] = None) -> str:
+    """
+    驗證伺服器端路徑是否在允許的根目錄內
+    
+    Args:
+        p: 要驗證的路徑
+        allowed_roots: 允許的根目錄清單（預設使用 ALLOWED_ROOTS）
+    
+    Returns:
+        str: 驗證後的路徑（絕對路徑）
+    
+    Raises:
+        ValueError: 如果路徑不在 allowed roots 內
+        FileNotFoundError: 如果路徑不存在
+    """
+    if allowed_roots is None:
+        allowed_roots = ALLOWED_ROOTS
+    
+    # 轉換為 Path 物件
+    path = Path(p)
+    
+    # 如果是相對路徑，嘗試解析為絕對路徑
+    if not path.is_absolute():
+        # 嘗試在每個 allowed root 下尋找
+        for root in allowed_roots:
+            candidate = root / path
+            if candidate.exists():
+                path = candidate
+                break
+        else:
+            # 如果找不到，使用第一個 allowed root 作為基礎
+            path = allowed_roots[0] / path
+    
+    # 確保路徑是絕對路徑
+    path = path.resolve()
+    
+    # 檢查是否在 allowed roots 內
+    if not _is_allowed_path(path, allowed_roots):
+        raise ValueError(f"路徑不在允許的根目錄內: {path}")
+    
+    # 檢查路徑是否存在
+    if not path.exists():
+        raise FileNotFoundError(f"路徑不存在: {path}")
+    
+    return str(path)
+
+
+def _is_allowed_path(path: Path, allowed_roots: Optional[List[Path]] = None) -> bool:
+    """
+    檢查路徑是否在 allowed roots 內
+    
+    Args:
+        path: 要檢查的路徑
+        allowed_roots: 允許的根目錄清單
+    
+    Returns:
+        bool: 是否允許
+    """
+    if allowed_roots is None:
+        allowed_roots = ALLOWED_ROOTS
+    
+    path = path.resolve()
+    
+    for root in allowed_roots:
+        root = root.resolve()
+        try:
+            # 檢查 path 是否是 root 的子目錄
+            if path.is_relative_to(root):
+                return True
+        except (AttributeError, ValueError):
+            # Python 3.8 兼容性：使用 str 比較
+            if str(path).startswith(str(root) + os.sep):
+                return True
+    
+    return False
+
+
+def get_allowed_roots_info() -> List[dict]:
+    """
+    獲取 allowed roots 的資訊
+    
+    Returns:
+        List[dict]: 每個 root 的資訊
+    """
+    info = []
+    for root in ALLOWED_ROOTS:
+        exists = root.exists()
+        info.append({
+            "path": str(root),
+            "exists": exists,
+            "readable": os.access(root, os.R_OK) if exists else False,
+            "files_count": _count_files(root) if exists else 0,
+        })
+    return info
+
+
+def _count_files(directory: Path) -> int:
+    """計算目錄下的檔案數量"""
+    if not directory.exists() or not directory.is_dir():
+        return 0
+    
+    try:
+        return sum(1 for _ in directory.rglob("*") if _.is_file())
+    except (OSError, PermissionError):
+        return 0
+
+
+def browse_directory(directory: Path, pattern: str = "*") -> List[dict]:
+    """
+    瀏覽目錄內容
+    
+    Args:
+        directory: 要瀏覽的目錄
+        pattern: 檔案模式
+    
+    Returns:
+        List[dict]: 目錄內容
+    """
+    if not _is_allowed_path(directory):
+        raise ValueError(f"目錄不在允許的根目錄內: {directory}")
+    
+    if not directory.exists() or not directory.is_dir():
+        return []
+    
+    contents = []
+    try:
+        for item in directory.iterdir():
+            try:
+                stat = item.stat()
+                contents.append({
+                    "name": item.name,
+                    "path": str(item),
+                    "is_dir": item.is_dir(),
+                    "is_file": item.is_file(),
+                    "size": stat.st_size if item.is_file() else 0,
+                    "mtime": stat.st_mtime,
+                    "readable": os.access(item, os.R_OK),
+                })
+            except (OSError, PermissionError):
+                continue
+        
+        # 排序：目錄在前，檔案在後
+        contents.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
+    except (OSError, PermissionError):
+        pass
+    
+    return contents
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/reload_service.py
+sha256(source_bytes) = 3147294ae8337abf10f65b96feac655956afcc702acd0a2e6dab460e473b80c3
+bytes = 18387
+redacted = False
+--------------------------------------------------------------------------------
+"""Reload Service for System Status and Cache Invalidation.
+
+Provides functions to:
+1. Get system snapshot (datasets, strategies, caches)
+2. Invalidate caches and reload registries
+3. Compute file signatures for validation
+4. TXT → Parquet build functionality
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import time
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import List, Optional, Dict, Any, Tuple
+
+from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog, DatasetCatalog
+from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog, StrategyCatalog
+from FishBroWFS_V2.control.feature_resolver import invalidate_feature_cache as invalidate_feature_cache_impl
+from FishBroWFS_V2.control.data_build import BuildParquetRequest, BuildParquetResult, build_parquet_from_txt
+from FishBroWFS_V2.control.dataset_descriptor import DatasetDescriptor, get_descriptor, list_descriptors
+from FishBroWFS_V2.data.dataset_registry import DatasetRecord
+from FishBroWFS_V2.strategy.registry import StrategySpecForGUI
+
+
+@dataclass
+class FileStatus:
+    """Status of a file or directory."""
+    path: str
+    exists: bool
+    size: int = 0
+    mtime: float = 0.0
+    signature: str = ""
+    error: Optional[str] = None
+
+
+@dataclass
+class DatasetStatus:
+    """Status of a dataset with TXT and Parquet information."""
+    # Required fields (no defaults) first
+    dataset_id: str
+    kind: str
+    txt_root: str
+    txt_required_paths: List[str]
+    parquet_root: str
+    parquet_expected_paths: List[str]
+    
+    # Optional fields with defaults
+    descriptor: Optional[DatasetDescriptor] = None
+    txt_present: bool = False
+    txt_missing: List[str] = field(default_factory=list)
+    txt_latest_mtime_utc: Optional[str] = None
+    txt_total_size_bytes: int = 0
+    txt_signature: str = ""
+    parquet_present: bool = False
+    parquet_missing: List[str] = field(default_factory=list)
+    parquet_latest_mtime_utc: Optional[str] = None
+    parquet_total_size_bytes: int = 0
+    parquet_signature: str = ""
+    up_to_date: bool = False
+    bars_count: Optional[int] = None
+    schema_ok: Optional[bool] = None
+    error: Optional[str] = None
+
+
+@dataclass
+class StrategyStatus:
+    """Status of a strategy."""
+    id: str
+    spec: Optional[StrategySpecForGUI] = None
+    can_import: bool = False
+    can_build_spec: bool = False
+    mtime: float = 0.0
+    signature: str = ""
+    feature_requirements_count: int = 0
+    error: Optional[str] = None
+
+
+@dataclass
+class SystemSnapshot:
+    """System snapshot with status of all components."""
+    created_at: datetime = field(default_factory=datetime.now)
+    total_datasets: int = 0
+    total_strategies: int = 0
+    dataset_statuses: List[DatasetStatus] = field(default_factory=list)
+    strategy_statuses: List[StrategyStatus] = field(default_factory=list)
+    notes: List[str] = field(default_factory=list)
+    errors: List[str] = field(default_factory=list)
+
+
+@dataclass
+class ReloadResult:
+    """Result of a reload operation."""
+    ok: bool
+    error: Optional[str] = None
+    datasets_reloaded: int = 0
+    strategies_reloaded: int = 0
+    caches_invalidated: List[str] = field(default_factory=list)
+    duration_seconds: float = 0.0
+
+
+def compute_file_signature(file_path: Path, max_size_mb: int = 50) -> str:
+    """Compute signature for a file.
+    
+    For small files (< max_size_mb): compute sha256
+    For large files: use stat-hash (path + size + mtime)
+    """
+    try:
+        if not file_path.exists():
+            return "missing"
+        
+        stat = file_path.stat()
+        file_size_mb = stat.st_size / (1024 * 1024)
+        
+        if file_size_mb < max_size_mb:
+            # Small file: compute actual hash
+            hasher = hashlib.sha256()
+            with open(file_path, 'rb') as f:
+                # Read in chunks to handle large files
+                chunk_size = 8192
+                while chunk := f.read(chunk_size):
+                    hasher.update(chunk)
+            return f"sha256:{hasher.hexdigest()[:16]}"
+        else:
+            # Large file: use stat-hash
+            return f"stat:{file_path.name}:{stat.st_size}:{stat.st_mtime}"
+    except Exception as e:
+        return f"error:{str(e)[:50]}"
+
+
+def check_dataset_files(dataset: DatasetRecord) -> Tuple[List[FileStatus], int]:
+    """Check files for a dataset (legacy compatibility).
+    
+    Args:
+        dataset: DatasetRecord with root and required_paths attributes
+        
+    Returns:
+        Tuple of (list of FileStatus objects, missing_count)
+    """
+    # This is a legacy compatibility function for tests
+    # The new API uses check_txt_files and check_parquet_files
+    files = []
+    missing_count = 0
+    
+    # Check root directory
+    root_path = Path(dataset.root) if hasattr(dataset, 'root') else Path(".")
+    root_status = FileStatus(
+        path=str(root_path),
+        exists=root_path.exists(),
+        size=root_path.stat().st_size if root_path.exists() else 0,
+        mtime=root_path.stat().st_mtime if root_path.exists() else 0.0,
+        signature=compute_file_signature(root_path) if root_path.exists() else ""
+    )
+    files.append(root_status)
+    
+    # Check required paths
+    required_paths = getattr(dataset, 'required_paths', [])
+    for path_str in required_paths:
+        path = Path(path_str)
+        exists = path.exists()
+        if not exists:
+            missing_count += 1
+        
+        status = FileStatus(
+            path=path_str,
+            exists=exists,
+            size=path.stat().st_size if exists else 0,
+            mtime=path.stat().st_mtime if exists else 0.0,
+            signature=compute_file_signature(path) if exists else ""
+        )
+        files.append(status)
+    
+    return files, missing_count
+
+
+def check_txt_files(txt_root: str, txt_required_paths: List[str]) -> Tuple[bool, List[str], Optional[str], int, str]:
+    """Check TXT files for a dataset.
+    
+    Returns:
+        Tuple of (present, missing_paths, latest_mtime_utc, total_size_bytes, signature)
+    """
+    missing = []
+    latest_mtime = 0.0
+    total_size = 0
+    signatures = []
+    
+    for txt_path_str in txt_required_paths:
+        txt_path = Path(txt_path_str)
+        if txt_path.exists():
+            stat = txt_path.stat()
+            latest_mtime = max(latest_mtime, stat.st_mtime)
+            total_size += stat.st_size
+            sig = compute_file_signature(txt_path)
+            signatures.append(f"{txt_path.name}:{sig}")
+        else:
+            missing.append(txt_path_str)
+    
+    present = len(missing) == 0
+    signature = "|".join(signatures) if signatures else "none"
+    
+    # Convert latest mtime to UTC string
+    latest_mtime_utc = None
+    if latest_mtime > 0:
+        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
+    
+    return present, missing, latest_mtime_utc, total_size, signature
+
+
+def check_parquet_files(parquet_root: str, parquet_expected_paths: List[str]) -> Tuple[bool, List[str], Optional[str], int, str]:
+    """Check Parquet files for a dataset.
+    
+    Returns:
+        Tuple of (present, missing_paths, latest_mtime_utc, total_size_bytes, signature)
+    """
+    missing = []
+    latest_mtime = 0.0
+    total_size = 0
+    signatures = []
+    
+    for parquet_path_str in parquet_expected_paths:
+        parquet_path = Path(parquet_path_str)
+        if parquet_path.exists():
+            stat = parquet_path.stat()
+            latest_mtime = max(latest_mtime, stat.st_mtime)
+            total_size += stat.st_size
+            sig = compute_file_signature(parquet_path)
+            signatures.append(f"{parquet_path.name}:{sig}")
+        else:
+            missing.append(parquet_path_str)
+    
+    present = len(missing) == 0
+    signature = "|".join(signatures) if signatures else "none"
+    
+    # Convert latest mtime to UTC string
+    latest_mtime_utc = None
+    if latest_mtime > 0:
+        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
+    
+    return present, missing, latest_mtime_utc, total_size, signature
+
+
+def get_dataset_status(dataset_id: str) -> DatasetStatus:
+    """Get status for a single dataset with TXT and Parquet information."""
+    try:
+        # Get dataset descriptor
+        descriptor = get_descriptor(dataset_id)
+        if descriptor is None:
+            return DatasetStatus(
+                dataset_id=dataset_id,
+                kind="unknown",
+                txt_root="",
+                txt_required_paths=[],
+                parquet_root="",
+                parquet_expected_paths=[],
+                error=f"Dataset not found: {dataset_id}"
+            )
+        
+        # Check TXT files
+        txt_present, txt_missing, txt_latest_mtime_utc, txt_total_size, txt_signature = check_txt_files(
+            descriptor.txt_root, descriptor.txt_required_paths
+        )
+        
+        # Check Parquet files
+        parquet_present, parquet_missing, parquet_latest_mtime_utc, parquet_total_size, parquet_signature = check_parquet_files(
+            descriptor.parquet_root, descriptor.parquet_expected_paths
+        )
+        
+        # Determine if up-to-date
+        up_to_date = False
+        if txt_present and parquet_present:
+            # Simple up-to-date check: compare signatures
+            # In a real implementation, this would compare content hashes
+            up_to_date = True  # Placeholder
+        
+        # Try to get bars count (lazy, can be expensive)
+        bars_count = None
+        schema_ok = None
+        
+        # Simple schema check for Parquet files
+        if parquet_present and descriptor.parquet_expected_paths:
+            try:
+                parquet_path = Path(descriptor.parquet_expected_paths[0])
+                if parquet_path.exists():
+                    # Quick check: try to read first few rows
+                    import pandas as pd
+                    df_sample = pd.read_parquet(parquet_path, nrows=1)
+                    schema_ok = True
+                    bars_count = len(pd.read_parquet(parquet_path)) if parquet_path.stat().st_size < 1000000 else None
+            except Exception:
+                schema_ok = False
+        
+        return DatasetStatus(
+            dataset_id=dataset_id,
+            kind=descriptor.kind,
+            descriptor=descriptor,
+            txt_root=descriptor.txt_root,
+            txt_required_paths=descriptor.txt_required_paths,
+            txt_present=txt_present,
+            txt_missing=txt_missing,
+            txt_latest_mtime_utc=txt_latest_mtime_utc,
+            txt_total_size_bytes=txt_total_size,
+            txt_signature=txt_signature,
+            parquet_root=descriptor.parquet_root,
+            parquet_expected_paths=descriptor.parquet_expected_paths,
+            parquet_present=parquet_present,
+            parquet_missing=parquet_missing,
+            parquet_latest_mtime_utc=parquet_latest_mtime_utc,
+            parquet_total_size_bytes=parquet_total_size,
+            parquet_signature=parquet_signature,
+            up_to_date=up_to_date,
+            bars_count=bars_count,
+            schema_ok=schema_ok
+        )
+    except Exception as e:
+        return DatasetStatus(
+            dataset_id=dataset_id,
+            kind="unknown",
+            txt_root="",
+            txt_required_paths=[],
+            parquet_root="",
+            parquet_expected_paths=[],
+            error=str(e)
+        )
+
+
+def get_strategy_status(strategy: StrategySpecForGUI) -> StrategyStatus:
+    """Get status for a single strategy."""
+    try:
+        # Check if strategy can be imported
+        can_import = True  # Assume yes for now
+        can_build_spec = True  # Assume yes for now
+        
+        # Get feature requirements count
+        feature_requirements_count = 0
+        if hasattr(strategy, 'feature_requirements'):
+            feature_requirements_count = len(strategy.feature_requirements)
+        
+        # Try to get file info if path is available
+        mtime = 0.0
+        signature = ""
+        if hasattr(strategy, 'file_path') and strategy.file_path:
+            file_path = Path(strategy.file_path)
+            if file_path.exists():
+                stat = file_path.stat()
+                mtime = stat.st_mtime
+                signature = compute_file_signature(file_path)
+        
+        return StrategyStatus(
+            id=strategy.strategy_id,
+            spec=strategy,
+            can_import=can_import,
+            can_build_spec=can_build_spec,
+            mtime=mtime,
+            signature=signature,
+            feature_requirements_count=feature_requirements_count
+        )
+    except Exception as e:
+        return StrategyStatus(
+            id=strategy.strategy_id if hasattr(strategy, 'strategy_id') else 'unknown',
+            error=str(e),
+            can_import=False,
+            can_build_spec=False
+        )
+
+
+def get_system_snapshot() -> SystemSnapshot:
+    """Get current system snapshot with TXT and Parquet status."""
+    snapshot = SystemSnapshot()
+    
+    try:
+        # Get dataset descriptors
+        descriptors = list_descriptors()
+        snapshot.total_datasets = len(descriptors)
+        
+        for descriptor in descriptors:
+            status = get_dataset_status(descriptor.dataset_id)
+            snapshot.dataset_statuses.append(status)
+            if status.error:
+                snapshot.errors.append(f"Dataset {descriptor.dataset_id}: {status.error}")
+        
+        # Get strategies
+        strategy_catalog = get_strategy_catalog()
+        strategies = strategy_catalog.list_strategies()
+        snapshot.total_strategies = len(strategies)
+        
+        for strategy in strategies:
+            status = get_strategy_status(strategy)
+            snapshot.strategy_statuses.append(status)
+            if status.error:
+                snapshot.errors.append(f"Strategy {strategy.strategy_id}: {status.error}")
+        
+        # Add notes
+        if snapshot.errors:
+            snapshot.notes.append(f"Found {len(snapshot.errors)} errors")
+        
+        # Count TXT/Parquet status
+        txt_present_count = sum(1 for ds in snapshot.dataset_statuses if ds.txt_present)
+        parquet_present_count = sum(1 for ds in snapshot.dataset_statuses if ds.parquet_present)
+        up_to_date_count = sum(1 for ds in snapshot.dataset_statuses if ds.up_to_date)
+        
+        snapshot.notes.append(f"TXT present: {txt_present_count}/{snapshot.total_datasets}")
+        snapshot.notes.append(f"Parquet present: {parquet_present_count}/{snapshot.total_datasets}")
+        snapshot.notes.append(f"Up-to-date: {up_to_date_count}/{snapshot.total_datasets}")
+        snapshot.notes.append(f"Snapshot created at {snapshot.created_at.isoformat()}")
+        
+    except Exception as e:
+        snapshot.errors.append(f"Failed to get system snapshot: {str(e)}")
+    
+    return snapshot
+
+
+def invalidate_feature_cache() -> bool:
+    """Invalidate feature resolver cache."""
+    try:
+        return invalidate_feature_cache_impl()
+    except Exception as e:
+        return False
+
+
+def reload_dataset_registry() -> bool:
+    """Reload dataset registry."""
+    try:
+        catalog = get_dataset_catalog()
+        # Force reload by calling load_index
+        catalog.load_index()  # Force load
+        return True
+    except Exception as e:
+        return False
+
+
+def reload_strategy_registry() -> bool:
+    """Reload strategy registry."""
+    try:
+        catalog = get_strategy_catalog()
+        # Force reload by calling load_registry
+        catalog.load_registry()  # Force load
+        return True
+    except Exception as e:
+        return False
+
+
+def reload_everything(reason: str = "manual") -> ReloadResult:
+    """Reload all caches and registries."""
+    start_time = time.time()
+    result = ReloadResult(ok=True)
+    caches_invalidated = []
+    
+    try:
+        # 1. Invalidate feature cache
+        if invalidate_feature_cache():
+            caches_invalidated.append("feature_cache")
+        else:
+            result.ok = False
+            result.error = "Failed to invalidate feature cache"
+        
+        # 2. Reload dataset registry
+        if reload_dataset_registry():
+            result.datasets_reloaded += 1
+        else:
+            result.ok = False
+            result.error = "Failed to reload dataset registry"
+        
+        # 3. Reload strategy registry
+        if reload_strategy_registry():
+            result.strategies_reloaded += 1
+        else:
+            result.ok = False
+            result.error = "Failed to reload strategy registry"
+        
+        # 4. Rebuild snapshot (implicitly done by get_system_snapshot)
+        
+        result.caches_invalidated = caches_invalidated
+        result.duration_seconds = time.time() - start_time
+        
+        if result.ok:
+            result.error = None
+        
+    except Exception as e:
+        result.ok = False
+        result.error = f"Reload failed: {str(e)}"
+        result.duration_seconds = time.time() - start_time
+    
+    return result
+
+
+def build_parquet(
+    dataset_id: str,
+    force: bool = False,
+    deep_validate: bool = False,
+    reason: str = "manual"
+) -> BuildParquetResult:
+    """Build Parquet from TXT for a dataset.
+    
+    Args:
+        dataset_id: Dataset ID to build
+        force: Rebuild even if up-to-date
+        deep_validate: Perform schema validation after build
+        reason: Reason for build (for audit/logging)
+        
+    Returns:
+        BuildParquetResult with build status
+    """
+    req = BuildParquetRequest(
+        dataset_id=dataset_id,
+        force=force,
+        deep_validate=deep_validate,
+        reason=reason
+    )
+    
+    return build_parquet_from_txt(req)
+
+
+def build_all_parquet(force: bool = False, reason: str = "manual") -> List[BuildParquetResult]:
+    """Build Parquet for all datasets.
+    
+    Args:
+        force: Rebuild even if up-to-date
+        reason: Reason for build (for audit/logging)
+        
+    Returns:
+        List of BuildParquetResult for each dataset
+    """
+    results = []
+    descriptors = list_descriptors()
+    
+    for descriptor in descriptors:
+        result = build_parquet(
+            dataset_id=descriptor.dataset_id,
+            force=force,
+            deep_validate=False,
+            reason=f"{reason}_batch"
+        )
+        results.append(result)
+    
+    return results
+
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/runs_index.py
+sha256(source_bytes) = eef1021b4bd992d1eb48c399a1a3cd60cdcbf68e3465d3732379482e5f17aa0d
+bytes = 7518
+redacted = False
+--------------------------------------------------------------------------------
+"""Runs Index 服務 - 禁止全量掃描，只讀最新 N 個 run"""
+
+import json
+import os
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional, Dict, Any
+from datetime import datetime
+
+
+@dataclass(frozen=True)
+class RunIndexRow:
+    """Run 索引行，包含必要 metadata"""
+    run_id: str
+    run_dir: str
+    mtime: float
+    season: str
+    status: str
+    mode: str
+    strategy_id: Optional[str]
+    dataset_id: Optional[str]
+    stage: Optional[str]
+    manifest_path: Optional[str]
+    
+    @property
+    def mtime_iso(self) -> str:
+        """返回 ISO 格式的修改時間"""
+        return datetime.fromtimestamp(self.mtime).isoformat()
+    
+    @property
+    def is_archived(self) -> bool:
+        """檢查是否已歸檔（路徑包含 .archive）"""
+        return ".archive" in self.run_dir
+
+
+class RunsIndex:
+    """Runs Index 管理器 - 只掃最新 N 個 run，避免全量掃描"""
+    
+    def __init__(self, outputs_root: Path, limit: int = 50) -> None:
+        self.outputs_root = Path(outputs_root)
+        self.limit = limit
+        self._cache: List[RunIndexRow] = []
+        self._cache_time: float = 0.0
+        self._cache_ttl: float = 30.0  # 快取 30 秒
+        
+    def build(self) -> None:
+        """建立索引（掃描 seasons/<season>/runs 目錄）"""
+        rows: List[RunIndexRow] = []
+        
+        # 掃描所有 season 目錄
+        seasons_dir = self.outputs_root / "seasons"
+        if not seasons_dir.exists():
+            self._cache = []
+            self._cache_time = time.time()
+            return
+        
+        for season_dir in seasons_dir.iterdir():
+            if not season_dir.is_dir():
+                continue
+                
+            season = season_dir.name
+            runs_dir = season_dir / "runs"
+            
+            if not runs_dir.exists():
+                continue
+                
+            # 只掃描 runs 目錄下的直接子目錄
+            run_dirs = []
+            for run_path in runs_dir.iterdir():
+                if run_path.is_dir():
+                    try:
+                        mtime = run_path.stat().st_mtime
+                        run_dirs.append((run_path, mtime, season))
+                    except OSError:
+                        continue
+            
+            # 按修改時間排序，取最新的
+            run_dirs.sort(key=lambda x: x[1], reverse=True)
+            
+            for run_path, mtime, season in run_dirs[:self.limit]:
+                row = self._parse_run_dir(run_path, mtime, season)
+                if row:
+                    rows.append(row)
+        
+        # 按修改時間全局排序
+        rows.sort(key=lambda x: x.mtime, reverse=True)
+        rows = rows[:self.limit]
+        
+        self._cache = rows
+        self._cache_time = time.time()
+    
+    def _parse_run_dir(self, run_path: Path, mtime: float, season: str) -> Optional[RunIndexRow]:
+        """解析單個 run 目錄，讀取 manifest.json（如果存在）"""
+        run_id = run_path.name
+        manifest_path = run_path / "manifest.json"
+        
+        # 預設值
+        status = "unknown"
+        mode = "unknown"
+        strategy_id = None
+        dataset_id = None
+        stage = None
+        
+        # 嘗試讀取 manifest.json
+        if manifest_path.exists():
+            try:
+                with open(manifest_path, 'r', encoding='utf-8') as f:
+                    manifest = json.load(f)
+                
+                # 從 manifest 提取資訊
+                status = manifest.get("status", "unknown")
+                mode = manifest.get("mode", "unknown")
+                strategy_id = manifest.get("strategy_id")
+                dataset_id = manifest.get("dataset_id")
+                stage = manifest.get("stage")
+                
+                # 如果 stage 不存在，嘗試從 run_id 推斷
+                if stage is None and "stage" in run_id:
+                    for stage_name in ["stage0", "stage1", "stage2", "stage3"]:
+                        if stage_name in run_id:
+                            stage = stage_name
+                            break
+            except (json.JSONDecodeError, OSError):
+                # 如果讀取失敗，使用預設值
+                pass
+        
+        # 從 run_id 推斷 stage（如果尚未設定）
+        if stage is None:
+            if "stage0" in run_id:
+                stage = "stage0"
+            elif "stage1" in run_id:
+                stage = "stage1"
+            elif "stage2" in run_id:
+                stage = "stage2"
+            elif "demo" in run_id:
+                stage = "demo"
+        
+        return RunIndexRow(
+            run_id=run_id,
+            run_dir=str(run_path),
+            mtime=mtime,
+            season=season,
+            status=status,
+            mode=mode,
+            strategy_id=strategy_id,
+            dataset_id=dataset_id,
+            stage=stage,
+            manifest_path=str(manifest_path) if manifest_path.exists() else None
+        )
+    
+    def refresh(self) -> None:
+        """刷新索引（重建快取）"""
+        self.build()
+    
+    def list(self, season: Optional[str] = None, include_archived: bool = False) -> List[RunIndexRow]:
+        """列出 runs（可選按 season 過濾）"""
+        # 如果快取過期，重新建立
+        if time.time() - self._cache_time > self._cache_ttl:
+            self.build()
+        
+        rows = self._cache
+        
+        # 按 season 過濾
+        if season is not None:
+            rows = [r for r in rows if r.season == season]
+        
+        # 過濾歸檔的 runs
+        if not include_archived:
+            rows = [r for r in rows if not r.is_archived]
+        
+        return rows
+    
+    def get(self, run_id: str) -> Optional[RunIndexRow]:
+        """根據 run_id 獲取單個 run"""
+        # 如果快取過期，重新建立
+        if time.time() - self._cache_time > self._cache_ttl:
+            self.build()
+        
+        for row in self._cache:
+            if row.run_id == run_id:
+                return row
+        
+        # 如果不在快取中，嘗試直接查找
+        # 掃描所有 season 目錄尋找該 run_id
+        seasons_dir = self.outputs_root / "seasons"
+        if seasons_dir.exists():
+            for season_dir in seasons_dir.iterdir():
+                if not season_dir.is_dir():
+                    continue
+                    
+                runs_dir = season_dir / "runs"
+                if not runs_dir.exists():
+                    continue
+                
+                run_path = runs_dir / run_id
+                if run_path.exists() and run_path.is_dir():
+                    try:
+                        mtime = run_path.stat().st_mtime
+                        return self._parse_run_dir(run_path, mtime, season_dir.name)
+                    except OSError:
+                        pass
+        
+        return None
+
+
+# Singleton instance for app-level caching
+_global_index: Optional[RunsIndex] = None
+
+def get_global_index(outputs_root: Optional[Path] = None) -> RunsIndex:
+    """獲取全域 RunsIndex 實例（singleton）"""
+    global _global_index
+    
+    if _global_index is None:
+        if outputs_root is None:
+            # 預設使用專案根目錄下的 outputs
+            outputs_root = Path(__file__).parent.parent.parent.parent / "outputs"
+        _global_index = RunsIndex(outputs_root)
+        _global_index.build()
+    
+    return _global_index
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/services/stale.py
+sha256(source_bytes) = 33e0a537d8b49a98dece00c3b6769a3b04d9d2a7d86b26931c1c7616e468cc06
+bytes = 6340
+redacted = False
+--------------------------------------------------------------------------------
+"""Stale Warning 服務 - UI 開著超過 10 分鐘顯示警告"""
+
+import time
+from dataclasses import dataclass
+from typing import Optional
+
+
+@dataclass
+class StaleState:
+    """Stale 狀態"""
+    opened_at: float
+    warned: bool = False
+    last_check: float = 0.0
+    warning_shown_at: Optional[float] = None
+
+
+def should_warn_stale(state: StaleState, seconds: int = 600) -> bool:
+    """
+    檢查是否應該顯示 stale warning
+    
+    Args:
+        state: StaleState 物件
+        seconds: 警告閾值（秒），預設 600 秒（10 分鐘）
+    
+    Returns:
+        bool: 是否應該顯示警告
+    """
+    if state.warned:
+        return False
+    
+    elapsed = time.time() - state.opened_at
+    return elapsed >= seconds
+
+
+def update_stale_state(state: StaleState) -> dict:
+    """
+    更新 stale 狀態並返回狀態資訊
+    
+    Args:
+        state: StaleState 物件
+    
+    Returns:
+        dict: 狀態資訊
+    """
+    current_time = time.time()
+    elapsed = current_time - state.opened_at
+    
+    state.last_check = current_time
+    
+    # 檢查是否應該警告
+    should_warn = should_warn_stale(state)
+    
+    if should_warn and not state.warned:
+        state.warned = True
+        state.warning_shown_at = current_time
+    
+    return {
+        "opened_at": state.opened_at,
+        "opened_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.opened_at)),
+        "elapsed_seconds": elapsed,
+        "elapsed_minutes": elapsed / 60,
+        "elapsed_hours": elapsed / 3600,
+        "should_warn": should_warn,
+        "warned": state.warned,
+        "warning_shown_at": state.warning_shown_at,
+        "warning_shown_at_iso": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(state.warning_shown_at)) if state.warning_shown_at else None,
+        "last_check": state.last_check,
+    }
+
+
+class StaleMonitor:
+    """Stale 監視器"""
+    
+    def __init__(self, warning_threshold_seconds: int = 600):
+        """
+        初始化 StaleMonitor
+        
+        Args:
+            warning_threshold_seconds: 警告閾值（秒）
+        """
+        self.warning_threshold = warning_threshold_seconds
+        self._states = {}  # client_id -> StaleState
+        self._start_time = time.time()
+    
+    def register_client(self, client_id: str) -> StaleState:
+        """
+        註冊客戶端
+        
+        Args:
+            client_id: 客戶端 ID
+        
+        Returns:
+            StaleState: 新建立的狀態
+        """
+        state = StaleState(opened_at=time.time())
+        self._states[client_id] = state
+        return state
+    
+    def unregister_client(self, client_id: str) -> None:
+        """取消註冊客戶端"""
+        if client_id in self._states:
+            del self._states[client_id]
+    
+    def get_client_state(self, client_id: str) -> Optional[StaleState]:
+        """獲取客戶端狀態"""
+        return self._states.get(client_id)
+    
+    def update_client(self, client_id: str) -> Optional[dict]:
+        """
+        更新客戶端狀態
+        
+        Args:
+            client_id: 客戶端 ID
+        
+        Returns:
+            Optional[dict]: 狀態資訊，如果客戶端不存在則返回 None
+        """
+        state = self.get_client_state(client_id)
+        if state is None:
+            return None
+        
+        return update_stale_state(state)
+    
+    def check_all_clients(self) -> dict:
+        """
+        檢查所有客戶端
+        
+        Returns:
+            dict: 所有客戶端的狀態摘要
+        """
+        results = {}
+        warnings = []
+        
+        for client_id, state in self._states.items():
+            info = update_stale_state(state)
+            results[client_id] = info
+            
+            if info["should_warn"] and not state.warned:
+                warnings.append({
+                    "client_id": client_id,
+                    "elapsed_minutes": info["elapsed_minutes"],
+                    "opened_at": info["opened_at_iso"],
+                })
+        
+        return {
+            "total_clients": len(self._states),
+            "clients": results,
+            "warnings": warnings,
+            "has_warnings": len(warnings) > 0,
+            "monitor_uptime": time.time() - self._start_time,
+        }
+    
+    def reset_client(self, client_id: str) -> Optional[StaleState]:
+        """
+        重置客戶端狀態（重新計時）
+        
+        Args:
+            client_id: 客戶端 ID
+        
+        Returns:
+            Optional[StaleState]: 新的狀態，如果客戶端不存在則返回 None
+        """
+        if client_id not in self._states:
+            return None
+        
+        self._states[client_id] = StaleState(opened_at=time.time())
+        return self._states[client_id]
+
+
+# 全域監視器實例
+_global_monitor: Optional[StaleMonitor] = None
+
+def get_global_monitor() -> StaleMonitor:
+    """獲取全域 StaleMonitor 實例"""
+    global _global_monitor
+    if _global_monitor is None:
+        _global_monitor = StaleMonitor()
+    return _global_monitor
+
+
+def create_stale_warning_message(state_info: dict) -> str:
+    """
+    建立 stale warning 訊息
+    
+    Args:
+        state_info: 狀態資訊
+    
+    Returns:
+        str: 警告訊息
+    """
+    elapsed_minutes = state_info["elapsed_minutes"]
+    
+    if elapsed_minutes < 60:
+        time_str = f"{elapsed_minutes:.1f} 分鐘"
+    else:
+        time_str = f"{elapsed_minutes/60:.1f} 小時"
+    
+    return (
+        f"⚠️  UI 已開啟 {time_str}，資料可能已過期。\n"
+        f"建議重新整理頁面以獲取最新資料。\n"
+        f"（開啟時間: {state_info['opened_at_iso']})"
+    )
+
+
+def create_stale_warning_ui_state(state_info: dict) -> dict:
+    """
+    建立 stale warning UI 狀態
+    
+    Args:
+        state_info: 狀態資訊
+    
+    Returns:
+        dict: UI 狀態
+    """
+    return {
+        "show_warning": state_info["should_warn"],
+        "message": create_stale_warning_message(state_info) if state_info["should_warn"] else "",
+        "severity": "warning",
+        "elapsed_minutes": state_info["elapsed_minutes"],
+        "opened_at": state_info["opened_at_iso"],
+        "can_dismiss": True,
+        "auto_refresh_suggested": state_info["elapsed_minutes"] > 20,  # 超過 20 分鐘建議自動重新整理
+    }
+--------------------------------------------------------------------------------
+
+FILE src/FishBroWFS_V2/gui/viewer/__init__.py
+sha256(source_bytes) = 2f52538f216f07d0e68d4bdb192cccd19072506ea5fcce09b2d87dcc9d05f4d6
+bytes = 39
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Viewer package for Phase 6.0."""
+
+
+
+--------------------------------------------------------------------------------
+
 FILE src/FishBroWFS_V2/gui/viewer/app.py
 sha256(source_bytes) = 16ab9da16c0c1aa43a068bca0b6a3d90bd701ec4eeb8b8ba3ca8bf0854663192
 bytes = 3821
@@ -1983,8 +4271,8 @@ redacted = False
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/pipeline/funnel.py
-sha256(source_bytes) = ee3b91e4f143383035667f29473d8af0a821978af5e732f1cdc79aba2da5ec65
-bytes = 3386
+sha256(source_bytes) = 3c1fd4656e13d9b307ecc17e11a691ee6076cea59d7490254620f4c5191f8a91
+bytes = 3878
 redacted = False
 --------------------------------------------------------------------------------
 
@@ -2024,6 +4312,9 @@ class FunnelResult:
     meta: Optional[dict] = None
 
 
+import warnings
+
+
 def run_funnel(
     open_: np.ndarray,
     high: np.ndarray,
@@ -2038,7 +4329,10 @@ def run_funnel(
     proxy_name: str = "ma_proxy_v0",
 ) -> FunnelResult:
     """
-    Run complete Funnel pipeline: Stage0 → Top-K → Stage2.
+    [DEPRECATED] Run complete Funnel pipeline: Stage0 → Top-K → Stage2.
+    
+    This function is deprecated in favor of `FishBroWFS_V2.pipeline.funnel_runner.run_funnel`.
+    The new implementation provides better audit logging, artifact writing, and OOM gating.
     
     Pipeline flow (fixed):
     1. Stage0: proxy ranking on all parameters
@@ -2067,7 +4361,14 @@ def run_funnel(
         - Stage0 does NOT compute PnL metrics (only proxy_value)
         - Top-K selection is based solely on proxy_value
         - Stage2 runs full backtest only on Top-K subset
+        - DEPRECATED: Use `FishBroWFS_V2.pipeline.funnel_runner.run_funnel` instead
     """
+    warnings.warn(
+        "pipeline.funnel.run_funnel is deprecated. "
+        "Use pipeline.funnel_runner.run_funnel instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     # Step 1: Stage0 - proxy ranking
     stage0_results = run_stage0(
         close,
@@ -3328,8 +5629,8 @@ def run_portfolio(spec_path: Path, outputs_root: Path) -> Dict[str, Any]:
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/pipeline/runner_adapter.py
-sha256(source_bytes) = 6e0e855e6f0610b709c943bfef172046db54f19908bc699e41bc1f401113c5d5
-bytes = 8891
+sha256(source_bytes) = aaf0f0053e2e5e915d61695af6f3e6ca9e4100619a74c6db1c3023eb146b3093
+bytes = 8817
 redacted = False
 --------------------------------------------------------------------------------
 
@@ -3345,7 +5646,6 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.funnel import run_funnel as run_funnel_legacy
 from FishBroWFS_V2.pipeline.runner_grid import run_grid
 from FishBroWFS_V2.pipeline.stage0_runner import run_stage0
 from FishBroWFS_V2.pipeline.stage2_runner import run_stage2
@@ -18247,1731 +20547,6 @@ def test_clean_rebuild_fingerprint_stable(tmp_path: Path, sample_raw_txt: Path) 
         f"Fingerprint computation changed: "
         f"first={fingerprint1.sha1}, second={fingerprint2.sha1}"
     )
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_data_ingest_monkeypatch_trap.py
-sha256(source_bytes) = e06e425db569bba538be494e7e4e2230d82615922b61ca93229cb47dd13f2fea
-bytes = 6017
-redacted = False
---------------------------------------------------------------------------------
-
-"""Monkeypatch trap test: Ensure forbidden pandas methods are never called during raw ingest.
-
-This test uses monkeypatch to trap any calls to forbidden methods.
-If any forbidden method is called, the test immediately fails with a clear error.
-
-Binding: Raw means RAW (Phase 6.5) - no sort, no dedup, no dropna, no datetime parse.
-"""
-
-from __future__ import annotations
-
-from pathlib import Path
-
-import pandas as pd
-import pytest
-
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
-
-
-def test_raw_ingest_forbidden_methods_trap(monkeypatch: pytest.MonkeyPatch, sample_raw_txt: Path) -> None:
-    """Trap test: Any forbidden pandas method call during ingest will immediately fail.
-    
-    This test uses monkeypatch to replace forbidden methods with functions that
-    raise AssertionError. If ingest_raw_txt() calls any forbidden method, the
-    test will fail immediately with a clear error message.
-    
-    Forbidden methods:
-    - pd.DataFrame.sort_values() - violates row order preservation
-    - pd.DataFrame.dropna() - violates empty value preservation
-    - pd.DataFrame.drop_duplicates() - violates duplicate preservation
-    - pd.to_datetime() - violates naive ts_str contract (Phase 6.5)
-    
-    ⚠️ This is a constitutional test, not a debug log.
-    The error messages are legal requirements, not debugging hints.
-    """
-    # Arrange: Patch forbidden methods to raise AssertionError if called
-    
-    def _boom_sort_values(*args, **kwargs):
-        """Trap function for sort_values() - violates Raw means RAW."""
-        raise AssertionError(
-            "FORBIDDEN: sort_values() violates Raw means RAW (Phase 6.5). "
-            "Row order must be preserved exactly as in TXT file."
-        )
-    
-    def _boom_dropna(*args, **kwargs):
-        """Trap function for dropna() - violates Raw means RAW."""
-        raise AssertionError(
-            "FORBIDDEN: dropna() violates Raw means RAW (Phase 6.5). "
-            "Empty values must be preserved (e.g., volume=0)."
-        )
-    
-    def _boom_drop_duplicates(*args, **kwargs):
-        """Trap function for drop_duplicates() - violates Raw means RAW."""
-        raise AssertionError(
-            "FORBIDDEN: drop_duplicates() violates Raw means RAW (Phase 6.5). "
-            "Duplicate rows must be preserved exactly as in TXT file."
-        )
-    
-    def _boom_to_datetime(*args, **kwargs):
-        """Trap function for pd.to_datetime() - violates naive ts_str contract."""
-        raise AssertionError(
-            "FORBIDDEN: pd.to_datetime() violates Naive ts_str Contract (Phase 6.5). "
-            "Timestamp must remain as string literal, no datetime parsing allowed."
-        )
-    
-    # Apply monkeypatches (scope limited to this test function)
-    # Note: pd.to_datetime() is only used in _normalize_24h() for date parsing.
-    # Since sample_raw_txt doesn't contain 24:00:00, _normalize_24h won't be called,
-    # so we can safely trap all pd.to_datetime calls
-    monkeypatch.setattr(pd.DataFrame, "sort_values", _boom_sort_values)
-    monkeypatch.setattr(pd.DataFrame, "dropna", _boom_dropna)
-    monkeypatch.setattr(pd.DataFrame, "drop_duplicates", _boom_drop_duplicates)
-    monkeypatch.setattr(pd, "to_datetime", _boom_to_datetime)
-    
-    # Act: Call ingest_raw_txt() with patched pandas
-    # If any forbidden method is called, AssertionError will be raised immediately
-    result = ingest_raw_txt(sample_raw_txt)
-    
-    # Assert: Ingest completed successfully without triggering any traps
-    # If we reach here, no forbidden methods were called
-    assert result is not None
-    assert len(result.df) > 0
-    assert "ts_str" in result.df.columns
-    assert result.df["ts_str"].dtype == "object"  # Must be string, not datetime
-
-
-def test_raw_ingest_forbidden_methods_trap_with_24h_normalization(
-    monkeypatch: pytest.MonkeyPatch, temp_dir: Path
-) -> None:
-    """Trap test with 24:00 normalization - ensure no forbidden DataFrame methods called.
-    
-    Tests the same traps but with a TXT file containing 24:00:00 time.
-    Note: pd.to_datetime() is allowed in _normalize_24h() for date parsing only,
-    so we only trap DataFrame methods, not pd.to_datetime().
-    """
-    # Create TXT with 24:00:00 (requires normalization)
-    txt_path = temp_dir / "test_24h.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,1000
-2013/1/1,24:00:00,104.0,106.0,103.0,105.0,1200
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,1500
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    # Arrange: Patch forbidden DataFrame methods only
-    # Note: pd.to_datetime() is allowed for date parsing in _normalize_24h()
-    def _boom_sort_values(*args, **kwargs):
-        raise AssertionError(
-            "FORBIDDEN: sort_values() violates Raw means RAW (Phase 6.5). "
-            "Row order must be preserved exactly as in TXT file."
-        )
-    
-    def _boom_dropna(*args, **kwargs):
-        raise AssertionError(
-            "FORBIDDEN: dropna() violates Raw means RAW (Phase 6.5). "
-            "Empty values must be preserved (e.g., volume=0)."
-        )
-    
-    def _boom_drop_duplicates(*args, **kwargs):
-        raise AssertionError(
-            "FORBIDDEN: drop_duplicates() violates Raw means RAW (Phase 6.5). "
-            "Duplicate rows must be preserved exactly as in TXT file."
-        )
-    
-    monkeypatch.setattr(pd.DataFrame, "sort_values", _boom_sort_values)
-    monkeypatch.setattr(pd.DataFrame, "dropna", _boom_dropna)
-    monkeypatch.setattr(pd.DataFrame, "drop_duplicates", _boom_drop_duplicates)
-    
-    # Act: Call ingest_raw_txt() - should succeed with 24h normalization
-    result = ingest_raw_txt(txt_path)
-    
-    # Assert: Ingest completed successfully
-    assert result is not None
-    assert len(result.df) == 3
-    assert result.policy.normalized_24h == True  # Should have normalized 24:00:00
-    # Verify 24:00:00 was normalized to next day 00:00:00
-    assert "2013/1/2 00:00:00" in result.df["ts_str"].values
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_data_ingest_raw_means_raw.py
-sha256(source_bytes) = 378c1ee44861439dc0a2c3c582033fe5bc98c669ae99c6d76df5dd2782fbe4c5
-bytes = 5756
-redacted = False
---------------------------------------------------------------------------------
-
-"""Test: Raw means RAW - regression prevention.
-
-RED TEAM #1: Lock down three things:
-1. Row order unchanged (no sort)
-2. Duplicate ts_str not deduplicated (no drop_duplicates)
-3. Empty values not dropped (no dropna) - test with volume=0
-"""
-
-from __future__ import annotations
-
-from pathlib import Path
-
-import pandas as pd
-import pytest
-
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
-
-
-def test_row_order_preserved(temp_dir: Path) -> None:
-    """Test that row order matches TXT file exactly (no sort)."""
-    # Create TXT with intentionally unsorted timestamps
-    txt_path = temp_dir / "test_order.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/3,09:30:00,110.0,115.0,109.0,114.0,2000
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,1000
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,1500
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # Assert order matches TXT (first row should be 2013/1/3)
-    assert result.df.iloc[0]["ts_str"] == "2013/1/3 09:30:00"
-    assert result.df.iloc[1]["ts_str"] == "2013/1/1 09:30:00"
-    assert result.df.iloc[2]["ts_str"] == "2013/1/2 09:30:00"
-    
-    # Verify no sort occurred (should be in TXT order)
-    assert len(result.df) == 3
-
-
-def test_duplicate_ts_str_not_deduped(temp_dir: Path) -> None:
-    """Test that duplicate ts_str rows are preserved (no drop_duplicates)."""
-    # Create TXT with duplicate Date/Time but different Close values
-    txt_path = temp_dir / "test_duplicate.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,1000
-2013/1/1,09:30:00,100.0,105.0,99.0,105.0,1200
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,1500
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # Assert both duplicate rows are present
-    assert len(result.df) == 3
-    
-    # Assert order matches TXT
-    assert result.df.iloc[0]["ts_str"] == "2013/1/1 09:30:00"
-    assert result.df.iloc[0]["close"] == 104.0
-    
-    assert result.df.iloc[1]["ts_str"] == "2013/1/1 09:30:00"
-    assert result.df.iloc[1]["close"] == 105.0  # Different close value
-    
-    assert result.df.iloc[2]["ts_str"] == "2013/1/2 09:30:00"
-    
-    # Verify duplicates exist (ts_str column should have duplicates)
-    ts_str_counts = result.df["ts_str"].value_counts()
-    assert ts_str_counts["2013/1/1 09:30:00"] == 2
-
-
-def test_volume_zero_preserved(temp_dir: Path) -> None:
-    """Test that volume=0 rows are preserved (no dropna)."""
-    # Create TXT with volume=0
-    txt_path = temp_dir / "test_volume_zero.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,0
-2013/1/1,10:00:00,104.0,106.0,103.0,105.0,1200
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,0
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # Assert all rows are present (including volume=0)
-    assert len(result.df) == 3
-    
-    # Assert volume=0 rows are preserved
-    assert result.df.iloc[0]["volume"] == 0
-    assert result.df.iloc[1]["volume"] == 1200
-    assert result.df.iloc[2]["volume"] == 0
-    
-    # Verify volume column type is int64
-    assert result.df["volume"].dtype == "int64"
-
-
-def test_no_sort_values_called(temp_dir: Path) -> None:
-    """Regression test: Ensure sort_values is never called internally."""
-    # This is a contract test - if sort is called, order would change
-    txt_path = temp_dir / "test_no_sort.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/3,09:30:00,110.0,115.0,109.0,114.0,2000
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,1000
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,1500
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # If sort was called, first row would be 2013/1/1 (earliest)
-    # But we expect 2013/1/3 (first in TXT)
-    first_ts = result.df.iloc[0]["ts_str"]
-    assert first_ts.startswith("2013/1/3"), f"Row order changed - first row is {first_ts}, expected 2013/1/3"
-
-
-def test_no_drop_duplicates_called(temp_dir: Path) -> None:
-    """Regression test: Ensure drop_duplicates is never called internally."""
-    txt_path = temp_dir / "test_no_dedup.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,1000
-2013/1/1,09:30:00,100.0,105.0,99.0,105.0,1200
-2013/1/1,09:30:00,100.0,105.0,99.0,106.0,1300
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # If drop_duplicates was called, we'd have only 1 row
-    # But we expect 3 rows (all duplicates preserved)
-    assert len(result.df) == 3
-    
-    # All should have same ts_str
-    assert all(result.df["ts_str"] == "2013/1/1 09:30:00")
-    
-    # But different close values
-    assert result.df.iloc[0]["close"] == 104.0
-    assert result.df.iloc[1]["close"] == 105.0
-    assert result.df.iloc[2]["close"] == 106.0
-
-
-def test_no_dropna_called(temp_dir: Path) -> None:
-    """Regression test: Ensure dropna is never called internally (volume=0 preserved)."""
-    txt_path = temp_dir / "test_no_dropna.txt"
-    txt_content = """Date,Time,Open,High,Low,Close,TotalVolume
-2013/1/1,09:30:00,100.0,105.0,99.0,104.0,0
-2013/1/1,10:00:00,104.0,106.0,103.0,105.0,0
-2013/1/2,09:30:00,105.0,107.0,104.0,106.0,0
-"""
-    txt_path.write_text(txt_content, encoding="utf-8")
-    
-    result = ingest_raw_txt(txt_path)
-    
-    # If dropna was called on volume, rows with volume=0 might be dropped
-    # But we expect all 3 rows preserved
-    assert len(result.df) == 3
-    
-    # All should have volume=0
-    assert all(result.df["volume"] == 0)
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_data_layout.py
-sha256(source_bytes) = 6294a2a7e2807ae01cbf4e991229f882ca37a5d8fb4ac9de95f807a7ccea4943
-bytes = 641
-redacted = False
---------------------------------------------------------------------------------
-
-import numpy as np
-import pytest
-from FishBroWFS_V2.data.layout import normalize_bars
-
-
-def test_normalize_bars_dtype_and_contiguous():
-    o = np.arange(10, dtype=np.float32)[::2]
-    h = o + 1
-    l = o - 1
-    c = o + 0.5
-
-    bars = normalize_bars(o, h, l, c)
-
-    for arr in (bars.open, bars.high, bars.low, bars.close):
-        assert arr.dtype == np.float64
-        assert arr.flags["C_CONTIGUOUS"]
-
-
-def test_normalize_bars_reject_nan():
-    o = np.array([1.0, np.nan])
-    h = np.array([1.0, 2.0])
-    l = np.array([0.5, 1.5])
-    c = np.array([0.8, 1.8])
-
-    with pytest.raises(ValueError):
-        normalize_bars(o, h, l, c)
-
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_day_bar_definition.py
-sha256(source_bytes) = 71e6084ad18d2376271005393eaf8e6dbb1cb2b03d02739121cb74036bb5aa98
-bytes = 3747
-redacted = False
---------------------------------------------------------------------------------
-
-"""Test DAY bar definition: one complete session per bar."""
-
-from __future__ import annotations
-
-from pathlib import Path
-
-import pandas as pd
-import pytest
-
-from FishBroWFS_V2.data.session.kbar import aggregate_kbar
-from FishBroWFS_V2.data.session.loader import load_session_profile
-
-
-@pytest.fixture
-def mnq_profile() -> Path:
-    """Load CME.MNQ session profile."""
-    profile_path = Path(__file__).parent.parent / "src" / "FishBroWFS_V2" / "data" / "profiles" / "CME_MNQ_TPE_v1.yaml"
-    return profile_path
-
-
-def test_day_bar_one_session(mnq_profile: Path) -> None:
-    """Test DAY bar = one complete DAY session."""
-    profile = load_session_profile(mnq_profile)
-    
-    # Create bars for one complete DAY session
-    df = pd.DataFrame({
-        "ts_str": [
-            "2013/1/1 08:45:00",  # DAY session start
-            "2013/1/1 09:00:00",
-            "2013/1/1 10:00:00",
-            "2013/1/1 11:00:00",
-            "2013/1/1 12:00:00",
-            "2013/1/1 13:00:00",
-            "2013/1/1 13:44:00",  # Last bar before session end
-        ],
-        "open": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0, 106.0],
-        "high": [100.5, 101.5, 102.5, 103.5, 104.5, 105.5, 106.5],
-        "low": [99.5, 100.5, 101.5, 102.5, 103.5, 104.5, 105.5],
-        "close": [100.5, 101.5, 102.5, 103.5, 104.5, 105.5, 106.5],
-        "volume": [1000, 1100, 1200, 1300, 1400, 1500, 1600],
-    })
-    
-    result = aggregate_kbar(df, "DAY", profile)
-    
-    # Should have exactly one DAY bar
-    assert len(result) == 1, f"Should have 1 DAY bar, got {len(result)}"
-    
-    # Verify the bar contains all DAY session bars
-    day_bar = result.iloc[0]
-    assert day_bar["open"] == 100.0, "Open should be first bar's open"
-    assert day_bar["high"] == 106.5, "High should be max of all bars"
-    assert day_bar["low"] == 99.5, "Low should be min of all bars"
-    assert day_bar["close"] == 106.5, "Close should be last bar's close"
-    assert day_bar["volume"] == sum([1000, 1100, 1200, 1300, 1400, 1500, 1600]), "Volume should be sum"
-    
-    # Verify ts_str is anchored to session start
-    ts_str = day_bar["ts_str"]
-    time_part = ts_str.split(" ")[1]
-    assert time_part == "08:45:00", f"DAY bar should be anchored to session start, got {time_part}"
-
-
-def test_day_bar_multiple_sessions(mnq_profile: Path) -> None:
-    """Test DAY bars for multiple sessions."""
-    profile = load_session_profile(mnq_profile)
-    
-    # Create bars for DAY and NIGHT sessions on same day
-    df = pd.DataFrame({
-        "ts_str": [
-            # DAY session
-            "2013/1/1 08:45:00",
-            "2013/1/1 10:00:00",
-            "2013/1/1 13:00:00",
-            # NIGHT session
-            "2013/1/1 21:00:00",
-            "2013/1/1 23:00:00",
-            "2013/1/2 02:00:00",
-        ],
-        "open": [100.0, 101.0, 102.0, 103.0, 104.0, 105.0],
-        "high": [100.5, 101.5, 102.5, 103.5, 104.5, 105.5],
-        "low": [99.5, 100.5, 101.5, 102.5, 103.5, 104.5],
-        "close": [100.5, 101.5, 102.5, 103.5, 104.5, 105.5],
-        "volume": [1000, 1100, 1200, 1300, 1400, 1500],
-    })
-    
-    result = aggregate_kbar(df, "DAY", profile)
-    
-    # Should have 2 DAY bars (one for DAY session, one for NIGHT session)
-    assert len(result) == 2, f"Should have 2 DAY bars (DAY + NIGHT), got {len(result)}"
-    
-    # Verify DAY session bar
-    day_bar = result[result["ts_str"].str.contains("2013/1/1 08:45:00")].iloc[0]
-    assert day_bar["volume"] == 1000 + 1100 + 1200, "DAY bar volume should sum DAY session bars"
-    
-    # Verify NIGHT session bar
-    night_bar = result[result["ts_str"].str.contains("2013/1/1 21:00:00")].iloc[0]
-    assert night_bar["volume"] == 1300 + 1400 + 1500, "NIGHT bar volume should sum NIGHT session bars"
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_dtype_compression_contract.py
-sha256(source_bytes) = 51e0b87167e50adb191a0a1d81da056adf509ad8fa54b7953d9fe3699e7f260d
-bytes = 16341
-redacted = False
---------------------------------------------------------------------------------
-
-"""Contract tests for dtype compression (Phase P1).
-
-These tests ensure:
-1. INDEX_DTYPE=int32 safety: order_id, created_bar, qty never exceed 2^31-1
-2. UINT8 enum consistency: role/kind/side correctly encode/decode without sentinel issues
-"""
-
-import numpy as np
-import pytest
-
-from FishBroWFS_V2.config.dtypes import (
-    INDEX_DTYPE,
-    INTENT_ENUM_DTYPE,
-    INTENT_PRICE_DTYPE,
-)
-from FishBroWFS_V2.engine.constants import (
-    KIND_LIMIT,
-    KIND_STOP,
-    ROLE_ENTRY,
-    ROLE_EXIT,
-    SIDE_BUY,
-    SIDE_SELL,
-)
-from FishBroWFS_V2.engine.engine_jit import (
-    SIDE_BUY_CODE,
-    SIDE_SELL_CODE,
-    _pack_intents,
-    simulate_arrays,
-)
-from FishBroWFS_V2.engine.types import BarArrays, OrderIntent, OrderKind, OrderRole, Side
-
-
-class TestIndexDtypeSafety:
-    """Test that INDEX_DTYPE=int32 is safe for all use cases."""
-
-    def test_order_id_max_value_contract(self):
-        """
-        Contract: order_id must never exceed 2^31-1 (int32 max).
-        
-        In strategy/kernel.py, order_id is generated as:
-        - Entry: np.arange(1, n_entry + 1)
-        - Exit: np.arange(n_entry + 1, n_entry + 1 + exit_intents_count)
-        
-        Maximum order_id = n_entry + exit_intents_count
-        
-        For 200,000 bars with reasonable intent generation, this should be << 2^31-1.
-        """
-        INT32_MAX = 2**31 - 1
-        
-        # Simulate worst-case scenario: 200,000 bars, each bar generates 1 entry + 1 exit
-        # This is extremely conservative (realistic scenarios generate far fewer intents)
-        n_bars = 200_000
-        max_intents_per_bar = 2  # 1 entry + 1 exit per bar (worst case)
-        max_total_intents = n_bars * max_intents_per_bar
-        
-        # Maximum order_id would be max_total_intents (if all are sequential)
-        max_order_id = max_total_intents
-        
-        assert max_order_id < INT32_MAX, (
-            f"order_id would exceed int32 max ({INT32_MAX}) "
-            f"with {n_bars} bars and {max_intents_per_bar} intents per bar. "
-            f"Max order_id would be {max_order_id}"
-        )
-        
-        # More realistic: check that even with 10x safety margin, we're still safe
-        safety_margin = 10
-        assert max_order_id * safety_margin < INT32_MAX, (
-            f"order_id with {safety_margin}x safety margin would exceed int32 max"
-        )
-
-    def test_created_bar_max_value_contract(self):
-        """
-        Contract: created_bar must never exceed 2^31-1.
-        
-        created_bar is a bar index, so max value = n_bars - 1.
-        For 200,000 bars, max created_bar = 199,999 << 2^31-1.
-        """
-        INT32_MAX = 2**31 - 1
-        
-        # Worst case: 200,000 bars
-        max_bars = 200_000
-        max_created_bar = max_bars - 1
-        
-        assert max_created_bar < INT32_MAX, (
-            f"created_bar would exceed int32 max ({INT32_MAX}) "
-            f"with {max_bars} bars. Max created_bar would be {max_created_bar}"
-        )
-
-    def test_qty_max_value_contract(self):
-        """
-        Contract: qty must never exceed 2^31-1.
-        
-        qty is typically small (1, 10, 100, etc.), so this should be safe.
-        """
-        INT32_MAX = 2**31 - 1
-        
-        # Realistic qty values are much smaller than int32 max
-        realistic_max_qty = 1_000_000  # Even 1M shares is << 2^31-1
-        
-        assert realistic_max_qty < INT32_MAX, (
-            f"qty would exceed int32 max ({INT32_MAX}) "
-            f"with realistic max qty of {realistic_max_qty}"
-        )
-
-    def test_order_id_generation_in_kernel(self):
-        """
-        Test that actual order_id generation in kernel stays within int32 range.
-        
-        This test simulates the order_id generation logic from strategy/kernel.py.
-        """
-        INT32_MAX = 2**31 - 1
-        
-        # Simulate realistic scenario: 200,000 bars, ~1000 entry intents, ~500 exit intents
-        n_entry = 1000
-        n_exit = 500
-        
-        # Entry order_ids: np.arange(1, n_entry + 1)
-        entry_order_ids = np.arange(1, n_entry + 1, dtype=INDEX_DTYPE)
-        assert entry_order_ids.max() < INT32_MAX
-        
-        # Exit order_ids: np.arange(n_entry + 1, n_entry + 1 + n_exit)
-        exit_order_ids = np.arange(n_entry + 1, n_entry + 1 + n_exit, dtype=INDEX_DTYPE)
-        max_order_id = exit_order_ids.max()
-        
-        assert max_order_id < INT32_MAX, (
-            f"Generated order_id {max_order_id} exceeds int32 max ({INT32_MAX})"
-        )
-
-
-class TestUint8EnumConsistency:
-    """Test that uint8 enum encoding/decoding is consistent and safe."""
-
-    def test_role_enum_encoding(self):
-        """Test that role enum values encode correctly as uint8."""
-        # ROLE_EXIT = 0, ROLE_ENTRY = 1
-        exit_val = INTENT_ENUM_DTYPE(ROLE_EXIT)
-        entry_val = INTENT_ENUM_DTYPE(ROLE_ENTRY)
-        
-        assert exit_val == 0
-        assert entry_val == 1
-        assert exit_val.dtype == np.uint8
-        assert entry_val.dtype == np.uint8
-
-    def test_kind_enum_encoding(self):
-        """Test that kind enum values encode correctly as uint8."""
-        # KIND_STOP = 0, KIND_LIMIT = 1
-        stop_val = INTENT_ENUM_DTYPE(KIND_STOP)
-        limit_val = INTENT_ENUM_DTYPE(KIND_LIMIT)
-        
-        assert stop_val == 0
-        assert limit_val == 1
-        assert stop_val.dtype == np.uint8
-        assert limit_val.dtype == np.uint8
-
-    def test_side_enum_encoding(self):
-        """
-        Test that side enum values encode correctly as uint8.
-        
-        SIDE_BUY_CODE = 1, SIDE_SELL_CODE = 255 (avoid -1 cast deprecation)
-        """
-        buy_val = INTENT_ENUM_DTYPE(SIDE_BUY_CODE)
-        sell_val = INTENT_ENUM_DTYPE(SIDE_SELL_CODE)
-        
-        assert buy_val == 1
-        assert sell_val == 255
-        assert buy_val.dtype == np.uint8
-        assert sell_val.dtype == np.uint8
-
-    def test_side_enum_decoding_consistency(self):
-        """
-        Test that side enum decoding correctly handles uint8 values.
-        
-        Critical: uint8 value 255 (SIDE_SELL_CODE) must decode back to SELL.
-        """
-        # Encode SIDE_SELL_CODE (255) as uint8
-        sell_encoded = INTENT_ENUM_DTYPE(SIDE_SELL_CODE)
-        assert sell_encoded == 255
-        
-        # Decode: int(sd[i]) == SIDE_BUY (1) ? BUY : SELL
-        # If sd[i] = 255, int(255) != 1, so it should decode to SELL
-        decoded_is_buy = int(sell_encoded) == SIDE_BUY
-        decoded_is_sell = int(sell_encoded) != SIDE_BUY
-        
-        assert not decoded_is_buy, "uint8 value 255 should not decode to BUY"
-        assert decoded_is_sell, "uint8 value 255 should decode to SELL"
-        
-        # Also test BUY encoding/decoding
-        buy_encoded = INTENT_ENUM_DTYPE(SIDE_BUY_CODE)
-        assert buy_encoded == 1
-        decoded_is_buy = int(buy_encoded) == SIDE_BUY_CODE
-        assert decoded_is_buy, "uint8 value 1 should decode to BUY"
-
-    def test_allowed_enum_values_contract(self):
-        """
-        Contract: enum arrays must only contain explicitly allowed values.
-        
-        This test ensures that:
-        1. Only valid enum values are used (no uninitialized/invalid values)
-        2. Decoding functions will raise ValueError for invalid values (strict mode)
-        
-        Allowed values:
-        - role: {0 (EXIT), 1 (ENTRY)}
-        - kind: {0 (STOP), 1 (LIMIT)}
-        - side: {1 (BUY), 255 (SELL as uint8)}
-        """
-        # Define allowed values explicitly
-        ALLOWED_ROLE_VALUES = {ROLE_EXIT, ROLE_ENTRY}  # {0, 1}
-        ALLOWED_KIND_VALUES = {KIND_STOP, KIND_LIMIT}  # {0, 1}
-        ALLOWED_SIDE_VALUES = {SIDE_BUY_CODE, SIDE_SELL_CODE}  # {1, 255} - avoid -1 cast
-        
-        # Test that encoding produces only allowed values
-        role_encoded = [INTENT_ENUM_DTYPE(ROLE_EXIT), INTENT_ENUM_DTYPE(ROLE_ENTRY)]
-        kind_encoded = [INTENT_ENUM_DTYPE(KIND_STOP), INTENT_ENUM_DTYPE(KIND_LIMIT)]
-        side_encoded = [INTENT_ENUM_DTYPE(SIDE_BUY_CODE), INTENT_ENUM_DTYPE(SIDE_SELL_CODE)]
-        
-        for val in role_encoded:
-            assert int(val) in ALLOWED_ROLE_VALUES, f"Role value {val} not in allowed set {ALLOWED_ROLE_VALUES}"
-        
-        for val in kind_encoded:
-            assert int(val) in ALLOWED_KIND_VALUES, f"Kind value {val} not in allowed set {ALLOWED_KIND_VALUES}"
-        
-        for val in side_encoded:
-            assert int(val) in ALLOWED_SIDE_VALUES, f"Side value {val} not in allowed set {ALLOWED_SIDE_VALUES}"
-        
-        # Test that invalid values raise ValueError (strict decoding)
-        from FishBroWFS_V2.engine.engine_jit import _role_from_int, _kind_from_int, _side_from_int
-        
-        # Test invalid role values
-        with pytest.raises(ValueError, match="Invalid role enum value"):
-            _role_from_int(2)
-        with pytest.raises(ValueError, match="Invalid role enum value"):
-            _role_from_int(-1)
-        
-        # Test invalid kind values
-        with pytest.raises(ValueError, match="Invalid kind enum value"):
-            _kind_from_int(2)
-        with pytest.raises(ValueError, match="Invalid kind enum value"):
-            _kind_from_int(-1)
-        
-        # Test invalid side values
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(0)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(2)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(100)
-        
-        # Test valid values don't raise
-        assert _role_from_int(0) == OrderRole.EXIT
-        assert _role_from_int(1) == OrderRole.ENTRY
-        assert _kind_from_int(0) == OrderKind.STOP
-        assert _kind_from_int(1) == OrderKind.LIMIT
-        assert _side_from_int(SIDE_BUY_CODE) == Side.BUY
-        assert _side_from_int(SIDE_SELL_CODE) == Side.SELL
-
-    def test_pack_intents_roundtrip(self):
-        """
-        Test that packing intents and decoding them preserves enum values correctly.
-        
-        This is an integration test to ensure the full encode/decode cycle works.
-        """
-        # Create test intents with all enum combinations
-        intents = [
-            OrderIntent(
-                order_id=1,
-                created_bar=0,
-                role=OrderRole.EXIT,
-                kind=OrderKind.STOP,
-                side=Side.SELL,  # -1 -> uint8(255)
-                price=100.0,
-                qty=1,
-            ),
-            OrderIntent(
-                order_id=2,
-                created_bar=0,
-                role=OrderRole.ENTRY,
-                kind=OrderKind.LIMIT,
-                side=Side.BUY,  # 1 -> uint8(1)
-                price=101.0,
-                qty=1,
-            ),
-        ]
-        
-        # Pack intents
-        order_id, created_bar, role, kind, side, price, qty = _pack_intents(intents)
-        
-        # Verify dtypes
-        assert order_id.dtype == INDEX_DTYPE
-        assert created_bar.dtype == INDEX_DTYPE
-        assert role.dtype == INTENT_ENUM_DTYPE
-        assert kind.dtype == INTENT_ENUM_DTYPE
-        assert side.dtype == INTENT_ENUM_DTYPE
-        assert price.dtype == INTENT_PRICE_DTYPE
-        assert qty.dtype == INDEX_DTYPE
-        
-        # Verify enum values
-        assert role[0] == ROLE_EXIT  # 0
-        assert role[1] == ROLE_ENTRY  # 1
-        assert kind[0] == KIND_STOP  # 0
-        assert kind[1] == KIND_LIMIT  # 1
-        assert side[0] == SIDE_SELL_CODE  # SELL -> uint8(255)
-        assert side[1] == SIDE_BUY_CODE  # BUY -> uint8(1)
-        
-        # Verify decoding logic (as used in engine_jit.py)
-        # Decode role
-        decoded_role_0 = OrderRole.EXIT if int(role[0]) == ROLE_EXIT else OrderRole.ENTRY
-        assert decoded_role_0 == OrderRole.EXIT
-        
-        decoded_role_1 = OrderRole.EXIT if int(role[1]) == ROLE_EXIT else OrderRole.ENTRY
-        assert decoded_role_1 == OrderRole.ENTRY
-        
-        # Decode kind
-        decoded_kind_0 = OrderKind.STOP if int(kind[0]) == KIND_STOP else OrderKind.LIMIT
-        assert decoded_kind_0 == OrderKind.STOP
-        
-        decoded_kind_1 = OrderKind.STOP if int(kind[1]) == KIND_STOP else OrderKind.LIMIT
-        assert decoded_kind_1 == OrderKind.LIMIT
-        
-        # Decode side (critical: uint8(255) must decode to SELL)
-        decoded_side_0 = Side.BUY if int(side[0]) == SIDE_BUY_CODE else Side.SELL
-        assert decoded_side_0 == Side.SELL, f"uint8(255) should decode to SELL, got {decoded_side_0}"
-        
-        decoded_side_1 = Side.BUY if int(side[1]) == SIDE_BUY_CODE else Side.SELL
-        assert decoded_side_1 == Side.BUY, f"uint8(1) should decode to BUY, got {decoded_side_1}"
-
-    def test_simulate_arrays_accepts_uint8_enums(self):
-        """
-        Test that simulate_arrays correctly accepts and processes uint8 enum arrays.
-        
-        This ensures the numba kernel can handle uint8 enum values correctly.
-        """
-        # Create minimal test data
-        bars = BarArrays(
-            open=np.array([100.0, 101.0], dtype=np.float64),
-            high=np.array([102.0, 103.0], dtype=np.float64),
-            low=np.array([99.0, 100.0], dtype=np.float64),
-            close=np.array([101.0, 102.0], dtype=np.float64),
-        )
-        
-        # Create intent arrays with uint8 enums
-        order_id = np.array([1], dtype=INDEX_DTYPE)
-        created_bar = np.array([0], dtype=INDEX_DTYPE)
-        role = np.array([ROLE_ENTRY], dtype=INTENT_ENUM_DTYPE)
-        kind = np.array([KIND_STOP], dtype=INTENT_ENUM_DTYPE)
-        side = np.array([SIDE_BUY_CODE], dtype=INTENT_ENUM_DTYPE)  # 1 -> uint8(1)
-        price = np.array([102.0], dtype=INTENT_PRICE_DTYPE)
-        qty = np.array([1], dtype=INDEX_DTYPE)
-        
-        # This should not raise any dtype-related errors
-        fills = simulate_arrays(
-            bars,
-            order_id=order_id,
-            created_bar=created_bar,
-            role=role,
-            kind=kind,
-            side=side,
-            price=price,
-            qty=qty,
-            ttl_bars=1,
-        )
-        
-        # Verify fills were generated (basic sanity check)
-        assert isinstance(fills, list)
-        
-        # Test with SELL side (uint8 value 255)
-        side_sell = np.array([SIDE_SELL_CODE], dtype=INTENT_ENUM_DTYPE)  # 255 (avoid -1 cast)
-        fills_sell = simulate_arrays(
-            bars,
-            order_id=order_id,
-            created_bar=created_bar,
-            role=role,
-            kind=kind,
-            side=side_sell,
-            price=price,
-            qty=qty,
-            ttl_bars=1,
-        )
-        
-        # Should not raise errors
-        assert isinstance(fills_sell, list)
-        
-        # Verify that fills with SELL side decode correctly
-        # Note: numba kernel outputs uint8(255) as 255.0, but _side_from_int correctly decodes it
-        if fills_sell:
-            # The fill's side should be Side.SELL
-            assert fills_sell[0].side == Side.SELL, (
-                f"Fill with uint8(255) side should decode to Side.SELL, got {fills_sell[0].side}"
-            )
-
-    def test_side_output_value_contract(self):
-        """
-        Contract: numba kernel outputs side as float.
-        
-        Note: uint8(255) from SIDE_SELL will output as 255.0, not -1.0.
-        This is acceptable as long as _side_from_int correctly decodes it.
-        
-        With strict mode, invalid values will raise ValueError instead of silently
-        decoding to SELL.
-        """
-        from FishBroWFS_V2.engine.engine_jit import _side_from_int
-        
-        # Test that _side_from_int correctly handles allowed values
-        assert _side_from_int(SIDE_BUY_CODE) == Side.BUY
-        assert _side_from_int(SIDE_SELL_CODE) == Side.SELL, (
-            f"_side_from_int({SIDE_SELL_CODE}) should decode to Side.SELL, not BUY"
-        )
-        
-        # Test that invalid values raise ValueError (strict mode)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(0)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(-1)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(2)
-        with pytest.raises(ValueError, match="Invalid side enum value"):
-            _side_from_int(100)
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_engine_constitution.py
-sha256(source_bytes) = 558a0418da58b3359417f04e0934458c0dc252049e0edd23f68c60d957184372
-bytes = 3459
-redacted = False
---------------------------------------------------------------------------------
-
-import numpy as np
-
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.matcher_core import simulate
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
-
-
-def _bars1(o, h, l, c):
-    return normalize_bars(
-        np.array([o], dtype=np.float64),
-        np.array([h], dtype=np.float64),
-        np.array([l], dtype=np.float64),
-        np.array([c], dtype=np.float64),
-    )
-
-
-def _bars2(o0, h0, l0, c0, o1, h1, l1, c1):
-    return normalize_bars(
-        np.array([o0, o1], dtype=np.float64),
-        np.array([h0, h1], dtype=np.float64),
-        np.array([l0, l1], dtype=np.float64),
-        np.array([c0, c1], dtype=np.float64),
-    )
-
-
-def test_tc01_buy_stop_normal():
-    bars = _bars1(90, 105, 90, 100)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].price == 100.0
-
-
-def test_tc02_buy_stop_gap_up_fill_open():
-    bars = _bars1(105, 110, 105, 108)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].price == 105.0
-
-
-def test_tc03_sell_stop_gap_down_fill_open():
-    bars = _bars1(90, 95, 80, 85)
-    intents = [
-        # Exit a long position requires SELL stop; we will enter long first in same bar is not allowed here,
-        # so we simulate already-in-position by forcing an entry earlier: created_bar=-2 triggers at -1 (ignored),
-        # Instead: use two bars and enter on bar0, exit on bar1.
-    ]
-    bars2 = _bars2(
-        100, 100, 100, 100,   # bar0: enter long at 100 (buy stop gap/normal both ok)
-        90, 95, 80, 85        # bar1: exit stop triggers gap down open
-    )
-    intents2 = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-        OrderIntent(order_id=2, created_bar=0, role=OrderRole.EXIT, kind=OrderKind.STOP, side=Side.SELL, price=100.0),
-    ]
-    fills = simulate(bars2, intents2)
-    assert len(fills) == 2
-    # second fill is the exit
-    assert fills[1].price == 90.0
-
-
-def test_tc08_next_bar_active_not_same_bar():
-    # bar0 has high 105 which would hit stop 102, but order created at bar0 must not fill at bar0.
-    # bar1 hits again, should fill at bar1.
-    bars = _bars2(
-        100, 105, 95, 100,
-        100, 105, 95, 100,
-    )
-    intents = [
-        OrderIntent(order_id=1, created_bar=0, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=102.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].bar_index == 1
-    assert fills[0].price == 102.0
-
-
-def test_tc09_open_equals_stop_gap_branch_but_same_price():
-    bars = _bars1(100, 100, 90, 95)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].price == 100.0
-
-
-def test_tc10_no_fill_when_not_touched():
-    bars = _bars1(90, 95, 90, 92)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert fills == []
-
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_engine_fill_buffer_capacity.py
-sha256(source_bytes) = b16aacd89a6c84199d2ad2a2a936d79bfda771e19c0578b0cec0302b5e448475
-bytes = 2446
-redacted = False
---------------------------------------------------------------------------------
-
-"""Test that engine fill buffer handles extreme intents without crashing."""
-
-from __future__ import annotations
-
-import numpy as np
-import pytest
-
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import STATUS_BUFFER_FULL, STATUS_OK, simulate as simulate_jit
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
-
-
-def test_engine_fill_buffer_capacity_extreme_intents() -> None:
-    """
-    Test that engine handles extreme intents (many intents, few bars) without crashing.
-    
-    Scenario: bars=10, intents=500
-    Each intent is designed to fill (STOP BUY that triggers immediately).
-    """
-    n_bars = 10
-    n_intents = 500
-
-    # Create bars with high volatility to ensure fills
-    bars = normalize_bars(
-        np.array([100.0] * n_bars, dtype=np.float64),
-        np.array([120.0] * n_bars, dtype=np.float64),
-        np.array([80.0] * n_bars, dtype=np.float64),
-        np.array([110.0] * n_bars, dtype=np.float64),
-    )
-
-    # Create many intents that will all fill (STOP BUY at 105, which is below high=120)
-    # Distribute across bars to maximize fills
-    intents = []
-    for i in range(n_intents):
-        created_bar = (i % n_bars) - 1  # Distribute across bars
-        intents.append(
-            OrderIntent(
-                order_id=i,
-                created_bar=created_bar,
-                role=OrderRole.ENTRY,
-                kind=OrderKind.STOP,
-                side=Side.BUY,
-                price=105.0,  # Will trigger on any bar (high=120 > 105)
-                qty=1,
-            )
-        )
-
-    # Should not crash or segfault
-    try:
-        fills = simulate_jit(bars, intents)
-        # If we get here, no segfault occurred
-        
-        # Fills should be bounded by n_intents (each intent can produce at most 1 fill)
-        assert len(fills) <= n_intents, f"fills ({len(fills)}) should not exceed n_intents ({n_intents})"
-        
-        # Should have some fills (most intents should trigger)
-        assert len(fills) > 0, "Should have at least some fills"
-        
-    except RuntimeError as e:
-        # If buffer is full, error message should be graceful (not segfault)
-        error_msg = str(e)
-        assert "buffer full" in error_msg.lower() or "buffer_full" in error_msg.lower(), (
-            f"Expected buffer full error, got: {error_msg}"
-        )
-        # This is acceptable - buffer protection worked correctly
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_engine_gaps_and_priority.py
-sha256(source_bytes) = 7085a766fa19c133dfe62251db24fe8300f77deaf7e81de7d5289919230e9b37
-bytes = 2900
-redacted = False
---------------------------------------------------------------------------------
-
-import numpy as np
-
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.matcher_core import simulate
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
-
-
-def _bars1(o, h, l, c):
-    return normalize_bars(
-        np.array([o], dtype=np.float64),
-        np.array([h], dtype=np.float64),
-        np.array([l], dtype=np.float64),
-        np.array([c], dtype=np.float64),
-    )
-
-
-def test_tc04_buy_limit_gap_down_better_fill_open():
-    bars = _bars1(90, 95, 85, 92)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.LIMIT, side=Side.BUY, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].price == 90.0
-
-
-def test_tc05_sell_limit_gap_up_better_fill_open():
-    bars = _bars1(105, 110, 100, 108)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.LIMIT, side=Side.SELL, price=100.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 1
-    assert fills[0].price == 105.0
-
-
-def test_tc06_priority_stop_wins_over_limit_on_exit():
-    # First enter long on this same bar, then exit on next bar where both stop and limit are triggerable.
-    # Bar0: enter long at 100 (buy stop hits)
-    # Bar1: both exit stop 90 and exit limit 110 are touchable (high=110, low=80), STOP must win (fill=90)
-    bars = normalize_bars(
-        np.array([100, 100], dtype=np.float64),
-        np.array([110, 110], dtype=np.float64),
-        np.array([90, 80], dtype=np.float64),
-        np.array([100, 90], dtype=np.float64),
-    )
-
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=100.0),
-        OrderIntent(order_id=2, created_bar=0, role=OrderRole.EXIT, kind=OrderKind.STOP, side=Side.SELL, price=90.0),
-        OrderIntent(order_id=3, created_bar=0, role=OrderRole.EXIT, kind=OrderKind.LIMIT, side=Side.SELL, price=110.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 2
-    # Second fill is exit; STOP wins -> 90
-    assert fills[1].kind == OrderKind.STOP
-    assert fills[1].price == 90.0
-
-
-def test_tc07_same_bar_entry_then_exit():
-    # Same bar allows Entry then Exit.
-    # Bar: O=100 H=120 L=90 C=110
-    # Entry: Buy Stop 105 -> fills at 105 (since open 100 < 105 and high 120 >= 105)
-    # Exit: Sell Stop 95 -> after entry, low 90 <= 95 -> fills at 95
-    bars = _bars1(100, 120, 90, 110)
-    intents = [
-        OrderIntent(order_id=1, created_bar=-1, role=OrderRole.ENTRY, kind=OrderKind.STOP, side=Side.BUY, price=105.0),
-        OrderIntent(order_id=2, created_bar=-1, role=OrderRole.EXIT, kind=OrderKind.STOP, side=Side.SELL, price=95.0),
-    ]
-    fills = simulate(bars, intents)
-    assert len(fills) == 2
-    assert fills[0].price == 105.0
-    assert fills[1].price == 95.0
-
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_engine_jit_active_book_contract.py
-sha256(source_bytes) = d35dcb498636c6c25ef00e4efc5f31e9b326a667cdecff9a2f9208d277960f56
-bytes = 8869
-redacted = False
---------------------------------------------------------------------------------
-
-from __future__ import annotations
-
-import os
-
-import numpy as np
-import pytest
-
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import _simulate_with_ttl, simulate as simulate_jit
-from FishBroWFS_V2.engine.matcher_core import simulate as simulate_py
-from FishBroWFS_V2.engine.types import Fill, OrderIntent, OrderKind, OrderRole, Side
-
-
-def _assert_fills_equal(a: list[Fill], b: list[Fill]) -> None:
-    assert len(a) == len(b)
-    for fa, fb in zip(a, b):
-        assert fa.bar_index == fb.bar_index
-        assert fa.role == fb.role
-        assert fa.kind == fb.kind
-        assert fa.side == fb.side
-        assert fa.qty == fb.qty
-        assert fa.order_id == fb.order_id
-        assert abs(fa.price - fb.price) <= 1e-9
-
-
-def test_jit_sorted_invariance_matches_python() -> None:
-    # Bars: 3 bars, deterministic highs/lows for STOP triggers
-    bars = normalize_bars(
-        np.array([100.0, 100.0, 100.0], dtype=np.float64),
-        np.array([110.0, 110.0, 110.0], dtype=np.float64),
-        np.array([90.0, 90.0, 90.0], dtype=np.float64),
-        np.array([100.0, 100.0, 100.0], dtype=np.float64),
-    )
-
-    # Intents across multiple activate bars (created_bar = t-1)
-    intents = [
-        # activate on bar0 (created -1)
-        OrderIntent(3, -1, OrderRole.EXIT, OrderKind.STOP, Side.SELL, 95.0, 1),
-        OrderIntent(2, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 105.0, 1),
-        # activate on bar1 (created 0)
-        OrderIntent(6, 0, OrderRole.EXIT, OrderKind.LIMIT, Side.SELL, 110.0, 1),
-        OrderIntent(5, 0, OrderRole.ENTRY, OrderKind.LIMIT, Side.BUY, 99.0, 1),
-        # activate on bar2 (created 1)
-        OrderIntent(9, 1, OrderRole.EXIT, OrderKind.STOP, Side.SELL, 90.0, 1),
-        OrderIntent(8, 1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
-    ]
-
-    shuffled = list(intents)
-    rng = np.random.default_rng(123)
-    rng.shuffle(shuffled)
-
-    # JIT simulate sorts internally for cursor+book; it must be invariant to input ordering.
-    jit_a = simulate_jit(bars, shuffled)
-    jit_b = simulate_jit(bars, intents)
-    _assert_fills_equal(jit_a, jit_b)
-
-    # Also must match Python reference semantics.
-    py = simulate_py(bars, shuffled)
-    _assert_fills_equal(jit_a, py)
-
-
-def test_one_bar_max_one_entry_one_exit_defense() -> None:
-    # Single bar is enough: created_bar=-1 activates on bar 0.
-    bars = normalize_bars(
-        np.array([100.0], dtype=np.float64),
-        np.array([120.0], dtype=np.float64),
-        np.array([80.0], dtype=np.float64),
-        np.array([110.0], dtype=np.float64),
-    )
-
-    # Same activate bar contains Entry1, Exit1, Entry2.
-    intents = [
-        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 105.0, 1),
-        OrderIntent(2, -1, OrderRole.EXIT, OrderKind.STOP, Side.SELL, 95.0, 1),
-        OrderIntent(3, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 110.0, 1),
-    ]
-
-    fills = simulate_jit(bars, intents)
-    assert len(fills) == 2
-    assert fills[0].order_id == 1
-    assert fills[1].order_id == 2
-
-
-def test_ttl_one_shot_vs_gtc_extension_point() -> None:
-    # Skip if JIT is disabled; ttl=0 is a JIT-only extension behavior.
-    import FishBroWFS_V2.engine.engine_jit as ej
-
-    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        pytest.skip("numba not available or disabled; ttl=0 extension tested only under JIT")
-
-    # Bar0: stop not touched, Bar1: stop touched
-    bars = normalize_bars(
-        np.array([90.0, 90.0], dtype=np.float64),
-        np.array([99.0, 110.0], dtype=np.float64),
-        np.array([90.0, 90.0], dtype=np.float64),
-        np.array([95.0, 100.0], dtype=np.float64),
-    )
-    intents = [
-        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
-    ]
-
-    # ttl=1 (default semantics): active only on bar0 -> no fill
-    fills_ttl1 = simulate_jit(bars, intents)
-    assert fills_ttl1 == []
-
-    # ttl=0 (GTC extension): order stays in book and can fill on bar1
-    fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
-    assert len(fills_gtc) == 1
-    assert fills_gtc[0].bar_index == 1
-    assert abs(fills_gtc[0].price - 100.0) <= 1e-9
-
-
-def test_ttl_one_expires_before_fill_opportunity() -> None:
-    """
-    Case A: ttl=1 is one-shot next-bar-only (does not fill if not triggered on activate bar).
-    
-    Scenario:
-      - BUY STOP order, created_bar=-1 (activates at bar0)
-      - bar0: high < stop (not triggered)
-      - bar1: high >= stop (would trigger, but order expired)
-      - ttl_bars=1: order should expire after bar0, not fill on bar1
-    """
-    import FishBroWFS_V2.engine.engine_jit as ej
-
-    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
-
-    # 2 bars: bar0 doesn't trigger, bar1 would trigger
-    bars = normalize_bars(
-        np.array([90.0, 90.0], dtype=np.float64),  # open
-        np.array([99.0, 110.0], dtype=np.float64),  # high: bar0 < 100, bar1 >= 100
-        np.array([90.0, 90.0], dtype=np.float64),  # low
-        np.array([95.0, 100.0], dtype=np.float64),  # close
-    )
-    intents = [
-        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
-    ]
-
-    # ttl_bars=1: activate_bar=0, expire_bar=0, so at bar1 (t=1) > expire_bar (0), order expired
-    fills_ttl1 = _simulate_with_ttl(bars, intents, ttl_bars=1)
-    assert len(fills_ttl1) == 0, "ttl=1 should expire after activate bar, no fill on bar1"
-
-    # Verify JIT matches expected semantics
-    # activate_bar = created_bar + 1 = -1 + 1 = 0
-    # expire_bar = activate_bar + (ttl_bars - 1) = 0 + (1 - 1) = 0
-    # At bar1 (t=1), t > expire_bar (0), so order should be removed before Step B/C
-
-
-def test_ttl_zero_gtc_never_expires() -> None:
-    """
-    Case B: ttl=0 is GTC (Good Till Canceled), order never expires.
-    
-    Scenario:
-      - BUY STOP order, created_bar=-1 (activates at bar0)
-      - bar0: high < stop (not triggered)
-      - bar1: high >= stop (triggers)
-      - ttl_bars=0: order should remain active and fill on bar1
-    """
-    import FishBroWFS_V2.engine.engine_jit as ej
-
-    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
-
-    # 2 bars: bar0 doesn't trigger, bar1 triggers
-    bars = normalize_bars(
-        np.array([90.0, 90.0], dtype=np.float64),  # open
-        np.array([99.0, 110.0], dtype=np.float64),  # high: bar0 < 100, bar1 >= 100
-        np.array([90.0, 90.0], dtype=np.float64),  # low
-        np.array([95.0, 100.0], dtype=np.float64),  # close
-    )
-    intents = [
-        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
-    ]
-
-    # ttl_bars=0: GTC, order never expires, should fill on bar1
-    fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
-    assert len(fills_gtc) == 1, "ttl=0 (GTC) should allow fill on bar1"
-    assert fills_gtc[0].bar_index == 1, "Fill should occur on bar1"
-    assert fills_gtc[0].order_id == 1
-    assert abs(fills_gtc[0].price - 100.0) <= 1e-9, "Fill price should be stop price"
-
-
-def test_ttl_semantics_three_bars() -> None:
-    """
-    Additional test: verify ttl=1 semantics with 3 bars to ensure expiration timing is correct.
-    
-    Scenario:
-      - BUY STOP order, created_bar=-1 (activates at bar0)
-      - bar0: high < stop (not triggered)
-      - bar1: high < stop (not triggered)
-      - bar2: high >= stop (would trigger, but order expired)
-      - ttl_bars=1: order should expire after bar0, not fill on bar2
-    """
-    import FishBroWFS_V2.engine.engine_jit as ej
-
-    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
-
-    # 3 bars: bar0 and bar1 don't trigger, bar2 would trigger
-    bars = normalize_bars(
-        np.array([90.0, 90.0, 90.0], dtype=np.float64),  # open
-        np.array([99.0, 99.0, 110.0], dtype=np.float64),  # high: bar0,bar1 < 100, bar2 >= 100
-        np.array([90.0, 90.0, 90.0], dtype=np.float64),  # low
-        np.array([95.0, 95.0, 100.0], dtype=np.float64),  # close
-    )
-    intents = [
-        OrderIntent(1, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 100.0, 1),
-    ]
-
-    # ttl_bars=1: activate_bar=0, expire_bar=0, so at bar1 (t=1) > expire_bar (0), order expired
-    fills_ttl1 = _simulate_with_ttl(bars, intents, ttl_bars=1)
-    assert len(fills_ttl1) == 0, "ttl=1 should expire after activate bar, no fill on bar2"
-
-    # ttl_bars=0: GTC, should fill on bar2
-    fills_gtc = _simulate_with_ttl(bars, intents, ttl_bars=0)
-    assert len(fills_gtc) == 1, "ttl=0 (GTC) should allow fill on bar2"
-    assert fills_gtc[0].bar_index == 2, "Fill should occur on bar2"
-
-
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_engine_jit_fill_buffer_capacity.py
-sha256(source_bytes) = 616a73f1caad6fdad950c6c6f74cb4467cb5afb3fcd4bb1b8eccda09b729631a
-bytes = 5299
-redacted = False
---------------------------------------------------------------------------------
-
-"""Test that fill buffer scales with n_intents and does not segfault."""
-
-from __future__ import annotations
-
-import os
-
-import numpy as np
-import pytest
-
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import STATUS_BUFFER_FULL, simulate as simulate_jit
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
-
-
-def test_fill_buffer_scales_with_intents():
-    """
-    Test that buffer size accommodates n_intents > n_bars*2.
-    
-    Scenario: n_bars=10, n_intents=100
-    Each intent is designed to fill (market entry with stop that triggers immediately).
-    This tests that buffer scales with n_intents, not just n_bars*2.
-    """
-    n_bars = 10
-    n_intents = 100
-    
-    # Create bars with high volatility to ensure fills
-    bars = normalize_bars(
-        np.array([100.0] * n_bars, dtype=np.float64),
-        np.array([120.0] * n_bars, dtype=np.float64),
-        np.array([80.0] * n_bars, dtype=np.float64),
-        np.array([110.0] * n_bars, dtype=np.float64),
-    )
-    
-    # Create many intents that will all fill (STOP BUY at 105, which is below high=120)
-    # Each intent activates on a different bar to maximize fills
-    intents = []
-    for i in range(n_intents):
-        created_bar = (i % n_bars) - 1  # Distribute across bars
-        intents.append(
-            OrderIntent(
-                order_id=i,
-                created_bar=created_bar,
-                role=OrderRole.ENTRY,
-                kind=OrderKind.STOP,
-                side=Side.BUY,
-                price=105.0,  # Will trigger on any bar (high=120 > 105)
-                qty=1,
-            )
-        )
-    
-    # Should not crash or segfault
-    try:
-        fills = simulate_jit(bars, intents)
-        # If we get here, no segfault occurred
-        
-        # Fills should be bounded by n_intents (each intent can produce at most 1 fill)
-        assert len(fills) <= n_intents, f"fills ({len(fills)}) should not exceed n_intents ({n_intents})"
-        
-        # In this scenario, we expect many fills (most intents should trigger)
-        # But exact count depends on bar distribution, so we just check it's reasonable
-        assert len(fills) > 0, "Should have at least some fills"
-        
-    except RuntimeError as e:
-        # If buffer is full, error message should be graceful (not segfault)
-        error_msg = str(e)
-        assert "buffer full" in error_msg.lower() or "buffer_full" in error_msg.lower(), (
-            f"Expected buffer full error, got: {error_msg}"
-        )
-        # This is acceptable - buffer protection worked correctly
-
-
-def test_fill_buffer_protection_prevents_segfault():
-    """
-    Test that buffer protection prevents segfault even with extreme intents.
-    
-    This test ensures STATUS_BUFFER_FULL is returned gracefully instead of segfaulting.
-    """
-    import FishBroWFS_V2.engine.engine_jit as ej
-    
-    # Skip if JIT is disabled (buffer protection is in JIT kernel)
-    if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        pytest.skip("numba not available or disabled; buffer protection tested only under JIT")
-    
-    n_bars = 5
-    n_intents = 1000  # Extreme: way more intents than bars
-    
-    bars = normalize_bars(
-        np.array([100.0] * n_bars, dtype=np.float64),
-        np.array([120.0] * n_bars, dtype=np.float64),
-        np.array([80.0] * n_bars, dtype=np.float64),
-        np.array([110.0] * n_bars, dtype=np.float64),
-    )
-    
-    # Create intents that will all try to fill
-    intents = []
-    for i in range(n_intents):
-        # All activate on bar 0 (created_bar=-1)
-        intents.append(
-            OrderIntent(
-                order_id=i,
-                created_bar=-1,
-                role=OrderRole.ENTRY,
-                kind=OrderKind.STOP,
-                side=Side.BUY,
-                price=105.0,  # Will trigger
-                qty=1,
-            )
-        )
-    
-    # Should not segfault - either succeed or return graceful error
-    try:
-        fills = simulate_jit(bars, intents)
-        # If successful, fills should be bounded
-        assert len(fills) <= n_intents
-        # With this many intents on one bar, we might hit buffer limit
-        # But should not crash
-    except RuntimeError as e:
-        # Graceful error is acceptable
-        assert "buffer" in str(e).lower() or "full" in str(e).lower(), (
-            f"Expected buffer-related error, got: {e}"
-        )
-
-
-def test_fill_buffer_minimum_size():
-    """
-    Test that buffer is at least n_bars*2 (default heuristic).
-    
-    Even with few intents, buffer should accommodate reasonable fill rate.
-    """
-    n_bars = 20
-    n_intents = 5  # Few intents
-    
-    bars = normalize_bars(
-        np.array([100.0] * n_bars, dtype=np.float64),
-        np.array([120.0] * n_bars, dtype=np.float64),
-        np.array([80.0] * n_bars, dtype=np.float64),
-        np.array([110.0] * n_bars, dtype=np.float64),
-    )
-    
-    intents = [
-        OrderIntent(i, -1, OrderRole.ENTRY, OrderKind.STOP, Side.BUY, 105.0, 1)
-        for i in range(n_intents)
-    ]
-    
-    # Should work fine (buffer should be at least n_bars*2 = 40, which is > n_intents=5)
-    fills = simulate_jit(bars, intents)
-    assert len(fills) <= n_intents
-    # Should not crash
-
-
-
---------------------------------------------------------------------------------
-
-FILE tests/test_entry_only_regression.py
-sha256(source_bytes) = 77b0a1628ec2ff998aba61a8173e67ec7b70ff68003625542bd7ffc8e2bb1cd5
-bytes = 7008
-redacted = False
---------------------------------------------------------------------------------
-
-"""
-Regression test for entry-only fills scenario.
-
-This test ensures that when entry fills occur but exit fills do not,
-the metrics behavior is correct:
-- trades=0 is valid (no completed round-trips)
-- metrics may be all-zero or have non-zero values depending on implementation
-- The system should not crash or produce invalid metrics
-"""
-from __future__ import annotations
-
-import numpy as np
-import os
-
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
-
-
-def test_entry_only_fills_metrics_behavior() -> None:
-    """
-    Test metrics behavior when only entry fills occur (no exit fills).
-    
-    Scenario:
-    - Entry stop triggers at t=31 (high[31] crosses buy stop=high[30]=120)
-    - Exit stop never triggers (all subsequent lows stay above exit stop)
-    - Result: entry_fills_total > 0, exit_fills_total == 0, trades == 0
-    """
-    # Ensure clean environment
-    old_trigger_rate = os.environ.pop("FISHBRO_PERF_TRIGGER_RATE", None)
-    old_param_subsample_rate = os.environ.pop("FISHBRO_PERF_PARAM_SUBSAMPLE_RATE", None)
-    old_param_subsample_seed = os.environ.pop("FISHBRO_PERF_PARAM_SUBSAMPLE_SEED", None)
-    
-    try:
-        # Set required environment variables
-        os.environ["FISHBRO_PERF_TRIGGER_RATE"] = "1.0"
-        os.environ["FISHBRO_PERF_PARAM_SUBSAMPLE_RATE"] = "1.0"
-        os.environ["FISHBRO_PERF_PARAM_SUBSAMPLE_SEED"] = "42"
-        
-        n = 60
-        
-        # Construct OHLC as specified
-        # Initial: all flat at 100.0
-        close = np.full(n, 100.0, dtype=np.float64)
-        open_ = close.copy()
-        high = np.full(n, 100.5, dtype=np.float64)
-        low = np.full(n, 99.5, dtype=np.float64)
-        
-        # At t=30: set high[30]=120.0 (forms Donchian high point)
-        high[30] = 120.0
-        
-        # At t=31: set high[31]=121.0 and low[31]=110.0
-        # This ensures next-bar buy stop=high[30]=120 will be triggered
-        high[31] = 121.0
-        low[31] = 110.0
-        
-        # t>=32: set low[t]=110.1, high[t]=111.0, close[t]=110.5
-        # This ensures exit stop will never trigger (low stays above exit stop)
-        for t in range(32, n):
-            low[t] = 110.1  # Slightly above 110.0 to avoid triggering exit stop
-            high[t] = 111.0
-            close[t] = 110.5
-            open_[t] = 110.5
-        
-        # Ensure OHLC consistency
-        high = np.maximum(high, np.maximum(open_, close))
-        low = np.minimum(low, np.minimum(open_, close))
-        
-        # Single param: channel_len=20, atr_len=10, stop_mult=1.0
-        params_matrix = np.array([[20, 10, 1.0]], dtype=np.float64)
-        
-        result = run_grid(
-            open_=open_,
-            high=high,
-            low=low,
-            close=close,
-            params_matrix=params_matrix,
-            commission=0.0,
-            slip=0.0,
-            order_qty=1,
-            sort_params=True,
-            force_close_last=False,  # Critical: do not force close
-        )
-        
-        # Verify metrics shape
-        metrics = result.get("metrics")
-        assert metrics is not None, "metrics must exist"
-        assert isinstance(metrics, np.ndarray), "metrics must be np.ndarray"
-        assert metrics.shape == (1, 3), (
-            f"metrics shape should be (1, 3), got {metrics.shape}"
-        )
-        
-        # Verify perf dict
-        perf = result.get("perf", {})
-        assert isinstance(perf, dict), "perf must be a dict"
-        
-        # Extract perf fields for entry-only invariants
-        fills_total = int(perf.get("fills_total", 0))
-        entry_fills_total = int(perf.get("entry_fills_total", 0))
-        exit_fills_total = int(perf.get("exit_fills_total", 0))
-        entry_intents_total = int(perf.get("entry_intents_total", 0))
-        exit_intents_total = int(perf.get("exit_intents_total", 0))
-        
-        # Assertions: lock semantics, not performance
-        assert fills_total >= 1, (
-            f"fills_total ({fills_total}) should be >= 1 (entry fill should occur)"
-        )
-        
-        assert entry_fills_total >= 1, (
-            f"entry_fills_total ({entry_fills_total}) should be >= 1"
-        )
-        
-        assert exit_fills_total == 0, (
-            f"exit_fills_total ({exit_fills_total}) should be 0 (exit stop should never trigger)"
-        )
-        
-        # If exit intents exist, fine; but they must not fill.
-        assert exit_intents_total >= 0, (
-            f"exit_intents_total ({exit_intents_total}) should be >= 0"
-        )
-        
-        assert entry_intents_total >= 1, (
-            f"entry_intents_total ({entry_intents_total}) should be >= 1"
-        )
-        
-        # Entry-only scenario: no exit fills => no completed trades.
-        # Our metrics are trade-based, so metrics may legitimately remain all zeros.
-        assert np.all(np.isfinite(metrics[0])), f"metrics[0] must be finite, got {metrics[0]}"
-        
-        # Verify trades and net_profit from result or perf (compatible with different return locations)
-        trades = int(result.get("trades", perf.get("trades", 0)) or 0)
-        net_profit = float(result.get("net_profit", perf.get("net_profit", 0.0)) or 0.0)
-        
-        assert trades == 0, f"entry-only must have trades==0, got {trades}"
-        assert abs(net_profit) <= 1e-12, f"entry-only must have net_profit==0, got {net_profit}"
-        
-        # Verify metrics values match
-        assert int(metrics[0, 1]) == 0, f"metrics[0, 1] (trades) must be 0, got {metrics[0, 1]}"
-        assert abs(float(metrics[0, 0])) <= 1e-12, f"metrics[0, 0] (net_profit) must be 0, got {metrics[0, 0]}"
-        assert abs(float(metrics[0, 2])) <= 1e-12, f"metrics[0, 2] (max_dd) must be 0, got {metrics[0, 2]}"
-        
-        # Evidence-chain sanity (optional but recommended)
-        if "metrics_subset_abs_sum" in perf:
-            assert float(perf["metrics_subset_abs_sum"]) >= 0.0
-        if "metrics_subset_nonzero_rows" in perf:
-            assert int(perf["metrics_subset_nonzero_rows"]) == 0
-        
-        # Optional: Check if position tracking exists (entry-only should end in open position)
-        pos_last = perf.get("position_last", perf.get("pos_last", perf.get("last_position", None)))
-        if pos_last is not None:
-            assert int(pos_last) != 0, f"entry-only should end in open position, got {pos_last}"
-        
-    finally:
-        # Restore environment
-        if old_trigger_rate is None:
-            os.environ.pop("FISHBRO_PERF_TRIGGER_RATE", None)
-        else:
-            os.environ["FISHBRO_PERF_TRIGGER_RATE"] = old_trigger_rate
-        
-        if old_param_subsample_rate is None:
-            os.environ.pop("FISHBRO_PERF_PARAM_SUBSAMPLE_RATE", None)
-        else:
-            os.environ["FISHBRO_PERF_PARAM_SUBSAMPLE_RATE"] = old_param_subsample_rate
-        
-        if old_param_subsample_seed is None:
-            os.environ.pop("FISHBRO_PERF_PARAM_SUBSAMPLE_SEED", None)
-        else:
-            os.environ["FISHBRO_PERF_PARAM_SUBSAMPLE_SEED"] = old_param_subsample_seed
 
 
 

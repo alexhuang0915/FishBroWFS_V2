@@ -4,43 +4,43 @@
       "file_count": 59,
       "filename": "SNAPSHOT_0001.md",
       "index": 1,
-      "sha256": "61716f8e7938b76e5a88a2e71f4d9e8bfed34c897a12b5fb70bc19632c10d204",
-      "size": 765366
+      "sha256": "28a6e349262ff14e641b2d9447e96d6488c5278cc0b4a321291543212a4086f5",
+      "size": 758165
     },
     {
-      "file_count": 101,
+      "file_count": 94,
       "filename": "SNAPSHOT_0002.md",
       "index": 2,
-      "sha256": "a29713b4c0ad9afe4f984babffafc79a3493d1cebfbb961524564876b3c87ed4",
-      "size": 716348
-    },
-    {
-      "file_count": 100,
-      "filename": "SNAPSHOT_0003.md",
-      "index": 3,
-      "sha256": "948fb1162df7d4e94d62f2428233773d8194aeebb9c2aca6e1cd7677a0f1e68f",
-      "size": 710926
-    },
-    {
-      "file_count": 121,
-      "filename": "SNAPSHOT_0004.md",
-      "index": 4,
-      "sha256": "d6e9a83348d34682699db3ed2e48517812c21fd474010eb0920be2f433f540e6",
-      "size": 693933
+      "sha256": "337487796eee697f138a2da795d2226944058cc942077f69a5be796b547488e8",
+      "size": 714417
     },
     {
       "file_count": 102,
-      "filename": "SNAPSHOT_0005.md",
-      "index": 5,
-      "sha256": "9d7db72123cfaef9d94f753684392131d240bde25603d9c25ed1eb1340222b38",
-      "size": 700580
+      "filename": "SNAPSHOT_0003.md",
+      "index": 3,
+      "sha256": "cedaf10d6c9942539729f6cc7cd79ffd969707138419ff425c5c738e27e98aa8",
+      "size": 707961
     },
     {
-      "file_count": 74,
+      "file_count": 119,
+      "filename": "SNAPSHOT_0004.md",
+      "index": 4,
+      "sha256": "a950bc0d7c6e2ef3065d3441faa8375861f78d801d40b2acb3460fc3488817cd",
+      "size": 700903
+    },
+    {
+      "file_count": 104,
+      "filename": "SNAPSHOT_0005.md",
+      "index": 5,
+      "sha256": "6054f14c90522c6c0289d2c27551ba2c38ee69e80c2b67e8f4a9f15407ce7134",
+      "size": 701424
+    },
+    {
+      "file_count": 69,
       "filename": "SNAPSHOT_0006.md",
       "index": 6,
-      "sha256": "767efb75616b3c6ca10a0b161a082a6f07721278176b04f4d5f7d8a9a0900324",
-      "size": 598012
+      "sha256": "b35eb37c84bc2ab11c4def6e2bbc96f79a34a2898362e2f2c4bd608b8b2a3af7",
+      "size": 614780
     }
   ],
   "files": [
@@ -55,8 +55,8 @@
       "include_content": true,
       "path": "Makefile",
       "redacted": true,
-      "sha256": "2ec119f6b2ec35d5dea65fd16baf805b45f4f679e11c0552d5d577457c5679a1",
-      "size": 17651
+      "sha256": "f623bec9f39f63eb971b31eb48435320ecf6376acc5a49ceaa7625b23d97e475",
+      "size": 17679
     },
     {
       "include_content": true,
@@ -76,8 +76,8 @@
       "include_content": true,
       "path": "SYSTEM_FULL_SNAPSHOT.md",
       "redacted": false,
-      "sha256": "93a4864717109347bca23bce425bf36b2625236e432d5cdc346de498fdf612ba",
-      "size": 40743
+      "sha256": "26e9ee2a215afdc301bb0330bd0d6ba87d16dff1d3908ae7457e6b12369dfce2",
+      "size": 55861
     },
     {
       "include_content": true,
@@ -95,10 +95,17 @@
     },
     {
       "include_content": true,
+      "path": "pytest.ini",
+      "redacted": false,
+      "sha256": "c3f4ccfc9c4b729312c9a09e8ffcaf4ea772123470a35b42974d5173cec8e91e",
+      "size": 153
+    },
+    {
+      "include_content": true,
       "path": "requirements.txt",
       "redacted": false,
-      "sha256": "10de6a75b8a2c1df62c66435a2ed556748983f87405537e9932ca3a8c1ba58f1",
-      "size": 1519
+      "sha256": "ecc874655d9d50e324260c49b4e6e08ebab0bacc52e9305ff13b86204f2bf592",
+      "size": 1687
     },
     {
       "include_content": true,
@@ -134,20 +141,6 @@
       "redacted": false,
       "sha256": "762d389ab786f3eef20ffdd1f84b4ccd5a004997cae4308898c253da459aa0a8",
       "size": 3830
-    },
-    {
-      "include_content": true,
-      "path": "GM_Huang/clean_repo_caches.py",
-      "redacted": false,
-      "sha256": "25fc11e02eaa2f8c5e808161e7ac6569dba8d3ba498c8c5e64c0cf9d22cb8d56",
-      "size": 2133
-    },
-    {
-      "include_content": true,
-      "path": "GM_Huang/release_tool.py",
-      "redacted": false,
-      "sha256": "eee9a8e46a0f6e943720b973eeddce6c4a0dff259f06bed5ba2677d84aa1c574",
-      "size": 8983
     },
     {
       "include_content": true,
@@ -270,6 +263,20 @@
     },
     {
       "include_content": true,
+      "path": "docs/NO_FOG_DEEP_CLEAN_PHASE_A.md",
+      "redacted": false,
+      "sha256": "023c984c163c49583c4010f0527357cbfa8236ad00193aa65780d39f72881284",
+      "size": 10486
+    },
+    {
+      "include_content": true,
+      "path": "docs/NO_FOG_DEEP_CLEAN_PHASE_B1_PLAN.md",
+      "redacted": false,
+      "sha256": "69c97b5dd48fa151f94fb2086ff4cb16deda15bcf3f26707c9f445875ad76fb5",
+      "size": 15128
+    },
+    {
+      "include_content": true,
       "path": "docs/PHASE12_RESEARCH_JOB_WIZARD.md",
       "redacted": false,
       "sha256": "55d2d307c90113178b8a62cdff173b56796d21bb986aed5f9e0ef5b0f02de86a",
@@ -288,6 +295,13 @@
       "redacted": false,
       "sha256": "7b0415a4c613c9c8446d4f1a5008f58cf5266f972073eb37fdc95c805ed67729",
       "size": 6251
+    },
+    {
+      "include_content": true,
+      "path": "docs/STAGE0_TEST_RATIONALIZATION_ANALYSIS.md",
+      "redacted": false,
+      "sha256": "85d66f188a608655f142153be01d81c3542e7404bc4de006dcc8cfef1a3a7ce1",
+      "size": 3212
     },
     {
       "include_content": true,
@@ -459,13 +473,6 @@
     },
     {
       "include_content": true,
-      "path": "scripts/restore_from_release_txt_force.py",
-      "redacted": false,
-      "sha256": "44bc391a987303e6974820a9ba5861fae986b926debc5c15018a543ecfb3d565",
-      "size": 1453
-    },
-    {
-      "include_content": true,
       "path": "scripts/run_funnel.py",
       "redacted": false,
       "sha256": "22e36315315c51870bf5958b9a74af926c1fcfffb466213138c4820d77349e36",
@@ -517,8 +524,8 @@
       "include_content": true,
       "path": "scripts/no_fog/generate_full_snapshot.py",
       "redacted": true,
-      "sha256": "6e3105b1adaddb988b75a206844b5f36e52b1c7af48a6c347bc769c83ce53d56",
-      "size": 17780
+      "sha256": "a30b96dd75db6143280d7bae75e07dd81c66907c55c9c1ce01c7c42bee5c09d7",
+      "size": 17794
     },
     {
       "include_content": true,
@@ -526,6 +533,27 @@
       "redacted": false,
       "sha256": "1969fadade49b291dd418d6f25e702d7e1cf83ccf1e6195b75e1ffe90444282f",
       "size": 11690
+    },
+    {
+      "include_content": true,
+      "path": "scripts/no_fog/phase_a_audit.py",
+      "redacted": false,
+      "sha256": "3d4114d9afd14b047970d5b04e0a6b823bab36ccd41a090de0eaa1f007c8eca0",
+      "size": 9245
+    },
+    {
+      "include_content": true,
+      "path": "scripts/tools/GM_Huang/clean_repo_caches.py",
+      "redacted": false,
+      "sha256": "25fc11e02eaa2f8c5e808161e7ac6569dba8d3ba498c8c5e64c0cf9d22cb8d56",
+      "size": 2133
+    },
+    {
+      "include_content": true,
+      "path": "scripts/tools/GM_Huang/release_tool.py",
+      "redacted": false,
+      "sha256": "eee9a8e46a0f6e943720b973eeddce6c4a0dff259f06bed5ba2677d84aa1c574",
+      "size": 8983
     },
     {
       "include_content": true,
@@ -797,8 +825,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/control/dataset_catalog.py",
       "redacted": false,
-      "sha256": "68aedee9fafba44296827dc4c0cfbb620d9cda80670c1b8c1007e5bac5f3ce6b",
-      "size": 5054
+      "sha256": "257ce99c60997e2a35b0f9cf724d947c2344e97648cea30d6f452e693cb680c7",
+      "size": 5287
     },
     {
       "include_content": true,
@@ -867,8 +895,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/control/input_manifest.py",
       "redacted": false,
-      "sha256": "8e048ed2268517acf210e0decb3dab1be082b3138ee9c4c05e8c2aa81eac7994",
-      "size": 13253
+      "sha256": "473cad8568afade416dd9ccbf037ac0bb08b271bd91ffcac4ba472e2d9489861",
+      "size": 13980
     },
     {
       "include_content": true,
@@ -1203,8 +1231,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/core/processor.py",
       "redacted": false,
-      "sha256": "9a4b2341efd5b5832c32894f56383c8687c35b3fa0c07291470faf808518dbd9",
-      "size": 17813
+      "sha256": "5a2061eeeb5959378f8fa51060e16bd88509a449aa5e96de5ef8ba4649e39341",
+      "size": 22696
     },
     {
       "include_content": true,
@@ -1588,8 +1616,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/gui/adapters/intent_bridge.py",
       "redacted": false,
-      "sha256": "77806c3872e95a1c5e1ae4cf70c100cf1b1704ec829b0b694c33b0527345eef1",
-      "size": 21726
+      "sha256": "38dc3e2df0c32e13efbc6687fbfab420c2e142df7edd5a20edb98833440e8845",
+      "size": 22196
     },
     {
       "include_content": true,
@@ -1840,8 +1868,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/gui/services/reload_service.py",
       "redacted": false,
-      "sha256": "b80fcc1e996552f0c1ba3458a3155eaee88a1b9dc604419459ea6ab542964fb3",
-      "size": 16858
+      "sha256": "3147294ae8337abf10f65b96feac655956afcc702acd0a2e6dab460e473b80c3",
+      "size": 18387
     },
     {
       "include_content": true,
@@ -2036,8 +2064,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/pipeline/funnel.py",
       "redacted": false,
-      "sha256": "ee3b91e4f143383035667f29473d8af0a821978af5e732f1cdc79aba2da5ec65",
-      "size": 3386
+      "sha256": "3c1fd4656e13d9b307ecc17e11a691ee6076cea59d7490254620f4c5191f8a91",
+      "size": 3878
     },
     {
       "include_content": true,
@@ -2092,8 +2120,8 @@
       "include_content": true,
       "path": "src/FishBroWFS_V2/pipeline/runner_adapter.py",
       "redacted": false,
-      "sha256": "6e0e855e6f0610b709c943bfef172046db54f19908bc699e41bc1f401113c5d5",
-      "size": 8891
+      "sha256": "aaf0f0053e2e5e915d61695af6f3e6ca9e4100619a74c6db1c3023eb146b3093",
+      "size": 8817
     },
     {
       "include_content": true,
@@ -3217,48 +3245,6 @@
     },
     {
       "include_content": true,
-      "path": "tests/test_stage0_contract.py",
-      "redacted": false,
-      "sha256": "3e0adf88bd21a99c1643510b0741c532779eca76b336c1f3649e342f45df9cd0",
-      "size": 1429
-    },
-    {
-      "include_content": true,
-      "path": "tests/test_stage0_ma_proxy.py",
-      "redacted": false,
-      "sha256": "ffe0f2d0355276ca5e28204fe0180066918f9f4b48f5ace3e76a593604b2356d",
-      "size": 1140
-    },
-    {
-      "include_content": true,
-      "path": "tests/test_stage0_no_pnl_contract.py",
-      "redacted": false,
-      "sha256": "f9519c481fbf92f71139b02f691dc4e7b36c0458d11e914c86b78121f351fad5",
-      "size": 4808
-    },
-    {
-      "include_content": true,
-      "path": "tests/test_stage0_proxies.py",
-      "redacted": false,
-      "sha256": "359c0dca2e0a090391526eb71fe075da888832d37ba8e4f1f28f9f0693374c5e",
-      "size": 8775
-    },
-    {
-      "include_content": true,
-      "path": "tests/test_stage0_proxy_rank_corr.py",
-      "redacted": false,
-      "sha256": "4edd6c3849f30d607ae963bdfed7f0f1a4d7671f56d1ddda04feea24e76331be",
-      "size": 17445
-    },
-    {
-      "include_content": true,
-      "path": "tests/test_stage2_params_influence.py",
-      "redacted": false,
-      "sha256": "91c658fddeff12e7826b71c04a190d91e0bd6fd733cc50d3deff81c771c7eab5",
-      "size": 4455
-    },
-    {
-      "include_content": true,
       "path": "tests/test_state_processor_serialization.py",
       "redacted": false,
       "sha256": "08edcb6b3ec2dbaece22627be454fd3c3884f97e760333643295fe4f24505b98",
@@ -3275,8 +3261,8 @@
       "include_content": true,
       "path": "tests/test_strategy_registry.py",
       "redacted": false,
-      "sha256": "8da2e8eec4bad35a8bf3df881d55e431ad781ec7f667301178ba05a1f8422f5b",
-      "size": 3730
+      "sha256": "7a534d8f12b984f33abfa01f946c3717e28bae254c307bfcef5e1db7da102f2a",
+      "size": 4124
     },
     {
       "include_content": true,
@@ -3310,8 +3296,8 @@
       "include_content": true,
       "path": "tests/test_ui_race_condition_headless.py",
       "redacted": false,
-      "sha256": "35145b069c11d27bbf628ace312fd5f9139b9ff2f8d83ec0d315190a7c00a08e",
-      "size": 12657
+      "sha256": "21457dca5521088ad1089dd4702506ccd6db4d932c5d27a742351c9d37ccca14",
+      "size": 14540
     },
     {
       "include_content": true,
@@ -3408,8 +3394,8 @@
       "include_content": true,
       "path": "tests/control/test_input_manifest.py",
       "redacted": false,
-      "sha256": "ca623439d358f653974f23e7c6dbed9f5b03d9698fbee638b6a88bcc29d21913",
-      "size": 12665
+      "sha256": "a33c06cb31e202ad56d1100ae5f112fbe4ad2b8363039b722be398c4cec5aea6",
+      "size": 13532
     },
     {
       "include_content": true,
@@ -3632,22 +3618,22 @@
       "include_content": true,
       "path": "tests/gui/test_reload_service.py",
       "redacted": false,
-      "sha256": "e933762c955fe0a160990e72bdfd92aad936a719afa356eec8b5bffba9d3d21b",
-      "size": 17009
+      "sha256": "ef6244ff162cd0608898ee00c72af66e636d408a3c0ad9254eab577e790d03db",
+      "size": 18515
     },
     {
       "include_content": true,
       "path": "tests/gui/test_routes_registered.py",
       "redacted": false,
-      "sha256": "1ecb6c7059297b7b39c636ee47d02b7857c7d992b3992b74b14c865bd1a8f111",
-      "size": 5907
+      "sha256": "01b49e0129dd673fed88ec41b8668ce18a34e721701477dcd3e99678c1b69ad9",
+      "size": 6444
     },
     {
       "include_content": true,
       "path": "tests/gui/test_status_snapshot.py",
       "redacted": false,
-      "sha256": "941f04d6868c44f9421780eb746fcd2f5ac3a631426fcfaeb2d47b75ed85f9ad",
-      "size": 8460
+      "sha256": "787e7d9063397f16bce4ef304487b3cac2f08b3507c53e8bae115a75d64d0ae0",
+      "size": 11648
     },
     {
       "include_content": true,
@@ -3735,69 +3721,6 @@
     },
     {
       "include_content": true,
-      "path": "tests/legacy/README.md",
-      "redacted": false,
-      "sha256": "f4afef2fd10c15ac89ba61f1ba28e04ef2eef9c5671b35f52b0139fcbae12ec5",
-      "size": 3397
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/__init__.py",
-      "redacted": false,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "size": 0
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/_integration_gate.py",
-      "redacted": false,
-      "sha256": "f817a228923a67bb662cc8b3eaa5106bbb36ca656783c3ef78f6bf6e821cb47a",
-      "size": 2815
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_api.py",
-      "redacted": false,
-      "sha256": "dd1aad01150f9c7b8d394434a1e95a10a4ef84157573db7ea5d7437bdb1f03fc",
-      "size": 1893
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_app_start.py",
-      "redacted": false,
-      "sha256": "081c43c018f8423ae3e5280344ac2169d7c5963e03ec2a8cc1b1368240b6600a",
-      "size": 3759
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_gui_integration.py",
-      "redacted": false,
-      "sha256": "70eca3ef96fe7468f44f40f0468b94484bc5a998faba2034952264700cc3daa8",
-      "size": 3693
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_nicegui.py",
-      "redacted": false,
-      "sha256": "d1333d2db3646a3b49c9ed3e96750765c386f384b69ab5623efe9b32208f5d9f",
-      "size": 3380
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_nicegui_submit.py",
-      "redacted": false,
-      "sha256": "94fa24751d6ab15e24ec38ce260ca1d3c934fb7e295ab5f769015e9acc3a471e",
-      "size": 3746
-    },
-    {
-      "include_content": true,
-      "path": "tests/legacy/test_p0_completion.py",
-      "redacted": false,
-      "sha256": "57eafeca82f1e10580b518069b14352783a7caaf6cfe81f514fd650335d88ba3",
-      "size": 4159
-    },
-    {
-      "include_content": true,
       "path": "tests/policy/test_action_policy_engine.py",
       "redacted": true,
       "sha256": "d7e852edb3fb028a307539a29802dd6020453b764569fd058e64b5f1cf827600",
@@ -3807,8 +3730,8 @@
       "include_content": true,
       "path": "tests/policy/test_no_streamlit_left.py",
       "redacted": false,
-      "sha256": "ed09f839a36709735adc39652cb89b3d4b51d2822434abcb20a1d101cb4c21af",
-      "size": 8167
+      "sha256": "8beafa705910100416f487371e15f4862d86baa1b3704ca8727d37924f082c42",
+      "size": 8928
     },
     {
       "include_content": true,
@@ -3837,6 +3760,13 @@
       "redacted": false,
       "sha256": "3f1dca5ed88236c4ad91817d615675eff7661524fe319c96194bb18c303b5b28",
       "size": 5874
+    },
+    {
+      "include_content": true,
+      "path": "tests/policy/test_ui_no_database_writes.py",
+      "redacted": false,
+      "sha256": "efa75bd04afcd242aa3bd727e6dfe43609224899a14b5266b0ca7b94c74f0edc",
+      "size": 11751
     },
     {
       "include_content": true,
@@ -3944,7 +3874,7 @@
       "size": 255
     }
   ],
-  "generated_at": "2025-12-25T11:44:38.080693+00:00",
+  "generated_at": "2025-12-25T17:27:04.373749+00:00",
   "repo_root": "/home/fishbro/FishBroWFS_V2",
   "skipped": [
     {
@@ -4024,18 +3954,6 @@
       "reason": "size 714440 > 307200",
       "sha256": "4fcd659982c4c84a690fd9beffd0eb54dddd465d76618013420ccc960ef78995",
       "size": 714440
-    },
-    {
-      "path": "scripts/launch_b5.sh",
-      "reason": "extension/filename not in whitelist",
-      "sha256": "4e2adf7ad2903c78ec6e0dd252c4e3248b3f5ac923437213e1bcfc65424dc7cd",
-      "size": 182
-    },
-    {
-      "path": "scripts/launch_b5c.sh",
-      "reason": "extension/filename not in whitelist",
-      "sha256": "0e51b04e0b801edb1f296b703a90cd017f7ced67ada091fccce7fe728bc05ed4",
-      "size": 273
     },
     {
       "path": "scripts/no_fog/no_fog_gate.sh",

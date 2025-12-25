@@ -81,30 +81,39 @@ class InputManifest:
 
 def create_file_manifest(file_path: str) -> FileManifest:
     """Create manifest for a single file."""
-    path = Path(file_path)
-    
-    if not path.exists():
-        return FileManifest(
-            path=str(file_path),
-            exists=False,
-            error="File not found"
-        )
-    
     try:
-        stat = path.stat()
-        signature = compute_file_signature(path)
+        p = Path(file_path)
+        exists = p.exists()
+        
+        if not exists:
+            return FileManifest(
+                path=file_path,
+                exists=False,
+                size_bytes=0,
+                mtime_utc=None,
+                signature="",
+                error="File not found"
+            )
+        
+        st = p.stat()
+        mtime_utc = datetime.fromtimestamp(st.st_mtime, datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+        signature = compute_file_signature(p)
         
         return FileManifest(
-            path=str(file_path),
+            path=file_path,
             exists=True,
-            size_bytes=stat.st_size,
-            mtime_utc=datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
-            signature=signature
+            size_bytes=int(st.st_size),
+            mtime_utc=mtime_utc,
+            signature=signature,
+            error=""
         )
     except Exception as e:
         return FileManifest(
-            path=str(file_path),
+            path=file_path,
             exists=False,
+            size_bytes=0,
+            mtime_utc=None,
+            signature="",
             error=str(e)
         )
 
@@ -175,7 +184,13 @@ def create_dataset_manifest(dataset_id: str) -> DatasetManifest:
                     # Try to get row count for small files
                     if parquet_path.stat().st_size < 1000000:  # < 1MB
                         df = pd.read_parquet(parquet_path)
-                        bars_count = len(df)
+                        # Use df.shape[0] or len(df.index) instead of len(df)
+                        if hasattr(df, 'shape') and len(df.shape) >= 1:
+                            bars_count = df.shape[0]
+                        elif hasattr(df, 'index'):
+                            bars_count = len(df.index)
+                        else:
+                            bars_count = len(df)  # fallback
             except Exception:
                 schema_ok = False
         
@@ -343,21 +358,20 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
         "checks": []
     }
     
-    # Check manifest hash
-    manifest_dict = asdict(manifest)
-    original_hash = manifest_dict.pop("manifest_hash", None)
+    # Check timestamp first (warnings)
+    try:
+        created_at = datetime.fromisoformat(manifest.created_at.replace('Z', '+00:00'))
+        age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
+        if age_hours > 24:
+            results["warnings"].append(f"Manifest is {age_hours:.1f} hours old")
+    except Exception:
+        results["warnings"].append("Invalid timestamp format")
     
-    manifest_json = json.dumps(manifest_dict, sort_keys=True, separators=(',', ':'))
-    computed_hash = hashlib.sha256(manifest_json.encode('utf-8')).hexdigest()[:32]
-    
-    if original_hash != computed_hash:
+    # Check DATA1 manifest (structural errors before hash)
+    if not manifest.data1_manifest:
+        results["errors"].append("Missing DATA1 manifest")
         results["valid"] = False
-        results["errors"].append(f"Manifest hash mismatch: expected {original_hash}, got {computed_hash}")
     else:
-        results["checks"].append("Manifest hash verified")
-    
-    # Check DATA1 manifest
-    if manifest.data1_manifest:
         if not manifest.data1_manifest.txt_present:
             results["warnings"].append(f"DATA1 dataset {manifest.data1_manifest.dataset_id} missing TXT files")
         
@@ -366,9 +380,6 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
         
         if manifest.data1_manifest.error:
             results["warnings"].append(f"DATA1 dataset error: {manifest.data1_manifest.error}")
-    else:
-        results["errors"].append("Missing DATA1 manifest")
-        results["valid"] = False
     
     # Check DATA2 manifest if present
     if manifest.data2_manifest:
@@ -385,13 +396,17 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
     if not manifest.system_snapshot_summary:
         results["warnings"].append("System snapshot summary is empty")
     
-    # Check timestamp
-    try:
-        created_at = datetime.fromisoformat(manifest.created_at.replace('Z', '+00:00'))
-        age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
-        if age_hours > 24:
-            results["warnings"].append(f"Manifest is {age_hours:.1f} hours old")
-    except Exception:
-        results["warnings"].append("Invalid timestamp format")
+    # Check manifest hash (after structural checks)
+    manifest_dict = asdict(manifest)
+    original_hash = manifest_dict.pop("manifest_hash", None)
+    
+    manifest_json = json.dumps(manifest_dict, sort_keys=True, separators=(',', ':'))
+    computed_hash = hashlib.sha256(manifest_json.encode('utf-8')).hexdigest()[:32]
+    
+    if original_hash != computed_hash:
+        results["valid"] = False
+        results["errors"].append(f"Manifest hash mismatch: expected {original_hash}, got {computed_hash}")
+    else:
+        results["checks"].append("Manifest hash verified")
     
     return results

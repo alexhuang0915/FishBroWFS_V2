@@ -35,6 +35,9 @@ class FunnelResult:
     meta: Optional[dict] = None
 
 
+import warnings
+
+
 def run_funnel(
     open_: np.ndarray,
     high: np.ndarray,
@@ -49,7 +52,10 @@ def run_funnel(
     proxy_name: str = "ma_proxy_v0",
 ) -> FunnelResult:
     """
-    Run complete Funnel pipeline: Stage0 → Top-K → Stage2.
+    [DEPRECATED] Run complete Funnel pipeline: Stage0 → Top-K → Stage2.
+    
+    This function is deprecated in favor of `FishBroWFS_V2.pipeline.funnel_runner.run_funnel`.
+    The new implementation provides better audit logging, artifact writing, and OOM gating.
     
     Pipeline flow (fixed):
     1. Stage0: proxy ranking on all parameters
@@ -78,7 +84,14 @@ def run_funnel(
         - Stage0 does NOT compute PnL metrics (only proxy_value)
         - Top-K selection is based solely on proxy_value
         - Stage2 runs full backtest only on Top-K subset
+        - DEPRECATED: Use `FishBroWFS_V2.pipeline.funnel_runner.run_funnel` instead
     """
+    warnings.warn(
+        "pipeline.funnel.run_funnel is deprecated. "
+        "Use pipeline.funnel_runner.run_funnel instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
     # Step 1: Stage0 - proxy ranking
     stage0_results = run_stage0(
         close,

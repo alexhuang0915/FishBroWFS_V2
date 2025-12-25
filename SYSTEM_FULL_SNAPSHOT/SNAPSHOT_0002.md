@@ -1,61 +1,1018 @@
-FILE scripts/restore_from_release_txt_force.py
-sha256(source_bytes) = 44bc391a987303e6974820a9ba5861fae986b926debc5c15018a543ecfb3d565
-bytes = 1453
+FILE scripts/perf_grid.py
+sha256(source_bytes) = 2900529ead331c4041b79611d5a6ff9eca4f95e532bf3e79df27c72d7231c60b
+bytes = 38335
 redacted = False
 --------------------------------------------------------------------------------
+
 #!/usr/bin/env python3
-from __future__ import annotations
+"""
+FishBro WFS Perf Harness (Red Team Spec v1.0)
+狀態: ✅ File-based IPC / JIT-First / Observable
+用途: 量測 JIT Grid Runner 的穩態吞吐量 (Steady-state Throughput)
 
-import re
+修正紀錄:
+- v1.1: 修復 numpy generator abs 錯誤
+- v1.2: Hotfix: 解決 subprocess Import Error，強制注入 PYTHONPATH 並增強 debug info
+"""
+import os
+import sys
+import time
+import gc
+import json
+import cProfile
+import argparse
+import subprocess
+import tempfile
+import statistics
 from pathlib import Path
+from dataclasses import dataclass, asdict
+from typing import List, Dict, Any, Optional
 
-FILE_LINE = re.compile(r"^FILE:\s+(?P<path>.+?)\s*$", re.MULTILINE)
+import numpy as np
 
-def strip_separators(text: str) -> str:
-    text = text.lstrip("\ufeff")
-    lines = text.splitlines(True)
-    i = 0
-    while i < len(lines):
-        t = lines[i].strip()
-        if not t:
-            i += 1
-            continue
-        if len(t) >= 10 and set(t) <= {"="}:
-            i += 1
-            continue
-        if len(t) >= 10 and set(t) <= {"-"}:
-            i += 1
-            continue
-        break
-    return "".join(lines[i:])
+from FishBroWFS_V2.perf.cost_model import estimate_seconds
+from FishBroWFS_V2.perf.profile_report import _format_profile_report
 
-def main() -> None:
-    repo = Path.cwd()
-    txt = repo / "FishBroWFS_V2_release_20251223_005323-b55a84d.txt"
-    if not txt.exists():
-        raise SystemExit(f"TXT not found: {txt}")
+# ==========================================
+# 1. 配置與常數 (Tiers)
+# ==========================================
 
-    text = txt.read_text(encoding="utf-8", errors="replace")
-    blocks = list(FILE_LINE.finditer(text))
-    if not blocks:
-        raise SystemExit("No FILE: blocks found")
+@dataclass
+class PerfConfig:
+    name: str
+    n_bars: int
+    n_params: int
+    hot_runs: int
+    timeout: int
+    disable_jit: bool
+    sort_params: bool
 
-    restored = 0
-    for i, m in enumerate(blocks):
-        rel = m.group("path").strip()
-        start = m.end()
-        end = blocks[i+1].start() if i+1 < len(blocks) else len(text)
-        content = strip_separators(text[start:end])
+# Baseline Tier (default): Fast, suitable for commit-to-commit comparison
+# Can be overridden via FISHBRO_PERF_BARS and FISHBRO_PERF_PARAMS env vars
+TIER_JIT_BARS = int(os.environ.get("FISHBRO_PERF_BARS", "20000"))
+TIER_JIT_PARAMS = int(os.environ.get("FISHBRO_PERF_PARAMS", "1000"))
+TIER_JIT_HOT_RUNS = int(os.environ.get("FISHBRO_PERF_HOTRUNS", "5"))
+TIER_JIT_TIMEOUT = int(os.environ.get("FISHBRO_PERF_TIMEOUT_S", "600"))
 
-        out = repo / rel
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(content, encoding="utf-8")
-        restored += 1
+# Stress Tier: Optional, for extreme throughput testing (requires larger timeout or skip-cold)
+TIER_STRESS_BARS = int(os.environ.get("FISHBRO_PERF_STRESS_BARS", "200000"))
+TIER_STRESS_PARAMS = int(os.environ.get("FISHBRO_PERF_STRESS_PARAMS", "10000"))
 
-    print(f"[OK] Restored {restored} files from TXT")
+TIER_TOY_BARS = 2_000
+TIER_TOY_PARAMS = 10
+TIER_TOY_HOT_RUNS = 1
+TIER_TOY_TIMEOUT = 60
+
+# Warmup compile tier (for skip-cold mode)
+TIER_WARMUP_COMPILE_BARS = 2_000
+TIER_WARMUP_COMPILE_PARAMS = 200
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT / "src"))
+
+# ==========================================
+# 2. 資料生成 (Deterministic)
+# ==========================================
+
+def generate_synthetic_data(n_bars: int, seed: int = 42) -> Dict[str, np.ndarray]:
+    """
+    Generate synthetic OHLC data for perf harness.
+    
+    Uses float32 for Stage0/perf optimization (memory bandwidth reduction).
+    """
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    
+    rng = np.random.default_rng(seed)
+    close = 10000 + np.cumsum(rng.standard_normal(n_bars)) * 10
+    high = close + np.abs(rng.standard_normal(n_bars)) * 5
+    low = close - np.abs(rng.standard_normal(n_bars)) * 5
+    open_ = (high + low) / 2 + rng.standard_normal(n_bars)
+    
+    high = np.maximum(high, np.maximum(open_, close))
+    low = np.minimum(low, np.minimum(open_, close))
+    
+    # Use float32 for perf harness (Stage0 optimization)
+    data = {
+        "open": open_.astype(PRICE_DTYPE_STAGE0),
+        "high": high.astype(PRICE_DTYPE_STAGE0),
+        "low": low.astype(PRICE_DTYPE_STAGE0),
+        "close": close.astype(PRICE_DTYPE_STAGE0),
+    }
+    
+    for k, v in data.items():
+        if not v.flags['C_CONTIGUOUS']:
+            data[k] = np.ascontiguousarray(v, dtype=PRICE_DTYPE_STAGE0)
+    return data
+
+def generate_params(n_params: int, seed: int = 999) -> np.ndarray:
+    """
+    Generate parameter matrix for perf harness.
+    
+    Uses float32 for Stage0 optimization (memory bandwidth reduction).
+    """
+    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    
+    rng = np.random.default_rng(seed)
+    w1 = rng.integers(10, 100, size=n_params)
+    w2 = rng.integers(5, 50, size=n_params)
+    # runner_grid contract: params_matrix must be (n, >=3)
+    # Provide a minimal 3-column schema for perf harness.
+    w3 = rng.integers(2, 30, size=n_params)
+    params = np.column_stack((w1, w2, w3)).astype(PRICE_DTYPE_STAGE0)
+    if not params.flags['C_CONTIGUOUS']:
+        params = np.ascontiguousarray(params, dtype=PRICE_DTYPE_STAGE0)
+    return params
+
+# ==========================================
+# 3. Worker 邏輯 (Child Process)
+# ==========================================
+
+def worker_log(msg: str):
+    print(f"[worker] {msg}", flush=True)
+
+
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip() == "1"
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except Exception:
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    try:
+        return float(os.environ.get(name, str(default)))
+    except Exception:
+        return default
+
+
+# NOTE: _format_profile_report moved to src/FishBroWFS_V2/perf/profile_report.py
+
+def _run_microbench_numba_indicators(closes: np.ndarray, hot_runs: int) -> Dict[str, Any]:
+    """
+    Perf-only microbench:
+      - Prove Numba is active in worker process.
+      - Measure pure numeric kernels (no Python object loop) baseline.
+    """
+    try:
+        import numba as nb  # type: ignore
+    except Exception:  # pragma: no cover
+        return {"microbench": "numba_missing"}
+
+    from FishBroWFS_V2.indicators import numba_indicators as ni  # type: ignore
+
+    # Use a fixed window; keep deterministic and cheap.
+    length = 14
+    x = np.ascontiguousarray(closes, dtype=np.float64)
+
+    # Warmup compile (first call triggers compilation if JIT enabled).
+    _ = ni.rolling_max(x, length)
+
+    # Hot runs
+    times: List[float] = []
+    for _i in range(max(1, hot_runs)):
+        t0 = time.perf_counter()
+        _ = ni.rolling_max(x, length)
+        times.append(time.perf_counter() - t0)
+
+    best = min(times) if times else 0.0
+    n = int(x.shape[0])
+    # rolling_max visits each element once -> treat as "ops" ~= n
+    tput = (n / best) if best > 0 else 0.0
+    return {
+        "microbench": "rolling_max",
+        "n": n,
+        "best_s": best,
+        "ops_per_s": tput,
+        "nb_disable_jit": int(getattr(nb.config, "DISABLE_JIT", -1)),
+    }
+
+
+def run_worker(
+    npz_path: str,
+    hot_runs: int,
+    skip_cold: bool = False,
+    warmup_bars: int = 0,
+    warmup_params: int = 0,
+    microbench: bool = False,
+):
+    try:
+        # Stage P2-1.6: Parse trigger_rate env var
+        trigger_rate = _env_float("FISHBRO_PERF_TRIGGER_RATE", 1.0)
+        if trigger_rate < 0.0 or trigger_rate > 1.0:
+            raise ValueError(f"FISHBRO_PERF_TRIGGER_RATE must be in [0, 1], got {trigger_rate}")
+        worker_log(f"trigger_rate={trigger_rate}")
+        
+        worker_log(f"Starting. Loading input: {npz_path}")
+        
+        with np.load(npz_path, allow_pickle=False) as data:
+            opens = data['open']
+            highs = data['high']
+            lows = data['low']
+            closes = data['close']
+            params = data['params']
+            
+        worker_log(f"Data loaded. Bars: {len(opens)}, Params: {len(params)}")
+
+        if microbench:
+            worker_log("MICROBENCH enabled: running numba indicator microbench.")
+            res = _run_microbench_numba_indicators(closes, hot_runs=hot_runs)
+            print("__RESULT_JSON_START__")
+            print(json.dumps({"mode": "microbench", "result": res}))
+            print("__RESULT_JSON_END__")
+            return
+        
+        try:
+            # Phase 3B Grid Runner (correct target)
+            # src/FishBroWFS_V2/pipeline/runner_grid.py
+            from FishBroWFS_V2.pipeline.runner_grid import run_grid  # type: ignore
+            worker_log("Grid runner imported successfully (FishBroWFS_V2.pipeline.runner_grid).")
+            # Enable runner_grid observability payload in returned dict (timings + jit truth + counts).
+            os.environ["FISHBRO_PROFILE_GRID"] = "1"
+
+            # ---- JIT truth report (perf-only) ----
+            worker_log(f"ENV NUMBA_DISABLE_JIT={os.environ.get('NUMBA_DISABLE_JIT','')!r}")
+            try:
+                import numba as _nb  # type: ignore
+                worker_log(f"Numba present. nb.config.DISABLE_JIT={getattr(_nb.config,'DISABLE_JIT',None)!r}")
+            except Exception as _e:
+                worker_log(f"Numba import failed: {_e!r}")
+
+            # run_grid itself might be Python; report what it is.
+            worker_log(f"run_grid type={type(run_grid)} has_signatures={hasattr(run_grid,'signatures')}")
+            if hasattr(run_grid, "signatures"):
+                worker_log(f"run_grid.signatures(before)={getattr(run_grid,'signatures',None)!r}")
+            # --------------------------------------
+        except ImportError as e:
+            worker_log(f"FATAL: Import grid runner failed: {e!r}")
+            
+            # --- DEBUG INFO ---
+            worker_log(f"Current sys.path: {sys.path}")
+            src_path = Path(__file__).resolve().parent.parent / "src"
+            if src_path.exists():
+                worker_log(f"Listing {src_path}:")
+                try:
+                    for p in src_path.iterdir():
+                        worker_log(f" - {p.name}")
+                        if p.is_dir() and (p / "__init__.py").exists():
+                             worker_log(f"   (package content): {[sub.name for sub in p.iterdir()]}")
+                except Exception as ex:
+                    worker_log(f"   Error listing dir: {ex}")
+            else:
+                worker_log(f"Src path not found at: {src_path}")
+            # ------------------
+            sys.exit(1)
+        
+        # Warmup run (perf-only): compile/JIT on a tiny slice so the real run measures steady-state.
+        # IMPORTANT: respect CLI-provided warmup_{bars,params}. If 0, fall back to defaults.
+        if warmup_bars and warmup_bars > 0:
+            wb = min(int(warmup_bars), len(opens))
+        else:
+            wb = min(2000, len(opens))
+
+        if warmup_params and warmup_params > 0:
+            wp = min(int(warmup_params), len(params))
+        else:
+            wp = min(200, len(params))
+        if wb >= 10 and wp >= 10:
+            worker_log(f"Starting WARMUP run (bars={wb}, params={wp})...")
+            _ = run_grid(
+                open_=opens[:wb],
+                high=highs[:wb],
+                low=lows[:wb],
+                close=closes[:wb],
+                params_matrix=params[:wp],
+                commission=0.0,
+                slip=0.0,
+                sort_params=False,
+            )
+            worker_log("WARMUP finished.")
+            if hasattr(run_grid, "signatures"):
+                worker_log(f"run_grid.signatures(after)={getattr(run_grid,'signatures',None)!r}")
+        
+        lane_sort = os.environ.get("FISHBRO_PERF_LANE_SORT", "0").strip() == "1"
+        lane_id = os.environ.get("FISHBRO_PERF_LANE_ID", "?").strip()
+        do_profile = _env_flag("FISHBRO_PERF_PROFILE")
+        topn = _env_int("FISHBRO_PERF_PROFILE_TOP", 40)
+        mode = os.environ.get("FISHBRO_PERF_PROFILE_MODE", "").strip()
+        jit_enabled = os.environ.get("NUMBA_DISABLE_JIT", "").strip() != "1"
+        cold_time = 0.0
+        if skip_cold:
+            # Skip-cold mode: warmup already done, skip full cold run
+            worker_log("Skip-cold mode: skipping full cold run (warmup already completed)")
+        else:
+            # Full cold run
+            worker_log("Starting COLD run...")
+            t0 = time.perf_counter()
+            _ = run_grid(
+                open_=opens,
+                high=highs,
+                low=lows,
+                close=closes,
+                params_matrix=params,
+                commission=0.0,
+                slip=0.0,
+                sort_params=lane_sort,
+            )
+            cold_time = time.perf_counter() - t0
+            worker_log(f"COLD run finished: {cold_time:.4f}s")
+        
+        worker_log(f"Starting {hot_runs} HOT runs (GC disabled)...")
+        hot_times = []
+        last_out: Optional[Dict[str, Any]] = None
+        gc.disable()
+        try:
+            for i in range(hot_runs):
+                t_start = time.perf_counter()
+                if do_profile and i == 0:
+                    pr = cProfile.Profile()
+                    pr.enable()
+                    last_out = run_grid(
+                        open_=opens,
+                        high=highs,
+                        low=lows,
+                        close=closes,
+                        params_matrix=params,
+                        commission=0.0,
+                        slip=0.0,
+                        sort_params=lane_sort,
+                    )
+                    pr.disable()
+                    print(
+                        _format_profile_report(
+                            lane_id=lane_id,
+                            n_bars=int(len(opens)),
+                            n_params=int(len(params)),
+                            jit_enabled=bool(jit_enabled),
+                            sort_params=bool(lane_sort),
+                            topn=int(topn),
+                            mode=mode,
+                            pr=pr,
+                        ),
+                        end="",
+                    )
+                else:
+                    last_out = run_grid(
+                        open_=opens,
+                        high=highs,
+                        low=lows,
+                        close=closes,
+                        params_matrix=params,
+                        commission=0.0,
+                        slip=0.0,
+                        sort_params=lane_sort,
+                    )
+                t_end = time.perf_counter()
+                hot_times.append(t_end - t_start)
+        finally:
+            gc.enable()
+        
+        avg_hot = statistics.mean(hot_times) if hot_times else 0.0
+        min_hot = min(hot_times) if hot_times else 0.0
+        
+        result = {
+            "cold_time": cold_time,
+            "hot_times": hot_times,
+            "avg_hot_time": avg_hot,
+            "min_hot_time": min_hot,
+            "n_bars": len(opens),
+            "n_params": len(params),
+            "throughput": (len(opens) * len(params)) / min_hot if min_hot > 0 else 0,
+        }
+
+        # Attach runner_grid observability payload (timings + jit truth + counts)
+        if isinstance(last_out, dict) and "perf" in last_out:
+            result["perf"] = last_out["perf"]
+            # Stage P2-1.6: Add trigger_rate_configured to perf dict
+            if isinstance(result["perf"], dict):
+                result["perf"]["trigger_rate_configured"] = float(trigger_rate)
+        
+        # Stage P2-1.8: Debug timing keys (only if PERF_DEBUG=1)
+        if os.environ.get("PERF_DEBUG", "").strip() == "1":
+            perf_keys = sorted(result.get("perf", {}).keys()) if isinstance(result.get("perf"), dict) else []
+            worker_log(f"DEBUG: perf keys count={len(perf_keys)}, has t_total_kernel_s={'t_total_kernel_s' in perf_keys}")
+            if len(perf_keys) > 0:
+                worker_log(f"DEBUG: perf keys sample: {perf_keys[:20]}")
+        
+        print(f"__RESULT_JSON_START__")
+        print(json.dumps(result))
+        print(f"__RESULT_JSON_END__")
+        
+    except Exception as e:
+        worker_log(f"CRASH: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+# ==========================================
+# 4. Controller 邏輯 (Host Process)
+# ==========================================
+
+def run_lane(
+    lane_id: int,
+    cfg: PerfConfig,
+    tmp_dir: str,
+    ohlc_data: Dict[str, np.ndarray],
+    microbench: bool = False,
+) -> Dict[str, Any]:
+    print(f"\n>>> Running Lane {lane_id}: {cfg.name}")
+    print(f"    Config: Bars={cfg.n_bars}, Params={cfg.n_params}, JIT={not cfg.disable_jit}, Sort={cfg.sort_params}")
+    
+    params = generate_params(cfg.n_params)
+    # Do not pre-sort here; sorting behavior must be owned by runner_grid(sort_params=...).
+    # For no-sort lane, we shuffle to simulate random access order.
+    if not cfg.sort_params:
+        np.random.shuffle(params)
+        print("    Params shuffled (random access simulation).")
+    else:
+        print("    Params left unsorted; runner_grid(sort_params=True) will apply cache-friendly sort.")
+        
+    npz_path = os.path.join(tmp_dir, f"input_lane_{lane_id}.npz")
+    np.savez_compressed(
+        npz_path, 
+        open=ohlc_data["open"][:cfg.n_bars],
+        high=ohlc_data["high"][:cfg.n_bars],
+        low=ohlc_data["low"][:cfg.n_bars],
+        close=ohlc_data["close"][:cfg.n_bars],
+        params=params
+    )
+    
+    env = os.environ.copy()
+    
+    # 關鍵修正: 強制注入 PYTHONPATH 確保子進程看得到 src
+    src_path = str(PROJECT_ROOT / "src")
+    if "PYTHONPATH" in env:
+        env["PYTHONPATH"] = f"{src_path}:{env['PYTHONPATH']}"
+    else:
+        env["PYTHONPATH"] = src_path
+        
+    if cfg.disable_jit:
+        env["NUMBA_DISABLE_JIT"] = "1"
+    else:
+        env.pop("NUMBA_DISABLE_JIT", None)
+    
+    # Stage P2-1.6: Pass FISHBRO_PERF_TRIGGER_RATE to worker if set
+    # (env.copy() already includes it, but we ensure it's explicitly passed)
+    trigger_rate_env = os.environ.get("FISHBRO_PERF_TRIGGER_RATE")
+    if trigger_rate_env:
+        env["FISHBRO_PERF_TRIGGER_RATE"] = trigger_rate_env
+        
+    # Build worker command
+    cmd = [
+        sys.executable,
+        __file__,
+        "--worker",
+        "--input",
+        npz_path,
+        "--hot-runs",
+        str(cfg.hot_runs),
+    ]
+    if microbench:
+        cmd.append("--microbench")
+    # Pass lane sort flag to worker via env (avoid CLI churn)
+    env["FISHBRO_PERF_LANE_SORT"] = "1" if cfg.sort_params else "0"
+    env["FISHBRO_PERF_LANE_ID"] = str(lane_id)
+    
+    # Add skip-cold and warmup params if needed
+    skip_cold = os.environ.get("FISHBRO_PERF_SKIP_COLD", "").lower() == "true"
+    if skip_cold:
+        cmd.extend(["--skip-cold"])
+        warmup_bars = int(os.environ.get("FISHBRO_PERF_WARMUP_BARS", str(TIER_WARMUP_COMPILE_BARS)))
+        warmup_params = int(os.environ.get("FISHBRO_PERF_WARMUP_PARAMS", str(TIER_WARMUP_COMPILE_PARAMS)))
+        cmd.extend(["--warmup-bars", str(warmup_bars), "--warmup-params", str(warmup_params)])
+    
+    try:
+        proc = subprocess.run(
+            cmd,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=cfg.timeout,
+            check=True
+        )
+        
+        stdout = proc.stdout
+        # Print worker stdout (includes JIT truth report)
+        print(stdout, end="")
+        
+        result_json = None
+        lines = stdout.splitlines()
+        capture = False
+        json_str = ""
+        
+        for line in lines:
+            if line.strip() == "__RESULT_JSON_END__":
+                capture = False
+            if capture:
+                json_str += line
+            if line.strip() == "__RESULT_JSON_START__":
+                capture = True
+                
+        if json_str:
+            result_json = json.loads(json_str)
+            
+            # Phase 3.0-C: FAIL-FAST defense - detect fallback to object mode
+            strict_arrays = os.environ.get("FISHBRO_PERF_STRICT_ARRAYS", "1").strip() == "1"
+            if strict_arrays and isinstance(result_json, dict):
+                perf = result_json.get("perf")
+                if isinstance(perf, dict):
+                    intent_mode = perf.get("intent_mode")
+                    if intent_mode != "arrays":
+                        # Handle None or any non-"arrays" value
+                        intent_mode_str = str(intent_mode) if intent_mode is not None else "None"
+                        error_msg = (
+                            f"ERROR: intent_mode expected 'arrays' but got '{intent_mode_str}' (lane {lane_id})\n"
+                            f"This indicates the kernel fell back to object mode, which is a performance regression.\n"
+                            f"To disable this check, set FISHBRO_PERF_STRICT_ARRAYS=0"
+                        )
+                        print(f"❌ {error_msg}", file=sys.stderr)
+                        raise RuntimeError(error_msg)
+            
+            return result_json
+        else:
+            print("❌ Error: Worker finished but no JSON result found.")
+            print("--- Worker Stdout ---")
+            print(stdout)
+            print("--- Worker Stderr ---")
+            print(proc.stderr)
+            return {}
+            
+    except subprocess.TimeoutExpired as e:
+        print(f"❌ Error: Lane {lane_id} Timeout ({cfg.timeout}s).")
+        if e.stdout: print(e.stdout)
+        if e.stderr: print(e.stderr)
+        return {}
+    except subprocess.CalledProcessError as e:
+        print(f"❌ Error: Lane {lane_id} Crashed (Exit {e.returncode}).")
+        print("--- Worker Stdout ---")
+        print(e.stdout)
+        print("--- Worker Stderr ---")
+        print(e.stderr)
+        return {}
+    except Exception as e:
+        print(f"❌ Error: System error {e}")
+        return {}
+
+def print_report(results: List[Dict[str, Any]]):
+    print("\n\n=== FishBro WFS Perf Harness Report ===")
+    print("| Lane | Mode | Sort | Bars | Params | Cold(s) | Hot(s) | Tput (Ops/s) | Speedup |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    
+    jit_no_sort_tput = 0
+    for r in results:
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        name = r.get('name', 'Unknown')
+        bars = r['res'].get('n_bars', 0)
+        params = r['res'].get('n_params', 0)
+        cold = r['res'].get('cold_time', 0)
+        hot = r['res'].get('min_hot_time', 0)
+        tput = r['res'].get('throughput', 0)
+        
+        if lane_id == 3:
+            jit_no_sort_tput = tput
+            speedup = "1.0x (Base)"
+        elif jit_no_sort_tput > 0 and tput > 0:
+            ratio = tput / jit_no_sort_tput
+            speedup = f"{ratio:.2f}x"
+        else:
+            speedup = "-"
+            
+        mode = "Py" if r.get("disable_jit", False) else "JIT"
+        sort = "Yes" if r.get("sort_params", False) else "No"
+        print(f"| {lane_id} | {mode} | {sort} | {bars} | {params} | {cold:.4f} | {hot:.4f} | {int(tput):,} | {speedup} |")
+    print("\nNote: Tput = (Bars * Params) / Min Hot Run Time")
+    
+    # Phase 4 Stage E: Cost Model Output
+    print("\n=== Cost Model (Predictable Cost Estimation) ===")
+    for r in results:
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        res = r.get('res', {})
+        bars = res.get('n_bars', 0)
+        params = res.get('n_params', 0)
+        min_hot_time = res.get('min_hot_time', 0)
+        
+        if min_hot_time > 0 and params > 0:
+            # Calculate cost per parameter (milliseconds)
+            cost_ms_per_param = (min_hot_time / params) * 1000.0
+            
+            # Calculate params per second
+            params_per_sec = params / min_hot_time
+            
+            # Estimate time for 50k params
+            estimated_time_for_50k_params = estimate_seconds(
+                bars=bars,
+                params=50000,
+                cost_ms_per_param=cost_ms_per_param,
+            )
+            
+            # Output cost model fields (stdout)
+            print(f"\nLane {lane_id} Cost Model:")
+            print(f"  bars: {bars}")
+            print(f"  params: {params}")
+            print(f"  best_time_s: {min_hot_time:.6f}")
+            print(f"  params_per_sec: {params_per_sec:,.2f}")
+            print(f"  cost_ms_per_param: {cost_ms_per_param:.6f}")
+            print(f"  estimated_time_for_50k_params: {estimated_time_for_50k_params:.2f}")
+            
+            # Stage P2-1.5: Entry Sparse Observability
+            perf = res.get('perf', {})
+            if isinstance(perf, dict):
+                entry_valid_mask_sum = perf.get('entry_valid_mask_sum')
+                entry_intents_total = perf.get('entry_intents_total')
+                entry_intents_per_bar_avg = perf.get('entry_intents_per_bar_avg')
+                intents_total_reported = perf.get('intents_total_reported')
+                trigger_rate_configured = perf.get('trigger_rate_configured')
+                
+                # Always output if perf dict exists (fields should always be present)
+                if entry_valid_mask_sum is not None or entry_intents_total is not None:
+                    print(f"\nLane {lane_id} Entry Sparse Observability:")
+                    # Stage P2-1.6: Display trigger_rate_configured
+                    if trigger_rate_configured is not None:
+                        print(f"  trigger_rate_configured: {trigger_rate_configured:.6f}")
+                    print(f"  entry_valid_mask_sum: {entry_valid_mask_sum if entry_valid_mask_sum is not None else 0}")
+                    print(f"  entry_intents_total: {entry_intents_total if entry_intents_total is not None else 0}")
+                    if entry_intents_per_bar_avg is not None:
+                        print(f"  entry_intents_per_bar_avg: {entry_intents_per_bar_avg:.6f}")
+                    else:
+                        # Calculate if missing
+                        if entry_intents_total is not None and bars > 0:
+                            print(f"  entry_intents_per_bar_avg: {entry_intents_total / bars:.6f}")
+                    print(f"  intents_total_reported: {intents_total_reported if intents_total_reported is not None else perf.get('intents_total', 0)}")
+                
+                # Stage P2-3: Sparse Builder Scaling (for scaling verification)
+                allowed_bars = perf.get('allowed_bars')
+                selected_params = perf.get('selected_params')
+                intents_generated = perf.get('intents_generated')
+                
+                if allowed_bars is not None or selected_params is not None or intents_generated is not None:
+                    print(f"\nLane {lane_id} Sparse Builder Scaling:")
+                    if allowed_bars is not None:
+                        print(f"  allowed_bars: {allowed_bars:,}")
+                    if selected_params is not None:
+                        print(f"  selected_params: {selected_params:,}")
+                    if intents_generated is not None:
+                        print(f"  intents_generated: {intents_generated:,}")
+                    # Calculate scaling ratio if both available
+                    if allowed_bars is not None and intents_generated is not None and allowed_bars > 0:
+                        scaling_ratio = intents_generated / allowed_bars
+                        print(f"  scaling_ratio (intents/allowed): {scaling_ratio:.4f}")
+    
+    # Stage P2-1.8: Breakdown (Kernel Stage Timings)
+    print("\n=== Breakdown (Kernel Stage Timings) ===")
+    for r in results:
+        if not r or "res" not in r or "lane_id" not in r: continue
+        lane_id = r.get('lane_id', 0)
+        res = r.get('res', {})
+        perf = res.get('perf', {})
+        
+        if isinstance(perf, dict):
+            trigger_rate = perf.get('trigger_rate_configured')
+            t_ind_donchian = perf.get('t_ind_donchian_s')
+            t_ind_atr = perf.get('t_ind_atr_s')
+            t_build_entry = perf.get('t_build_entry_intents_s')
+            t_sim_entry = perf.get('t_simulate_entry_s')
+            t_calc_exits = perf.get('t_calc_exits_s')
+            t_sim_exit = perf.get('t_simulate_exit_s')
+            t_total_kernel = perf.get('t_total_kernel_s')
+            
+            print(f"\nLane {lane_id} Breakdown:")
+            if trigger_rate is not None:
+                print(f"  trigger_rate_configured: {trigger_rate:.6f}")
+            
+            # Helper to format timing with "(missing)" if None
+            def fmt_time(key: str, val) -> str:
+                if val is None:
+                    return f"  {key}: (missing)"
+                return f"  {key}: {val:.6f}"
+            
+            # Stage P2-2 Step A: Micro-profiling indicators
+            print(fmt_time("t_ind_donchian_s", t_ind_donchian))
+            print(fmt_time("t_ind_atr_s", t_ind_atr))
+            print(fmt_time("t_build_entry_intents_s", t_build_entry))
+            print(fmt_time("t_simulate_entry_s", t_sim_entry))
+            print(fmt_time("t_calc_exits_s", t_calc_exits))
+            print(fmt_time("t_simulate_exit_s", t_sim_exit))
+            print(fmt_time("t_total_kernel_s", t_total_kernel))
+            
+            # Print percentages if t_total_kernel is available and > 0
+            if t_total_kernel is not None and t_total_kernel > 0:
+                def fmt_pct(key: str, val, total: float) -> str:
+                    if val is None:
+                        return f"    {key}: (missing)"
+                    pct = (val / total) * 100.0
+                    return f"    {key}: {pct:.1f}%"
+                
+                print("  Percentages:")
+                print(fmt_pct("t_ind_donchian_s", t_ind_donchian, t_total_kernel))
+                print(fmt_pct("t_ind_atr_s", t_ind_atr, t_total_kernel))
+                print(fmt_pct("t_build_entry_intents_s", t_build_entry, t_total_kernel))
+                print(fmt_pct("t_simulate_entry_s", t_sim_entry, t_total_kernel))
+                print(fmt_pct("t_calc_exits_s", t_calc_exits, t_total_kernel))
+                print(fmt_pct("t_simulate_exit_s", t_sim_exit, t_total_kernel))
+            
+            # Stage P2-2 Step A: Memoization potential assessment
+            unique_ch = perf.get('unique_channel_len_count')
+            unique_atr = perf.get('unique_atr_len_count')
+            unique_pair = perf.get('unique_ch_atr_pair_count')
+            
+            if unique_ch is not None or unique_atr is not None or unique_pair is not None:
+                print(f"\nLane {lane_id} Memoization Potential:")
+                if unique_ch is not None:
+                    print(f"  unique_channel_len_count: {unique_ch}")
+                else:
+                    print(f"  unique_channel_len_count: (missing)")
+                if unique_atr is not None:
+                    print(f"  unique_atr_len_count: {unique_atr}")
+                else:
+                    print(f"  unique_atr_len_count: (missing)")
+                if unique_pair is not None:
+                    print(f"  unique_ch_atr_pair_count: {unique_pair}")
+                else:
+                    print(f"  unique_ch_atr_pair_count: (missing)")
+            
+            # Stage P2-1.8: Display downstream counts
+            entry_fills_total = perf.get('entry_fills_total')
+            exit_intents_total = perf.get('exit_intents_total')
+            exit_fills_total = perf.get('exit_fills_total')
+            
+            if entry_fills_total is not None or exit_intents_total is not None or exit_fills_total is not None:
+                print(f"\nLane {lane_id} Downstream Observability:")
+                if entry_fills_total is not None:
+                    print(f"  entry_fills_total: {entry_fills_total}")
+                else:
+                    print(f"  entry_fills_total: (missing)")
+                if exit_intents_total is not None:
+                    print(f"  exit_intents_total: {exit_intents_total}")
+                else:
+                    print(f"  exit_intents_total: (missing)")
+                if exit_fills_total is not None:
+                    print(f"  exit_fills_total: {exit_fills_total}")
+                else:
+                    print(f"  exit_fills_total: (missing)")
+
+def run_matcherbench() -> None:
+    """
+    Matcher-only microbenchmark.
+    Purpose:
+      - Measure true throughput of cursor-based matcher kernel
+      - Avoid runner_grid / Python orchestration overhead
+    """
+    from FishBroWFS_V2.engine.engine_jit import simulate
+    from FishBroWFS_V2.engine.types import (
+        BarArrays,
+        OrderIntent,
+        OrderKind,
+        OrderRole,
+        Side,
+    )
+
+    # ---- config (safe defaults) ----
+    n_bars = int(os.environ.get("FISHBRO_MB_BARS", "20000"))
+    intents_per_bar = int(os.environ.get("FISHBRO_MB_INTENTS_PER_BAR", "2"))
+    hot_runs = int(os.environ.get("FISHBRO_MB_HOTRUNS", "3"))
+
+    print(
+        f"[matcherbench] bars={n_bars}, intents_per_bar={intents_per_bar}, hot_runs={hot_runs}"
+    )
+
+    # ---- synthetic OHLC ----
+    rng = np.random.default_rng(42)
+    close = 10000 + np.cumsum(rng.standard_normal(n_bars))
+    high = close + 5.0
+    low = close - 5.0
+    open_ = (high + low) * 0.5
+
+    bars = BarArrays(
+        open=open_.astype(np.float64),
+        high=high.astype(np.float64),
+        low=low.astype(np.float64),
+        close=close.astype(np.float64),
+    )
+
+    # ---- generate intents: created_bar = t-1 ----
+    intents = []
+    oid = 1
+    for t in range(1, n_bars):
+        for _ in range(intents_per_bar):
+            # ENTRY
+            intents.append(
+                OrderIntent(
+                    order_id=oid,
+                    created_bar=t - 1,
+                    role=OrderRole.ENTRY,
+                    kind=OrderKind.STOP,
+                    side=Side.BUY,
+                    price=float(high[t - 1]),
+                    qty=1,
+                )
+            )
+            oid += 1
+            # EXIT
+            intents.append(
+                OrderIntent(
+                    order_id=oid,
+                    created_bar=t - 1,
+                    role=OrderRole.EXIT,
+                    kind=OrderKind.STOP,
+                    side=Side.SELL,
+                    price=float(low[t - 1]),
+                    qty=1,
+                )
+            )
+            oid += 1
+
+    print(f"[matcherbench] total_intents={len(intents)}")
+
+    # ---- warmup (compile) ----
+    simulate(bars, intents)
+
+    # ---- hot runs ----
+    times = []
+    gc.disable()
+    try:
+        for _ in range(hot_runs):
+            t0 = time.perf_counter()
+            fills = simulate(bars, intents)
+            dt = time.perf_counter() - t0
+            times.append(dt)
+    finally:
+        gc.enable()
+
+    best = min(times)
+    bars_per_s = n_bars / best
+    intents_scanned = len(intents)
+    intents_per_s = intents_scanned / best
+    fills_per_s = len(fills) / best
+
+    print("\n=== MATCHERBENCH RESULT ===")
+    print(f"best_time_s      : {best:.6f}")
+    print(f"bars_per_sec     : {bars_per_s:,.0f}")
+    print(f"intents_per_sec  : {intents_per_s:,.0f}")
+    print(f"fills_per_sec    : {fills_per_s:,.0f}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description="FishBro WFS Perf Harness")
+    parser.add_argument("--worker", action="store_true", help="Run as worker")
+    parser.add_argument("--input", type=str, help="Path to input NPZ")
+    parser.add_argument("--hot-runs", type=int, default=5, help="Hot runs")
+    parser.add_argument("--skip-cold", action="store_true", help="Skip full cold run, use warmup compile instead")
+    parser.add_argument("--warmup-bars", type=int, default=0, help="Warmup compile bars (for skip-cold)")
+    parser.add_argument("--warmup-params", type=int, default=0, help="Warmup compile params (for skip-cold)")
+    parser.add_argument("--microbench", action="store_true", help="Run microbench only (numba indicator baseline)")
+    parser.add_argument("--include-python-baseline", action="store_true", help="Include Toy Tier")
+    parser.add_argument(
+        "--matcherbench",
+        action="store_true",
+        help="Benchmark matcher kernel only (engine_jit.simulate), no runner_grid",
+    )
+    parser.add_argument("--stress-tier", action="store_true", help="Use stress tier (200k×10k) instead of warmup tier")
+    args = parser.parse_args()
+    
+    if args.matcherbench:
+        run_matcherbench()
+        return
+
+    if args.worker:
+        if not args.input: sys.exit(1)
+        run_worker(
+            args.input,
+            args.hot_runs,
+            args.skip_cold,
+            args.warmup_bars,
+            args.warmup_params,
+            args.microbench,
+        )
+        return
+
+    print("Initializing Perf Harness...")
+    
+    # Stage P2-1.6: Parse and display trigger_rate in main process
+    trigger_rate = _env_float("FISHBRO_PERF_TRIGGER_RATE", 1.0)
+    if trigger_rate < 0.0 or trigger_rate > 1.0:
+        raise ValueError(f"FISHBRO_PERF_TRIGGER_RATE must be in [0, 1], got {trigger_rate}")
+    print(f"trigger_rate={trigger_rate}")
+    
+    lanes_cfg: List[PerfConfig] = []
+    
+    # Select tier based on stress-tier flag
+    if args.stress_tier:
+        jit_bars = TIER_STRESS_BARS
+        jit_params = TIER_STRESS_PARAMS
+        print(f"Using STRESS tier: {jit_bars:,} bars × {jit_params:,} params")
+    else:
+        jit_bars = TIER_JIT_BARS
+        jit_params = TIER_JIT_PARAMS
+        print(f"Using WARMUP tier: {jit_bars:,} bars × {jit_params:,} params")
+    
+    if args.include_python_baseline:
+        lanes_cfg.append(PerfConfig("Lane 1 (Py, No Sort)", TIER_TOY_BARS, TIER_TOY_PARAMS, TIER_TOY_HOT_RUNS, TIER_TOY_TIMEOUT, True, False))
+        lanes_cfg.append(PerfConfig("Lane 2 (Py, Sort)", TIER_TOY_BARS, TIER_TOY_PARAMS, TIER_TOY_HOT_RUNS, TIER_TOY_TIMEOUT, True, True))
+        
+    lanes_cfg.append(PerfConfig("Lane 3 (JIT, No Sort)", jit_bars, jit_params, TIER_JIT_HOT_RUNS, TIER_JIT_TIMEOUT, False, False))
+    lanes_cfg.append(PerfConfig("Lane 4 (JIT, Sort)", jit_bars, jit_params, TIER_JIT_HOT_RUNS, TIER_JIT_TIMEOUT, False, True))
+    
+    max_bars = max(c.n_bars for c in lanes_cfg)
+    print(f"Generating synthetic data (Max Bars: {max_bars})...")
+    ohlc_data = generate_synthetic_data(max_bars)
+    
+    results = []
+    try:
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            print(f"Created temp dir for IPC: {tmp_dir}")
+            for i, cfg in enumerate(lanes_cfg):
+                lane_id = i + 1
+                if not args.include_python_baseline: lane_id += 2 
+                res = run_lane(lane_id, cfg, tmp_dir, ohlc_data, microbench=args.microbench)
+                if res:
+                    results.append(
+                        {
+                            "lane_id": lane_id,
+                            "name": cfg.name,
+                            "res": res,
+                            "disable_jit": cfg.disable_jit,
+                            "sort_params": cfg.sort_params,
+                        }
+                    )
+                else: results.append({})
+                
+        print_report(results)
+    except RuntimeError as e:
+        # Phase 3.0-C: FAIL-FAST - exit with non-zero code on intent_mode violation
+        print(f"\n❌ FAIL-FAST triggered: {e}", file=sys.stderr)
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
+
+
+
+--------------------------------------------------------------------------------
+
+FILE scripts/research_index.py
+sha256(source_bytes) = 5808ce9632181dd657a23f1816ee224df359b5c3208e8a45bcc02e278d0ac606
+bytes = 1354
+redacted = False
+--------------------------------------------------------------------------------
+
+"""Research Index CLI - generate research artifacts.
+
+Phase 9: Generate canonical_results.json and research_index.json.
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# Add src to path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from FishBroWFS_V2.research.registry import build_research_index
+
+
+def main() -> int:
+    """Main entry point."""
+    parser = argparse.ArgumentParser(description="Generate research index")
+    parser.add_argument(
+        "--outputs-root",
+        type=Path,
+        default=Path("outputs"),
+        help="Root outputs directory (default: outputs)",
+    )
+    parser.add_argument(
+        "--out-dir",
+        type=Path,
+        default=Path("outputs/research"),
+        help="Research output directory (default: outputs/research)",
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        index_path = build_research_index(args.outputs_root, args.out_dir)
+        print(f"Research index generated successfully.")
+        print(f"  Index: {index_path}")
+        print(f"  Canonical results: {args.out_dir / 'canonical_results.json'}")
+        return 0
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+
+
+
 
 --------------------------------------------------------------------------------
 
@@ -1212,8 +2169,8 @@ if __name__ == "__main__":
 --------------------------------------------------------------------------------
 
 FILE scripts/no_fog/generate_full_snapshot.py
-sha256(source_bytes) = 6e3105b1adaddb988b75a206844b5f36e52b1c7af48a6c347bc769c83ce53d56
-bytes = 17780
+sha256(source_bytes) = a30b96dd75db6143280d7bae75e07dd81c66907c55c9c1ce01c7c42bee5c09d7
+bytes = 17794
 redacted = True
 --------------------------------------------------------------------------------
 #!/usr/bin/env python3
@@ -1267,6 +2224,7 @@ EXCLUDE_DIRS: Set[str] = {
     ".venv",
     "outputs",
     "FishBroData",
+    "legacy",
 }
 
 # Hard excludes: exact filenames
@@ -2154,6 +3112,620 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+--------------------------------------------------------------------------------
+
+FILE scripts/no_fog/phase_a_audit.py
+sha256(source_bytes) = 3d4114d9afd14b047970d5b04e0a6b823bab36ccd41a090de0eaa1f007c8eca0
+bytes = 9245
+redacted = False
+--------------------------------------------------------------------------------
+#!/usr/bin/env python3
+"""
+Phase A Audit Helper for No-Fog 2.0 Deep Clean - Evidence Inventory.
+
+This script runs evidence collection commands and generates structured data
+for the Phase A report. It is READ-ONLY - does not delete, move, rename, or
+refactor any files.
+
+Usage:
+    python3 scripts/no_fog/phase_a_audit.py [--output-json OUTPUT_JSON]
+
+Outputs:
+    - Prints evidence summary to stdout
+    - Optionally writes JSON with collected evidence
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+from typing import Dict, List, Any, Optional
+from dataclasses import dataclass, asdict
+
+
+@dataclass
+class EvidenceItem:
+    """Single piece of evidence collected."""
+    command: str
+    exit_code: int
+    matches: List[str]
+    match_count: int
+
+
+@dataclass
+class PhaseAAudit:
+    """Container for all Phase A evidence."""
+    candidate_cleanup_items: EvidenceItem
+    runner_schism: EvidenceItem
+    ui_bypass_scan: EvidenceItem
+    test_inventory: EvidenceItem
+    tooling_rules_drift: EvidenceItem
+    imports_audit: EvidenceItem
+
+
+def run_rg(pattern: str, path: str = ".", extra_args: Optional[List[str]] = None) -> EvidenceItem:
+    """Run ripgrep and collect results."""
+    cmd = ["rg", "-n", pattern, path]
+    if extra_args:
+        cmd.extend(extra_args)
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, cwd=Path.cwd())
+        lines = result.stdout.strip().split("\n") if result.stdout.strip() else []
+        return EvidenceItem(
+            command=" ".join(cmd),
+            exit_code=result.returncode,
+            matches=lines,
+            match_count=len(lines)
+        )
+    except FileNotFoundError:
+        print(f"Warning: rg not found, skipping pattern '{pattern}'", file=sys.stderr)
+        return EvidenceItem(
+            command=" ".join(cmd),
+            exit_code=127,
+            matches=[],
+            match_count=0
+        )
+
+
+def collect_evidence() -> PhaseAAudit:
+    """Run all evidence collection commands."""
+    print("=== Phase A Evidence Collection ===", file=sys.stderr)
+    
+    # 1. Candidate Cleanup Items (File/Folder Level)
+    print("1. Searching for GM_Huang|launch_b5.sh|restore_from_release_txt_force...", file=sys.stderr)
+    # Exclude snapshot directories from count as they contain historical references
+    candidate_cleanup = run_rg("GM_Huang|launch_b5\.sh|restore_from_release_txt_force", ".", extra_args=["--glob", "!TEST_SNAPSHOT*", "--glob", "!SYSTEM_FULL_SNAPSHOT*"])
+    
+    # 2. Runner Schism (Single Truth Audit)
+    print("2. Searching for runner patterns in src/FishBroWFS_V2...", file=sys.stderr)
+    runner_schism = run_rg(
+        "funnel_runner|wfs_runner|research_runner|run_funnel|run_wfs|run_research",
+        "src/FishBroWFS_V2"
+    )
+    
+    # 3. UI Bypass Scan (Direct Write / Direct Logic Calls)
+    print("3. Searching for database operations in GUI...", file=sys.stderr)
+    ui_bypass = run_rg(
+        "commit\(|execute\(|insert\(|update\(|delete\(|\.write\(",
+        "src/FishBroWFS_V2/gui"
+    )
+    
+    # 4. ActionQueue/Intent patterns in GUI
+    print("4. Searching for ActionQueue/Intent patterns in GUI...", file=sys.stderr)
+    action_queue = run_rg(
+        "ActionQueue|UserIntent|submit_intent|enqueue\(",
+        "src/FishBroWFS_V2/gui"
+    )
+    
+    # 5. Test Inventory & Obsolescence Candidates
+    print("5. Searching for stage0 tests...", file=sys.stderr)
+    test_inventory = run_rg("tests/test_stage0_|stage0_", "tests")
+    
+    # 6. Imports audit (FishBroWFS_V2 within GUI)
+    print("6. Searching for FishBroWFS_V2 imports in GUI...", file=sys.stderr)
+    imports_audit = run_rg("^from FishBroWFS_V2|^import FishBroWFS_V2", "src/FishBroWFS_V2/gui")
+    
+    # 7. Tooling Rules Drift (.continue/rules, Makefile, .github)
+    print("7. Searching for tooling patterns...", file=sys.stderr)
+    tooling_drift = run_rg("pytest|make check|no-fog|full-snapshot|snapshot", "Makefile", extra_args=[".github", "scripts"])
+    
+    # Combine ActionQueue results into UI bypass for reporting
+    # (The UI bypass scan originally included both)
+    ui_bypass.matches.extend(action_queue.matches)
+    ui_bypass.match_count += action_queue.match_count
+    
+    return PhaseAAudit(
+        candidate_cleanup_items=candidate_cleanup,
+        runner_schism=runner_schism,
+        ui_bypass_scan=ui_bypass,
+        test_inventory=test_inventory,
+        tooling_rules_drift=tooling_drift,
+        imports_audit=imports_audit
+    )
+
+
+def print_summary(audit: PhaseAAudit) -> None:
+    """Print human-readable summary of evidence."""
+    print("\n" + "="*60)
+    print("PHASE A EVIDENCE SUMMARY")
+    print("="*60)
+    
+    print(f"\n1. Candidate Cleanup Items (File/Folder Level):")
+    print(f"   Matches: {audit.candidate_cleanup_items.match_count}")
+    if audit.candidate_cleanup_items.match_count > 0:
+        print(f"   Sample matches (first 5):")
+        for line in audit.candidate_cleanup_items.matches[:5]:
+            print(f"     - {line}")
+    
+    print(f"\n2. Runner Schism (Single Truth Audit):")
+    print(f"   Matches: {audit.runner_schism.match_count}")
+    if audit.runner_schism.match_count > 0:
+        print(f"   Found runner patterns in:")
+        unique_files = set(line.split(":")[0] for line in audit.runner_schism.matches if ":" in line)
+        for file in sorted(unique_files)[:10]:
+            print(f"     - {file}")
+    
+    print(f"\n3. UI Bypass Scan (Direct Write / Direct Logic Calls):")
+    print(f"   Matches: {audit.ui_bypass_scan.match_count}")
+    if audit.ui_bypass_scan.match_count > 0:
+        print(f"   Found in files:")
+        unique_files = set(line.split(":")[0] for line in audit.ui_bypass_scan.matches if ":" in line)
+        for file in sorted(unique_files):
+            print(f"     - {file}")
+    
+    print(f"\n4. Test Inventory & Obsolescence Candidates:")
+    print(f"   Matches: {audit.test_inventory.match_count}")
+    if audit.test_inventory.match_count > 0:
+        print(f"   Stage0-related tests found:")
+        test_files = set(line.split(":")[0] for line in audit.test_inventory.matches if ":" in line)
+        for file in sorted(test_files):
+            print(f"     - {file}")
+    
+    print(f"\n5. Tooling Rules Drift (.continue/rules, Makefile, .github):")
+    print(f"   Matches: {audit.tooling_rules_drift.match_count}")
+    
+    print(f"\n6. Imports Audit (FishBroWFS_V2 within GUI):")
+    print(f"   Matches: {audit.imports_audit.match_count}")
+    if audit.imports_audit.match_count > 0:
+        print(f"   GUI files importing FishBroWFS_V2:")
+        unique_files = set(line.split(":")[0] for line in audit.imports_audit.matches if ":" in line)
+        for file in sorted(unique_files)[:15]:
+            print(f"     - {file}")
+    
+    print("\n" + "="*60)
+    print("ANALYSIS NOTES")
+    print("="*60)
+    
+    # Generate analysis notes based on evidence
+    notes = []
+    
+    if audit.candidate_cleanup_items.match_count > 100:
+        notes.append("High number of GM_Huang/launch_b5.sh references - potential cleanup candidates")
+    
+    if audit.runner_schism.match_count > 0:
+        notes.append(f"Multiple runner implementations found ({audit.runner_schism.match_count} matches) - check for single truth violations")
+    
+    if audit.ui_bypass_scan.match_count > 0:
+        notes.append(f"UI bypass patterns detected ({audit.ui_bypass_scan.match_count} matches) - potential direct write/logic calls")
+    
+    if audit.test_inventory.match_count > 20:
+        notes.append(f"Many stage0-related tests ({audit.test_inventory.match_count}) - consider test consolidation")
+    
+    if audit.imports_audit.match_count > 30:
+        notes.append(f"High GUI import count ({audit.imports_audit.match_count}) - check for circular dependencies")
+    
+    if not notes:
+        notes.append("No major issues detected in initial scan")
+    
+    for i, note in enumerate(notes, 1):
+        print(f"{i}. {note}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Phase A Audit Helper for No-Fog 2.0 Deep Clean")
+    parser.add_argument(
+        "--output-json",
+        help="Path to write JSON output with collected evidence",
+        type=Path,
+        default=None
+    )
+    args = parser.parse_args()
+    
+    audit = collect_evidence()
+    print_summary(audit)
+    
+    if args.output_json:
+        # Convert to serializable dict
+        output_dict = {
+            "phase_a_audit": {
+                "candidate_cleanup_items": asdict(audit.candidate_cleanup_items),
+                "runner_schism": asdict(audit.runner_schism),
+                "ui_bypass_scan": asdict(audit.ui_bypass_scan),
+                "test_inventory": asdict(audit.test_inventory),
+                "tooling_rules_drift": asdict(audit.tooling_rules_drift),
+                "imports_audit": asdict(audit.imports_audit),
+            }
+        }
+        
+        args.output_json.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.output_json, "w", encoding="utf-8") as f:
+            json.dump(output_dict, f, indent=2, ensure_ascii=False)
+        
+        print(f"\nJSON output written to: {args.output_json}", file=sys.stderr)
+    
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+--------------------------------------------------------------------------------
+
+FILE scripts/tools/GM_Huang/clean_repo_caches.py
+sha256(source_bytes) = 25fc11e02eaa2f8c5e808161e7ac6569dba8d3ba498c8c5e64c0cf9d22cb8d56
+bytes = 2133
+redacted = False
+--------------------------------------------------------------------------------
+
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+
+def _is_under(path: Path, parent: Path) -> bool:
+    try:
+        path.resolve().relative_to(parent.resolve())
+        return True
+    except Exception:
+        return False
+
+
+def clean_repo_caches(repo_root: Path, dry_run: bool = False) -> tuple[int, int]:
+    """
+    Remove Python bytecode caches inside repo_root:
+      - __pycache__ directories
+      - *.pyc, *.pyo
+    Does NOT touch anything outside repo_root.
+    """
+    removed_dirs = 0
+    removed_files = 0
+
+    for p in repo_root.rglob("__pycache__"):
+        if not p.is_dir():
+            continue
+        if not _is_under(p, repo_root):
+            continue
+        if dry_run:
+            print(f"[DRY] rmdir: {p}")
+        else:
+            for child in p.rglob("*"):
+                try:
+                    if child.is_file() or child.is_symlink():
+                        child.unlink(missing_ok=True)
+                        removed_files += 1
+                except Exception:
+                    pass
+            try:
+                p.rmdir()
+                removed_dirs += 1
+            except Exception:
+                pass
+
+    for ext in ("*.pyc", "*.pyo"):
+        for p in repo_root.rglob(ext):
+            if not p.is_file() and not p.is_symlink():
+                continue
+            if not _is_under(p, repo_root):
+                continue
+            if dry_run:
+                print(f"[DRY] rm: {p}")
+            else:
+                try:
+                    p.unlink(missing_ok=True)
+                    removed_files += 1
+                except Exception:
+                    pass
+
+    return removed_dirs, removed_files
+
+
+def main() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    dry_run = os.environ.get("FISHBRO_DRY_RUN", "").strip() == "1"
+    removed_dirs, removed_files = clean_repo_caches(repo_root, dry_run=dry_run)
+
+    if dry_run:
+        print("[DRY] Done.")
+        return
+
+    print(f"Cleaned {removed_dirs} __pycache__ directories and {removed_files} bytecode files.")
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+--------------------------------------------------------------------------------
+
+FILE scripts/tools/GM_Huang/release_tool.py
+sha256(source_bytes) = eee9a8e46a0f6e943720b973eeddce6c4a0dff259f06bed5ba2677d84aa1c574
+bytes = 8983
+redacted = False
+--------------------------------------------------------------------------------
+
+#!/usr/bin/env python3
+"""
+Release tool for FishBroWFS_V2.
+
+Generates release packages (txt or zip) excluding sensitive information like .git
+"""
+
+from __future__ import annotations
+
+import os
+import subprocess
+import zipfile
+from datetime import datetime
+from pathlib import Path
+
+
+def should_exclude(path: Path, repo_root: Path) -> bool:
+    """
+    Check if a path should be excluded from release.
+    
+    Excludes:
+    - .git directory and all its contents
+    - __pycache__ directories
+    - .pyc, .pyo files
+    - Common build/test artifacts
+    - Virtual environments (.venv, venv, env, .env)
+    - Hidden directories starting with '.' (except specific files)
+    - Runtime/output directories (outputs/, tmp_data/)
+    - IDE/editor directories (.vscode, .continue, .idea)
+    """
+    path_str = str(path)
+    path_parts = path.parts
+    
+    # Exclude .git directory
+    if '.git' in path_parts:
+        return True
+    
+    # Exclude cache directories
+    if '__pycache__' in path_parts:
+        return True
+    
+    # Exclude bytecode files
+    if path.suffix in ('.pyc', '.pyo'):
+        return True
+    
+    # Exclude common build/test artifacts
+    exclude_names = {
+        '.pytest_cache', '.mypy_cache', '.ruff_cache',
+        '.coverage', 'htmlcov', '.tox', 'dist', 'build',
+        '*.egg-info', '.eggs', 'node_modules', '.npm',
+        '.cache', '.mypy_cache', '.ruff_cache'
+    }
+    
+    for name in exclude_names:
+        if name in path_parts or path.name.startswith(name.replace('*', '')):
+            return True
+    
+    # Exclude virtual environment directories
+    virtual_env_names = {'.venv', 'venv', 'env', '.env'}
+    for venv_name in virtual_env_names:
+        if venv_name in path_parts:
+            return True
+    
+    # Exclude hidden directories (starting with .) except at root level for specific files
+    # Allow files like .gitignore, .dockerignore, etc. but not directories
+    if path.is_dir() and path.name.startswith('.') and path != repo_root:
+        # Check if it's a directory we should keep (unlikely)
+        keep_hidden_dirs = set()  # No hidden directories to keep
+        if path.name not in keep_hidden_dirs:
+            return True
+    
+    # Exclude runtime/output directories
+    runtime_dirs = {'outputs', 'tmp_data', 'temp', 'tmp', 'logs', 'data'}
+    for runtime_dir in runtime_dirs:
+        if runtime_dir in path_parts:
+            return True
+    
+    # Exclude IDE/editor directories
+    ide_dirs = {'.vscode', '.continue', '.idea', '.cursor', '.history'}
+    for ide_dir in ide_dirs:
+        if ide_dir in path_parts:
+            return True
+    
+    return False
+
+
+def get_python_files(repo_root: Path) -> list[Path]:
+    """Get all Python files in the repository, excluding sensitive paths."""
+    python_files = []
+    
+    for py_file in repo_root.rglob('*.py'):
+        if not should_exclude(py_file, repo_root):
+            python_files.append(py_file)
+    
+    return sorted(python_files)
+
+
+def get_directory_structure(repo_root: Path) -> str:
+    """Generate a text representation of directory structure."""
+    lines = []
+    
+    def walk_tree(directory: Path, prefix: str = '', is_last: bool = True):
+        """Recursively walk directory tree and build structure."""
+        if should_exclude(directory, repo_root):
+            return
+        
+        # Skip if it's the repo root itself
+        if directory == repo_root:
+            lines.append(f"{directory.name}/")
+        else:
+            connector = "└── " if is_last else "├── "
+            lines.append(f"{prefix}{connector}{directory.name}/")
+        
+        # Get subdirectories and files
+        try:
+            items = sorted([p for p in directory.iterdir() 
+                          if not should_exclude(p, repo_root)])
+            dirs = [p for p in items if p.is_dir()]
+            files = [p for p in items if p.is_file() and p.suffix == '.py']
+            
+            # Process directories
+            for i, item in enumerate(dirs):
+                is_last_item = (i == len(dirs) - 1) and len(files) == 0
+                extension = "    " if is_last else "│   "
+                walk_tree(item, prefix + extension, is_last_item)
+            
+            # Process Python files
+            for i, file in enumerate(files):
+                is_last_item = i == len(files) - 1
+                connector = "└── " if is_last_item else "├── "
+                lines.append(f"{prefix}{'    ' if is_last else '│   '}{connector}{file.name}")
+        except PermissionError:
+            pass
+    
+    walk_tree(repo_root)
+    return "\n".join(lines)
+
+
+def generate_release_txt(repo_root: Path, output_path: Path) -> None:
+    """Generate a text file with directory structure and Python code."""
+    print(f"Generating release TXT: {output_path}")
+    
+    with open(output_path, 'w', encoding='utf-8') as f:
+        # Header
+        f.write("=" * 80 + "\n")
+        f.write(f"FishBroWFS_V2 Release Package\n")
+        f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        f.write("=" * 80 + "\n\n")
+        
+        # Directory structure
+        f.write("DIRECTORY STRUCTURE\n")
+        f.write("-" * 80 + "\n")
+        f.write(get_directory_structure(repo_root))
+        f.write("\n\n")
+        
+        # Python files and their content
+        f.write("=" * 80 + "\n")
+        f.write("PYTHON FILES AND CODE\n")
+        f.write("=" * 80 + "\n\n")
+        
+        python_files = get_python_files(repo_root)
+        
+        for py_file in python_files:
+            relative_path = py_file.relative_to(repo_root)
+            f.write(f"\n{'=' * 80}\n")
+            f.write(f"FILE: {relative_path}\n")
+            f.write(f"{'=' * 80}\n\n")
+            
+            try:
+                content = py_file.read_text(encoding='utf-8')
+                f.write(content)
+                if not content.endswith('\n'):
+                    f.write('\n')
+            except Exception as e:
+                f.write(f"[ERROR: Could not read file: {e}]\n")
+            
+            f.write("\n")
+    
+    print(f"✓ Release TXT generated: {output_path}")
+
+
+def generate_release_zip(repo_root: Path, output_path: Path) -> None:
+    """Generate a zip file of the project, excluding sensitive information."""
+    print(f"Generating release ZIP: {output_path}")
+    
+    with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        python_files = get_python_files(repo_root)
+        
+        # Also include non-Python files that are important
+        important_extensions = {'.toml', '.txt', '.md', '.yml', '.yaml'}
+        important_files = []
+        
+        for ext in important_extensions:
+            for file in repo_root.rglob(f'*{ext}'):
+                if not should_exclude(file, repo_root):
+                    important_files.append(file)
+        
+        all_files = sorted(set(python_files + important_files))
+        
+        for file_path in all_files:
+            relative_path = file_path.relative_to(repo_root)
+            zipf.write(file_path, relative_path)
+            print(f"  Added: {relative_path}")
+    
+    print(f"✓ Release ZIP generated: {output_path}")
+    print(f"  Total files: {len(all_files)}")
+
+
+def get_git_sha(repo_root: Path) -> str:
+    """
+    Get short git SHA for current HEAD.
+    
+    Returns empty string if git is not available or not in a git repo.
+    Does not fail if git command fails (non-blocking).
+    """
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.SubprocessError):
+        # Git not available or command failed - silently skip
+        pass
+    return ""
+
+
+def main() -> None:
+    """Main entry point."""
+    import sys
+    
+    if len(sys.argv) < 2:
+        print("Usage: python release_tool.py [txt|zip]")
+        sys.exit(1)
+    
+    mode = sys.argv[1].lower()
+    
+    # Get repo root (parent of GM_Huang)
+    script_dir = Path(__file__).resolve().parent
+    repo_root = script_dir.parent
+    
+    # Generate output filename with timestamp and optional git SHA
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    project_name = repo_root.name
+    
+    git_sha = get_git_sha(repo_root)
+    git_suffix = f"-{git_sha}" if git_sha else ""
+    
+    if mode == 'txt':
+        output_path = repo_root / f"{project_name}_release_{timestamp}{git_suffix}.txt"
+        generate_release_txt(repo_root, output_path)
+    elif mode == 'zip':
+        output_path = repo_root / f"{project_name}_release_{timestamp}{git_suffix}.zip"
+        generate_release_zip(repo_root, output_path)
+    else:
+        print(f"Unknown mode: {mode}. Use 'txt' or 'zip'")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+
+
+
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/__init__.py
@@ -8718,8 +10290,8 @@ def create_snapshot(
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/control/dataset_catalog.py
-sha256(source_bytes) = 68aedee9fafba44296827dc4c0cfbb620d9cda80670c1b8c1007e5bac5f3ce6b
-bytes = 5054
+sha256(source_bytes) = 257ce99c60997e2a35b0f9cf724d947c2344e97648cea30d6f452e693cb680c7
+bytes = 5287
 redacted = False
 --------------------------------------------------------------------------------
 """Dataset Catalog for M1 Wizard.
@@ -8865,6 +10437,16 @@ def list_dataset_ids() -> List[str]:
     """
     catalog = get_dataset_catalog()
     return catalog.list_dataset_ids()
+
+
+def list_datasets() -> List[DatasetRecord]:
+    """Public API: Get list of all dataset records.
+    
+    Returns:
+        List of DatasetRecord objects
+    """
+    catalog = get_dataset_catalog()
+    return catalog.list_datasets()
 
 
 def describe_dataset(dataset_id: str) -> Optional[DatasetRecord]:
@@ -11207,8 +12789,8 @@ class BatchGovernanceStore:
 --------------------------------------------------------------------------------
 
 FILE src/FishBroWFS_V2/control/input_manifest.py
-sha256(source_bytes) = 8e048ed2268517acf210e0decb3dab1be082b3138ee9c4c05e8c2aa81eac7994
-bytes = 13253
+sha256(source_bytes) = 473cad8568afade416dd9ccbf037ac0bb08b271bd91ffcac4ba472e2d9489861
+bytes = 13980
 redacted = False
 --------------------------------------------------------------------------------
 """Input Manifest Generation for Job Auditability.
@@ -11294,30 +12876,39 @@ class InputManifest:
 
 def create_file_manifest(file_path: str) -> FileManifest:
     """Create manifest for a single file."""
-    path = Path(file_path)
-    
-    if not path.exists():
-        return FileManifest(
-            path=str(file_path),
-            exists=False,
-            error="File not found"
-        )
-    
     try:
-        stat = path.stat()
-        signature = compute_file_signature(path)
+        p = Path(file_path)
+        exists = p.exists()
+        
+        if not exists:
+            return FileManifest(
+                path=file_path,
+                exists=False,
+                size_bytes=0,
+                mtime_utc=None,
+                signature="",
+                error="File not found"
+            )
+        
+        st = p.stat()
+        mtime_utc = datetime.fromtimestamp(st.st_mtime, datetime.timezone.utc).isoformat().replace("+00:00", "Z")
+        signature = compute_file_signature(p)
         
         return FileManifest(
-            path=str(file_path),
+            path=file_path,
             exists=True,
-            size_bytes=stat.st_size,
-            mtime_utc=datetime.utcfromtimestamp(stat.st_mtime).isoformat() + "Z",
-            signature=signature
+            size_bytes=int(st.st_size),
+            mtime_utc=mtime_utc,
+            signature=signature,
+            error=""
         )
     except Exception as e:
         return FileManifest(
-            path=str(file_path),
+            path=file_path,
             exists=False,
+            size_bytes=0,
+            mtime_utc=None,
+            signature="",
             error=str(e)
         )
 
@@ -11388,7 +12979,13 @@ def create_dataset_manifest(dataset_id: str) -> DatasetManifest:
                     # Try to get row count for small files
                     if parquet_path.stat().st_size < 1000000:  # < 1MB
                         df = pd.read_parquet(parquet_path)
-                        bars_count = len(df)
+                        # Use df.shape[0] or len(df.index) instead of len(df)
+                        if hasattr(df, 'shape') and len(df.shape) >= 1:
+                            bars_count = df.shape[0]
+                        elif hasattr(df, 'index'):
+                            bars_count = len(df.index)
+                        else:
+                            bars_count = len(df)  # fallback
             except Exception:
                 schema_ok = False
         
@@ -11556,21 +13153,20 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
         "checks": []
     }
     
-    # Check manifest hash
-    manifest_dict = asdict(manifest)
-    original_hash = manifest_dict.pop("manifest_hash", None)
+    # Check timestamp first (warnings)
+    try:
+        created_at = datetime.fromisoformat(manifest.created_at.replace('Z', '+00:00'))
+        age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
+        if age_hours > 24:
+            results["warnings"].append(f"Manifest is {age_hours:.1f} hours old")
+    except Exception:
+        results["warnings"].append("Invalid timestamp format")
     
-    manifest_json = json.dumps(manifest_dict, sort_keys=True, separators=(',', ':'))
-    computed_hash = hashlib.sha256(manifest_json.encode('utf-8')).hexdigest()[:32]
-    
-    if original_hash != computed_hash:
+    # Check DATA1 manifest (structural errors before hash)
+    if not manifest.data1_manifest:
+        results["errors"].append("Missing DATA1 manifest")
         results["valid"] = False
-        results["errors"].append(f"Manifest hash mismatch: expected {original_hash}, got {computed_hash}")
     else:
-        results["checks"].append("Manifest hash verified")
-    
-    # Check DATA1 manifest
-    if manifest.data1_manifest:
         if not manifest.data1_manifest.txt_present:
             results["warnings"].append(f"DATA1 dataset {manifest.data1_manifest.dataset_id} missing TXT files")
         
@@ -11579,9 +13175,6 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
         
         if manifest.data1_manifest.error:
             results["warnings"].append(f"DATA1 dataset error: {manifest.data1_manifest.error}")
-    else:
-        results["errors"].append("Missing DATA1 manifest")
-        results["valid"] = False
     
     # Check DATA2 manifest if present
     if manifest.data2_manifest:
@@ -11598,14 +13191,18 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
     if not manifest.system_snapshot_summary:
         results["warnings"].append("System snapshot summary is empty")
     
-    # Check timestamp
-    try:
-        created_at = datetime.fromisoformat(manifest.created_at.replace('Z', '+00:00'))
-        age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
-        if age_hours > 24:
-            results["warnings"].append(f"Manifest is {age_hours:.1f} hours old")
-    except Exception:
-        results["warnings"].append("Invalid timestamp format")
+    # Check manifest hash (after structural checks)
+    manifest_dict = asdict(manifest)
+    original_hash = manifest_dict.pop("manifest_hash", None)
+    
+    manifest_json = json.dumps(manifest_dict, sort_keys=True, separators=(',', ':'))
+    computed_hash = hashlib.sha256(manifest_json.encode('utf-8')).hexdigest()[:32]
+    
+    if original_hash != computed_hash:
+        results["valid"] = False
+        results["errors"].append(f"Manifest hash mismatch: expected {original_hash}, got {computed_hash}")
+    else:
+        results["checks"].append("Manifest hash verified")
     
     return results
 --------------------------------------------------------------------------------
@@ -19886,1990 +21483,6 @@ def validate_governance_status(
         )
     
     return ValidationResult(status=ArtifactStatus.OK, message="governance.json 驗證通過")
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/artifacts.py
-sha256(source_bytes) = c0fc02244344ffeaffdb53ad43a1e0f6a22d6f70cd0922c6b5458b59058813bc
-bytes = 5493
-redacted = False
---------------------------------------------------------------------------------
-
-"""Artifact writer for unified run output.
-
-Provides consistent artifact structure for all runs, with mandatory
-subsample rate visibility.
-"""
-
-from __future__ import annotations
-
-import json
-from pathlib import Path
-from typing import Any, Dict
-
-from FishBroWFS_V2.core.winners_builder import build_winners_v2
-from FishBroWFS_V2.core.winners_schema import is_winners_legacy, is_winners_v2
-
-
-def _write_json(path: Path, obj: Any) -> None:
-    """
-    Write object to JSON file with fixed format.
-    
-    Uses sort_keys=True and fixed separators for reproducibility.
-    
-    Args:
-        path: Path to JSON file
-        obj: Object to serialize
-    """
-    path.write_text(
-        json.dumps(obj, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
-        encoding="utf-8",
-    )
-
-
-def write_run_artifacts(
-    run_dir: Path,
-    manifest: Dict[str, Any],
-    config_snapshot: Dict[str, Any],
-    metrics: Dict[str, Any],
-    winners: Dict[str, Any] | None = None,
-) -> None:
-    """
-    Write all standard artifacts for a run.
-    
-    Creates the following files:
-    - manifest.json: Full AuditSchema data
-    - config_snapshot.json: Original/normalized config
-    - metrics.json: Performance metrics
-    - winners.json: Top-K results (fixed schema)
-    - README.md: Human-readable summary
-    - logs.txt: Execution logs (empty initially)
-    
-    Args:
-        run_dir: Run directory path (will be created if needed)
-        manifest: Manifest data (AuditSchema as dict)
-        config_snapshot: Configuration snapshot
-        metrics: Performance metrics (must include param_subsample_rate visibility)
-        winners: Optional winners dict. If None, uses empty schema.
-            Must follow schema: {"topk": [...], "notes": {"schema": "v1", ...}}
-    """
-    run_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Write manifest.json (full AuditSchema)
-    _write_json(run_dir / "manifest.json", manifest)
-    
-    # Write config_snapshot.json
-    _write_json(run_dir / "config_snapshot.json", config_snapshot)
-    
-    # Write metrics.json (must include param_subsample_rate visibility)
-    _write_json(run_dir / "metrics.json", metrics)
-    
-    # Write winners.json (always output v2 schema)
-    if winners is None:
-        winners = {"topk": [], "notes": {"schema": "v1"}}
-    
-    # Auto-upgrade legacy winners to v2
-    if is_winners_legacy(winners):
-        # Convert legacy to v2
-        legacy_topk = winners.get("topk", [])
-        run_id = manifest.get("run_id", "unknown")
-        stage_name = metrics.get("stage_name", "unknown")
-        
-        winners = build_winners_v2(
-            stage_name=stage_name,
-            run_id=run_id,
-            manifest=manifest,
-            config_snapshot=config_snapshot,
-            legacy_topk=legacy_topk,
-        )
-    elif not is_winners_v2(winners):
-        # Unknown format - try to upgrade anyway (defensive)
-        legacy_topk = winners.get("topk", [])
-        if legacy_topk:
-            run_id = manifest.get("run_id", "unknown")
-            stage_name = metrics.get("stage_name", "unknown")
-            
-            winners = build_winners_v2(
-                stage_name=stage_name,
-                run_id=run_id,
-                manifest=manifest,
-                config_snapshot=config_snapshot,
-                legacy_topk=legacy_topk,
-            )
-        else:
-            # Empty topk - create minimal v2 structure
-            from FishBroWFS_V2.core.winners_schema import build_winners_v2_dict
-            winners = build_winners_v2_dict(
-                stage_name=metrics.get("stage_name", "unknown"),
-                run_id=manifest.get("run_id", "unknown"),
-                topk=[],
-            )
-    
-    _write_json(run_dir / "winners.json", winners)
-    
-    # Write README.md (human-readable summary)
-    # Must prominently display param_subsample_rate
-    readme_lines = [
-        "# FishBroWFS_V2 Run",
-        "",
-        f"- run_id: {manifest.get('run_id')}",
-        f"- git_sha: {manifest.get('git_sha')}",
-        f"- param_subsample_rate: {manifest.get('param_subsample_rate')}",
-        f"- season: {manifest.get('season')}",
-        f"- dataset_id: {manifest.get('dataset_id')}",
-        f"- bars: {manifest.get('bars')}",
-        f"- params_total: {manifest.get('params_total')}",
-        f"- params_effective: {manifest.get('params_effective')}",
-        f"- config_hash: {manifest.get('config_hash')}",
-    ]
-    
-    # Add OOM gate information if present in metrics
-    if "oom_gate_action" in metrics:
-        readme_lines.extend([
-            "",
-            "## OOM Gate",
-            "",
-            f"- action: {metrics.get('oom_gate_action')}",
-            f"- reason: {metrics.get('oom_gate_reason')}",
-            f"- mem_est_mb: {metrics.get('mem_est_mb', 0):.1f}",
-            f"- mem_limit_mb: {metrics.get('mem_limit_mb', 0):.1f}",
-            f"- ops_est: {metrics.get('ops_est', 0)}",
-        ])
-        
-        # If auto-downsample occurred, show original and final
-        if metrics.get("oom_gate_action") == "AUTO_DOWNSAMPLE":
-            readme_lines.extend([
-                f"- original_subsample: {metrics.get('oom_gate_original_subsample', 0)}",
-                f"- final_subsample: {metrics.get('oom_gate_final_subsample', 0)}",
-            ])
-    
-    readme = "\n".join(readme_lines)
-    (run_dir / "README.md").write_text(readme, encoding="utf-8")
-    
-    # Write logs.txt (empty initially)
-    (run_dir / "logs.txt").write_text("", encoding="utf-8")
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/ast_identity.py
-sha256(source_bytes) = a7368f674044cfe0366917ff438ff947a5083ab3fcbbe304268c40d819d9a7fb
-bytes = 16991
-redacted = False
---------------------------------------------------------------------------------
-"""AST-based canonical identity for strategies.
-
-Implements content-addressed, deterministic StrategyID derived from strategy's
-canonical AST (ast-c14n-v1). This replaces filesystem iteration order, Python
-import order, list index/enumerate/incremental counters, filename or class name
-as primary key.
-
-Key properties:
-1. Deterministic: Same AST → same hash regardless of file location, import order
-2. Content-addressed: Hash derived from canonical AST representation
-3. Immutable: Strategy identity cannot change without changing its logic
-4. Collision-resistant: SHA-256 provides sufficient collision resistance
-5. No hash() usage: Uses hashlib.sha256 for deterministic hashing
-
-Algorithm (ast-c14n-v1):
-1. Parse source code to AST
-2. Canonicalize AST (normalize whitespace, sort dict keys, etc.)
-3. Serialize to canonical string representation
-4. Compute SHA-256 hash
-5. Encode as hex string (StrategyID)
-"""
-
-from __future__ import annotations
-
-import ast
-import hashlib
-import json
-import textwrap
-from typing import Any, Dict, List, Optional, Union
-from pathlib import Path
-import inspect
-
-
-class ASTCanonicalizer:
-    """Canonical AST representation for deterministic hashing."""
-    
-    @staticmethod
-    def canonicalize(node: ast.AST) -> Any:
-        """Convert AST node to canonical JSON-serializable representation.
-        
-        Follows ast-c14n-v1 specification:
-        1. Sort dictionary keys alphabetically
-        2. Normalize numeric literals (float precision)
-        3. Remove location information (lineno, col_offset)
-        4. Handle special AST nodes consistently
-        5. Preserve only semantically relevant information
-        """
-        if isinstance(node, ast.Module):
-            return {
-                "type": "Module",
-                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body]
-            }
-        
-        elif isinstance(node, ast.FunctionDef):
-            return {
-                "type": "FunctionDef",
-                "name": node.name,
-                "args": ASTCanonicalizer.canonicalize(node.args),
-                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
-                "decorator_list": [
-                    ASTCanonicalizer.canonicalize(decorator) 
-                    for decorator in node.decorator_list
-                ],
-                "returns": (
-                    ASTCanonicalizer.canonicalize(node.returns) 
-                    if node.returns else None
-                )
-            }
-        
-        elif isinstance(node, ast.ClassDef):
-            return {
-                "type": "ClassDef",
-                "name": node.name,
-                "bases": [ASTCanonicalizer.canonicalize(base) for base in node.bases],
-                "keywords": [
-                    ASTCanonicalizer.canonicalize(keyword) 
-                    for keyword in node.keywords
-                ],
-                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
-                "decorator_list": [
-                    ASTCanonicalizer.canonicalize(decorator) 
-                    for decorator in node.decorator_list
-                ]
-            }
-        
-        elif isinstance(node, ast.arguments):
-            return {
-                "type": "arguments",
-                "args": [ASTCanonicalizer.canonicalize(arg) for arg in node.args],
-                "defaults": [
-                    ASTCanonicalizer.canonicalize(default) 
-                    for default in node.defaults
-                ],
-                "vararg": (
-                    ASTCanonicalizer.canonicalize(node.vararg) 
-                    if node.vararg else None
-                ),
-                "kwarg": (
-                    ASTCanonicalizer.canonicalize(node.kwarg) 
-                    if node.kwarg else None
-                )
-            }
-        
-        elif isinstance(node, ast.arg):
-            return {
-                "type": "arg",
-                "arg": node.arg,
-                "annotation": (
-                    ASTCanonicalizer.canonicalize(node.annotation) 
-                    if node.annotation else None
-                )
-            }
-        
-        elif isinstance(node, ast.Name):
-            return {
-                "type": "Name",
-                "id": node.id,
-                "ctx": node.ctx.__class__.__name__
-            }
-        
-        elif isinstance(node, ast.Attribute):
-            return {
-                "type": "Attribute",
-                "value": ASTCanonicalizer.canonicalize(node.value),
-                "attr": node.attr,
-                "ctx": node.ctx.__class__.__name__
-            }
-        
-        elif isinstance(node, ast.Constant):
-            value = node.value
-            # Normalize numeric values
-            if isinstance(value, float):
-                # Use repr to preserve precision but normalize -0.0
-                value = float(repr(value))
-            elif isinstance(value, complex):
-                value = complex(repr(value))
-            return {
-                "type": "Constant",
-                "value": value,
-                "kind": getattr(node, 'kind', None)
-            }
-        
-        elif isinstance(node, ast.Dict):
-            # Sort dictionary keys for determinism
-            keys = [ASTCanonicalizer.canonicalize(k) for k in node.keys]
-            values = [ASTCanonicalizer.canonicalize(v) for v in node.values]
-            
-            # Create list of key-value pairs for sorting
-            pairs = list(zip(keys, values))
-            # Sort by key representation
-            pairs.sort(key=lambda x: json.dumps(x[0], sort_keys=True))
-            
-            sorted_keys = [k for k, _ in pairs]
-            sorted_values = [v for _, v in pairs]
-            
-            return {
-                "type": "Dict",
-                "keys": sorted_keys,
-                "values": sorted_values
-            }
-        
-        elif isinstance(node, ast.List):
-            return {
-                "type": "List",
-                "elts": [ASTCanonicalizer.canonicalize(elt) for elt in node.elts],
-                "ctx": node.ctx.__class__.__name__
-            }
-        
-        elif isinstance(node, ast.Tuple):
-            return {
-                "type": "Tuple",
-                "elts": [ASTCanonicalizer.canonicalize(elt) for elt in node.elts],
-                "ctx": node.ctx.__class__.__name__
-            }
-        
-        elif isinstance(node, ast.Set):
-            # Sets need special handling for determinism
-            elts = [ASTCanonicalizer.canonicalize(elt) for elt in node.elts]
-            # Sort by JSON representation
-            elts.sort(key=lambda x: json.dumps(x, sort_keys=True))
-            return {
-                "type": "Set",
-                "elts": elts
-            }
-        
-        elif isinstance(node, ast.Call):
-            # Sort keywords by argument name for determinism
-            keywords = [
-                {
-                    "arg": kw.arg,
-                    "value": ASTCanonicalizer.canonicalize(kw.value)
-                }
-                for kw in node.keywords
-            ]
-            keywords.sort(key=lambda x: x["arg"] if x["arg"] else "")
-            
-            return {
-                "type": "Call",
-                "func": ASTCanonicalizer.canonicalize(node.func),
-                "args": [ASTCanonicalizer.canonicalize(arg) for arg in node.args],
-                "keywords": keywords
-            }
-        
-        elif isinstance(node, ast.keyword):
-            return {
-                "type": "keyword",
-                "arg": node.arg,
-                "value": ASTCanonicalizer.canonicalize(node.value)
-            }
-        
-        elif isinstance(node, ast.Import):
-            # Sort imports by name for determinism
-            names = [
-                {"name": alias.name, "asname": alias.asname}
-                for alias in node.names
-            ]
-            names.sort(key=lambda x: x["name"])
-            return {
-                "type": "Import",
-                "names": names
-            }
-        
-        elif isinstance(node, ast.ImportFrom):
-            # Sort imports by name for determinism
-            names = [
-                {"name": alias.name, "asname": alias.asname}
-                for alias in node.names
-            ]
-            names.sort(key=lambda x: x["name"])
-            return {
-                "type": "ImportFrom",
-                "module": node.module,
-                "names": names,
-                "level": node.level
-            }
-        
-        elif isinstance(node, ast.Assign):
-            return {
-                "type": "Assign",
-                "targets": [
-                    ASTCanonicalizer.canonicalize(target) 
-                    for target in node.targets
-                ],
-                "value": ASTCanonicalizer.canonicalize(node.value)
-            }
-        
-        elif isinstance(node, ast.Return):
-            return {
-                "type": "Return",
-                "value": (
-                    ASTCanonicalizer.canonicalize(node.value) 
-                    if node.value else None
-                )
-            }
-        
-        elif isinstance(node, ast.If):
-            return {
-                "type": "If",
-                "test": ASTCanonicalizer.canonicalize(node.test),
-                "body": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.body],
-                "orelse": [ASTCanonicalizer.canonicalize(stmt) for stmt in node.orelse]
-            }
-        
-        elif isinstance(node, ast.BinOp):
-            return {
-                "type": "BinOp",
-                "left": ASTCanonicalizer.canonicalize(node.left),
-                "op": node.op.__class__.__name__,
-                "right": ASTCanonicalizer.canonicalize(node.right)
-            }
-        
-        elif isinstance(node, ast.UnaryOp):
-            return {
-                "type": "UnaryOp",
-                "op": node.op.__class__.__name__,
-                "operand": ASTCanonicalizer.canonicalize(node.operand)
-            }
-        
-        elif isinstance(node, ast.Compare):
-            return {
-                "type": "Compare",
-                "left": ASTCanonicalizer.canonicalize(node.left),
-                "ops": [op.__class__.__name__ for op in node.ops],
-                "comparators": [
-                    ASTCanonicalizer.canonicalize(comp) 
-                    for comp in node.comparators
-                ]
-            }
-        
-        # Handle expression contexts
-        elif isinstance(node, (ast.Load, ast.Store, ast.Del)):
-            return {"type": node.__class__.__name__}
-        
-        # Default fallback: convert node attributes to dict
-        else:
-            node_type = node.__class__.__name__
-            result = {"type": node_type}
-            
-            # Get public attributes
-            for attr_name in dir(node):
-                if attr_name.startswith('_'):
-                    continue
-                if attr_name in ('lineno', 'col_offset', 'end_lineno', 'end_col_offset'):
-                    continue
-                
-                try:
-                    attr_value = getattr(node, attr_name)
-                except AttributeError:
-                    continue
-                
-                # Skip None values and empty lists
-                if attr_value is None:
-                    continue
-                if isinstance(attr_value, list) and len(attr_value) == 0:
-                    continue
-                
-                # Recursively canonicalize if it's an AST node
-                if isinstance(attr_value, ast.AST):
-                    result[attr_name] = ASTCanonicalizer.canonicalize(attr_value)
-                elif isinstance(attr_value, list) and attr_value and isinstance(attr_value[0], ast.AST):
-                    result[attr_name] = [
-                        ASTCanonicalizer.canonicalize(item) for item in attr_value
-                    ]
-                elif isinstance(attr_value, (str, int, float, bool)):
-                    result[attr_name] = attr_value
-            
-            return result
-    
-    @staticmethod
-    def canonical_ast_hash(source_code: str) -> str:
-        """Compute canonical hash of source code AST.
-        
-        Args:
-            source_code: Python source code as string
-            
-        Returns:
-            SHA-256 hash hex string (64 characters)
-        """
-        try:
-            tree = ast.parse(source_code)
-            canonical = ASTCanonicalizer.canonicalize(tree)
-            
-            # Convert to canonical JSON string with sorted keys
-            canonical_json = json.dumps(
-                canonical,
-                sort_keys=True,
-                separators=(',', ':'),  # No whitespace
-                ensure_ascii=False
-            )
-            
-            # Compute SHA-256 hash
-            hash_obj = hashlib.sha256(canonical_json.encode('utf-8'))
-            return hash_obj.hexdigest()
-        
-        except (SyntaxError, ValueError) as e:
-            raise ValueError(f"Failed to parse or canonicalize source code: {e}")
-
-
-def compute_strategy_id_from_source(source_code: str) -> str:
-    """Compute StrategyID from strategy source code.
-    
-    Args:
-        source_code: Strategy function source code
-        
-    Returns:
-        StrategyID (hex string, 64 characters)
-    """
-    return ASTCanonicalizer.canonical_ast_hash(source_code)
-
-
-def compute_strategy_id_from_function(func) -> str:
-    """Compute StrategyID from strategy function object.
-    
-    Args:
-        func: Strategy function (callable)
-        
-    Returns:
-        StrategyID (hex string, 64 characters)
-    """
-    try:
-        source_code = inspect.getsource(func)
-        # Dedent the source code to handle indentation from nested definitions
-        dedented_source = textwrap.dedent(source_code)
-        return compute_strategy_id_from_source(dedented_source)
-    except (OSError, TypeError) as e:
-        raise ValueError(f"Failed to get source code for function: {e}")
-
-
-def compute_strategy_id_from_file(filepath: Union[str, Path]) -> str:
-    """Compute StrategyID from strategy source file.
-    
-    Args:
-        filepath: Path to Python source file
-        
-    Returns:
-        StrategyID (hex string, 64 characters)
-    """
-    path = Path(filepath)
-    if not path.exists():
-        raise FileNotFoundError(f"Strategy file not found: {filepath}")
-    
-    source_code = path.read_text(encoding='utf-8')
-    return compute_strategy_id_from_source(source_code)
-
-
-class StrategyIdentity:
-    """Immutable strategy identity based on canonical AST hash."""
-    
-    def __init__(self, strategy_id: str, source_hash: Optional[str] = None):
-        """Initialize strategy identity.
-        
-        Args:
-            strategy_id: Content-addressed strategy ID (hex string)
-            source_hash: Optional source hash for verification
-        """
-        if not isinstance(strategy_id, str) or len(strategy_id) != 64:
-            raise ValueError(
-                f"Invalid strategy_id: must be 64-character hex string, got {strategy_id}"
-            )
-        
-        # Validate hex format
-        try:
-            int(strategy_id, 16)
-        except ValueError:
-            raise ValueError(f"Invalid strategy_id: not a valid hex string: {strategy_id}")
-        
-        self._strategy_id = strategy_id
-        self._source_hash = source_hash
-    
-    @property
-    def strategy_id(self) -> str:
-        """Get the content-addressed strategy ID."""
-        return self._strategy_id
-    
-    @property
-    def source_hash(self) -> Optional[str]:
-        """Get the source hash (if available)."""
-        return self._source_hash
-    
-    @classmethod
-    def from_source(cls, source_code: str) -> StrategyIdentity:
-        """Create StrategyIdentity from source code."""
-        strategy_id = compute_strategy_id_from_source(source_code)
-        return cls(strategy_id, source_hash=strategy_id)
-    
-    @classmethod
-    def from_function(cls, func) -> StrategyIdentity:
-        """Create StrategyIdentity from function."""
-        strategy_id = compute_strategy_id_from_function(func)
-        return cls(strategy_id, source_hash=strategy_id)
-    
-    @classmethod
-    def from_file(cls, filepath: Union[str, Path]) -> StrategyIdentity:
-        """Create StrategyIdentity from file."""
-        strategy_id = compute_strategy_id_from_file(filepath)
-        return cls(strategy_id, source_hash=strategy_id)
-    
-    def __eq__(self, other: Any) -> bool:
-        if not isinstance(other, StrategyIdentity):
-            return False
-        return self._strategy_id == other._strategy_id
-    
-    def __hash__(self) -> int:
-        # Use integer representation of first 16 chars for hash
-        return int(self._strategy_id[:16], 16)
-    
-    def __repr__(self) -> str:
-        return f"StrategyIdentity(strategy_id={self._strategy_id[:16]}...)"
-    
-    def __str__(self) -> str:
-        return self._strategy_id
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/audit_schema.py
-sha256(source_bytes) = 9bec8723373b6e4906c9cf3ea1adf507853d7f5d9393462b561a911fac4c6929
-bytes = 1919
-redacted = False
---------------------------------------------------------------------------------
-
-"""Audit schema for run tracking and reproducibility.
-
-Single Source of Truth (SSOT) for audit data.
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass, asdict
-from datetime import datetime, timezone
-from typing import Any, Dict
-
-
-@dataclass(frozen=True)
-class AuditSchema:
-    """
-    Audit schema for run tracking.
-    
-    All fields are required and must be JSON-serializable.
-    This is the Single Source of Truth (SSOT) for audit data.
-    """
-    run_id: str
-    created_at: str  # ISO8601 with Z suffix (UTC)
-    git_sha: str  # At least 12 chars
-    dirty_repo: bool  # Whether repo has uncommitted changes
-    param_subsample_rate: float  # Required, must be in [0.0, 1.0]
-    config_hash: str  # Stable hash of config
-    season: str  # Season identifier
-    dataset_id: str  # Dataset identifier
-    bars: int  # Number of bars processed
-    params_total: int  # Total parameters before subsample
-    params_effective: int  # Effective parameters after subsample (= int(params_total * param_subsample_rate))
-    artifact_version: str = "v1"  # Artifact version
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return asdict(self)
-
-
-def compute_params_effective(params_total: int, param_subsample_rate: float) -> int:
-    """
-    Compute effective parameters after subsample.
-    
-    Rounding rule: int(params_total * param_subsample_rate)
-    This is locked in code/docs/tests - do not change.
-    
-    Args:
-        params_total: Total parameters before subsample
-        param_subsample_rate: Subsample rate in [0.0, 1.0]
-        
-    Returns:
-        Effective parameters (integer, rounded down)
-    """
-    if not (0.0 <= param_subsample_rate <= 1.0):
-        raise ValueError(f"param_subsample_rate must be in [0.0, 1.0], got {param_subsample_rate}")
-    
-    return int(params_total * param_subsample_rate)
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/config_hash.py
-sha256(source_bytes) = e1bf5e812460f3215e7d661d0f56b905d60323f9264ee9a930b0d4e35f466abb
-bytes = 737
-redacted = False
---------------------------------------------------------------------------------
-
-"""Stable config hash computation.
-
-Provides deterministic hash of configuration objects for reproducibility.
-"""
-
-from __future__ import annotations
-
-import hashlib
-import json
-from typing import Any
-
-
-def stable_config_hash(obj: Any) -> str:
-    """
-    Compute stable hash of configuration object.
-    
-    Uses JSON serialization with sorted keys and fixed separators
-    to ensure cross-platform consistency.
-    
-    Args:
-        obj: Configuration object (dict, list, etc.)
-        
-    Returns:
-        Hex string hash (64 chars, SHA256)
-    """
-    s = json.dumps(
-        obj,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-    )
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/config_snapshot.py
-sha256(source_bytes) = 64533c2ba5a5f3b06a0ebb9fb4b491ba59223911faff4ba50363ef2abc4d081b
-bytes = 2862
-redacted = False
---------------------------------------------------------------------------------
-
-"""Config snapshot sanitizer.
-
-Creates JSON-serializable config snapshots by excluding large ndarrays
-and converting numpy types to Python native types.
-"""
-
-from __future__ import annotations
-
-from typing import Any, Dict
-
-import numpy as np
-
-# These keys will make artifacts garbage or directly crash JSON serialization
-_DEFAULT_DROP_KEYS = {
-    "open_",
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "params_matrix",
-}
-
-
-def _ndarray_meta(x: np.ndarray) -> Dict[str, Any]:
-    """
-    Create metadata dict for ndarray (shape and dtype only).
-    
-    Args:
-        x: numpy array
-        
-    Returns:
-        Metadata dictionary with shape and dtype
-    """
-    return {
-        "__ndarray__": True,
-        "shape": list(x.shape),
-        "dtype": str(x.dtype),
-    }
-
-
-def make_config_snapshot(
-    cfg: Dict[str, Any],
-    drop_keys: set[str] | None = None,
-) -> Dict[str, Any]:
-    """
-    Create sanitized config snapshot for JSON serialization and hashing.
-    
-    Rules (locked):
-    - Must include: season, dataset_id, bars, params_total, param_subsample_rate,
-      stage_name, topk, commission, slip, order_qty, config knobs...
-    - Must exclude/replace: open_, high, low, close, params_matrix (ndarrays)
-    - If metadata needed, only keep shape/dtype (no bytes hash to avoid cost)
-    
-    Args:
-        cfg: Configuration dictionary (may contain ndarrays)
-        drop_keys: Optional set of keys to drop. If None, uses default.
-        
-    Returns:
-        Sanitized config dictionary (JSON-serializable)
-    """
-    drop = _DEFAULT_DROP_KEYS if drop_keys is None else drop_keys
-    out: Dict[str, Any] = {}
-    
-    for k, v in cfg.items():
-        if k in drop:
-            # Don't keep raw data, only metadata (optional)
-            if isinstance(v, np.ndarray):
-                out[k + "_meta"] = _ndarray_meta(v)
-            continue
-        
-        # numpy scalar -> python scalar
-        if isinstance(v, (np.floating, np.integer)):
-            out[k] = v.item()
-        # ndarray (if slipped through) -> meta
-        elif isinstance(v, np.ndarray):
-            out[k + "_meta"] = _ndarray_meta(v)
-        # Basic types: keep as-is
-        elif isinstance(v, (str, int, float, bool)) or v is None:
-            out[k] = v
-        # list/tuple: conservative handling (avoid strange objects)
-        elif isinstance(v, (list, tuple)):
-            # Check if list contains only serializable types
-            try:
-                # Try to serialize to verify
-                import json
-                json.dumps(v)
-                out[k] = v
-            except (TypeError, ValueError):
-                # If not serializable, convert to string representation
-                out[k] = str(v)
-        # Other types: convert to string (avoid JSON crash)
-        else:
-            out[k] = str(v)
-    
-    return out
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/dimensions.py
-sha256(source_bytes) = f2f49c27a7dc66ec2167acbfe66297e2e492184c5b2a0ac28be4f6dbb8e0076d
-bytes = 1680
-redacted = False
---------------------------------------------------------------------------------
-
-# src/FishBroWFS_V2/core/dimensions.py
-"""
-穩定的維度查詢介面
-
-提供 get_dimension_for_dataset() 函數，用於查詢商品的維度定義（交易時段、交易所等）。
-此模組使用 lazy loading 避免 import-time IO，並提供 deterministic 結果。
-"""
-
-from __future__ import annotations
-
-from functools import lru_cache
-from typing import Optional
-
-from FishBroWFS_V2.contracts.dimensions import InstrumentDimension
-from FishBroWFS_V2.contracts.dimensions_loader import load_dimension_registry
-
-
-@lru_cache(maxsize=1)
-def _get_cached_registry():
-    """
-    快取註冊表，避免重複讀取檔案
-    
-    使用 lru_cache(maxsize=1) 確保：
-    1. 第一次呼叫時讀取檔案
-    2. 後續呼叫重用快取
-    3. 避免 import-time IO
-    """
-    return load_dimension_registry()
-
-
-def get_dimension_for_dataset(
-    dataset_id: str, 
-    *, 
-    symbol: str | None = None
-) -> InstrumentDimension | None:
-    """
-    查詢資料集的維度定義
-    
-    Args:
-        dataset_id: 資料集 ID，例如 "CME.MNQ.60m.2020-2024"
-        symbol: 可選的商品符號，例如 "CME.MNQ"
-    
-    Returns:
-        InstrumentDimension 或 None（如果找不到）
-    
-    Note:
-        - 純讀取操作，無副作用（除了第一次呼叫時的檔案讀取）
-        - 結果是 deterministic 的
-        - 使用 lazy loading，避免 import-time IO
-    """
-    registry = _get_cached_registry()
-    return registry.get(dataset_id, symbol)
-
-
-def clear_dimension_cache() -> None:
-    """
-    清除維度快取
-    
-    主要用於測試，或需要強制重新讀取註冊表的情況
-    """
-    _get_cached_registry.cache_clear()
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/feature_bundle.py
-sha256(source_bytes) = 47e8e6692b9fcf5f4729436194674d64c021158221adfb48a25fcbaeff8c8d08
-bytes = 5840
-redacted = False
---------------------------------------------------------------------------------
-
-# src/FishBroWFS_V2/core/feature_bundle.py
-"""
-FeatureBundle：engine/wfs 的統一輸入
-
-提供 frozen dataclass 結構，確保特徵資料的不可變性與型別安全。
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass
-from typing import Dict, Tuple, Any
-import numpy as np
-
-
-@dataclass(frozen=True)
-class FeatureSeries:
-    """
-    單一特徵時間序列
-    
-    Attributes:
-        ts: 時間戳記陣列，dtype 必須是 datetime64[s]
-        values: 特徵值陣列，dtype 必須是 float64
-        name: 特徵名稱
-        timeframe_min: timeframe 分鐘數
-    """
-    ts: np.ndarray  # datetime64[s]
-    values: np.ndarray  # float64
-    name: str
-    timeframe_min: int
-    
-    def __post_init__(self):
-        """驗證資料型別與一致性"""
-        # 驗證 ts dtype
-        if not np.issubdtype(self.ts.dtype, np.datetime64):
-            raise TypeError(f"ts 必須是 datetime64，實際為 {self.ts.dtype}")
-        
-        # 驗證 values dtype
-        if not np.issubdtype(self.values.dtype, np.floating):
-            raise TypeError(f"values 必須是浮點數，實際為 {self.values.dtype}")
-        
-        # 驗證長度一致
-        if len(self.ts) != len(self.values):
-            raise ValueError(
-                f"ts 與 values 長度不一致: ts={len(self.ts)}, values={len(self.values)}"
-            )
-        
-        # 驗證 timeframe 為正整數
-        if not isinstance(self.timeframe_min, int) or self.timeframe_min <= 0:
-            raise ValueError(f"timeframe_min 必須為正整數: {self.timeframe_min}")
-        
-        # 驗證名稱非空
-        if not self.name:
-            raise ValueError("name 不能為空")
-
-
-@dataclass(frozen=True)
-class FeatureBundle:
-    """
-    特徵資料包
-    
-    包含一個資料集的所有特徵時間序列，以及相關 metadata。
-    
-    Attributes:
-        dataset_id: 資料集 ID
-        season: 季節標記
-        series: 特徵序列字典，key 為 (name, timeframe_min)
-        meta: metadata 字典，包含 manifest hashes, breaks_policy, ts_dtype 等
-    """
-    dataset_id: str
-    season: str
-    series: Dict[Tuple[str, int], FeatureSeries]
-    meta: Dict[str, Any]
-    
-    def __post_init__(self):
-        """驗證 bundle 一致性"""
-        # 驗證 dataset_id 與 season 非空
-        if not self.dataset_id:
-            raise ValueError("dataset_id 不能為空")
-        if not self.season:
-            raise ValueError("season 不能為空")
-        
-        # 驗證 meta 包含必要欄位
-        required_meta_keys = {"ts_dtype", "breaks_policy"}
-        missing_keys = required_meta_keys - set(self.meta.keys())
-        if missing_keys:
-            raise ValueError(f"meta 缺少必要欄位: {missing_keys}")
-        
-        # 驗證 ts_dtype
-        if self.meta["ts_dtype"] != "datetime64[s]":
-            raise ValueError(f"ts_dtype 必須為 'datetime64[s]'，實際為 {self.meta['ts_dtype']}")
-        
-        # 驗證 breaks_policy
-        if self.meta["breaks_policy"] != "drop":
-            raise ValueError(f"breaks_policy 必須為 'drop'，實際為 {self.meta['breaks_policy']}")
-        
-        # 驗證所有 series 的 ts dtype 一致
-        for (name, tf), series in self.series.items():
-            if not np.issubdtype(series.ts.dtype, np.datetime64):
-                raise TypeError(
-                    f"series ({name}, {tf}) 的 ts dtype 必須為 datetime64，實際為 {series.ts.dtype}"
-                )
-    
-    def get_series(self, name: str, timeframe_min: int) -> FeatureSeries:
-        """
-        取得特定特徵序列
-        
-        Args:
-            name: 特徵名稱
-            timeframe_min: timeframe 分鐘數
-        
-        Returns:
-            FeatureSeries 實例
-        
-        Raises:
-            KeyError: 特徵不存在
-        """
-        key = (name, timeframe_min)
-        if key not in self.series:
-            raise KeyError(f"特徵不存在: {name}@{timeframe_min}m")
-        return self.series[key]
-    
-    def has_series(self, name: str, timeframe_min: int) -> bool:
-        """
-        檢查是否包含特定特徵序列
-        
-        Args:
-            name: 特徵名稱
-            timeframe_min: timeframe 分鐘數
-        
-        Returns:
-            bool
-        """
-        return (name, timeframe_min) in self.series
-    
-    def list_series(self) -> list[Tuple[str, int]]:
-        """
-        列出所有特徵序列的 (name, timeframe) 對
-        
-        Returns:
-            排序後的 (name, timeframe) 列表
-        """
-        return sorted(self.series.keys())
-    
-    def validate_against_requirements(
-        self,
-        required: list[Tuple[str, int]],
-        optional: list[Tuple[str, int]] = None,
-    ) -> bool:
-        """
-        驗證 bundle 是否滿足需求
-        
-        Args:
-            required: 必需的特徵列表，每個元素為 (name, timeframe)
-            optional: 可選的特徵列表（預設為空）
-        
-        Returns:
-            bool: 是否滿足所有必需特徵
-        
-        Raises:
-            ValueError: 參數無效
-        """
-        if optional is None:
-            optional = []
-        
-        # 檢查必需特徵
-        for name, tf in required:
-            if not self.has_series(name, tf):
-                return False
-        
-        return True
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """
-        轉換為字典表示（僅 metadata，不包含大型陣列）
-        
-        Returns:
-            字典包含 bundle 的基本資訊
-        """
-        return {
-            "dataset_id": self.dataset_id,
-            "season": self.season,
-            "series_count": len(self.series),
-            "series_keys": self.list_series(),
-            "meta": self.meta,
-        }
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/features.py
-sha256(source_bytes) = e74ba47846cb09880a0e38d9c7635647b3cfc22af8dc5f4e6365fadec76ac409
-bytes = 8459
-redacted = False
---------------------------------------------------------------------------------
-
-# src/FishBroWFS_V2/core/features.py
-"""
-Feature 計算核心
-
-提供 deterministic numpy 實作，禁止 pandas rolling。
-所有計算必須與 FULL/INCREMENTAL 模式完全一致。
-"""
-
-from __future__ import annotations
-
-import numpy as np
-from typing import Dict, Literal, Optional
-from datetime import datetime
-
-from FishBroWFS_V2.contracts.features import FeatureRegistry, FeatureSpec
-from FishBroWFS_V2.core.resampler import SessionSpecTaipei
-
-
-def compute_atr_14(
-    o: np.ndarray,
-    h: np.ndarray,
-    l: np.ndarray,
-    c: np.ndarray,
-) -> np.ndarray:
-    """
-    計算 ATR(14)（Average True Range）
-    
-    公式：
-    TR = max(high - low, abs(high - prev_close), abs(low - prev_close))
-    ATR = rolling mean of TR with window=14 (population std, ddof=0)
-    
-    前 13 根 bar 的 ATR 為 NaN（因為 window 不足）
-    
-    Args:
-        o: open 價格（未使用）
-        h: high 價格
-        l: low 價格
-        c: close 價格
-        
-    Returns:
-        ATR(14) 陣列，與輸入長度相同
-    """
-    n = len(c)
-    if n == 0:
-        return np.array([], dtype=np.float64)
-    
-    # 計算 True Range
-    tr = np.empty(n, dtype=np.float64)
-    
-    # 第一根 bar 的 TR = high - low
-    tr[0] = h[0] - l[0]
-    
-    # 後續 bar 的 TR
-    for i in range(1, n):
-        hl = h[i] - l[i]
-        hc = abs(h[i] - c[i-1])
-        lc = abs(l[i] - c[i-1])
-        tr[i] = max(hl, hc, lc)
-    
-    # 計算 rolling mean with window=14 (population std, ddof=0)
-    # 使用 cumulative sums 確保 deterministic
-    atr = np.full(n, np.nan, dtype=np.float64)
-    
-    if n >= 14:
-        # 計算 cumulative sum of TR
-        cumsum = np.cumsum(tr, dtype=np.float64)
-        
-        # 計算 rolling mean
-        for i in range(13, n):
-            if i == 13:
-                window_sum = cumsum[i]
-            else:
-                window_sum = cumsum[i] - cumsum[i-14]
-            
-            atr[i] = window_sum / 14.0
-    
-    return atr
-
-
-def compute_returns(
-    c: np.ndarray,
-    method: str = "log",
-) -> np.ndarray:
-    """
-    計算 returns
-    
-    公式：
-    - log: r = log(close).diff()
-    - simple: r = (close - prev_close) / prev_close
-    
-    第一根 bar 的 return 為 NaN
-    
-    Args:
-        c: close 價格
-        method: 計算方法，"log" 或 "simple"
-        
-    Returns:
-        returns 陣列，與輸入長度相同
-    """
-    n = len(c)
-    if n <= 1:
-        return np.full(n, np.nan, dtype=np.float64)
-    
-    ret = np.full(n, np.nan, dtype=np.float64)
-    
-    if method == "log":
-        # log returns: r = log(close).diff()
-        log_c = np.log(c)
-        ret[1:] = np.diff(log_c)
-    else:
-        # simple returns: r = (close - prev_close) / prev_close
-        ret[1:] = (c[1:] - c[:-1]) / c[:-1]
-    
-    return ret
-
-
-def compute_rolling_z(
-    x: np.ndarray,
-    window: int,
-) -> np.ndarray:
-    """
-    計算 rolling z-score（population std, ddof=0）
-    
-    公式：
-    mean = (sum_x[i] - sum_x[i-window]) / window
-    var = (sum_x2[i] - sum_x2[i-window]) / window - mean^2
-    std = sqrt(max(var, 0))  # 防浮點負數
-    z = (x - mean) / std
-    
-    前 window-1 根 bar 的 z-score 為 NaN
-    std == 0 時，z = NaN（而不是 0）
-    
-    Args:
-        x: 輸入數值陣列
-        window: 滾動視窗大小
-        
-    Returns:
-        z-score 陣列，與輸入長度相同
-    """
-    n = len(x)
-    if n == 0 or window <= 1:
-        return np.full(n, np.nan, dtype=np.float64)
-    
-    # 初始化結果為 NaN
-    z = np.full(n, np.nan, dtype=np.float64)
-    
-    # 計算 cumulative sums
-    cumsum = np.cumsum(x, dtype=np.float64)
-    cumsum2 = np.cumsum(x * x, dtype=np.float64)
-    
-    # 計算 rolling z-score
-    for i in range(window - 1, n):
-        # 計算視窗內的 sum 和 sum of squares
-        if i == window - 1:
-            sum_x = cumsum[i]
-            sum_x2 = cumsum2[i]
-        else:
-            sum_x = cumsum[i] - cumsum[i - window]
-            sum_x2 = cumsum2[i] - cumsum2[i - window]
-        
-        # 計算 mean 和 variance
-        mean = sum_x / window
-        var = (sum_x2 / window) - (mean * mean)
-        
-        # 防浮點負數
-        if var < 0:
-            var = 0.0
-        
-        std = np.sqrt(var)
-        
-        # 計算 z-score
-        if std == 0:
-            # std == 0 時，z = NaN（而不是 0）
-            z[i] = np.nan
-        else:
-            z[i] = (x[i] - mean) / std
-    
-    return z
-
-
-def compute_session_vwap(
-    ts: np.ndarray,
-    c: np.ndarray,
-    v: np.ndarray,
-    session_spec: SessionSpecTaipei,
-    breaks_policy: str = "drop",
-) -> np.ndarray:
-    """
-    計算 session VWAP（Volume Weighted Average Price）
-    
-    每個 session 獨立計算 VWAP，並將該 session 內的所有 bar 賦予相同的 VWAP 值。
-    
-    Args:
-        ts: 時間戳記陣列（datetime64[s]）
-        c: close 價格陣列
-        v: volume 陣列
-        session_spec: session 規格
-        breaks_policy: break 處理策略（目前只支援 "drop"）
-        
-    Returns:
-        session VWAP 陣列，與輸入長度相同
-    """
-    n = len(ts)
-    if n == 0:
-        return np.array([], dtype=np.float64)
-    
-    # 初始化結果為 NaN
-    vwap = np.full(n, np.nan, dtype=np.float64)
-    
-    # 將 datetime64[s] 轉換為 pandas Timestamp 以便進行日期時間操作
-    # 我們需要判斷每個 bar 屬於哪個 session
-    # 由於這是 MVP，我們先實作簡單版本：假設所有 bar 都在同一個 session
-    # 實際實作需要根據 session_spec 進行 session 分類
-    # 但根據 Phase 3B 要求，我們先提供固定實作
-    
-    # 簡單實作：計算整個時間範圍的 VWAP（所有 bar 視為同一個 session）
-    # 這不是正確的 session VWAP，但符合 MVP 要求
-    total_volume = np.sum(v)
-    if total_volume > 0:
-        weighted_sum = np.sum(c * v)
-        overall_vwap = weighted_sum / total_volume
-        vwap[:] = overall_vwap
-    else:
-        vwap[:] = np.nan
-    
-    return vwap
-
-
-def compute_features_for_tf(
-    ts: np.ndarray,
-    o: np.ndarray,
-    h: np.ndarray,
-    l: np.ndarray,
-    c: np.ndarray,
-    v: np.ndarray,
-    tf_min: int,
-    registry: FeatureRegistry,
-    session_spec: SessionSpecTaipei,
-    breaks_policy: str = "drop",
-) -> Dict[str, np.ndarray]:
-    """
-    計算指定 timeframe 的所有特徵
-    
-    Args:
-        ts: 時間戳記陣列（datetime64[s]），必須與 resampled bars 完全一致
-        o: open 價格陣列
-        h: high 價格陣列
-        l: low 價格陣列
-        c: close 價格陣列
-        v: volume 陣列
-        tf_min: timeframe 分鐘數
-        registry: 特徵註冊表
-        session_spec: session 規格
-        breaks_policy: break 處理策略
-        
-    Returns:
-        特徵字典，keys 必須為：
-        - ts: 與輸入 ts 相同的物件/值（datetime64[s]）
-        - atr_14: float64
-        - ret_z_200: float64
-        - session_vwap: float64
-        
-    Raises:
-        ValueError: 輸入陣列長度不一致或 registry 缺少必要特徵
-    """
-    # 驗證輸入長度
-    n = len(ts)
-    for arr, name in [(o, "open"), (h, "high"), (l, "low"), (c, "close"), (v, "volume")]:
-        if len(arr) != n:
-            raise ValueError(f"輸入陣列長度不一致: {name} 長度為 {len(arr)}，但 ts 長度為 {n}")
-    
-    # 取得該 timeframe 的特徵規格
-    specs = registry.specs_for_tf(tf_min)
-    
-    # 建立結果字典
-    result = {"ts": ts}  # ts 必須是相同的物件/值
-    
-    # 計算每個特徵
-    for spec in specs:
-        if spec.name == "atr_14":
-            result["atr_14"] = compute_atr_14(o, h, l, c)
-        elif spec.name == "ret_z_200":
-            # 先計算 returns
-            returns = compute_returns(c, method="log")
-            # 再計算 z-score
-            result["ret_z_200"] = compute_rolling_z(returns, window=200)
-        elif spec.name == "session_vwap":
-            result["session_vwap"] = compute_session_vwap(
-                ts, c, v, session_spec, breaks_policy
-            )
-        else:
-            raise ValueError(f"不支援的特徵名稱: {spec.name}")
-    
-    # 確保所有必要特徵都存在
-    required_features = ["atr_14", "ret_z_200", "session_vwap"]
-    for feat in required_features:
-        if feat not in result:
-            raise ValueError(f"registry 缺少必要特徵: {feat}")
-    
-    return result
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/fingerprint.py
-sha256(source_bytes) = 441ddd041b5bd8650c71eaae4a303f0cc5465f8abf56d5f0617a9ea79ce8a77e
-bytes = 7761
-redacted = False
---------------------------------------------------------------------------------
-
-# src/FishBroWFS_V2/core/fingerprint.py
-"""
-Fingerprint 計算核心
-
-提供 canonical bytes 規則與指紋計算函數，確保 deterministic 結果。
-"""
-
-from __future__ import annotations
-
-import hashlib
-from datetime import datetime
-from typing import Any, Dict, Iterable, List, Tuple
-
-import numpy as np
-import pandas as pd
-
-from FishBroWFS_V2.contracts.fingerprint import FingerprintIndex
-from FishBroWFS_V2.data.raw_ingest import RawIngestResult
-
-
-def canonical_bar_line(
-    ts: datetime,
-    o: float,
-    h: float,
-    l: float,
-    c: float,
-    v: float
-) -> str:
-    """
-    將單一 bar 轉換為標準化字串
-    
-    格式固定：YYYY-MM-DDTHH:MM:SS|{o:.4f}|{h:.4f}|{l:.4f}|{c:.4f}|{v:.0f}
-    
-    Args:
-        ts: 時間戳記
-        o: 開盤價
-        h: 最高價
-        l: 最低價
-        c: 收盤價
-        v: 成交量
-    
-    Returns:
-        標準化字串
-    """
-    # 格式化時間戳記
-    ts_str = ts.strftime("%Y-%m-%dT%H:%M:%S")
-    
-    # 格式化價格（固定小數位數）
-    # 使用 round 確保 deterministic，避免浮點數表示差異
-    o_fmt = f"{o:.4f}"
-    h_fmt = f"{h:.4f}"
-    l_fmt = f"{l:.4f}"
-    c_fmt = f"{c:.4f}"
-    
-    # 格式化成交量（整數）
-    v_fmt = f"{v:.0f}"
-    
-    return f"{ts_str}|{o_fmt}|{h_fmt}|{l_fmt}|{c_fmt}|{v_fmt}"
-
-
-def compute_day_hash(lines: List[str]) -> str:
-    """
-    計算一日的 hash
-    
-    將該日所有 bar 的標準化字串排序後連接，計算 SHA256。
-    
-    Args:
-        lines: 該日所有 bar 的標準化字串列表
-    
-    Returns:
-        SHA256 hex 字串
-    """
-    if not lines:
-        # 空日的 hash（理論上不應該發生）
-        return hashlib.sha256(b"").hexdigest()
-    
-    # 排序確保 deterministic
-    sorted_lines = sorted(lines)
-    
-    # 連接所有字串，以換行分隔
-    content = "\n".join(sorted_lines)
-    
-    # 計算 SHA256
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-
-def _parse_ts_str(ts_str: str) -> datetime:
-    """
-    解析時間戳記字串
-    
-    支援多種格式：
-    - "YYYY-MM-DD HH:MM:SS"
-    - "YYYY/MM/DD HH:MM:SS"
-    - "YYYY-MM-DDTHH:MM:SS"
-    """
-    # 嘗試常見格式
-    formats = [
-        "%Y-%m-%d %H:%M:%S",
-        "%Y/%m/%d %H:%M:%S",
-        "%Y-%m-%dT%H:%M:%S",
-        "%Y/%m/%dT%H:%M:%S",
-    ]
-    
-    for fmt in formats:
-        try:
-            return datetime.strptime(ts_str, fmt)
-        except ValueError:
-            continue
-    
-    # 如果都不匹配，嘗試使用 pandas 解析
-    try:
-        return pd.to_datetime(ts_str).to_pydatetime()
-    except Exception as e:
-        raise ValueError(f"無法解析時間戳記: {ts_str}") from e
-
-
-def _group_bars_by_day(
-    bars: Iterable[Tuple[datetime, float, float, float, float, float]]
-) -> Dict[str, List[str]]:
-    """
-    將 bars 按日期分組
-    
-    Args:
-        bars: (ts, o, h, l, c, v) 的迭代器
-    
-    Returns:
-        字典：日期字串 (YYYY-MM-DD) -> 該日所有 bar 的標準化字串列表
-    """
-    day_groups: Dict[str, List[str]] = {}
-    
-    for ts, o, h, l, c, v in bars:
-        # 取得日期字串
-        day_str = ts.strftime("%Y-%m-%d")
-        
-        # 建立標準化字串
-        line = canonical_bar_line(ts, o, h, l, c, v)
-        
-        # 加入對應日期的群組
-        if day_str not in day_groups:
-            day_groups[day_str] = []
-        day_groups[day_str].append(line)
-    
-    return day_groups
-
-
-def build_fingerprint_index_from_bars(
-    dataset_id: str,
-    bars: Iterable[Tuple[datetime, float, float, float, float, float]],
-    dataset_timezone: str = "Asia/Taipei",
-    build_notes: str = ""
-) -> FingerprintIndex:
-    """
-    從 bars 建立指紋索引
-    
-    Args:
-        dataset_id: 資料集 ID
-        bars: (ts, o, h, l, c, v) 的迭代器
-        dataset_timezone: 時區
-        build_notes: 建置備註
-    
-    Returns:
-        FingerprintIndex
-    """
-    # 按日期分組
-    day_groups = _group_bars_by_day(bars)
-    
-    if not day_groups:
-        raise ValueError("沒有 bars 資料")
-    
-    # 計算每日 hash
-    day_hashes: Dict[str, str] = {}
-    for day_str, lines in day_groups.items():
-        day_hashes[day_str] = compute_day_hash(lines)
-    
-    # 找出日期範圍
-    sorted_days = sorted(day_hashes.keys())
-    range_start = sorted_days[0]
-    range_end = sorted_days[-1]
-    
-    # 建立指紋索引
-    return FingerprintIndex.create(
-        dataset_id=dataset_id,
-        range_start=range_start,
-        range_end=range_end,
-        day_hashes=day_hashes,
-        dataset_timezone=dataset_timezone,
-        build_notes=build_notes
-    )
-
-
-def build_fingerprint_index_from_raw_ingest(
-    dataset_id: str,
-    raw_ingest_result: RawIngestResult,
-    dataset_timezone: str = "Asia/Taipei",
-    build_notes: str = ""
-) -> FingerprintIndex:
-    """
-    從 RawIngestResult 建立指紋索引（便利函數）
-    
-    Args:
-        dataset_id: 資料集 ID
-        raw_ingest_result: RawIngestResult
-        dataset_timezone: 時區
-        build_notes: 建置備註
-    
-    Returns:
-        FingerprintIndex
-    """
-    df = raw_ingest_result.df
-    
-    # 準備 bars 迭代器
-    bars = []
-    for _, row in df.iterrows():
-        try:
-            ts = _parse_ts_str(row["ts_str"])
-            bars.append((
-                ts,
-                float(row["open"]),
-                float(row["high"]),
-                float(row["low"]),
-                float(row["close"]),
-                float(row["volume"])
-            ))
-        except Exception as e:
-            raise ValueError(f"解析 bar 資料失敗: {e}") from e
-    
-    return build_fingerprint_index_from_bars(
-        dataset_id=dataset_id,
-        bars=bars,
-        dataset_timezone=dataset_timezone,
-        build_notes=build_notes
-    )
-
-
-def compare_fingerprint_indices(
-    old_index: FingerprintIndex | None,
-    new_index: FingerprintIndex
-) -> Dict[str, Any]:
-    """
-    比較兩個指紋索引，產生 diff 報告
-    
-    Args:
-        old_index: 舊索引（可為 None）
-        new_index: 新索引
-    
-    Returns:
-        diff 報告字典
-    """
-    if old_index is None:
-        return {
-            "old_range_start": None,
-            "old_range_end": None,
-            "new_range_start": new_index.range_start,
-            "new_range_end": new_index.range_end,
-            "append_only": False,
-            "append_range": None,
-            "earliest_changed_day": None,
-            "no_change": False,
-            "is_new": True,
-        }
-    
-    # 檢查是否完全相同
-    if old_index.index_sha256 == new_index.index_sha256:
-        return {
-            "old_range_start": old_index.range_start,
-            "old_range_end": old_index.range_end,
-            "new_range_start": new_index.range_start,
-            "new_range_end": new_index.range_end,
-            "append_only": False,
-            "append_range": None,
-            "earliest_changed_day": None,
-            "no_change": True,
-            "is_new": False,
-        }
-    
-    # 檢查是否為 append-only
-    append_only = old_index.is_append_only(new_index)
-    append_range = old_index.get_append_range(new_index) if append_only else None
-    
-    # 找出最早變更的日期
-    earliest_changed_day = old_index.get_earliest_changed_day(new_index)
-    
-    return {
-        "old_range_start": old_index.range_start,
-        "old_range_end": old_index.range_end,
-        "new_range_start": new_index.range_start,
-        "new_range_end": new_index.range_end,
-        "append_only": append_only,
-        "append_range": append_range,
-        "earliest_changed_day": earliest_changed_day,
-        "no_change": False,
-        "is_new": False,
-    }
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/governance_schema.py
-sha256(source_bytes) = c3eaa60d25152eaa39bff142e32237a840615eb166ea0eed79c2b20694e58f74
-bytes = 2629
-redacted = False
---------------------------------------------------------------------------------
-
-"""Governance schema for decision tracking and auditability.
-
-Single Source of Truth (SSOT) for governance decisions.
-"""
-
-from __future__ import annotations
-
-from dataclasses import dataclass, asdict
-from typing import Any, Dict, List
-
-from FishBroWFS_V2.core.schemas.governance import Decision
-
-
-@dataclass(frozen=True)
-class EvidenceRef:
-    """
-    Reference to evidence used in governance decision.
-    
-    Points to specific artifacts (run_id, stage, artifact paths, key metrics)
-    that support the decision.
-    """
-    run_id: str
-    stage_name: str
-    artifact_paths: List[str]  # Relative paths to artifacts (manifest.json, metrics.json, etc.)
-    key_metrics: Dict[str, Any]  # Key metrics extracted from artifacts
-
-
-@dataclass(frozen=True)
-class GovernanceItem:
-    """
-    Governance decision for a single candidate.
-    
-    Each item represents a decision (KEEP/FREEZE/DROP) for one candidate
-    parameter set, with reasons and evidence chain.
-    """
-    candidate_id: str  # Stable identifier: strategy_id:params_hash[:12]
-    decision: Decision
-    reasons: List[str]  # Human-readable reasons for decision
-    evidence: List[EvidenceRef]  # Evidence chain supporting decision
-    created_at: str  # ISO8601 with Z suffix (UTC)
-    git_sha: str  # Git SHA at time of governance evaluation
-
-
-@dataclass(frozen=True)
-class GovernanceReport:
-    """
-    Complete governance report for a set of candidates.
-    
-    Contains:
-    - items: List of governance decisions for each candidate
-    - metadata: Report-level metadata (governance_id, season, etc.)
-    """
-    items: List[GovernanceItem]
-    metadata: Dict[str, Any]  # Report metadata (governance_id, season, created_at, etc.)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for JSON serialization."""
-        return {
-            "items": [
-                {
-                    "candidate_id": item.candidate_id,
-                    "decision": item.decision.value,
-                    "reasons": item.reasons,
-                    "evidence": [
-                        {
-                            "run_id": ev.run_id,
-                            "stage_name": ev.stage_name,
-                            "artifact_paths": ev.artifact_paths,
-                            "key_metrics": ev.key_metrics,
-                        }
-                        for ev in item.evidence
-                    ],
-                    "created_at": item.created_at,
-                    "git_sha": item.git_sha,
-                }
-                for item in self.items
-            ],
-            "metadata": self.metadata,
-        }
-
-
-
---------------------------------------------------------------------------------
-
-FILE src/FishBroWFS_V2/core/governance_writer.py
-sha256(source_bytes) = 7ac1f8b05cbbb86cffa6e8134615c0a561e1e0266fef75befe7ad790a9f4bf31
-bytes = 4810
-redacted = False
---------------------------------------------------------------------------------
-
-"""Governance writer for decision artifacts.
-
-Writes governance results to outputs directory with machine-readable JSON
-and human-readable README.
-"""
-
-from __future__ import annotations
-
-import json
-from pathlib import Path
-from typing import Any, Dict
-
-from FishBroWFS_V2.core.governance_schema import GovernanceReport
-from FishBroWFS_V2.core.schemas.governance import Decision
-from FishBroWFS_V2.core.run_id import make_run_id
-
-
-def write_governance_artifacts(
-    governance_dir: Path,
-    report: GovernanceReport,
-) -> None:
-    """
-    Write governance artifacts to directory.
-    
-    Creates:
-    - governance.json: Machine-readable governance report
-    - README.md: Human-readable summary
-    - evidence_index.json: Optional evidence index (recommended)
-    
-    Args:
-        governance_dir: Path to governance directory (will be created if needed)
-        report: GovernanceReport to write
-    """
-    governance_dir.mkdir(parents=True, exist_ok=True)
-    
-    # Write governance.json (machine-readable SSOT)
-    governance_dict = report.to_dict()
-    governance_path = governance_dir / "governance.json"
-    with governance_path.open("w", encoding="utf-8") as f:
-        json.dump(
-            governance_dict,
-            f,
-            ensure_ascii=False,
-            sort_keys=True,
-            indent=2,
-        )
-        f.write("\n")
-    
-    # Write README.md (human-readable summary)
-    readme_lines = [
-        "# Governance Report",
-        "",
-        f"- governance_id: {report.metadata.get('governance_id')}",
-        f"- season: {report.metadata.get('season')}",
-        f"- created_at: {report.metadata.get('created_at')}",
-        f"- git_sha: {report.metadata.get('git_sha')}",
-        "",
-        "## Decision Summary",
-        "",
-    ]
-    
-    decisions = report.metadata.get("decisions", {})
-    readme_lines.extend([
-        f"- KEEP: {decisions.get('KEEP', 0)}",
-        f"- FREEZE: {decisions.get('FREEZE', 0)}",
-        f"- DROP: {decisions.get('DROP', 0)}",
-        "",
-    ])
-    
-    # List FREEZE reasons (concise)
-    freeze_items = [item for item in report.items if item.decision is Decision.FREEZE]
-    if freeze_items:
-        readme_lines.extend([
-            "## FREEZE Reasons",
-            "",
-        ])
-        for item in freeze_items:
-            reasons_str = "; ".join(item.reasons)
-            readme_lines.append(f"- {item.candidate_id}: {reasons_str}")
-        readme_lines.append("")
-    
-    # Subsample/params_effective summary
-    readme_lines.extend([
-        "## Subsample & Params Effective",
-        "",
-    ])
-    
-    # Extract subsample info from evidence
-    subsample_info: Dict[str, Any] = {}
-    for item in report.items:
-        for ev in item.evidence:
-            stage = ev.stage_name
-            if stage not in subsample_info:
-                subsample_info[stage] = {}
-            metrics = ev.key_metrics
-            if "stage_planned_subsample" in metrics:
-                subsample_info[stage]["stage_planned_subsample"] = metrics["stage_planned_subsample"]
-            if "param_subsample_rate" in metrics:
-                subsample_info[stage]["param_subsample_rate"] = metrics["param_subsample_rate"]
-            if "params_effective" in metrics:
-                subsample_info[stage]["params_effective"] = metrics["params_effective"]
-    
-    for stage, info in subsample_info.items():
-        readme_lines.append(f"### {stage}")
-        if "stage_planned_subsample" in info:
-            readme_lines.append(f"- stage_planned_subsample: {info['stage_planned_subsample']}")
-        if "param_subsample_rate" in info:
-            readme_lines.append(f"- param_subsample_rate: {info['param_subsample_rate']}")
-        if "params_effective" in info:
-            readme_lines.append(f"- params_effective: {info['params_effective']}")
-        readme_lines.append("")
-    
-    readme = "\n".join(readme_lines)
-    readme_path = governance_dir / "README.md"
-    readme_path.write_text(readme, encoding="utf-8")
-    
-    # Write evidence_index.json (optional but recommended)
-    evidence_index = {
-        "governance_id": report.metadata.get("governance_id"),
-        "evidence_by_candidate": {
-            item.candidate_id: [
-                {
-                    "run_id": ev.run_id,
-                    "stage_name": ev.stage_name,
-                    "artifact_paths": ev.artifact_paths,
-                }
-                for ev in item.evidence
-            ]
-            for item in report.items
-        },
-    }
-    evidence_index_path = governance_dir / "evidence_index.json"
-    with evidence_index_path.open("w", encoding="utf-8") as f:
-        json.dump(
-            evidence_index,
-            f,
-            ensure_ascii=False,
-            sort_keys=True,
-            indent=2,
-        )
-        f.write("\n")
 
 
 

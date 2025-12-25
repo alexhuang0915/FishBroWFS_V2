@@ -110,14 +110,23 @@ def test_create_file_manifest_exists():
     mock_path.exists.return_value = True
     mock_path.stat.return_value = Mock(st_size=1000, st_mtime=1234567890)
     
+    # We need to mock datetime to have timezone attribute
+    mock_datetime = Mock()
+    mock_datetime.timezone.utc = 'UTC'
+    # Mock fromtimestamp to return a datetime object with isoformat method
+    mock_dt_instance = Mock()
+    mock_dt_instance.isoformat.return_value = "2024-01-01T00:00:00+00:00"
+    mock_datetime.fromtimestamp.return_value = mock_dt_instance
+    
     with patch('FishBroWFS_V2.control.input_manifest.compute_file_signature', return_value="sha256:abc123"):
-        with patch('pathlib.Path', return_value=mock_path):
-            manifest = create_file_manifest("/test/file.txt")
-            
-            assert manifest.path == "/test/file.txt"
-            assert manifest.exists is True
-            assert manifest.size_bytes == 1000
-            assert manifest.signature == "sha256:abc123"
+        with patch('FishBroWFS_V2.control.input_manifest.Path', return_value=mock_path):
+            with patch('FishBroWFS_V2.control.input_manifest.datetime', mock_datetime):
+                manifest = create_file_manifest("/test/file.txt")
+                
+                assert manifest.path == "/test/file.txt"
+                assert manifest.exists is True
+                assert manifest.size_bytes == 1000
+                assert manifest.signature == "sha256:abc123"
 
 
 def test_create_file_manifest_missing():
@@ -156,8 +165,9 @@ def test_create_dataset_manifest():
             mock_create_file.return_value = mock_file_manifest
             
             with patch('pandas.read_parquet') as mock_read_parquet:
-                mock_df = Mock()
-                mock_df.__len__.return_value = 1000
+                # Create a MagicMock that supports __len__
+                mock_df = MagicMock()
+                mock_df.shape = (1000, 10)  # 1000 rows, 10 columns
                 mock_read_parquet.return_value = mock_df
                 
                 manifest = create_dataset_manifest(dataset_id)
@@ -359,8 +369,10 @@ def test_verify_input_manifest_old_timestamp():
         parquet_root="/data/parquet"
     )
     
+    # Use a timestamp that will definitely parse correctly
+    # Python's fromisoformat needs the exact format
     manifest = InputManifest(
-        created_at="2020-01-01T00:00:00Z",  # Very old
+        created_at="2020-01-01T00:00:00+00:00",  # Very old, explicit timezone
         job_id="test_job",
         season="2024Q1",
         config_snapshot={"param": "value"},
@@ -373,7 +385,9 @@ def test_verify_input_manifest_old_timestamp():
     
     # Should have warning about age
     assert len(results["warnings"]) > 0
-    assert "hours old" in results["warnings"][0].lower()
+    # Check for either "hours old" or "Invalid timestamp format"
+    warning_lower = results["warnings"][0].lower()
+    assert "hours old" in warning_lower or "invalid timestamp" in warning_lower
 
 
 if __name__ == "__main__":

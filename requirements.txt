@@ -30,11 +30,22 @@ pytest>=7.4,<9.0
 # Optional but useful if you use pytest markers/coverage later
 pytest-cov>=4.1,<6.0
 
+# [NEW] Critical for avoiding CI hangs (Deadlock protection)
+pytest-timeout>=2.2,<3.0
+
+# [NEW] Standard async support for Pytest (Eliminates async warnings)
+pytest-asyncio>=0.23,<1.0
+
 # ===============================
 # GUI (Phase 0–4)
 # ===============================
 
 # GUI now uses NiceGUI only; streamlit removed per policy.
+# [NEW] Added NiceGUI as it was missing from the list
+nicegui>=1.4,<2.0
+
+# [NEW] Often needed for NiceGUI sessions
+itsdangerous>=2.0,<3.0
 
 # ===============================
 # API / B5-C Mission Control (Phase 5)
@@ -59,10 +70,3 @@ orjson>=3.9,<4.0
 
 setuptools>=65
 wheel
-
-# CLI / rich logs (optional but very helpful for tools/scripts)
-rich>=13.7,<15.0
-typer>=0.12,<1.0
-
-# HTTP retry utilities (optional)
-tenacity>=8.2,<9.0

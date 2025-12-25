@@ -143,6 +143,16 @@ def list_dataset_ids() -> List[str]:
     return catalog.list_dataset_ids()
 
 
+def list_datasets() -> List[DatasetRecord]:
+    """Public API: Get list of all dataset records.
+    
+    Returns:
+        List of DatasetRecord objects
+    """
+    catalog = get_dataset_catalog()
+    return catalog.list_datasets()
+
+
 def describe_dataset(dataset_id: str) -> Optional[DatasetRecord]:
     """Public API: Get dataset descriptor by ID.
     

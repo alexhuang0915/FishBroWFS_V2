@@ -350,15 +350,60 @@ class StateProcessor:
         self.logger.info("StateProcessor started")
     
     async def stop(self) -> None:
-        """Stop the processor."""
-        self.is_running = False
-        if self.processing_task:
-            self.processing_task.cancel()
+        """Stop the processor safely without deadlock.
+
+        Contract:
+        - Never block the asyncio loop.
+        - Idempotent.
+        - Always returns promptly.
+        """
+        # (A) flip running flag
+        try:
+            self.is_running = False
+        except Exception:
+            pass
+
+        # (B) cancel and await worker task
+        task = self.processing_task
+        if task is not None:
             try:
-                await self.processing_task
-            except asyncio.CancelledError:
+                if not task.done():
+                    task.cancel()
+                # IMPORTANT: wait_for only works if loop is not frozen.
+                # This must return quickly after we remove blocking calls.
+                await asyncio.wait_for(task, timeout=1.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError):
                 pass
-        self.executor.shutdown(wait=True)
+            except Exception:
+                pass
+            finally:
+                try:
+                    self.processing_task = None
+                except Exception:
+                    pass
+
+        # (C) shutdown executor without blocking event loop
+        ex = self.executor
+        if ex is not None:
+            try:
+                ex.shutdown(wait=False, cancel_futures=True)  # py3.9+
+            except TypeError:
+                try:
+                    ex.shutdown(wait=False)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+            finally:
+                # If the class stores it, clear it to be idempotent
+                try:
+                    # Note: we don't set self.executor = None because
+                    # it's used in _process_intent. But we could create
+                    # a new executor on next start() if needed.
+                    pass
+                except Exception:
+                    pass
+        
         self.logger.info("StateProcessor stopped")
     
     async def _process_loop(self) -> None:
@@ -366,7 +411,9 @@ class StateProcessor:
         while self.is_running:
             try:
                 # Get next intent from queue (non-blocking)
-                intent = await self.action_queue.get_next()
+                # Note: get_next() is synchronous but we call it without await
+                # because it returns Optional[UserIntent], not a coroutine
+                intent = self.action_queue.get_next(block=False)
                 if intent is None:
                     # No intents in queue, sleep a bit
                     await asyncio.sleep(0.1)
@@ -395,12 +442,26 @@ class StateProcessor:
             if not handler:
                 raise ProcessingError(f"No handler for intent type: {intent.intent_type}")
             
-            # Process intent (run in thread pool to keep async loop responsive)
+            # Process intent with timeout to prevent indefinite hanging
+            # Use asyncio.wait_for on the handler execution
             loop = asyncio.get_event_loop()
-            new_state, result = await loop.run_in_executor(
-                self.executor,
-                lambda: asyncio.run(handler.handle(intent, self.current_state))
-            )
+            
+            # Define the handler execution function with timeout
+            async def execute_handler_with_timeout():
+                # Run handler in thread pool with its own event loop
+                return await loop.run_in_executor(
+                    self.executor,
+                    lambda: asyncio.run(handler.handle(intent, self.current_state))
+                )
+            
+            # Execute with timeout (30 seconds should be plenty for any handler)
+            try:
+                new_state, result = await asyncio.wait_for(
+                    execute_handler_with_timeout(),
+                    timeout=30.0
+                )
+            except asyncio.TimeoutError:
+                raise ProcessingError(f"Handler timed out after 30 seconds for intent {intent.intent_id}")
             
             # Update state
             self.current_state = new_state
@@ -408,6 +469,9 @@ class StateProcessor:
             # Update intent status
             intent.status = IntentStatus.COMPLETED
             intent.result = result
+            
+            # Notify queue that intent is completed
+            self.action_queue.mark_completed(intent.intent_id, result)
             
             processing_time_ms = (time.time() - start_time) * 1000
             self.logger.info(f"Processed intent {intent.intent_id} ({intent.intent_type}) in {processing_time_ms:.1f}ms")
@@ -418,13 +482,15 @@ class StateProcessor:
             intent.error_message = str(e)
             self.logger.error(f"Failed to process intent {intent.intent_id}: {e}", exc_info=True)
             
+            # Notify queue that intent failed
+            self.action_queue.mark_failed(intent.intent_id, str(e))
+            
             # Update metrics
+            intent_queue_dict = self.current_state.intent_queue.model_dump()
+            intent_queue_dict['failed_count'] = self.current_state.intent_queue.failed_count + 1
             self.current_state = create_state_snapshot(
                 self.current_state,
-                intent_queue=IntentQueueStatus(
-                    **self.current_state.intent_queue.model_dump(),
-                    failed_count=self.current_state.intent_queue.failed_count + 1
-                )
+                intent_queue=IntentQueueStatus(**intent_queue_dict)
             )
     
     def get_state(self) -> SystemState:
@@ -442,9 +508,24 @@ class StateProcessor:
         """Get intent status by ID."""
         return self.action_queue.get_intent(intent_id)
     
-    async def wait_for_intent(self, intent_id: str, timeout: float = 30.0) -> Optional[UserIntent]:
-        """Wait for an intent to complete."""
-        return await self.action_queue.wait_for_intent(intent_id, timeout)
+    async def wait_for_intent(self, intent_id: str, timeout: Optional[float] = 30.0) -> Optional[UserIntent]:
+        """Wait for an intent to complete.
+        
+        Hard guarantee: never hang forever.
+        If timeout is None, uses default 30.0 seconds.
+        Returns None on timeout or any exception (UI contract wants "no hang").
+        """
+        # Enforce a default hard cap in production
+        if timeout is None:
+            timeout = 30.0
+        
+        try:
+            return await self.action_queue.wait_for_intent_async(intent_id, timeout=timeout)
+        except Exception:
+            # No propagation; UI contract wants "no hang"
+            # Log at debug level to avoid noise in tests
+            self.logger.debug(f"wait_for_intent timed out or errored for intent {intent_id}", exc_info=True)
+            return None
     
     def get_queue_status(self) -> IntentQueueStatus:
         """Get queue status."""
@@ -472,8 +553,49 @@ async def start_processor() -> None:
 
 
 async def stop_processor() -> None:
-    """Stop the singleton processor."""
+    """Stop the singleton processor.
+    
+    Hard guarantee: never hang forever.
+    Uses asyncio.wait_for with timeout to ensure we don't block.
+    """
     global _processor_instance
     if _processor_instance:
-        await _processor_instance.stop()
+        try:
+            # Use timeout to prevent hanging
+            await asyncio.wait_for(_processor_instance.stop(), timeout=2.0)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            # If timeout, log and continue - we must not hang
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning("stop_processor timed out after 2 seconds, forcing cleanup")
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error stopping processor: {e}")
+        finally:
+            _processor_instance = None
+
+
+def reset_processor() -> None:
+    """Reset the singleton processor (for testing).
+    
+    This stops the processor if it's running and clears the singleton.
+    """
+    global _processor_instance
+    if _processor_instance:
+        # Try to stop synchronously (not ideal but works for tests)
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # If loop is running, we can't call stop_processor synchronously
+                # Just clear the reference and let garbage collection handle it
+                _processor_instance = None
+            else:
+                # Run stop_processor in the event loop
+                loop.run_until_complete(stop_processor())
+        except (RuntimeError, Exception):
+            # No event loop or other error, just clear the reference
+            _processor_instance = None
+    else:
         _processor_instance = None

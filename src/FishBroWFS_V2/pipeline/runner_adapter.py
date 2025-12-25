@@ -11,7 +11,6 @@ from typing import Any, Dict, List
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.funnel import run_funnel as run_funnel_legacy
 from FishBroWFS_V2.pipeline.runner_grid import run_grid
 from FishBroWFS_V2.pipeline.stage0_runner import run_stage0
 from FishBroWFS_V2.pipeline.stage2_runner import run_stage2

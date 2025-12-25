@@ -165,6 +165,25 @@ class StrategyCatalog:
             s for s in self.registry.strategies
             if min_params <= len(s.params) <= max_params
         ]
+    
+    def list_strategy_ids(self) -> List[str]:
+        """Get list of all strategy IDs.
+        
+        Returns:
+            List of strategy IDs sorted alphabetically
+        """
+        return sorted([s.strategy_id for s in self.registry.strategies])
+    
+    def get_strategy_spec_public(self, strategy_id: str) -> Optional[StrategySpecForGUI]:
+        """Public API: Get strategy spec by ID.
+        
+        Args:
+            strategy_id: Strategy ID to get
+            
+        Returns:
+            StrategySpecForGUI if found, None otherwise
+        """
+        return self.get_strategy(strategy_id)
 
 
 # Singleton instance for easy access
@@ -176,3 +195,27 @@ def get_strategy_catalog() -> StrategyCatalog:
     if _catalog_instance is None:
         _catalog_instance = StrategyCatalog()
     return _catalog_instance
+
+
+# Public API functions for registry access
+def list_strategy_ids() -> List[str]:
+    """Public API: Get list of all strategy IDs.
+    
+    Returns:
+        List of strategy IDs sorted alphabetically
+    """
+    catalog = get_strategy_catalog()
+    return catalog.list_strategy_ids()
+
+
+def get_strategy_spec(strategy_id: str) -> Optional[StrategySpecForGUI]:
+    """Public API: Get strategy spec by ID.
+    
+    Args:
+        strategy_id: Strategy ID to get
+        
+    Returns:
+        StrategySpecForGUI if found, None otherwise
+    """
+    catalog = get_strategy_catalog()
+    return catalog.get_strategy_spec_public(strategy_id)

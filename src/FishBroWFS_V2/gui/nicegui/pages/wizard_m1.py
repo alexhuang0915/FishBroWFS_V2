@@ -87,68 +87,77 @@ def create_step1_data1(state: M1WizardState) -> None:
         ui.label("Step 1: DATA1 Configuration").classes("text-xl font-bold mb-4")
         
         # Season input
-        season_input = ui.input(
-            label="Season",
-            value=state.season,
-            placeholder="e.g., 2024Q1, 2024Q2"
-        ).classes("w-full mb-4")
+        from FishBroWFS_V2.gui.nicegui.ui_compat import labeled_input, labeled_select, labeled_date
+        
+        with ui.column().classes("gap-1 w-full mb-4"):
+            ui.label("Season")
+            season_input = ui.input(
+                value=state.season,
+                placeholder="e.g., 2024Q1, 2024Q2"
+            ).classes("w-full")
+            season_input.bind_value(state, 'season')
         
         # Dataset selection
         catalog = get_dataset_catalog()
         datasets = catalog.list_datasets()
-        dataset_options = {d.id: f"{d.symbol} ({d.timeframe}) {d.start_date}-{d.end_date}" 
+        dataset_options = {d.id: f"{d.symbol} ({d.timeframe}) {d.start_date}-{d.end_date}"
                           for d in datasets}
         
-        dataset_select = ui.select(
-            label="Dataset",
-            options=dataset_options,
-            with_input=True
-        ).classes("w-full mb-4")
+        with ui.column().classes("gap-1 w-full mb-4"):
+            ui.label("Dataset")
+            dataset_select = ui.select(
+                options=dataset_options,
+                with_input=True
+            ).classes("w-full")
+            dataset_select.bind_value(state, 'dataset_id')
         
         # Symbols input
-        symbols_input = ui.input(
-            label="Symbols (comma separated)",
-            value="MNQ, MXF",
-            placeholder="e.g., MNQ, MXF, MES"
-        ).classes("w-full mb-4")
+        with ui.column().classes("gap-1 w-full mb-4"):
+            ui.label("Symbols (comma separated)")
+            symbols_input = ui.input(
+                value="MNQ, MXF",
+                placeholder="e.g., MNQ, MXF, MES"
+            ).classes("w-full")
+            symbols_input.bind_value(state, 'symbols')
         
         # Timeframes input
-        timeframes_input = ui.input(
-            label="Timeframes (comma separated)",
-            value="60m, 120m",
-            placeholder="e.g., 60m, 120m, 240m"
-        ).classes("w-full mb-4")
+        with ui.column().classes("gap-1 w-full mb-4"):
+            ui.label("Timeframes (comma separated)")
+            timeframes_input = ui.input(
+                value="60m, 120m",
+                placeholder="e.g., 60m, 120m, 240m"
+            ).classes("w-full")
+            timeframes_input.bind_value(state, 'timeframes')
         
         # Date range
         with ui.row().classes("w-full"):
-            start_date = ui.date(
-                label="Start Date",
-                value=date(2020, 1, 1)
-            ).classes("w-1/2")
+            with ui.column().classes("gap-1 w-1/2"):
+                ui.label("Start Date")
+                start_date = ui.date(
+                    value=date(2020, 1, 1)
+                ).classes("w-full")
+                start_date.bind_value(state, 'start_date')
             
-            end_date = ui.date(
-                label="End Date",
-                value=date(2024, 12, 31)
-            ).classes("w-1/2")
+            with ui.column().classes("gap-1 w-1/2"):
+                ui.label("End Date")
+                end_date = ui.date(
+                    value=date(2024, 12, 31)
+                ).classes("w-full")
+                end_date.bind_value(state, 'end_date')
         
-        # Update state on changes
-        def update_state():
-            state.season = season_input.value
-            state.dataset_id = dataset_select.value
-            state.symbols = [s.strip() for s in symbols_input.value.split(",") if s.strip()]
-            state.timeframes = [t.strip() for t in timeframes_input.value.split(",") if t.strip()]
-            state.start_date = start_date.value
-            state.end_date = end_date.value
+        # Initialize state with parsed values
+        def parse_initial_values():
+            if isinstance(state.symbols, str):
+                state.symbols = [s.strip() for s in state.symbols.split(",") if s.strip()]
+            elif not isinstance(state.symbols, list):
+                state.symbols = []
+            
+            if isinstance(state.timeframes, str):
+                state.timeframes = [t.strip() for t in state.timeframes.split(",") if t.strip()]
+            elif not isinstance(state.timeframes, list):
+                state.timeframes = []
         
-        season_input.on_change(lambda e: update_state())
-        dataset_select.on_change(lambda e: update_state())
-        symbols_input.on_change(lambda e: update_state())
-        timeframes_input.on_change(lambda e: update_state())
-        start_date.on_change(lambda e: update_state())
-        end_date.on_change(lambda e: update_state())
-        
-        # Initialize state
-        update_state()
+        parse_initial_values()
 
 
 def create_step2_data2(state: M1WizardState) -> None:
@@ -158,7 +167,7 @@ def create_step2_data2(state: M1WizardState) -> None:
         
         # Enable DATA2 toggle
         enable_toggle = ui.switch("Enable DATA2 (single filter validation)")
-        enable_toggle.bind_value_to(state, 'enable_data2')
+        enable_toggle.bind_value(state, 'enable_data2')
         
         # DATA2 container (initially hidden)
         data2_container = ui.column().classes("w-full mt-4")
@@ -177,33 +186,34 @@ def create_step2_data2(state: M1WizardState) -> None:
                 datasets = catalog.list_datasets()
                 dataset_options = {d.id: f"{d.symbol} ({d.timeframe})" for d in datasets}
                 
-                dataset_select = ui.select(
-                    label="DATA2 Dataset",
-                    options=dataset_options,
-                    with_input=True
-                ).classes("w-full mb-4")
+                with ui.column().classes("gap-1 w-full mb-4"):
+                    ui.label("DATA2 Dataset")
+                    dataset_select = ui.select(
+                        options=dataset_options,
+                        with_input=True
+                    ).classes("w-full")
+                    dataset_select.bind_value(state, 'data2_dataset_id')
                 
                 # Filter selection (single filter)
                 filter_options = ["momentum", "volatility", "trend", "mean_reversion"]
-                filter_select = ui.select(
-                    label="Filter",
-                    options=filter_options,
-                    value=filter_options[0] if filter_options else ""
-                ).classes("w-full mb-4")
+                with ui.column().classes("gap-1 w-full mb-4"):
+                    ui.label("Filter")
+                    filter_select = ui.select(
+                        options=filter_options,
+                        value=filter_options[0] if filter_options else ""
+                    ).classes("w-full")
+                    filter_select.bind_value(state, 'selected_filter')
                 
-                # Update state
-                def update_data2_state():
-                    state.data2_dataset_id = dataset_select.value
-                    state.data2_filters = filter_options
-                    state.selected_filter = filter_select.value
-                
-                dataset_select.on_change(lambda e: update_data2_state())
-                filter_select.on_change(lambda e: update_data2_state())
-                
-                # Initialize
-                update_data2_state()
+                # Initialize state
+                state.data2_filters = filter_options
+                if not state.selected_filter and filter_options:
+                    state.selected_filter = filter_options[0]
         
-        enable_toggle.on_change(lambda e: update_data2_visibility(e.value))
+        # Use timer to update visibility when enable_data2 changes
+        def update_visibility_from_state():
+            update_data2_visibility(state.enable_data2)
+        
+        ui.timer(0.2, update_visibility_from_state)
         
         # Initial visibility
         update_data2_visibility(state.enable_data2)
@@ -219,11 +229,13 @@ def create_step3_strategies(state: M1WizardState) -> None:
         strategies = catalog.list_strategies()
         strategy_options = {s.strategy_id: s.strategy_id for s in strategies}
         
-        strategy_select = ui.select(
-            label="Strategy",
-            options=strategy_options,
-            with_input=True
-        ).classes("w-full mb-4")
+        with ui.column().classes("gap-1 w-full mb-4"):
+            ui.label("Strategy")
+            strategy_select = ui.select(
+                options=strategy_options,
+                with_input=True
+            ).classes("w-full")
+            strategy_select.bind_value(state, 'strategy_id')
         
         # Parameters container (dynamic)
         param_container = ui.column().classes("w-full mt-4")
@@ -260,13 +272,13 @@ def create_step3_strategies(state: M1WizardState) -> None:
                             step=step
                         ).classes("w-2/3")
                         
-                        # Bind to state
-                        def make_param_updater(pname: str, field):
-                            def updater():
-                                state.params[pname] = field.value
-                            return updater
+                        # Use on('update:model-value') for immediate updates
+                        def make_param_handler(pname: str, field):
+                            def handler(e):
+                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                            return handler
                         
-                        input_field.on_change(make_param_updater(param.name, input_field))
+                        input_field.on('update:model-value', make_param_handler(param.name, input_field))
                         state.params[param.name] = param.default
                         
                     elif param.type == "enum" and param.choices:
@@ -276,39 +288,45 @@ def create_step3_strategies(state: M1WizardState) -> None:
                             value=param.default
                         ).classes("w-2/3")
                         
-                        def make_enum_updater(pname: str, field):
-                            def updater():
-                                state.params[pname] = field.value
-                            return updater
+                        def make_enum_handler(pname: str, field):
+                            def handler(e):
+                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                            return handler
                         
-                        dropdown.on_change(make_enum_updater(param.name, dropdown))
+                        dropdown.on('update:model-value', make_enum_handler(param.name, dropdown))
                         state.params[param.name] = param.default
                         
                     elif param.type == "bool":
                         # Switch for boolean
                         switch = ui.switch(value=param.default).classes("w-2/3")
                         
-                        def make_bool_updater(pname: str, field):
-                            def updater():
-                                state.params[pname] = field.value
-                            return updater
+                        def make_bool_handler(pname: str, field):
+                            def handler(e):
+                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                            return handler
                         
-                        switch.on_change(make_bool_updater(param.name, switch))
+                        switch.on('update:model-value', make_bool_handler(param.name, switch))
                         state.params[param.name] = param.default
                     
                     # Help text
                     if param.help:
                         ui.tooltip(param.help).classes("ml-2")
         
-        strategy_select.on_change(lambda e: update_strategy_ui(e.value))
+        # Use timer to update UI when strategy_id changes
+        def update_strategy_from_state():
+            if state.strategy_id != getattr(update_strategy_from_state, '_last_strategy', None):
+                update_strategy_ui(state.strategy_id)
+                update_strategy_from_state._last_strategy = state.strategy_id
+        
+        ui.timer(0.2, update_strategy_from_state)
         
         # Initialize if strategy is selected
-        if strategy_select.value:
-            update_strategy_ui(strategy_select.value)
+        if state.strategy_id:
+            update_strategy_ui(state.strategy_id)
         elif strategies:
             # Select first strategy by default
             first_strategy = strategies[0].strategy_id
-            strategy_select.value = first_strategy
+            state.strategy_id = first_strategy
             update_strategy_ui(first_strategy)
 
 

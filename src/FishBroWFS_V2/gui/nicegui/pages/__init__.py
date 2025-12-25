@@ -14,6 +14,7 @@ from .wizard import register as register_wizard
 from .portfolio import register as register_portfolio
 from .run_detail import register as register_run_detail
 from .settings import register as register_settings
+from .status import register as register_status
 
 __all__ = [
     "register_home",
@@ -29,6 +30,7 @@ __all__ = [
     "register_portfolio",
     "register_run_detail",
     "register_settings",
+    "register_status",
 ]
 
 

@@ -124,7 +124,7 @@ def create_data_section(
                 start_date.update()
                 end_date.update()
         
-        dataset_select.on_change(lambda e: update_date_limits(e.value))
+        dataset_select.on('update:model-value', lambda e: update_date_limits(e.args))
         
         # Set initial limits if dataset is selected
         if dataset_select.value:
@@ -207,7 +207,7 @@ def create_strategy_section(state: WizardState) -> Dict[str, Any]:
                     if param.help:
                         ui.tooltip(param.help).classes("ml-2")
         
-        strategy_select.on_change(lambda e: update_parameters(e.value))
+        strategy_select.on('update:model-value', lambda e: update_parameters(e.args))
         
         # Initialize if strategy is selected
         if strategy_select.value:
@@ -325,10 +325,10 @@ def create_batch_mode_section(state: WizardState) -> Dict[str, Any]:
                     
                     # Initial creation
                     updater = make_param_updater(param.name, mode_select, value_container, param)
-                    mode_select.on_change(lambda e: updater())
+                    mode_select.on('update:model-value', lambda e: updater())
                     updater()  # call once to create initial UI
         
-        batch_toggle.on_change(lambda e: update_batch_mode(e.value))
+        batch_toggle.on('update:model-value', lambda e: update_batch_mode(e.args))
         
         def update_cost_preview():
             """Update cost preview label based on current grid specs."""
@@ -559,7 +559,7 @@ def wizard_page() -> None:
             def update_season() -> None:
                 state.season = season_input.value
             
-            season_input.on_change(lambda e: update_season())
+            season_input.on('update:model-value', lambda e: update_season())
             update_season()
         
         # Step 1: Data
@@ -580,7 +580,7 @@ def wizard_page() -> None:
                     state.data2 = None
                     state.data2_widgets = {}
             
-            enable_data2.on_change(lambda e: toggle_data2(e.value))
+            enable_data2.on('update:model-value', lambda e: toggle_data2(e.args))
         
         # Step 2: Strategy
         with ui.expansion("Step 2: Strategy", value=True).classes("w-full mb-4"):
@@ -589,7 +589,7 @@ def wizard_page() -> None:
             def update_strategy() -> None:
                 state.strategy_id = strategy_widgets["strategy_select"].value
             
-            strategy_widgets["strategy_select"].on_change(lambda e: update_strategy())
+            strategy_widgets["strategy_select"].on('update:model-value', lambda e: update_strategy())
             if strategy_widgets["strategy_select"].value:
                 update_strategy()
         

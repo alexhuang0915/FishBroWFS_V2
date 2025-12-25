@@ -2,7 +2,7 @@
 from __future__ import annotations
 from nicegui import ui
 
-# 根據 P0-0 要求：Dashboard / Wizard / History / Candidates / Portfolio / Deploy / Settings
+# 根據 P0-0 要求：Dashboard / Wizard / History / Candidates / Portfolio / Deploy / Settings / Status
 NAV = [
     ("Dashboard", "/"),
     ("Wizard", "/wizard"),
@@ -11,6 +11,7 @@ NAV = [
     ("Portfolio", "/portfolio"),
     ("Deploy", "/deploy"),
     ("Settings", "/settings"),
+    ("Status", "/status"),
 ]
 
 def render_header(season: str) -> None:

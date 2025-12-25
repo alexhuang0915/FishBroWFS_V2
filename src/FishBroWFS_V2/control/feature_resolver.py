@@ -497,3 +497,32 @@ def _load_single_feature_series(
         raise FeatureResolutionError(f"無法建立 FeatureSeries: {e}")
 
 
+# Cache invalidation functions for reload service
+def invalidate_feature_cache() -> bool:
+    """Invalidate feature resolver cache.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Currently there's no persistent cache in this module
+        # This function exists for API compatibility
+        return True
+    except Exception:
+        return False
+
+
+def reload_feature_registry() -> bool:
+    """Reload feature registry.
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        # Currently there's no registry to reload
+        # This function exists for API compatibility
+        return True
+    except Exception:
+        return False
+
+

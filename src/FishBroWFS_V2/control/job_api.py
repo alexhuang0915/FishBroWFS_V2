@@ -14,6 +14,8 @@ from FishBroWFS_V2.control.jobs_db import create_job, get_job, list_jobs
 from FishBroWFS_V2.control.types import DBJobSpec, JobRecord, JobStatus
 from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog
 from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog
+from FishBroWFS_V2.control.dataset_descriptor import get_descriptor
+from FishBroWFS_V2.control.input_manifest import create_input_manifest, write_input_manifest
 from FishBroWFS_V2.core.config_snapshot import make_config_snapshot
 
 
@@ -73,6 +75,31 @@ def validate_wizard_payload(payload: Dict[str, Any]) -> List[str]:
         else:
             if "dataset_id" not in data1:
                 errors.append("data1 missing dataset_id")
+            else:
+                # Check dataset exists and has Parquet files
+                dataset_id = data1["dataset_id"]
+                try:
+                    descriptor = get_descriptor(dataset_id)
+                    if descriptor is None:
+                        errors.append(f"Dataset not found: {dataset_id}")
+                    else:
+                        # Check if Parquet files exist
+                        from pathlib import Path
+                        parquet_missing = []
+                        for parquet_path_str in descriptor.parquet_expected_paths:
+                            parquet_path = Path(parquet_path_str)
+                            if not parquet_path.exists():
+                                parquet_missing.append(parquet_path_str)
+                        
+                        if parquet_missing:
+                            missing_list = ", ".join(parquet_missing[:3])  # Show first 3
+                            if len(parquet_missing) > 3:
+                                missing_list += f" and {len(parquet_missing) - 3} more"
+                            errors.append(f"Dataset {dataset_id} missing Parquet files: {missing_list}")
+                            errors.append(f"Use the Status page to build Parquet from TXT sources")
+                except Exception as e:
+                    errors.append(f"Error checking dataset {dataset_id}: {str(e)}")
+            
             if "symbols" not in data1:
                 errors.append("data1 missing symbols")
             if "timeframes" not in data1:
@@ -86,6 +113,30 @@ def validate_wizard_payload(payload: Dict[str, Any]) -> List[str]:
         else:
             if "dataset_id" not in data2:
                 errors.append("data2 missing dataset_id")
+            else:
+                # Check data2 dataset exists and has Parquet files
+                dataset_id = data2["dataset_id"]
+                try:
+                    descriptor = get_descriptor(dataset_id)
+                    if descriptor is None:
+                        errors.append(f"DATA2 dataset not found: {dataset_id}")
+                    else:
+                        # Check if Parquet files exist
+                        from pathlib import Path
+                        parquet_missing = []
+                        for parquet_path_str in descriptor.parquet_expected_paths:
+                            parquet_path = Path(parquet_path_str)
+                            if not parquet_path.exists():
+                                parquet_missing.append(parquet_path_str)
+                        
+                        if parquet_missing:
+                            missing_list = ", ".join(parquet_missing[:3])
+                            if len(parquet_missing) > 3:
+                                missing_list += f" and {len(parquet_missing) - 3} more"
+                            errors.append(f"DATA2 dataset {dataset_id} missing Parquet files: {missing_list}")
+                except Exception as e:
+                    errors.append(f"Error checking DATA2 dataset {dataset_id}: {str(e)}")
+            
             if "filters" not in data2:
                 errors.append("data2 missing filters")
     
@@ -228,6 +279,40 @@ def create_job_from_wizard(payload: Dict[str, Any]) -> Dict[str, Any]:
     # Create job in database
     db_path = Path("outputs/jobs.db")
     job_id = create_job(db_path, spec)
+    
+    # Create input manifest for auditability
+    try:
+        # Extract DATA2 dataset ID if present
+        data2_dataset_id = None
+        if "data2" in payload and payload["data2"]:
+            data2 = payload["data2"]
+            data2_dataset_id = data2.get("dataset_id")
+        
+        # Create input manifest
+        from FishBroWFS_V2.control.input_manifest import create_input_manifest, write_input_manifest
+        
+        manifest = create_input_manifest(
+            job_id=job_id,
+            season=season,
+            config_snapshot=config_snapshot,
+            data1_dataset_id=dataset_id,
+            data2_dataset_id=data2_dataset_id,
+            previous_manifest_hash=None  # First in chain
+        )
+        
+        # Write manifest to job outputs directory
+        manifest_dir = Path(f"outputs/{season}/jobs/{job_id}")
+        manifest_dir.mkdir(parents=True, exist_ok=True)
+        manifest_path = manifest_dir / "input_manifest.json"
+        
+        write_success = write_input_manifest(manifest, manifest_path)
+        
+        if not write_success:
+            # Log warning but don't fail the job
+            print(f"Warning: Failed to write input manifest for job {job_id}")
+    except Exception as e:
+        # Don't fail job creation if manifest creation fails
+        print(f"Warning: Failed to create input manifest for job {job_id}: {e}")
     
     return {
         "job_id": job_id,

@@ -79,8 +79,8 @@ class DatasetCatalog:
         return sorted({d.exchange for d in self.index.datasets})
     
     def validate_dataset_selection(
-        self, 
-        dataset_id: str, 
+        self,
+        dataset_id: str,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None
     ) -> bool:
@@ -100,6 +100,25 @@ class DatasetCatalog:
         
         # TODO: Add date range validation if needed
         return True
+    
+    def list_dataset_ids(self) -> List[str]:
+        """Get list of all dataset IDs.
+        
+        Returns:
+            List of dataset IDs sorted alphabetically
+        """
+        return sorted([d.id for d in self.index.datasets])
+    
+    def describe_dataset(self, dataset_id: str) -> Optional[DatasetRecord]:
+        """Get dataset descriptor by ID.
+        
+        Args:
+            dataset_id: Dataset ID to describe
+            
+        Returns:
+            DatasetRecord if found, None otherwise
+        """
+        return self.get_dataset(dataset_id)
 
 
 # Singleton instance for easy access
@@ -111,3 +130,27 @@ def get_dataset_catalog() -> DatasetCatalog:
     if _catalog_instance is None:
         _catalog_instance = DatasetCatalog()
     return _catalog_instance
+
+
+# Public API functions for registry access
+def list_dataset_ids() -> List[str]:
+    """Public API: Get list of all dataset IDs.
+    
+    Returns:
+        List of dataset IDs sorted alphabetically
+    """
+    catalog = get_dataset_catalog()
+    return catalog.list_dataset_ids()
+
+
+def describe_dataset(dataset_id: str) -> Optional[DatasetRecord]:
+    """Public API: Get dataset descriptor by ID.
+    
+    Args:
+        dataset_id: Dataset ID to describe
+        
+    Returns:
+        DatasetRecord if found, None otherwise
+    """
+    catalog = get_dataset_catalog()
+    return catalog.describe_dataset(dataset_id)

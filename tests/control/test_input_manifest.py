@@ -4,7 +4,7 @@ import pytest
 import json
 from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from FishBroWFS_V2.control.input_manifest import (
     FileManifest,
@@ -289,7 +289,7 @@ def test_verify_input_manifest_valid():
     )
     
     manifest = InputManifest(
-        created_at=datetime.utcnow().isoformat() + "Z",
+        created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         job_id="test_job",
         season="2024Q1",
         config_snapshot={"param": "value"},

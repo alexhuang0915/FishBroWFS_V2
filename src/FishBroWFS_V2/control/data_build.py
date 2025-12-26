@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 import pandas as pd
@@ -131,7 +131,7 @@ def _build_parquet_from_txt_impl(
     deep_validate: bool
 ) -> BuildParquetResult:
     """Core implementation of TXT to Parquet conversion."""
-    started_utc = datetime.utcnow().isoformat() + "Z"
+    started_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     notes = []
     
     try:
@@ -142,7 +142,7 @@ def _build_parquet_from_txt_impl(
                 ok=False,
                 dataset_id="unknown",
                 started_utc=started_utc,
-                finished_utc=datetime.utcnow().isoformat() + "Z",
+                finished_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 txt_signature="",
                 parquet_signature="",
                 parquet_paths=[],
@@ -193,7 +193,7 @@ def _build_parquet_from_txt_impl(
                     ok=False,
                     dataset_id="unknown",
                     started_utc=started_utc,
-                    finished_utc=datetime.utcnow().isoformat() + "Z",
+                    finished_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                     txt_signature=txt_signature,
                     parquet_signature=parquet_signature,
                     parquet_paths=[],
@@ -208,7 +208,7 @@ def _build_parquet_from_txt_impl(
                 ok=False,
                 dataset_id="unknown",
                 started_utc=started_utc,
-                finished_utc=datetime.utcnow().isoformat() + "Z",
+                finished_utc=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 txt_signature=txt_signature,
                 parquet_signature=parquet_signature,
                 parquet_paths=[],
@@ -257,7 +257,7 @@ def _build_parquet_from_txt_impl(
             except Exception as e:
                 notes.append(f"Deep validation warning: {e}")
         
-        finished_utc = datetime.utcnow().isoformat() + "Z"
+        finished_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         
         return BuildParquetResult(
             ok=True,
@@ -273,7 +273,7 @@ def _build_parquet_from_txt_impl(
         )
         
     except Exception as e:
-        finished_utc = datetime.utcnow().isoformat() + "Z"
+        finished_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         return BuildParquetResult(
             ok=False,
             dataset_id="unknown",

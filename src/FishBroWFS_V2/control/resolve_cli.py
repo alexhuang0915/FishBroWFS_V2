@@ -4,7 +4,7 @@
 Resolve CLI：特徵解析命令列介面
 
 命令：
-fishbro resolve features --season 2026Q1 --dataset-id CME.MNQ --strategy-id S1 --req strategies/S1/features.json
+fishbro resolve features --season 2026Q1 --dataset-id CME.MNQ --strategy-id S1 --req configs/strategies/S1/features.json
 
 行為：
 - 不允許 build → 只做檢查與載入
@@ -190,8 +190,8 @@ def load_requirements(args) -> StrategyFeatureRequirements:
         # 3. 當前目錄下的 {strategy_id}_features.json
         
         possible_paths = [
-            Path(f"strategies/{args.strategy_id}/features.json"),
             Path(f"configs/strategies/{args.strategy_id}/features.json"),
+            Path(f"strategies/{args.strategy_id}/features.json"),  # legacy location
             Path(f"{args.strategy_id}_features.json"),
         ]
         

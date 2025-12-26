@@ -13,17 +13,30 @@ import hashlib
 import json
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 
-from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog, DatasetCatalog
-from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog, StrategyCatalog
-from FishBroWFS_V2.control.feature_resolver import invalidate_feature_cache as invalidate_feature_cache_impl
-from FishBroWFS_V2.control.data_build import BuildParquetRequest, BuildParquetResult, build_parquet_from_txt
-from FishBroWFS_V2.control.dataset_descriptor import DatasetDescriptor, get_descriptor, list_descriptors
+# Use intent-based system for Attack #9 - Headless Intent-State Contract
+from FishBroWFS_V2.gui.adapters.intent_bridge import migrate_ui_imports
+
+# Migrate imports to use intent bridge
+migrate_ui_imports()
+
+# The migrate_ui_imports() function provides:
+# - get_dataset_catalog
+# - get_strategy_catalog
+# - get_descriptor
+# - get_paths
+# - list_research_units, get_research_artifacts, get_portfolio_index
+# - list_descriptors, build_parquet_from_txt, invalidate_feature_cache
+# - BuildParquetRequest, BuildParquetResult types
+
 from FishBroWFS_V2.data.dataset_registry import DatasetRecord
 from FishBroWFS_V2.strategy.registry import StrategySpecForGUI
+
+# Type imports for compatibility (these are just types, not runtime dependencies)
+# We'll use string type annotations to avoid importing at module level
 
 
 @dataclass
@@ -49,7 +62,7 @@ class DatasetStatus:
     parquet_expected_paths: List[str]
     
     # Optional fields with defaults
-    descriptor: Optional[DatasetDescriptor] = None
+    descriptor: Optional["DatasetDescriptor"] = None  # String annotation to avoid importing control module
     txt_present: bool = False
     txt_missing: List[str] = field(default_factory=list)
     txt_latest_mtime_utc: Optional[str] = None
@@ -204,7 +217,7 @@ def check_txt_files(txt_root: str, txt_required_paths: List[str]) -> Tuple[bool,
     # Convert latest mtime to UTC string
     latest_mtime_utc = None
     if latest_mtime > 0:
-        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
+        latest_mtime_utc = datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat().replace("+00:00", "Z")
     
     return present, missing, latest_mtime_utc, total_size, signature
 
@@ -237,7 +250,7 @@ def check_parquet_files(parquet_root: str, parquet_expected_paths: List[str]) ->
     # Convert latest mtime to UTC string
     latest_mtime_utc = None
     if latest_mtime > 0:
-        latest_mtime_utc = datetime.utcfromtimestamp(latest_mtime).isoformat() + "Z"
+        latest_mtime_utc = datetime.fromtimestamp(latest_mtime, timezone.utc).isoformat().replace("+00:00", "Z")
     
     return present, missing, latest_mtime_utc, total_size, signature
 
@@ -371,7 +384,7 @@ def get_system_snapshot() -> SystemSnapshot:
     snapshot = SystemSnapshot()
     
     try:
-        # Get dataset descriptors
+        # Get dataset descriptors - use function provided by migrate_ui_imports()
         descriptors = list_descriptors()
         snapshot.total_datasets = len(descriptors)
         
@@ -412,13 +425,8 @@ def get_system_snapshot() -> SystemSnapshot:
     return snapshot
 
 
-def invalidate_feature_cache() -> bool:
-    """Invalidate feature resolver cache."""
-    try:
-        return invalidate_feature_cache_impl()
-    except Exception as e:
-        return False
-
+# Note: invalidate_feature_cache() is provided by migrate_ui_imports()
+# through the intent bridge adapter
 
 def reload_dataset_registry() -> bool:
     """Reload dataset registry."""
@@ -503,6 +511,7 @@ def build_parquet(
     Returns:
         BuildParquetResult with build status
     """
+    # Use functions and types provided by migrate_ui_imports()
     req = BuildParquetRequest(
         dataset_id=dataset_id,
         force=force,
@@ -523,6 +532,7 @@ def build_all_parquet(force: bool = False, reason: str = "manual") -> List[Build
     Returns:
         List of BuildParquetResult for each dataset
     """
+    # Use functions provided by migrate_ui_imports()
     results = []
     descriptors = list_descriptors()
     

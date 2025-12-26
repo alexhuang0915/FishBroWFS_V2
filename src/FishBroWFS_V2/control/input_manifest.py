@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import hashlib
@@ -60,7 +60,7 @@ class DatasetManifest:
 class InputManifest:
     """Complete input manifest for a job submission."""
     # Metadata
-    created_at: str = field(default_factory=lambda: datetime.utcnow().isoformat() + "Z")
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"))
     job_id: Optional[str] = None
     season: str = ""
     
@@ -361,7 +361,7 @@ def verify_input_manifest(manifest: InputManifest) -> Dict[str, Any]:
     # Check timestamp first (warnings)
     try:
         created_at = datetime.fromisoformat(manifest.created_at.replace('Z', '+00:00'))
-        age_hours = (datetime.utcnow() - created_at).total_seconds() / 3600
+        age_hours = (datetime.now(timezone.utc) - created_at).total_seconds() / 3600
         if age_hours > 24:
             results["warnings"].append(f"Manifest is {age_hours:.1f} hours old")
     except Exception:

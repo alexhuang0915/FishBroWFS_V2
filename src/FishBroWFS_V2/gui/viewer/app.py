@@ -19,7 +19,15 @@ from FishBroWFS_V2.gui.viewer.pages.governance import render_page as render_gove
 from FishBroWFS_V2.gui.viewer.pages.artifacts import render_page as render_artifacts_page
 from FishBroWFS_V2.gui.research.page import render as render_research_page
 from FishBroWFS_V2.ui.plan_viewer import render_page as render_plan_viewer_page
-from FishBroWFS_V2.control.paths import get_outputs_root
+
+# Use intent-based system for Attack #9 - Headless Intent-State Contract
+from FishBroWFS_V2.gui.adapters.intent_bridge import migrate_ui_imports
+
+# Migrate imports to use intent bridge
+migrate_ui_imports()
+
+# The migrate_ui_imports() function provides get_paths() which returns the paths module
+# We can use get_paths().get_outputs_root() instead of direct import
 
 
 def get_run_dir_from_query() -> Path | None:
@@ -68,7 +76,8 @@ def main() -> None:
     
     if mode == "Portfolio Plan":
         # Portfolio Plan mode - doesn't need query parameters
-        outputs_root = get_outputs_root()
+        # Use get_paths() from intent bridge migration
+        outputs_root = get_paths().get_outputs_root()
         
         # Show Portfolio Plan Viewer
         render_plan_viewer_page(outputs_root)

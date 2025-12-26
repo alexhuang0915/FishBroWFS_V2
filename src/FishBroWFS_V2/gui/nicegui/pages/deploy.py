@@ -13,9 +13,19 @@ from typing import Dict, List, Any
 from nicegui import ui
 
 from ..layout import render_shell
-from FishBroWFS_V2.control.job_api import list_jobs_with_progress
+# Use intent-based system for Attack #9 - Headless Intent-State Contract
+from FishBroWFS_V2.gui.adapters.intent_bridge import (
+    migrate_ui_imports,
+)
 from FishBroWFS_V2.core.season_context import current_season
 from FishBroWFS_V2.core.season_state import load_season_state
+
+# Migrate imports to use intent bridge
+migrate_ui_imports()
+
+# The migrate_ui_imports() function replaces the following imports
+# with intent-based implementations:
+# - list_jobs_with_progress
 
 
 def _check_live_execute_status() -> tuple[bool, str]:

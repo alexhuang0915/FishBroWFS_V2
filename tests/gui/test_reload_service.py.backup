@@ -55,7 +55,7 @@ def test_reload_result_error():
 def test_invalidate_feature_cache_success():
     """Test successful feature cache invalidation."""
     # Mock the actual function
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         result = reload_service.invalidate_feature_cache()
         assert result is True
 
@@ -63,7 +63,7 @@ def test_invalidate_feature_cache_success():
 def test_invalidate_feature_cache_failure():
     """Test failed feature cache invalidation."""
     # Mock the actual function to return False (simulating failure)
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=False):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=False):
         result = reload_service.invalidate_feature_cache()
         assert result is False
 
@@ -71,7 +71,7 @@ def test_invalidate_feature_cache_failure():
 def test_reload_dataset_registry_success():
     """Test successful dataset registry reload."""
     # Mock the catalog functions
-    with patch('FishBroWFS_V2.control.dataset_catalog.get_dataset_catalog') as mock_get_catalog:
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_dataset_catalog') as mock_get_catalog:
         mock_catalog = Mock()
         mock_catalog.load_index.return_value = Mock()
         mock_get_catalog.return_value = mock_catalog
@@ -83,7 +83,7 @@ def test_reload_dataset_registry_success():
 def test_reload_dataset_registry_failure():
     """Test failed dataset registry reload."""
     # Mock the catalog functions to raise exception
-    with patch('FishBroWFS_V2.control.dataset_catalog.get_dataset_catalog', side_effect=Exception("Test error")):
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_dataset_catalog', side_effect=Exception("Test error")):
         result = reload_service.reload_dataset_registry()
         assert result is False
 
@@ -91,7 +91,7 @@ def test_reload_dataset_registry_failure():
 def test_reload_strategy_registry_success():
     """Test successful strategy registry reload."""
     # Mock the catalog functions
-    with patch('FishBroWFS_V2.control.strategy_catalog.get_strategy_catalog') as mock_get_catalog:
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_strategy_catalog') as mock_get_catalog:
         mock_catalog = Mock()
         mock_catalog.load_registry.return_value = Mock()
         mock_get_catalog.return_value = mock_catalog
@@ -103,7 +103,7 @@ def test_reload_strategy_registry_success():
 def test_reload_strategy_registry_failure():
     """Test failed strategy registry reload."""
     # Mock the catalog functions to raise exception
-    with patch('FishBroWFS_V2.control.strategy_catalog.get_strategy_catalog', side_effect=Exception("Test error")):
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_strategy_catalog', side_effect=Exception("Test error")):
         result = reload_service.reload_strategy_registry()
         assert result is False
 
@@ -111,7 +111,7 @@ def test_reload_strategy_registry_failure():
 def test_reload_everything_success():
     """Test successful reload of everything."""
     # Mock all the component functions
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                 result = reload_everything(reason="test")
@@ -126,7 +126,7 @@ def test_reload_everything_success():
 
 def test_reload_everything_feature_cache_failure():
     """Test reload everything with feature cache failure."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=False):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=False):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                 result = reload_everything(reason="test")
@@ -137,7 +137,7 @@ def test_reload_everything_feature_cache_failure():
 
 def test_reload_everything_dataset_registry_failure():
     """Test reload everything with dataset registry failure."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=False):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                 result = reload_everything(reason="test")
@@ -148,7 +148,7 @@ def test_reload_everything_dataset_registry_failure():
 
 def test_reload_everything_strategy_registry_failure():
     """Test reload everything with strategy registry failure."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=False):
                 result = reload_everything(reason="test")
@@ -159,7 +159,7 @@ def test_reload_everything_strategy_registry_failure():
 
 def test_reload_everything_exception():
     """Test reload everything with unexpected exception."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', side_effect=Exception("Unexpected error")):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', side_effect=Exception("Unexpected error")):
         result = reload_everything(reason="test")
         
         assert result.ok is False
@@ -172,7 +172,7 @@ def test_reload_everything_duration():
     mock_times = [100.0, 100.5]  # 0.5 seconds duration
     
     with patch('time.time', side_effect=mock_times):
-        with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+        with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
                 with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                     result = reload_everything(reason="test")
@@ -182,7 +182,7 @@ def test_reload_everything_duration():
 
 def test_reload_everything_reason_parameter():
     """Test that reason parameter is accepted."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                 result = reload_everything(reason="manual_ui")
@@ -193,7 +193,7 @@ def test_reload_everything_reason_parameter():
 
 def test_reload_everything_caches_invalidated():
     """Test that caches_invalidated list is populated correctly."""
-    with patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache', return_value=True):
+    with patch('FishBroWFS_V2.gui.services.reload_service.invalidate_feature_cache', return_value=True):
         with patch('FishBroWFS_V2.gui.services.reload_service.reload_dataset_registry', return_value=True):
             with patch('FishBroWFS_V2.gui.services.reload_service.reload_strategy_registry', return_value=True):
                 result = reload_everything(reason="test")
@@ -335,7 +335,7 @@ def test_get_dataset_status():
     """Test getting dataset status."""
     dataset_id = "test_dataset"
     
-    with patch('FishBroWFS_V2.control.dataset_descriptor.get_descriptor') as mock_get_descriptor:
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_descriptor') as mock_get_descriptor:
         mock_descriptor = Mock()
         mock_descriptor.dataset_id = dataset_id
         mock_descriptor.kind = "test_kind"
@@ -365,7 +365,7 @@ def test_get_dataset_status_not_found():
     """Test getting dataset status for non-existent dataset."""
     dataset_id = "nonexistent"
     
-    with patch('FishBroWFS_V2.control.dataset_descriptor.get_descriptor', return_value=None):
+    with patch('FishBroWFS_V2.gui.services.reload_service.get_descriptor', return_value=None):
         status = get_dataset_status(dataset_id)
         
         assert status.dataset_id == dataset_id
@@ -378,7 +378,7 @@ def test_build_parquet():
     """Test building Parquet for a dataset."""
     dataset_id = "test_dataset"
     
-    with patch('FishBroWFS_V2.control.data_build.build_parquet_from_txt') as mock_build:
+    with patch('FishBroWFS_V2.gui.services.reload_service.build_parquet_from_txt') as mock_build:
         mock_result = Mock()
         mock_result.success = True
         mock_result.error = None
@@ -392,7 +392,7 @@ def test_build_parquet():
 
 def test_build_all_parquet():
     """Test building Parquet for all datasets."""
-    with patch('FishBroWFS_V2.control.dataset_descriptor.list_descriptors') as mock_list:
+    with patch('FishBroWFS_V2.gui.services.reload_service.list_descriptors') as mock_list:
         mock_descriptor1 = Mock()
         mock_descriptor1.dataset_id = "dataset1"
         mock_descriptor2 = Mock()

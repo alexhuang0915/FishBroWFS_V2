@@ -239,16 +239,26 @@ phase4:
 	@echo " 5. Check outputs/seasons/2026Q1/governance/ui_audit.jsonl"
 
 # ---------------------------------------------------------
-# Full repository snapshot
+# Full repository snapshot (Carpet Audit / Forensic Kit)
 # ---------------------------------------------------------
 full-snapshot:
-	@echo "==> Generating full repository snapshot (SYSTEM_FULL_SNAPSHOT/)"
-	@echo " - Deterministic file traversal"
-	@echo " - Hard excludes: outputs/, FishBroData/, .venv/, binaries, etc."
-	@echo " - Secret redaction: TOKEN/SECRET/PASSWORD/API_KEY"
-	@echo " - SHA256 per file + per chunk"
-	@echo " - Output: SYSTEM_FULL_SNAPSHOT/{MANIFEST.json, REPO_TREE.txt, SNAPSHOT_*.md}"
-	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/no_fog/generate_full_snapshot.py --output-dir SYSTEM_FULL_SNAPSHOT --force
+	@echo "==> Generating full repository forensic snapshot (Carpet Audit Kit)"
+	@echo " - Canonical source: git ls-files (100% tracked files)"
+	@echo " - Skip large (>2MB) and binary files"
+	@echo " - SHA256 per file, deterministic ordering"
+	@echo " - Output: outputs/snapshots/full/ (10 forensic artifacts)"
+	@echo "   • REPO_TREE.txt          (git tracked list + tree view)"
+	@echo "   • MANIFEST.json          (SHA256 for all tracked files)"
+	@echo "   • SKIPPED_FILES.txt      (skip policies + skipped files)"
+	@echo "   • AUDIT_GREP.txt         (pattern matches across code)"
+	@echo "   • AUDIT_IMPORTS.csv      (AST-truth of Python imports)"
+	@echo "   • AUDIT_ENTRYPOINTS.md   (entrypoints + risk flags)"
+	@echo "   • AUDIT_CONFIG_REFERENCES.txt (config key references)"
+	@echo "   • AUDIT_CALL_GRAPH.txt   (caller → target references)"
+	@echo "   • AUDIT_TEST_SURFACE.txt (test file classification)"
+	@echo "   • AUDIT_RUNTIME_MUTATIONS.txt (state mutation ops)"
+	@echo "   • AUDIT_STATE_FLOW.md    (architectural layer flow)"
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/no_fog/generate_full_snapshot.py --force
 
 # ---------------------------------------------------------
 # No-Fog Gate (Core Contracts + Snapshot Integrity)

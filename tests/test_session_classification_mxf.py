@@ -12,9 +12,9 @@ from FishBroWFS_V2.data.session.loader import load_session_profile
 
 
 @pytest.fixture
-def mxf_profile() -> Path:
+def mxf_profile(profiles_root: Path) -> Path:
     """Load TWF.MXF session profile."""
-    profile_path = Path(__file__).parent.parent / "src" / "FishBroWFS_V2" / "data" / "profiles" / "TWF_MXF_TPE_v1.yaml"
+    profile_path = profiles_root / "TWF_MXF_TPE_v1.yaml"
     return profile_path
 
 

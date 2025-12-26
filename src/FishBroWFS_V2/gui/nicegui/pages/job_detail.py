@@ -9,9 +9,20 @@ import json
 from typing import Dict, Any
 
 from nicegui import ui
+# Use intent-based system for Attack #9 - Headless Intent-State Contract
+from FishBroWFS_V2.gui.adapters.intent_bridge import (
+    migrate_ui_imports,
+)
 
-from FishBroWFS_V2.control.job_api import get_job_summary, get_job_status
-from FishBroWFS_V2.control.pipeline_runner import check_job_status, start_job_async
+# Migrate imports to use intent bridge
+migrate_ui_imports()
+
+# The migrate_ui_imports() function replaces the following imports
+# with intent-based implementations:
+# - get_job_summary
+# - get_job_status
+# Note: start_job_async is not available through intent bridge yet
+# TODO: Add start_job intent to IntentBridge
 
 
 def create_status_badge(status: str) -> ui.badge:

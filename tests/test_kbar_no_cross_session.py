@@ -13,9 +13,9 @@ from FishBroWFS_V2.data.session.loader import load_session_profile
 
 
 @pytest.fixture
-def mnq_profile() -> Path:
+def mnq_profile(profiles_root: Path) -> Path:
     """Load CME.MNQ session profile."""
-    profile_path = Path(__file__).parent.parent / "src" / "FishBroWFS_V2" / "data" / "profiles" / "CME_MNQ_TPE_v1.yaml"
+    profile_path = profiles_root / "CME_MNQ_TPE_v1.yaml"
     return profile_path
 
 

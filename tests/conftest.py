@@ -19,6 +19,41 @@ if str(src_path) not in sys.path:
     sys.path.insert(0, str(src_path))
 
 
+def _find_repo_root(start: Path) -> Path:
+    """Find repository root by walking up until pyproject.toml is found."""
+    cur = start.resolve()
+    for _ in range(15):
+        if (cur / "pyproject.toml").exists():
+            return cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+    raise AssertionError(f"Could not locate repo root from: {start}")
+
+
+@pytest.fixture(scope="session")
+def project_root() -> Path:
+    """Return the repository root directory."""
+    # tests/ is at <repo>/tests, so start from this file
+    return _find_repo_root(Path(__file__).resolve())
+
+
+@pytest.fixture(scope="session")
+def configs_root(project_root: Path) -> Path:
+    """Return the configs directory."""
+    p = project_root / "configs"
+    assert p.exists(), f"configs/ not found at {p}"
+    return p
+
+
+@pytest.fixture(scope="session")
+def profiles_root(configs_root: Path) -> Path:
+    """Return the profiles configuration directory."""
+    p = configs_root / "profiles"
+    assert p.exists(), f"configs/profiles not found at {p}"
+    return p
+
+
 @pytest.fixture
 def temp_dir(tmp_path: Path) -> Path:
     """Compatibility alias for older tests that used temp_dir.

@@ -13,11 +13,11 @@ Models:
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from FishBroWFS_V2.core.ast_identity import (
     StrategyIdentity,
@@ -57,7 +57,8 @@ class StrategyIdentityModel(BaseModel):
         pattern=r"^[0-9a-f]{64}$"
     )
     
-    @validator('strategy_id', 'source_hash')
+    @field_validator('strategy_id', 'source_hash')
+    @classmethod
     def validate_hex_string(cls, v: Optional[str]) -> Optional[str]:
         """Validate that string is a valid hex representation."""
         if v is None:
@@ -181,14 +182,16 @@ class StrategyParamSchema(BaseModel):
         description="Default parameter values"
     )
     
-    @validator('param_schema')
+    @field_validator('param_schema')
+    @classmethod
     def validate_param_schema(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """Validate parameter schema structure."""
         if not isinstance(v, dict):
             raise ValueError("param_schema must be a dict")
         return v
     
-    @validator('defaults')
+    @field_validator('defaults')
+    @classmethod
     def validate_defaults(cls, v: Dict[str, float]) -> Dict[str, float]:
         """Validate defaults structure."""
         if not isinstance(v, dict):
@@ -277,7 +280,7 @@ class StrategyManifest(BaseModel):
     )
     
     generated_at: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When the manifest was generated"
     )
     
@@ -286,7 +289,8 @@ class StrategyManifest(BaseModel):
         description="Registered strategies sorted by strategy_id"
     )
     
-    @validator('strategies')
+    @field_validator('strategies')
+    @classmethod
     def sort_strategies(cls, v: List[StrategyRegistryEntry]) -> List[StrategyRegistryEntry]:
         """Ensure strategies are sorted by strategy_id for determinism."""
         return sorted(v, key=lambda s: s.strategy_id)

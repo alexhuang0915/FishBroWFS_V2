@@ -15,15 +15,25 @@ from datetime import date
 
 from nicegui import ui
 
-from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog
-from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog
-from FishBroWFS_V2.control.job_api import (
-    create_job_from_wizard,
-    calculate_units,
-    check_season_not_frozen,
+# Use intent-based system for Attack #9 - Headless Intent-State Contract
+from FishBroWFS_V2.gui.adapters.intent_bridge import (
+    migrate_ui_imports,
     ValidationError,
     SeasonFrozenError,
 )
+
+# Migrate imports to use intent bridge
+migrate_ui_imports()
+
+# The migrate_ui_imports() function replaces the following imports
+# with intent-based implementations:
+# - create_job_from_wizard
+# - calculate_units
+# - check_season_not_frozen
+# - get_dataset_catalog
+# - get_strategy_catalog
+# - ValidationError (re-exported)
+# - SeasonFrozenError (re-exported)
 
 
 class M1WizardState:

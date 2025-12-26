@@ -24,7 +24,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -70,7 +70,7 @@ def test_load_json_spec(tmp_path: Path) -> None:
                 "leg_id": "leg1",
                 "symbol": "CME.MNQ",
                 "timeframe_min": 60,
-                "session_profile": "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml",
+                "session_profile": "configs/profiles/CME_MNQ_v2.yaml",
                 "strategy_id": "sma_cross",
                 "strategy_version": "v1",
                 "params": {
@@ -118,7 +118,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params: "invalid"  # Should be dict

@@ -34,7 +34,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -67,7 +67,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -77,7 +77,7 @@ legs:
   - leg_id: "leg2"
     symbol: "TWF.MXF"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/TWF_MXF_v2.yaml"
+    session_profile: "configs/profiles/TWF_MXF_v2.yaml"
     strategy_id: "mean_revert_zscore"
     strategy_version: "v1"
     params:
@@ -92,7 +92,7 @@ legs:
   - leg_id: "leg2"  # Different order
     symbol: "TWF.MXF"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/TWF_MXF_v2.yaml"
+    session_profile: "configs/profiles/TWF_MXF_v2.yaml"
     strategy_id: "mean_revert_zscore"
     strategy_version: "v1"
     params:
@@ -101,7 +101,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -135,7 +135,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -151,7 +151,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:
@@ -185,7 +185,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "src/FishBroWFS_V2/data/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params:

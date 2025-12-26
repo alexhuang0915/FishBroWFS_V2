@@ -74,8 +74,8 @@ def _load_strategy_feature_requirements(
     # 2. 嘗試 JSON 檔案
     json_path = outputs_root / "strategies" / strategy_id / "features.json"
     if not json_path.exists():
-        # 也嘗試在專案根目錄的 strategies 資料夾
-        json_path = Path("strategies") / strategy_id / "features.json"
+        # 也嘗試在 configs/strategies 資料夾
+        json_path = Path("configs/strategies") / strategy_id / "features.json"
         if not json_path.exists():
             raise ResearchRunError(
                 f"策略 {strategy_id} 無特徵需求定義："

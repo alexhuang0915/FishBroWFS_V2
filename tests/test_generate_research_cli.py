@@ -100,9 +100,7 @@ def test_generate_research_without_outputs_dir():
 def test_generate_research_import_fixed():
     """Test that import errors are fixed (no NameError for extract_canonical_metrics)."""
     # This test imports the module directly to check for import errors
-    import sys
-    project_root = Path(__file__).parent.parent
-    sys.path.insert(0, str(project_root / "src"))
+    # Note: conftest.py already adds src/ to sys.path, so no need to modify it here
     
     try:
         from FishBroWFS_V2.research.__main__ import generate_canonical_results

@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Callable, Any
 import threading
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, ConfigDict
 
 from FishBroWFS_V2.contracts.features import FeatureRegistry as ContractFeatureRegistry
 from FishBroWFS_V2.contracts.features import FeatureSpec as ContractFeatureSpec
@@ -43,8 +43,7 @@ class FeatureRegistry(BaseModel):
     verification_enabled: bool = Field(default=True)
     lock: threading.Lock = Field(default_factory=threading.Lock, exclude=True)
     
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
     
     def register_feature(
         self,

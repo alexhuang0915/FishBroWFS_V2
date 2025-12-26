@@ -539,6 +539,67 @@ class IntentBackendAdapter:
             "logs": logs,
             "log_tail": "\n".join(logs[-10:]) if logs else "No logs available"
         }
+    
+    # -----------------------------------------------------------------
+    # Catalog and artifacts API methods
+    # -----------------------------------------------------------------
+    
+    def list_research_units(self, season: str, job_id: str) -> List[Dict[str, Any]]:
+        """List research units for a job (artifacts API compatibility)."""
+        # For now, directly import and call artifacts_api
+        # TODO: Create proper intent for this read-only operation
+        from FishBroWFS_V2.control.artifacts_api import list_research_units as _list_research_units
+        return _list_research_units(season, job_id)
+    
+    def get_research_artifacts(self, season: str, job_id: str, unit_key: Dict[str, Any]) -> Dict[str, Any]:
+        """Get artifacts for a research unit (artifacts API compatibility)."""
+        from FishBroWFS_V2.control.artifacts_api import get_research_artifacts as _get_research_artifacts
+        return _get_research_artifacts(season, job_id, unit_key)
+    
+    def get_portfolio_index(self, season: str, job_id: str) -> Dict[str, Any]:
+        """Get portfolio index for a job (artifacts API compatibility)."""
+        from FishBroWFS_V2.control.artifacts_api import get_portfolio_index as _get_portfolio_index
+        return _get_portfolio_index(season, job_id)
+    
+    def get_dataset_catalog(self):
+        """Get dataset catalog instance (catalog compatibility)."""
+        from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog as _get_dataset_catalog
+        return _get_dataset_catalog()
+    
+    def get_strategy_catalog(self):
+        """Get strategy catalog instance (catalog compatibility)."""
+        from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog as _get_strategy_catalog
+        return _get_strategy_catalog()
+    
+    def get_descriptor(self, dataset_id: str):
+        """Get dataset descriptor (dataset_descriptor compatibility)."""
+        from FishBroWFS_V2.control.dataset_descriptor import get_descriptor as _get_descriptor
+        return _get_descriptor(dataset_id)
+    
+    def get_paths(self):
+        """Get paths module (paths compatibility)."""
+        from FishBroWFS_V2.control.paths import get_paths as _get_paths
+        return _get_paths()
+
+    def list_descriptors(self):
+        """List all dataset descriptors (dataset_descriptor compatibility)."""
+        from FishBroWFS_V2.control.dataset_descriptor import list_descriptors as _list_descriptors
+        return _list_descriptors()
+
+    def invalidate_feature_cache(self) -> bool:
+        """Invalidate feature resolver cache (feature_resolver compatibility)."""
+        from FishBroWFS_V2.control.feature_resolver import invalidate_feature_cache as _invalidate_feature_cache
+        return _invalidate_feature_cache()
+
+    def build_parquet_from_txt(self, request):
+        """Build Parquet from TXT (data_build compatibility)."""
+        from FishBroWFS_V2.control.data_build import build_parquet_from_txt as _build_parquet_from_txt
+        return _build_parquet_from_txt(request)
+
+    def get_build_parquet_types(self):
+        """Get BuildParquetRequest and BuildParquetResult types (data_build compatibility)."""
+        from FishBroWFS_V2.control.data_build import BuildParquetRequest, BuildParquetResult
+        return BuildParquetRequest, BuildParquetResult
 
 
 # Create a default adapter instance for easy import
@@ -561,12 +622,12 @@ def migrate_ui_imports() -> None:
     frame = inspect.currentframe().f_back
     module = frame.f_globals
     
+    # Create adapter instance (always available)
+    adapter = IntentBackendAdapter()
+    
     # Replace job_api functions with adapter methods
     if 'FishBroWFS_V2.control.job_api' in sys.modules:
         job_api = sys.modules['FishBroWFS_V2.control.job_api']
-        
-        # Create adapter instance
-        adapter = IntentBackendAdapter()
         
         # Replace functions in calling module's namespace
         module['create_job_from_wizard'] = adapter.create_job_from_wizard
@@ -584,3 +645,32 @@ def migrate_ui_imports() -> None:
         module['JobAPIError'] = getattr(job_api, 'JobAPIError', Exception)
         
         print(f"Migrated UI module {module.get('__name__', 'unknown')} to intent-based system")
+    else:
+        # Still provide the adapter methods even if job_api isn't imported
+        module['create_job_from_wizard'] = adapter.create_job_from_wizard
+        module['calculate_units'] = adapter.calculate_units
+        module['check_season_not_frozen'] = adapter.check_season_not_frozen
+        module['get_job_status'] = adapter.get_job_status
+        module['list_jobs_with_progress'] = adapter.list_jobs_with_progress
+        module['get_job_logs_tail'] = adapter.get_job_logs_tail
+        module['submit_wizard_job'] = adapter.submit_wizard_job
+        module['get_job_summary'] = adapter.get_job_summary
+        module['SeasonFrozenError'] = Exception
+        module['ValidationError'] = Exception
+        module['JobAPIError'] = Exception
+    
+    # Also provide catalog and artifacts API methods through the adapter
+    module['list_research_units'] = adapter.list_research_units
+    module['get_research_artifacts'] = adapter.get_research_artifacts
+    module['get_portfolio_index'] = adapter.get_portfolio_index
+    module['get_dataset_catalog'] = adapter.get_dataset_catalog
+    module['get_strategy_catalog'] = adapter.get_strategy_catalog
+    module['get_descriptor'] = adapter.get_descriptor
+    module['get_paths'] = adapter.get_paths
+    module['list_descriptors'] = adapter.list_descriptors
+    module['invalidate_feature_cache'] = adapter.invalidate_feature_cache
+    module['build_parquet_from_txt'] = adapter.build_parquet_from_txt
+    # Also provide type constructors
+    BuildParquetRequest, BuildParquetResult = adapter.get_build_parquet_types()
+    module['BuildParquetRequest'] = BuildParquetRequest
+    module['BuildParquetResult'] = BuildParquetResult

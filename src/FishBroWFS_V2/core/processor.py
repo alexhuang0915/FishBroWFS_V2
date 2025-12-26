@@ -444,7 +444,7 @@ class StateProcessor:
             
             # Process intent with timeout to prevent indefinite hanging
             # Use asyncio.wait_for on the handler execution
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             
             # Define the handler execution function with timeout
             async def execute_handler_with_timeout():
@@ -585,8 +585,30 @@ def reset_processor() -> None:
     if _processor_instance:
         # Try to stop synchronously (not ideal but works for tests)
         import asyncio
+        import warnings
         try:
-            loop = asyncio.get_event_loop()
+            # Try to get the running loop first (Python 3.7+)
+            try:
+                loop = asyncio.get_running_loop()
+                # If we're in a running loop, we can't call stop_processor synchronously
+                # Just clear the reference and let garbage collection handle it
+                _processor_instance = None
+                return
+            except RuntimeError:
+                # No running loop, we need to handle cleanup differently
+                pass
+            
+            # Check if there's an existing event loop
+            # Suppress deprecation warning for asyncio.get_event_loop() in Python 3.10+
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning, message="There is no current event loop")
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    # No event loop exists, create a new one
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            
             if loop.is_running():
                 # If loop is running, we can't call stop_processor synchronously
                 # Just clear the reference and let garbage collection handle it

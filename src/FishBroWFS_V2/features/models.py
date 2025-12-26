@@ -7,7 +7,7 @@ Defines FeatureSpec with window metadata and causality contract.
 from __future__ import annotations
 
 from typing import Dict, List, Optional, Callable, Any
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 import numpy as np
 
 
@@ -37,14 +37,16 @@ class FeatureSpec(BaseModel):
     causality_verified: bool = Field(default=False)
     verification_timestamp: Optional[float] = Field(default=None)
     
-    @validator('lookback_bars')
+    @field_validator('lookback_bars')
+    @classmethod
     def validate_lookback_bars(cls, v: int) -> int:
         """Ensure lookback_bars is non-negative."""
         if v < 0:
             raise ValueError(f"lookback_bars must be >= 0, got {v}")
         return v
     
-    @validator('timeframe_min')
+    @field_validator('timeframe_min')
+    @classmethod
     def validate_timeframe_min(cls, v: int) -> int:
         """Ensure timeframe_min is a supported value."""
         supported = [15, 30, 60, 120, 240]
@@ -127,8 +129,7 @@ class CausalityReport(BaseModel):
     error_message: Optional[str] = Field(default=None)
     timestamp: float = Field(default_factory=lambda: time.time())
     
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 # Import time for default factory

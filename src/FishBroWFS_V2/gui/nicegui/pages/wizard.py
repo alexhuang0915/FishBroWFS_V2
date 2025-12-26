@@ -15,8 +15,6 @@ from datetime import date
 
 from nicegui import ui
 
-from FishBroWFS_V2.control.dataset_catalog import get_dataset_catalog
-from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog
 # Use intent-based system for Attack #9 - Headless Intent-State Contract
 from FishBroWFS_V2.gui.adapters.intent_bridge import (
     migrate_ui_imports,
@@ -32,9 +30,11 @@ migrate_ui_imports()
 # - create_job_from_wizard
 # - calculate_units
 # - check_season_not_frozen
+# - get_dataset_catalog
+# - get_strategy_catalog
+# - get_descriptor
 # - ValidationError (re-exported)
 # - SeasonFrozenError (re-exported)
-from FishBroWFS_V2.control.dataset_descriptor import get_descriptor
 
 
 class M1WizardState:

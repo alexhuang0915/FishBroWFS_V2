@@ -24,6 +24,9 @@ def test_client() -> TestClient:
         
         # Override DB path
         os.environ["JOBS_DB_PATH"] = str(db_path)
+        # Allow worker spawn in tests and allow /tmp DB paths
+        os.environ["FISHBRO_ALLOW_SPAWN_IN_TESTS"] = "1"
+        os.environ["FISHBRO_ALLOW_TMP_DB"] = "1"
         
         # Re-import to get new DB path
         from FishBroWFS_V2.control import api

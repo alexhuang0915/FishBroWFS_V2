@@ -52,19 +52,10 @@ def validate_portfolio_spec(spec: PortfolioSpec) -> None:
                         # Try from current directory
                         pass
                 else:
-                    # Try multiple locations in order:
-                    # 1. configs/profiles/ (new location)
-                    # 2. src/FishBroWFS_V2/data/profiles/ (old location)
-                    
-                    # Check configs/profiles/ first
+                    # Check configs/profiles/ location
                     configs_profile_path = Path("configs/profiles") / session_profile_path.name
                     if configs_profile_path.exists():
                         session_profile_path = configs_profile_path
-                    else:
-                        # Fall back to old location
-                        project_profile_path = Path("src/FishBroWFS_V2/data/profiles") / session_profile_path.name
-                        if project_profile_path.exists():
-                            session_profile_path = project_profile_path
         
         if not session_profile_path.exists():
             raise FileNotFoundError(

@@ -102,6 +102,12 @@ from FishBroWFS_V2.control.season_export_replay import (
 from FishBroWFS_V2.data.dataset_registry import DatasetIndex
 from FishBroWFS_V2.strategy.registry import StrategyRegistryResponse
 
+# Phase A: Service Identity
+from FishBroWFS_V2.core.service_identity import get_service_identity
+
+# Phase B: Worker Spawn Governance
+from FishBroWFS_V2.control.worker_spawn_policy import can_spawn_worker, validate_pidfile
+
 # Phase 16.5: Real Data Snapshot Integration
 from FishBroWFS_V2.contracts.data.snapshot_payloads import SnapshotCreatePayload
 from FishBroWFS_V2.contracts.data.snapshot_models import SnapshotMetadata
@@ -298,6 +304,14 @@ app = FastAPI(title="B5-C Mission Control API", lifespan=lifespan)
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/__identity")
+async def identity() -> dict[str, Any]:
+    """Service identity endpoint for topology observability."""
+    db_path = get_db_path()
+    ident = get_service_identity(service_name="control_api", db_path=db_path)
+    return ident
 
 
 @app.get("/meta/datasets", response_model=DatasetIndex)
@@ -532,17 +546,19 @@ def _ensure_worker_running(db_path: Path) -> None:
     Args:
         db_path: Path to SQLite database
     """
-    # Check if worker is already running (simple check via pidfile)
+    # Check if worker is already running (enhanced pidfile validation)
     pidfile = db_path.parent / "worker.pid"
     if pidfile.exists():
-        try:
-            pid = int(pidfile.read_text().strip())
-            # Check if process exists
-            os.kill(pid, 0)
+        valid, reason = validate_pidfile(pidfile, db_path)
+        if valid:
             return  # Worker already running
-        except (OSError, ValueError):
-            # Process dead, remove pidfile
-            pidfile.unlink(missing_ok=True)
+        # pidfile is stale or mismatched, remove it
+        pidfile.unlink(missing_ok=True)
+
+    # Spawn guard: enforce governance rules
+    allowed, reason = can_spawn_worker(db_path)
+    if not allowed:
+        raise RuntimeError(f"Worker spawn denied: {reason}")
 
     # Prepare log file (same directory as db_path)
     logs_dir = db_path.parent  # usually outputs/.../control/

@@ -1,9 +1,11 @@
 
 """NiceGUI 主應用程式 - 唯一 UI 入口點"""
 
+import json
 from nicegui import ui
 from .router import register_pages
 from ..theme import inject_global_styles
+from FishBroWFS_V2.core.service_identity import get_service_identity
 
 
 @ui.page('/health')
@@ -11,6 +13,14 @@ def health_page():
     """健康檢查端點 - 用於 launcher readiness check"""
     # 用純文字就好，launcher 只需要 200 OK
     ui.label('ok')
+
+
+@ui.page('/__identity')
+def identity_page():
+    """服務身份端點 - 用於拓撲可觀測性"""
+    ident = get_service_identity(service_name="nicegui", db_path=None)
+    # 使用 ui.code 顯示 JSON，確保可複製
+    ui.code(json.dumps(ident, indent=2, sort_keys=True), language='json')
 
 
 def main() -> None:

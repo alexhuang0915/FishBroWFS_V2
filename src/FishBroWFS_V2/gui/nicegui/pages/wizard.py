@@ -10,6 +10,7 @@ Step5: Summary (must show Units formula and number)
 from __future__ import annotations
 
 import json
+import logging
 from typing import Dict, Any, List, Optional
 from datetime import date
 
@@ -21,6 +22,16 @@ from FishBroWFS_V2.gui.adapters.intent_bridge import (
     SeasonFrozenError,
     ValidationError,
 )
+
+# --- Pydantic strict validation guard (Wizard UI may be incomplete during render) ---
+try:
+    from pydantic import ValidationError as PydanticValidationError
+except ImportError:
+    # Sentinel exception: must NEVER degrade into a catch-all.
+    class PydanticValidationError(Exception):
+        pass
+
+logger = logging.getLogger(__name__)
 
 # Migrate imports to use intent bridge
 migrate_ui_imports()
@@ -388,46 +399,51 @@ def create_step4_cost(state: M1WizardState) -> None:
                     payload["enable_data2"] = True
                 
                 # Calculate units
+                # Wizard payload may be incomplete during render; calculate_units performs strict validation.
+                # We only suppress expected validation failures; unexpected bugs must still explode.
                 try:
                     units = calculate_units(payload)
-                    state.units = units
+                except (PydanticValidationError, ValueError, TypeError):
+                    # Incomplete wizard input => show 0 units, do not crash
+                    units = 0
+                except Exception:
+                    logger.exception("Unexpected error while calculating units in Step4")
+                    raise
+                
+                state.units = units
+                
+                # Display configuration
+                ui.label("Current Configuration:").classes("font-bold mb-2")
+                
+                with ui.grid(columns=2).classes("w-full gap-2 text-sm"):
+                    ui.label("Season:").classes("font-medium")
+                    ui.label(state.season)
                     
-                    # Display configuration
-                    ui.label("Current Configuration:").classes("font-bold mb-2")
+                    ui.label("DATA1 Dataset:").classes("font-medium")
+                    ui.label(state.dataset_id if state.dataset_id else "Not selected")
                     
-                    with ui.grid(columns=2).classes("w-full gap-2 text-sm"):
-                        ui.label("Season:").classes("font-medium")
-                        ui.label(state.season)
-                        
-                        ui.label("DATA1 Dataset:").classes("font-medium")
-                        ui.label(state.dataset_id if state.dataset_id else "Not selected")
-                        
-                        ui.label("Symbols:").classes("font-medium")
-                        ui.label(f"{len(state.symbols)}: {', '.join(state.symbols)}" if state.symbols else "None")
-                        
-                        ui.label("Timeframes:").classes("font-medium")
-                        ui.label(f"{len(state.timeframes)}: {', '.join(state.timeframes)}" if state.timeframes else "None")
-                        
-                        ui.label("Strategy:").classes("font-medium")
-                        ui.label(state.strategy_id if state.strategy_id else "Not selected")
-                        
-                        ui.label("DATA2 Enabled:").classes("font-medium")
-                        ui.label("Yes" if state.enable_data2 else "No")
-                        
-                        if state.enable_data2:
-                            ui.label("DATA2 Filter:").classes("font-medium")
-                            ui.label(state.selected_filter)
+                    ui.label("Symbols:").classes("font-medium")
+                    ui.label(f"{len(state.symbols)}: {', '.join(state.symbols)}" if state.symbols else "None")
                     
-                    # Update units display
-                    units_label.set_text(f"Total Units: {units}")
+                    ui.label("Timeframes:").classes("font-medium")
+                    ui.label(f"{len(state.timeframes)}: {', '.join(state.timeframes)}" if state.timeframes else "None")
                     
-                    # Cost estimation (simplified)
-                    if units > 100:
-                        ui.label("⚠️ High cost warning: This job may take significant resources").classes("text-yellow-600 mt-2")
+                    ui.label("Strategy:").classes("font-medium")
+                    ui.label(state.strategy_id if state.strategy_id else "Not selected")
                     
-                except Exception as e:
-                    units_label.set_text(f"Error calculating units: {str(e)}")
-                    state.units = 0
+                    ui.label("DATA2 Enabled:").classes("font-medium")
+                    ui.label("Yes" if state.enable_data2 else "No")
+                    
+                    if state.enable_data2:
+                        ui.label("DATA2 Filter:").classes("font-medium")
+                        ui.label(state.selected_filter)
+                
+                # Update units display
+                units_label.set_text(f"Total Units: {units}")
+                
+                # Cost estimation (simplified)
+                if units > 100:
+                    ui.label("⚠️ High cost warning: This job may take significant resources").classes("text-yellow-600 mt-2")
             
             # Update Parquet status warnings
             parquet_warning_container.clear()
@@ -540,7 +556,16 @@ def create_step5_summary(state: M1WizardState) -> None:
                 ui.textarea(payload_json).classes("w-full h-48 font-mono text-xs").props("readonly")
                 
                 # Units display
-                units = calculate_units(payload)
+                # Wizard payload may be incomplete during render; calculate_units performs strict validation.
+                # We only suppress expected validation failures; unexpected bugs must still explode.
+                try:
+                    units = calculate_units(payload)
+                except (PydanticValidationError, ValueError, TypeError):
+                    units = 0
+                except Exception:
+                    logger.exception("Unexpected error while calculating units in Step5")
+                    raise
+
                 ui.label(f"Total Units: {units}").classes("font-bold text-lg mt-2")
                 ui.label("Units = |symbols| × |timeframes| × |strategies| × |filters|").classes("text-sm text-gray-600")
                 ui.label(f"= {len(state.symbols)} × {len(state.timeframes)} × 1 × {1 if state.enable_data2 else 1} = {units}").classes("text-sm font-mono")

@@ -18,7 +18,6 @@ from FishBroWFS_V2.gui.viewer.pages.winners import render_page as render_winners
 from FishBroWFS_V2.gui.viewer.pages.governance import render_page as render_governance_page
 from FishBroWFS_V2.gui.viewer.pages.artifacts import render_page as render_artifacts_page
 from FishBroWFS_V2.gui.research.page import render as render_research_page
-from FishBroWFS_V2.ui.plan_viewer import render_page as render_plan_viewer_page
 
 # Use intent-based system for Attack #9 - Headless Intent-State Contract
 from FishBroWFS_V2.gui.adapters.intent_bridge import migrate_ui_imports
@@ -58,10 +57,10 @@ def main() -> None:
         layout="wide",
     )
     
-    # Mode selection: Viewer, Research Console, or Portfolio Plan
+    # Mode selection: Viewer or Research Console
     mode = st.sidebar.radio(
         "Mode",
-        ["Viewer", "Research Console", "Portfolio Plan"],
+        ["Viewer", "Research Console"],
         index=0,
     )
     
@@ -72,15 +71,6 @@ def main() -> None:
 
         # Show Research Console
         render_research_page(outputs_root)
-        return
-    
-    if mode == "Portfolio Plan":
-        # Portfolio Plan mode - doesn't need query parameters
-        # Use get_paths() from intent bridge migration
-        outputs_root = get_paths().get_outputs_root()
-        
-        # Show Portfolio Plan Viewer
-        render_plan_viewer_page(outputs_root)
         return
 
     # Viewer mode - requires query parameters

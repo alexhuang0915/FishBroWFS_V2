@@ -27,6 +27,10 @@ def test_worker_spawn_not_using_pipes(monkeypatch, tmp_path):
     monkeypatch.setattr("FishBroWFS_V2.control.api.subprocess.Popen", fake_popen)
     monkeypatch.setattr("FishBroWFS_V2.control.api.os.kill", lambda pid, sig: None)
     
+    # Allow worker spawn in tests and allow /tmp DB paths
+    monkeypatch.setenv("FISHBRO_ALLOW_SPAWN_IN_TESTS", "1")
+    monkeypatch.setenv("FISHBRO_ALLOW_TMP_DB", "1")
+    
     db_path = tmp_path / "jobs.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
     

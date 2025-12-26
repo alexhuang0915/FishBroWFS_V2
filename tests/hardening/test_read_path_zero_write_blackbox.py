@@ -209,32 +209,7 @@ def test_api_get_portfolio_plan_by_id_zero_write():
 
 def test_viewer_import_and_render_zero_write():
     """Viewer import module and render_page must not write anything."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        outputs_root = tmp_path / "outputs"
-        outputs_root.mkdir()
-        
-        # Create a plan directory with view file
-        plan_dir = create_minimal_plan_dir(outputs_root, "plan_view_test")
-        view_file = plan_dir / "plan_view.json"
-        view_file.write_text('{"plan_id": "plan_view_test", "test": "view"}')
-        
-        # Apply zero-write patch and snapshot equality
-        with ZeroWritePatch():
-            with snapshot_equality_check(outputs_root):
-                # Import the viewer module (should not scan on import due to lazy scanning)
-                import FishBroWFS_V2.ui.plan_viewer as viewer_module
-                
-                # Call the scan function (this is what the sidebar would do)
-                available_plans = viewer_module.scan_plan_ids(outputs_root)
-                assert "plan_view_test" in available_plans
-                
-                # Try to load a plan view
-                try:
-                    view_data = viewer_module.load_view(outputs_root, "plan_view_test")
-                except (FileNotFoundError, ValueError):
-                    # Expected if view file doesn't match schema, but that's OK
-                    pass
+    pytest.skip("UI plan viewer module deleted in Phase K-2")
 
 
 def test_quality_read_compute_quality_zero_write():
@@ -258,68 +233,6 @@ def test_quality_read_compute_quality_zero_write():
 
 def test_all_read_paths_combined_zero_write():
     """Combined test: exercise all read paths in sequence with single patch."""
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        outputs_root = tmp_path / "outputs"
-        outputs_root.mkdir()
-        
-        # Create two plans
-        plan1_dir = create_minimal_plan_dir(outputs_root, "plan_combined_1")
-        plan2_dir = create_minimal_plan_dir(outputs_root, "plan_combined_2")
-        
-        # Patch outputs root in API
-        from FishBroWFS_V2.control.api import _get_outputs_root
-        import FishBroWFS_V2.control.api as api_module
-        
-        original_get_outputs_root = api_module._get_outputs_root
-        
-        try:
-            api_module._get_outputs_root = lambda: outputs_root
-            
-            # Apply zero-write patch once for all operations
-            with ZeroWritePatch() as patcher:
-                # Take snapshot before all operations
-                from FishBroWFS_V2.utils.fs_snapshot import snapshot_tree, diff_snap
-                snap_before = snapshot_tree(outputs_root, include_sha256=True)
-                
-                # 1. API GET /portfolio/plans
-                client = TestClient(app)
-                response1 = client.get("/portfolio/plans")
-                assert response1.status_code == 200
-                
-                # 2. API GET /portfolio/plans/{plan_id}
-                response2 = client.get("/portfolio/plans/plan_combined_1")
-                assert response2.status_code == 200
-                
-                # 3. Viewer import and scan
-                import FishBroWFS_V2.ui.plan_viewer as viewer_module
-                available_plans = viewer_module.scan_plan_ids(outputs_root)
-                assert "plan_combined_1" in available_plans
-                assert "plan_combined_2" in available_plans
-                
-                # 4. Quality read
-                quality_report, inputs = compute_quality_from_plan_dir(plan1_dir)
-                assert quality_report.plan_id == "plan_combined_1"
-                
-                # Take snapshot after all operations
-                snap_after = snapshot_tree(outputs_root, include_sha256=True)
-                diff = diff_snap(snap_before, snap_after)
-                
-                # Verify no writes detected by patch
-                assert len(patcher.write_calls) == 0, \
-                    f"Write operations detected: {patcher.write_calls}"
-                
-                # Verify file system unchanged
-                assert diff["added"] == [], f"Files added: {diff['added']}"
-                assert diff["removed"] == [], f"Files removed: {diff['removed']}"
-                assert diff["changed"] == [], f"Files changed: {diff['changed']}"
-                
-                # Verify mtimes unchanged
-                for rel_path, snap in snap_before.items():
-                    if rel_path in snap_after:
-                        assert snap.mtime_ns == snap_after[rel_path].mtime_ns, \
-                            f"mtime changed for {rel_path}"
-        finally:
-            api_module._get_outputs_root = original_get_outputs_root
+    pytest.skip("UI plan viewer module deleted in Phase K-2")
 
 

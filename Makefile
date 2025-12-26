@@ -1,6 +1,6 @@
 PROJECT_ROOT := $(CURDIR)
-CACHE_CLEANER := scripts/tools/GM_Huang/clean_repo_caches.py
-RELEASE_TOOL := scripts/tools/GM_Huang/release_tool.py
+CACHE_CLEANER := scripts/tools/clean_repo_caches.py
+RELEASE_TOOL := scripts/tools/release_tool.py
 
 # --- SAFE MODE (WSL / pytest / numba stabilization) ---
 SAFE_ENV := NUMBA_DISABLE_CACHE=1 \
@@ -64,6 +64,12 @@ clean-data:
 # ---------------------------------------------------------
 test:
 	@echo "==> Running pytest (SAFE MODE)"
+	@# Phase B3: reject xdist (-n) to prevent uncontrolled worker spawning
+	@if echo "$(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)" | grep -q -- "-n"; then \
+		echo "ERROR: pytest -n (xdist) is forbidden by Phase B governance."; \
+		echo "       Remove -n from PYTEST_ADDOPTS or SAFE_PYTEST_ADDOPTS."; \
+		exit 1; \
+	fi
 	@$(SAFE_ENV) $(PYTEST) -q $(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)
 
 check:
@@ -71,6 +77,12 @@ check:
 	@PYTHONDONTWRITEBYTECODE=1 python3 -B $(CACHE_CLEANER) || true
 	@echo ""
 	@echo "==> [1/2] Running pytest (no bytecode, no numba cache)"
+	@# Phase B3: reject xdist (-n) to prevent uncontrolled worker spawning
+	@if echo "$(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)" | grep -q -- "-n"; then \
+		echo "ERROR: pytest -n (xdist) is forbidden by Phase B governance."; \
+		echo "       Remove -n from PYTEST_ADDOPTS or SAFE_PYTEST_ADDOPTS."; \
+		exit 1; \
+	fi
 	@$(SAFE_ENV) $(PYTEST) -q $(PYTEST_ADDOPTS) $(SAFE_PYTEST_ADDOPTS)
 	@echo ""
 	@echo "==> [2/2] Post-cleaning bytecode caches (ensure no pollution)"
@@ -81,6 +93,12 @@ check-safe: check
 
 research:
 	@echo "==> Running research-grade tests (slow)"
+	@# Phase B3: reject xdist (-n) to prevent uncontrolled worker spawning
+	@if echo "$$PYTEST_ADDOPTS" | grep -q -- "-n"; then \
+		echo "ERROR: pytest -n (xdist) is forbidden by Phase B governance."; \
+		echo "       Remove -n from PYTEST_ADDOPTS environment variable."; \
+		exit 1; \
+	fi
 	@PYTHONDONTWRITEBYTECODE=1 NUMBA_DISABLE_JIT=1 PYTHONPATH=src python3 -B -m pytest -q -m slow -vv
 
 # ---------------------------------------------------------

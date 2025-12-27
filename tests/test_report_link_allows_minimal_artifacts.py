@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.report_links import (
+from control.report_links import (
     build_report_link,
     get_outputs_root,
     is_report_ready,

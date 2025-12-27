@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.portfolio.loader import load_portfolio_spec
-from FishBroWFS_V2.portfolio.spec import PortfolioLeg, PortfolioSpec
+from portfolio.loader import load_portfolio_spec
+from portfolio.spec import PortfolioLeg, PortfolioSpec
 
 
 def test_load_yaml_spec(tmp_path: Path) -> None:

@@ -16,21 +16,21 @@ import shutil
 
 import pytest
 
-from FishBroWFS_V2.core.ast_identity import (
+from core.ast_identity import (
     ASTCanonicalizer,
     compute_strategy_id_from_source,
     compute_strategy_id_from_function,
     StrategyIdentity,
 )
-from FishBroWFS_V2.strategy.identity_models import (
+from strategy.identity_models import (
     StrategyIdentityModel,
     StrategyMetadata,
     StrategyParamSchema,
     StrategyRegistryEntry,
     StrategyManifest,
 )
-from FishBroWFS_V2.strategy.registry_builder import RegistryBuilder
-from FishBroWFS_V2.strategy.registry import register, clear, get_by_content_id
+from strategy.registry_builder import RegistryBuilder
+from strategy.registry import register, clear, get_by_content_id
 
 
 # Sample strategy source code for testing
@@ -40,7 +40,7 @@ SAMPLE_STRATEGY_SOURCE = '''
 from typing import Dict, Any, Mapping
 import numpy as np
 
-from FishBroWFS_V2.engine.types import OrderIntent
+from engine.types import OrderIntent
 
 def sample_strategy(context: Mapping[str, Any], params: Mapping[str, float]) -> Dict[str, Any]:
     """Sample strategy implementation."""
@@ -289,7 +289,7 @@ class TestDuplicateDetection:
     
     def test_duplicate_content_different_name(self) -> None:
         """Same content with different names should be detected as duplicate."""
-        from FishBroWFS_V2.strategy.spec import StrategySpec
+        from strategy.spec import StrategySpec
         
         # Create two specs with same function but different names
         def dummy_func(context, params):
@@ -327,7 +327,7 @@ class TestDuplicateDetection:
     
     def test_same_name_different_content(self) -> None:
         """Same name with different content should raise error."""
-        from FishBroWFS_V2.strategy.spec import StrategySpec
+        from strategy.spec import StrategySpec
         
         # Create two different functions
         def func1(context, params):
@@ -433,7 +433,7 @@ class TestRegistryBuilderDeterminism:
     
     def test_content_addressed_lookup(self) -> None:
         """Test lookup by content-addressed ID."""
-        from FishBroWFS_V2.strategy.spec import StrategySpec
+        from strategy.spec import StrategySpec
         
         def dummy_func(context, params):
             return {"intents": [], "debug": {}}
@@ -469,7 +469,7 @@ class TestFileBasedIdentity:
         strategy_file.write_text(SAMPLE_STRATEGY_SOURCE)
         
         # Compute identity multiple times
-        from FishBroWFS_V2.core.ast_identity import compute_strategy_id_from_file
+        from core.ast_identity import compute_strategy_id_from_file
         
         hash1 = compute_strategy_id_from_file(strategy_file)
         hash2 = compute_strategy_id_from_file(strategy_file)
@@ -487,7 +487,7 @@ class TestFileBasedIdentity:
         strategy_file2 = tmp_path / "strategy_b.py"
         strategy_file2.write_text(SAMPLE_STRATEGY_SOURCE)
         
-        from FishBroWFS_V2.core.ast_identity import compute_strategy_id_from_file
+        from core.ast_identity import compute_strategy_id_from_file
         
         hash1 = compute_strategy_id_from_file(strategy_file1)
         hash2 = compute_strategy_id_from_file(strategy_file2)

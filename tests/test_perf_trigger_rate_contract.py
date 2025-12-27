@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import os
 
-from FishBroWFS_V2.perf.scenario_control import apply_trigger_rate_mask
+from perf.scenario_control import apply_trigger_rate_mask
 
 
 def test_trigger_rate_mask_rate_1_0_no_change() -> None:
@@ -245,8 +245,8 @@ def test_trigger_rate_mask_integration_with_kernel() -> None:
     Integration test: verify that trigger_rate affects entry_intents_total in run_kernel_arrays.
     This test uses run_kernel_arrays directly (no subprocess) to verify the integration.
     """
-    from FishBroWFS_V2.strategy.kernel import run_kernel_arrays, DonchianAtrParams
-    from FishBroWFS_V2.engine.types import BarArrays
+    from strategy.kernel import run_kernel_arrays, DonchianAtrParams
+    from engine.types import BarArrays
     
     n_bars = 200
     warmup = 20

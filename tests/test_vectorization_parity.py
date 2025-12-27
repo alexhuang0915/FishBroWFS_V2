@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import simulate_arrays
-from FishBroWFS_V2.engine.types import Fill, OrderKind, OrderRole, Side
-from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, run_kernel_arrays, run_kernel_object_mode
+from data.layout import normalize_bars
+from engine.engine_jit import simulate_arrays
+from engine.types import Fill, OrderKind, OrderRole, Side
+from strategy.kernel import DonchianAtrParams, run_kernel_arrays, run_kernel_object_mode
 
 
 def _assert_fills_equal(a: list[Fill], b: list[Fill]) -> None:

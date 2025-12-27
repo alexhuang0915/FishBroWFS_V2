@@ -18,20 +18,20 @@ from unittest.mock import patch, mock_open
 import pytest
 import numpy as np
 
-from FishBroWFS_V2.contracts.fingerprint import FingerprintIndex
-from FishBroWFS_V2.control.shared_build import (
+from contracts.fingerprint import FingerprintIndex
+from control.shared_build import (
     BuildMode,
     IncrementalBuildRejected,
     build_shared,
     load_shared_manifest,
 )
-from FishBroWFS_V2.control.shared_manifest import write_shared_manifest
-from FishBroWFS_V2.core.fingerprint import (
+from control.shared_manifest import write_shared_manifest
+from core.fingerprint import (
     canonical_bar_line,
     compute_day_hash,
     build_fingerprint_index_from_bars,
 )
-from FishBroWFS_V2.data.raw_ingest import RawIngestResult, IngestPolicy
+from data.raw_ingest import RawIngestResult, IngestPolicy
 import pandas as pd
 
 
@@ -76,7 +76,7 @@ def test_full_mode_always_allowed(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 執行 FULL 模式
@@ -102,7 +102,7 @@ def test_incremental_append_only_allowed(tmp_path):
     txt_file.write_text("dummy")
     
     # 模擬 compare_fingerprint_indices 回傳 append_only=True
-    from FishBroWFS_V2.core.fingerprint import compare_fingerprint_indices
+    from core.fingerprint import compare_fingerprint_indices
     
     def mock_compare(old_index, new_index):
         return {
@@ -117,7 +117,7 @@ def test_incremental_append_only_allowed(tmp_path):
             "is_new": False,
         }
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         # 模擬 ingest_raw_txt 回傳一個 RawIngestResult
         bars = [
             (datetime(2023, 1, 1, 9, 30, 0), 100.0, 105.0, 99.5, 102.5, 1000.0),
@@ -125,7 +125,7 @@ def test_incremental_append_only_allowed(tmp_path):
         mock_result = _create_mock_raw_ingest_result(txt_file, bars)
         mock_ingest.return_value = mock_result
         
-        with patch("FishBroWFS_V2.control.shared_build.compare_fingerprint_indices", mock_compare):
+        with patch("control.shared_build.compare_fingerprint_indices", mock_compare):
             # 執行 INCREMENTAL 模式
             report = build_shared(
                 season="2026Q1",
@@ -158,7 +158,7 @@ def test_incremental_historical_changes_rejected(tmp_path):
     )
     
     # 寫入指紋索引
-    from FishBroWFS_V2.control.fingerprint_store import write_fingerprint_index
+    from control.fingerprint_store import write_fingerprint_index
     index_path = tmp_path / "fingerprints" / "2026Q1" / "TEST.DATASET" / "fingerprint_index.json"
     index_path.parent.mkdir(parents=True, exist_ok=True)
     write_fingerprint_index(old_index, index_path)
@@ -177,7 +177,7 @@ def test_incremental_historical_changes_rejected(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 執行 INCREMENTAL 模式，應該被拒絕
@@ -209,7 +209,7 @@ def test_incremental_new_dataset_allowed(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 執行 INCREMENTAL 模式
@@ -239,7 +239,7 @@ def test_manifest_deterministic(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 第一次執行
@@ -323,7 +323,7 @@ def test_load_shared_manifest(tmp_path):
     }
     
     # 使用正確的路徑結構：outputs_root/shared/season/dataset_id/shared_manifest.json
-    from FishBroWFS_V2.control.shared_build import _shared_manifest_path
+    from control.shared_build import _shared_manifest_path
     manifest_path = _shared_manifest_path(
         season="2026Q1",
         dataset_id="TEST.DATASET",
@@ -357,15 +357,15 @@ def test_load_shared_manifest(tmp_path):
 def test_no_mtime_size_usage():
     """確保沒有使用檔案 mtime/size 來判斷"""
     import os
-    import FishBroWFS_V2.control.shared_build
-    import FishBroWFS_V2.control.shared_manifest
-    import FishBroWFS_V2.control.shared_cli
+    import control.shared_build
+    import control.shared_manifest
+    import control.shared_cli
     
     # 檢查模組中是否有 os.stat().st_mtime 或 st_size
     modules = [
-        FishBroWFS_V2.control.shared_build,
-        FishBroWFS_V2.control.shared_manifest,
-        FishBroWFS_V2.control.shared_cli,
+        control.shared_build,
+        control.shared_manifest,
+        control.shared_cli,
     ]
     
     for module in modules:
@@ -380,7 +380,7 @@ def test_no_mtime_size_usage():
 
 def test_exit_code_simulation(tmp_path):
     """測試 CLI exit code 模擬（透過 IncrementalBuildRejected）"""
-    from FishBroWFS_V2.control.shared_build import IncrementalBuildRejected
+    from control.shared_build import IncrementalBuildRejected
     
     # 建立測試 TXT 檔案（模擬）
     txt_file = tmp_path / "test.txt"
@@ -393,11 +393,11 @@ def test_exit_code_simulation(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 模擬歷史變更（透過 monkey patch compare_fingerprint_indices）
-        from FishBroWFS_V2.core.fingerprint import compare_fingerprint_indices
+        from core.fingerprint import compare_fingerprint_indices
         
         def mock_compare(old_index, new_index):
             return {
@@ -412,7 +412,7 @@ def test_exit_code_simulation(tmp_path):
                 "is_new": False,
             }
         
-        with patch("FishBroWFS_V2.control.shared_build.compare_fingerprint_indices", mock_compare):
+        with patch("control.shared_build.compare_fingerprint_indices", mock_compare):
             with pytest.raises(IncrementalBuildRejected) as exc_info:
                 build_shared(
                     season="2026Q1",

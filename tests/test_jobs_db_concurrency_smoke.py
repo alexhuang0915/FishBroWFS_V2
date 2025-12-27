@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.jobs_db import (
+from control.jobs_db import (
     append_log,
     create_job,
     init_db,
@@ -16,7 +16,7 @@ from FishBroWFS_V2.control.jobs_db import (
     mark_done,
     mark_running,
 )
-from FishBroWFS_V2.control.types import DBJobSpec
+from control.types import DBJobSpec
 
 
 def _proc(db_path: str, n: int) -> None:

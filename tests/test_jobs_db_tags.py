@@ -15,14 +15,14 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.jobs_db import (
+from control.jobs_db import (
     create_job,
     get_job,
     init_db,
     list_jobs,
     search_by_tag,
 )
-from FishBroWFS_V2.control.types import DBJobSpec
+from control.types import DBJobSpec
 
 
 @pytest.fixture

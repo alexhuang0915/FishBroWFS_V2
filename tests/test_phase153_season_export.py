@@ -7,8 +7,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.control.artifacts import compute_sha256
+from control.api import app
+from control.artifacts import compute_sha256
 
 
 @pytest.fixture
@@ -34,9 +34,9 @@ def test_export_requires_frozen_season(client):
             {"season": season, "generated_at": "Z", "batches": []},
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.season_export.get_exports_root", return_value=exports_root):
             r = client.post(f"/seasons/{season}/export")
             assert r.status_code == 403
 
@@ -60,7 +60,7 @@ def test_export_builds_package_and_manifest_sha_matches(client):
 
         # create season metadata and freeze it
         # (use API to freeze for realism)
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_season_index_root", return_value=season_root):
             r = client.post(f"/seasons/{season}/freeze")
             assert r.status_code == 200
 
@@ -73,9 +73,9 @@ def test_export_builds_package_and_manifest_sha_matches(client):
         _wjson(artifacts_root / "batchB" / "index.json", {"y": 2})
         # omit batchB summary.json to test missing files recorded
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.season_export.get_exports_root", return_value=exports_root):
             r = client.post(f"/seasons/{season}/export")
             assert r.status_code == 200
             out = r.json()

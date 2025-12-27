@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.core.artifacts import write_run_artifacts
-from FishBroWFS_V2.core.audit_schema import AuditSchema, compute_params_effective
-from FishBroWFS_V2.core.config_hash import stable_config_hash
-from FishBroWFS_V2.core.paths import ensure_run_dir, get_run_dir
-from FishBroWFS_V2.core.run_id import make_run_id
+from core.artifacts import write_run_artifacts
+from core.audit_schema import AuditSchema, compute_params_effective
+from core.config_hash import stable_config_hash
+from core.paths import ensure_run_dir, get_run_dir
+from core.run_id import make_run_id
 
 
 def test_artifact_tree_contract():

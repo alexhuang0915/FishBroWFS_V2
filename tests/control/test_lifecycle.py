@@ -8,7 +8,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 import pytest
 
-from FishBroWFS_V2.control.lifecycle import (
+from control.lifecycle import (
     detect_port_occupant,
     verify_fishbro_control_identity,
     verify_fishbro_ui_identity,
@@ -127,7 +127,7 @@ class TestIdentityVerification:
     def test_verify_fishbro_ui_identity_success(self, monkeypatch):
         """UI process matches FishBro patterns."""
         mock_occupant = MagicMock()
-        mock_occupant.cmdline = "python3 -m FishBroWFS_V2.gui.nicegui.app"
+        mock_occupant.cmdline = "python3 -m gui.nicegui.app"
         
         result, error = verify_fishbro_ui_identity(mock_occupant)
         assert result is True
@@ -159,7 +159,7 @@ class TestPreflightPort:
         """Port is free -> START."""
         mock_occupant = MagicMock()
         mock_occupant.occupied = False
-        with patch("FishBroWFS_V2.control.lifecycle.detect_port_occupant", return_value=mock_occupant):
+        with patch("control.lifecycle.detect_port_occupant", return_value=mock_occupant):
             result = preflight_port(8000, service_type="control")
             assert result.status.value == "FREE"
             assert result.decision == "START"
@@ -169,8 +169,8 @@ class TestPreflightPort:
         mock_occupant = MagicMock()
         mock_occupant.occupied = True
         mock_occupant.pid = 12345
-        with patch("FishBroWFS_V2.control.lifecycle.detect_port_occupant", return_value=mock_occupant):
-            with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_control_identity", return_value=(True, {}, None)):
+        with patch("control.lifecycle.detect_port_occupant", return_value=mock_occupant):
+            with patch("control.lifecycle.verify_fishbro_control_identity", return_value=(True, {}, None)):
                 result = preflight_port(8000, service_type="control")
                 assert result.status.value == "OCCUPIED_FISHBRO"
                 assert result.decision == "REUSE"
@@ -179,15 +179,15 @@ class TestPreflightPort:
     def test_preflight_port_fishbro_ui(self, monkeypatch):
         """Port occupied by FishBro UI -> REUSE."""
         # Create a proper PortOccupant-like object
-        from FishBroWFS_V2.control.lifecycle import PortOccupant
+        from control.lifecycle import PortOccupant
         mock_occupant = PortOccupant(
             occupied=True,
             pid=12345,
-            cmdline="python -m FishBroWFS_V2.gui.nicegui.app"
+            cmdline="python -m gui.nicegui.app"
         )
-        with patch("FishBroWFS_V2.control.lifecycle.detect_port_occupant", return_value=mock_occupant):
-            with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_control_identity", return_value=(False, None, "error")):
-                with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_ui_identity", return_value=(True, None)):
+        with patch("control.lifecycle.detect_port_occupant", return_value=mock_occupant):
+            with patch("control.lifecycle.verify_fishbro_control_identity", return_value=(False, None, "error")):
+                with patch("control.lifecycle.verify_fishbro_ui_identity", return_value=(True, None)):
                     result = preflight_port(8080, service_type="ui")
                     assert result.status.value == "OCCUPIED_FISHBRO"
                     assert result.decision == "REUSE"
@@ -198,9 +198,9 @@ class TestPreflightPort:
         mock_occupant = MagicMock()
         mock_occupant.occupied = True
         mock_occupant.pid = 12345
-        with patch("FishBroWFS_V2.control.lifecycle.detect_port_occupant", return_value=mock_occupant):
-            with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_control_identity", return_value=(False, None, "error")):
-                with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_ui_identity", return_value=(False, "error")):
+        with patch("control.lifecycle.detect_port_occupant", return_value=mock_occupant):
+            with patch("control.lifecycle.verify_fishbro_control_identity", return_value=(False, None, "error")):
+                with patch("control.lifecycle.verify_fishbro_ui_identity", return_value=(False, "error")):
                     result = preflight_port(8000, service_type="control")
                     assert result.status.value == "OCCUPIED_NOT_FISHBRO"
                     assert result.decision == "FAIL_FAST"
@@ -211,9 +211,9 @@ class TestPreflightPort:
         mock_occupant = MagicMock()
         mock_occupant.occupied = True
         mock_occupant.pid = 12345
-        with patch("FishBroWFS_V2.control.lifecycle.detect_port_occupant", return_value=mock_occupant):
-            with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_control_identity", side_effect=Exception("error")):
-                with patch("FishBroWFS_V2.control.lifecycle.verify_fishbro_ui_identity", side_effect=Exception("error")):
+        with patch("control.lifecycle.detect_port_occupant", return_value=mock_occupant):
+            with patch("control.lifecycle.verify_fishbro_control_identity", side_effect=Exception("error")):
+                with patch("control.lifecycle.verify_fishbro_ui_identity", side_effect=Exception("error")):
                     result = preflight_port(8000, service_type="control")
                     assert result.status.value == "OCCUPIED_UNKNOWN"
                     assert result.decision == "FAIL_FAST"

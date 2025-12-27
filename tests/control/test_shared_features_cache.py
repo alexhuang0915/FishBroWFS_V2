@@ -19,29 +19,29 @@ from typing import Dict, Any
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.contracts.features import FeatureRegistry, FeatureSpec, default_feature_registry
-from FishBroWFS_V2.core.features import (
+from contracts.features import FeatureRegistry, FeatureSpec, default_feature_registry
+from core.features import (
     compute_atr_14,
     compute_returns,
     compute_rolling_z,
     compute_session_vwap,
     compute_features_for_tf,
 )
-from FishBroWFS_V2.control.features_store import (
+from control.features_store import (
     features_path,
     write_features_npz_atomic,
     load_features_npz,
     sha256_features_file,
 )
-from FishBroWFS_V2.control.features_manifest import (
+from control.features_manifest import (
     features_manifest_path,
     write_features_manifest,
     load_features_manifest,
     build_features_manifest_data,
     feature_spec_to_dict,
 )
-from FishBroWFS_V2.control.shared_build import build_shared
-from FishBroWFS_V2.core.resampler import SessionSpecTaipei
+from control.shared_build import build_shared
+from core.resampler import SessionSpecTaipei
 
 
 def test_feature_registry_default():
@@ -367,7 +367,7 @@ def test_no_txt_reading_for_features(monkeypatch, tmp_path: Path):
     
     使用 monkeypatch/spy 確保 build_features 不碰 TXT。
     """
-    import FishBroWFS_V2.data.raw_ingest as raw_ingest_module
+    import data.raw_ingest as raw_ingest_module
     
     call_count = 0
     original_ingest = raw_ingest_module.ingest_raw_txt

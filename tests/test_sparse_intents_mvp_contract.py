@@ -10,9 +10,9 @@ These tests ensure:
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.config.dtypes import INDEX_DTYPE
-from FishBroWFS_V2.engine.types import BarArrays
-from FishBroWFS_V2.strategy.kernel import (
+from config.dtypes import INDEX_DTYPE
+from engine.types import BarArrays
+from strategy.kernel import (
     DonchianAtrParams,
     _build_entry_intents_from_trigger,
     run_kernel_arrays,

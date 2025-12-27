@@ -4,8 +4,8 @@
 import tempfile
 from pathlib import Path
 
-from FishBroWFS_V2.control.batch_aggregate import compute_batch_summary
-from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+from control.batch_aggregate import compute_batch_summary
+from control.artifacts import canonical_json_bytes, compute_sha256
 
 
 def test_compute_batch_summary_topk():

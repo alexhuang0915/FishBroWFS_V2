@@ -15,12 +15,12 @@ from pathlib import Path
 import pytest
 import argparse
 
-from FishBroWFS_V2.control.research_cli import (
+from control.research_cli import (
     run_research_cli,
     ensure_builtin_strategies_loaded,
     create_parser
 )
-from FishBroWFS_V2.strategy.registry import get, list_strategies, load_builtin_strategies
+from strategy.registry import get, list_strategies, load_builtin_strategies
 
 
 def test_ensure_builtin_strategies_loaded():
@@ -71,7 +71,7 @@ def test_run_research_cli_loads_strategies(monkeypatch):
     def mock_ensure_builtin_strategies_loaded():
         called.append(True)
         # 實際執行原始函數
-        from FishBroWFS_V2.strategy.registry import load_builtin_strategies
+        from strategy.registry import load_builtin_strategies
         try:
             load_builtin_strategies()
         except ValueError as e:
@@ -79,7 +79,7 @@ def test_run_research_cli_loads_strategies(monkeypatch):
                 raise
     
     # monkeypatch ensure_builtin_strategies_loaded
-    import FishBroWFS_V2.control.research_cli as research_cli_module
+    import control.research_cli as research_cli_module
     monkeypatch.setattr(research_cli_module, "ensure_builtin_strategies_loaded", mock_ensure_builtin_strategies_loaded)
     
     # 建立臨時目錄和假參數
@@ -164,12 +164,12 @@ def test_cli_without_strategies_registry_empty(monkeypatch):
         # 不執行實際載入
     
     # monkeypatch load_builtin_strategies
-    import FishBroWFS_V2.strategy.registry as registry_module
+    import strategy.registry as registry_module
     monkeypatch.setattr(registry_module, "load_builtin_strategies", mock_load_builtin_strategies)
     
     # 直接呼叫 run_research_cli 的內部邏輯（不透過 ensure_builtin_strategies_loaded）
     # 我們將模擬一個沒有 bootstrap 的情況
-    import FishBroWFS_V2.control.research_cli as research_cli_module
+    import control.research_cli as research_cli_module
     
     # 儲存原始函數
     original_ensure = research_cli_module.ensure_builtin_strategies_loaded

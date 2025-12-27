@@ -11,9 +11,9 @@ from dataclasses import asdict, is_dataclass
 
 import numpy as np
 
-from FishBroWFS_V2.engine.types import BarArrays, Fill
-from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, PrecomputedIndicators, run_kernel_arrays
-from FishBroWFS_V2.indicators.numba_indicators import rolling_max, rolling_min, atr_wilder
+from engine.types import BarArrays, Fill
+from strategy.kernel import DonchianAtrParams, PrecomputedIndicators, run_kernel_arrays
+from indicators.numba_indicators import rolling_max, rolling_min, atr_wilder
 
 
 def _fill_to_tuple(f: Fill) -> tuple:

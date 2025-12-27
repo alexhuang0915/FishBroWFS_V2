@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+from data.dataset_registry import DatasetIndex, DatasetRecord
 from scripts.build_dataset_registry import build_registry, parse_filename_to_dates
 
 

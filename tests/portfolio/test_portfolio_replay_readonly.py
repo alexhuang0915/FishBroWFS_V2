@@ -8,13 +8,13 @@ from datetime import datetime
 
 import pytest
 
-from FishBroWFS_V2.core.schemas.portfolio_v1 import (
+from core.schemas.portfolio_v1 import (
     PortfolioPolicyV1,
     PortfolioSpecV1,
     SignalCandidateV1,
 )
-from FishBroWFS_V2.portfolio.runner_v1 import run_portfolio_admission
-from FishBroWFS_V2.portfolio.artifacts_writer_v1 import write_portfolio_artifacts
+from portfolio.runner_v1 import run_portfolio_admission
+from portfolio.artifacts_writer_v1 import write_portfolio_artifacts
 
 
 def create_test_candidates() -> list[SignalCandidateV1]:
@@ -90,7 +90,7 @@ def test_replay_mode_no_writes():
         # Instead, we'll directly test the artifacts writer with replay mode
         
         # Create test decisions and bar_states
-        from FishBroWFS_V2.core.schemas.portfolio_v1 import (
+        from core.schemas.portfolio_v1 import (
             AdmissionDecisionV1,
             PortfolioStateV1,
             PortfolioSummaryV1,

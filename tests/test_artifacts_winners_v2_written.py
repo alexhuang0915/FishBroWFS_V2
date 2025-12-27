@@ -11,11 +11,11 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from FishBroWFS_V2.core.artifacts import write_run_artifacts
-from FishBroWFS_V2.core.audit_schema import AuditSchema, compute_params_effective
-from FishBroWFS_V2.core.config_hash import stable_config_hash
-from FishBroWFS_V2.core.run_id import make_run_id
-from FishBroWFS_V2.core.winners_schema import is_winners_v2
+from core.artifacts import write_run_artifacts
+from core.audit_schema import AuditSchema, compute_params_effective
+from core.config_hash import stable_config_hash
+from core.run_id import make_run_id
+from core.winners_schema import is_winners_v2
 
 
 def test_artifacts_upgrades_legacy_winners_to_v2() -> None:

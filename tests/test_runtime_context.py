@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import pytest
 
-from FishBroWFS_V2.gui.services.runtime_context import (
+from gui.services.runtime_context import (
     write_runtime_context,
     get_snapshot_timestamp,
     get_git_info,
@@ -105,7 +105,7 @@ def test_policy_hash_section(tmp_path: Path):
     (policy_dir / "LOCAL_SCAN_RULES.json").write_text(policy_content)
     
     # Mock the policy path to point to our dummy
-    with patch('FishBroWFS_V2.gui.services.runtime_context.Path') as MockPath:
+    with patch('gui.services.runtime_context.Path') as MockPath:
         mock_path_instance = MagicMock()
         mock_path_instance.exists.return_value = True
         mock_path_instance.__str__.return_value = str(policy_dir / "LOCAL_SCAN_RULES.json")
@@ -142,7 +142,7 @@ def test_get_snapshot_timestamp(tmp_path: Path):
     expected_time = "2025-12-26T12:00:00Z"
     manifest_path.write_text(json.dumps({"generated_at_utc": expected_time}))
     
-    with patch('FishBroWFS_V2.gui.services.runtime_context.Path') as MockPath:
+    with patch('gui.services.runtime_context.Path') as MockPath:
         def side_effect(*args, **kwargs):
             if args[0] == "outputs/snapshots/full/MANIFEST.json":
                 return manifest_path
@@ -160,7 +160,7 @@ def test_get_snapshot_timestamp(tmp_path: Path):
     expected_mtime = time.time() - 3600
     os.utime(snapshot_path, (expected_mtime, expected_mtime))
     
-    with patch('FishBroWFS_V2.gui.services.runtime_context.Path') as MockPath:
+    with patch('gui.services.runtime_context.Path') as MockPath:
         def side_effect(*args, **kwargs):
             if args[0] == "outputs/snapshots/full/MANIFEST.json":
                 return Path("/nonexistent")
@@ -176,7 +176,7 @@ def test_get_snapshot_timestamp(tmp_path: Path):
         assert "Z" in timestamp or "+" in timestamp
     
     # Test UNKNOWN when neither exists
-    with patch('FishBroWFS_V2.gui.services.runtime_context.Path') as MockPath:
+    with patch('gui.services.runtime_context.Path') as MockPath:
         MockPath.return_value.exists.return_value = False
         
         timestamp = get_snapshot_timestamp()
@@ -202,7 +202,6 @@ def test_get_git_info():
 
 # def test_port_occupancy():
 #     """Test port occupancy checking."""
-#     with patch('FishBroWFS_V2.gui.services.runtime_context._run') as mock_run:
 #         mock_run.return_value = "LISTEN 0 128 0.0.0.0:8080 0.0.0.0:* users:(python)"
 #
 #         result = port_occupancy(8080)

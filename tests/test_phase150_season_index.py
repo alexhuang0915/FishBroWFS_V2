@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 @pytest.fixture
@@ -48,8 +48,8 @@ def test_rebuild_season_index_collects_batches_and_is_deterministic(client):
             {"batch_id": "batchX", "season": "2026Q2", "tags": ["ignore"], "note": "", "frozen": False},
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.post(f"/seasons/{season}/rebuild_index")
             assert r.status_code == 200
             data = r.json()
@@ -73,7 +73,7 @@ def test_season_metadata_lifecycle_and_freeze_rules(client):
         season_root = Path(tmp) / "season_index"
         season = "2026Q1"
 
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_season_index_root", return_value=season_root):
             # metadata not exist -> 404
             r = client.get(f"/seasons/{season}/metadata")
             assert r.status_code == 404
@@ -117,8 +117,8 @@ def test_rebuild_index_forbidden_when_season_frozen(client):
             {"batch_id": "batch1", "season": season, "tags": [], "note": "", "frozen": False},
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
 
             # freeze season first
             r = client.post(f"/seasons/{season}/freeze")

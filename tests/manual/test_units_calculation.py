@@ -4,7 +4,7 @@
 import sys
 sys.path.insert(0, "src")
 
-from FishBroWFS_V2.control.job_api import calculate_units
+from control.job_api import calculate_units
 
 def test_units_calculation():
     """Test various scenarios for units calculation."""

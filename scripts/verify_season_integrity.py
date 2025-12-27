@@ -13,9 +13,9 @@ from pathlib import Path
 src_dir = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
-from FishBroWFS_V2.core.season_state import load_season_state
-from FishBroWFS_V2.core.snapshot import verify_snapshot_integrity
-from FishBroWFS_V2.core.season_context import current_season
+from core.season_state import load_season_state
+from core.snapshot import verify_snapshot_integrity
+from core.season_context import current_season
 
 
 def main():

@@ -18,9 +18,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.portfolio.plan_quality import compute_quality_from_plan_dir
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from control.api import app
+from portfolio.plan_quality import compute_quality_from_plan_dir
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
@@ -151,8 +151,8 @@ def test_api_get_portfolio_plans_zero_write():
         plan_dir = create_minimal_plan_dir(outputs_root, "plan_existing")
         
         # Patch outputs root in API
-        from FishBroWFS_V2.control.api import _get_outputs_root
-        import FishBroWFS_V2.control.api as api_module
+        from control.api import _get_outputs_root
+        import control.api as api_module
         
         original_get_outputs_root = api_module._get_outputs_root
         
@@ -187,8 +187,8 @@ def test_api_get_portfolio_plan_by_id_zero_write():
         plan_dir = create_minimal_plan_dir(outputs_root, "plan_abc123")
         
         # Patch outputs root in API
-        from FishBroWFS_V2.control.api import _get_outputs_root
-        import FishBroWFS_V2.control.api as api_module
+        from control.api import _get_outputs_root
+        import control.api as api_module
         
         original_get_outputs_root = api_module._get_outputs_root
         

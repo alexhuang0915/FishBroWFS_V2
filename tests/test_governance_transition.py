@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from FishBroWFS_V2.core.governance.transition import governance_transition
-from FishBroWFS_V2.core.schemas.governance import Decision, LifecycleState
+from core.governance.transition import governance_transition
+from core.schemas.governance import Decision, LifecycleState
 
 
 # Transition test matrix: (prev_state, decision, expected_next_state)

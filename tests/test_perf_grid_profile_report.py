@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import cProfile
 
-from FishBroWFS_V2.perf.profile_report import _format_profile_report
+from perf.profile_report import _format_profile_report
 
 
 def test_profile_report_markers_present() -> None:

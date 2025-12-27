@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from FishBroWFS_V2.core.config_hash import stable_config_hash
-from FishBroWFS_V2.core.config_snapshot import make_config_snapshot
-from FishBroWFS_V2.core.oom_gate import decide_oom_action
+from core.config_hash import stable_config_hash
+from core.config_snapshot import make_config_snapshot
+from core.oom_gate import decide_oom_action
 
 
 def test_oom_gate_pure_function_hash_consistency(monkeypatch) -> None:
@@ -35,7 +35,7 @@ def test_oom_gate_pure_function_hash_consistency(monkeypatch) -> None:
         return int(base * subsample)
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.core.oom_cost_model.estimate_memory_bytes",
+        "core.oom_cost_model.estimate_memory_bytes",
         mock_estimate_memory_bytes,
     )
     

@@ -7,7 +7,7 @@ from unittest.mock import patch, mock_open, MagicMock
 
 import pytest
 
-from FishBroWFS_V2.control.worker_spawn_policy import can_spawn_worker, validate_pidfile
+from control.worker_spawn_policy import can_spawn_worker, validate_pidfile
 
 
 class TestCanSpawnWorker:
@@ -151,7 +151,7 @@ class TestValidatePidfile:
         pidfile = tmp_path / "worker.pid"
         pidfile.write_text(str(pid))
         db_path = tmp_path / "jobs.db"
-        fake_cmdline = f"python -m FishBroWFS_V2.control.worker_main /some/other.db"
+        fake_cmdline = f"python -m control.worker_main /some/other.db"
         with patch("pathlib.Path.read_bytes", return_value=fake_cmdline.encode() + b"\x00"):
             valid, reason = validate_pidfile(pidfile, db_path)
             assert valid is False
@@ -164,7 +164,7 @@ class TestValidatePidfile:
         pidfile = tmp_path / "worker.pid"
         pidfile.write_text(str(pid))
         db_path = tmp_path / "jobs.db"
-        fake_cmdline = f"python -m FishBroWFS_V2.control.worker_main {db_path}"
+        fake_cmdline = f"python -m control.worker_main {db_path}"
         with patch("pathlib.Path.read_bytes", return_value=fake_cmdline.encode() + b"\x00"):
             valid, reason = validate_pidfile(pidfile, db_path)
             assert valid is True
@@ -177,7 +177,7 @@ class TestValidatePidfile:
         pidfile.write_text(str(pid))
         db_path = tmp_path / "jobs.db"
         # Mock Path constructor to return a mock for /proc/{pid}/cmdline
-        with patch("FishBroWFS_V2.control.worker_spawn_policy.Path") as MockPath:
+        with patch("control.worker_spawn_policy.Path") as MockPath:
             # For other Path calls (pidfile, etc.) we need to return real Path objects
             # We'll use side_effect to differentiate
             def path_side(*args, **kwargs):

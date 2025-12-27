@@ -1,0 +1,26 @@
+version: 1
+base_currency: TWD
+
+fx_rates:
+  USD: 32.0
+  TWD: 1.0
+
+instruments:
+  CME.MNQ:
+    exchange: CME
+    currency: USD
+    multiplier: 2.0
+    tick_size: 0.25
+    tick_value: 0.50
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 4000.0
+    maintenance_margin_per_contract: 3500.0
+
+  TWF.MXF:
+    exchange: TAIFEX
+    underlying: MTX
+    currency: TWD
+    multiplier: 50.0
+    margin_basis: conservative_over_exchange
+    initial_margin_per_contract: 88000.0
+    maintenance_margin_per_contract: 80000.0

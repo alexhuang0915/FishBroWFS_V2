@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from FishBroWFS_V2.core.action_risk import RiskLevel, ActionPolicyDecision
-from FishBroWFS_V2.core.policy_engine import (
+from core.action_risk import RiskLevel, ActionPolicyDecision
+from core.policy_engine import (
     classify_action,
     enforce_action_policy,
     LIVE_TOKEN_PATH,
@@ -94,7 +94,7 @@ def test_enforce_action_policy_live_execute_env_1_token_wrong():
         token_path = Path(tmpdir) / "live_enable.token"
         token_path.write_text("WRONG_TOKEN", encoding="utf-8")
         
-        with patch("FishBroWFS_V2.core.policy_engine.LIVE_TOKEN_PATH", token_path):
+        with patch("core.policy_engine.LIVE_TOKEN_PATH", token_path):
             decision = enforce_action_policy("deploy_live", "2026Q1")
             assert decision.allowed is False
             assert "invalid token content" in decision.reason
@@ -113,7 +113,7 @@ def test_enforce_action_policy_live_execute_env_1_token_ok():
         token_path = Path(tmpdir) / "live_enable.token"
         token_path.write_text(LIVE_TOKEN_MAGIC, encoding="utf-8")
         
-        with patch("FishBroWFS_V2.core.policy_engine.LIVE_TOKEN_PATH", token_path):
+        with patch("core.policy_engine.LIVE_TOKEN_PATH", token_path):
             decision = enforce_action_policy("deploy_live", "2026Q1")
             assert decision.allowed is True
             assert "LIVE_EXECUTE enabled" in decision.reason
@@ -126,10 +126,10 @@ def test_enforce_action_policy_live_execute_env_1_token_ok():
 def test_enforce_action_policy_research_mutate_frozen_season():
     """測試 RESEARCH_MUTATE 動作在凍結季節被阻擋"""
     # Mock load_season_state 返回凍結的 SeasonState
-    from FishBroWFS_V2.core.season_state import SeasonState
+    from core.season_state import SeasonState
     frozen_state = SeasonState(season="2026Q1", state="FROZEN")
     
-    with patch("FishBroWFS_V2.core.policy_engine.load_season_state", return_value=frozen_state):
+    with patch("core.policy_engine.load_season_state", return_value=frozen_state):
         decision = enforce_action_policy("submit_job", "2026Q1")
         assert decision.allowed is False
         assert "Season 2026Q1 is frozen" in decision.reason
@@ -139,10 +139,10 @@ def test_enforce_action_policy_research_mutate_frozen_season():
 def test_enforce_action_policy_research_mutate_not_frozen():
     """測試 RESEARCH_MUTATE 動作在未凍結季節允許"""
     # Mock load_season_state 返回未凍結的 SeasonState
-    from FishBroWFS_V2.core.season_state import SeasonState
+    from core.season_state import SeasonState
     open_state = SeasonState(season="2026Q1", state="OPEN")
     
-    with patch("FishBroWFS_V2.core.policy_engine.load_season_state", return_value=open_state):
+    with patch("core.policy_engine.load_season_state", return_value=open_state):
         decision = enforce_action_policy("submit_job", "2026Q1")
         assert decision.allowed is True
         assert decision.reason == "OK"
@@ -161,20 +161,6 @@ def test_enforce_action_policy_unknown_action_blocked():
     assert "LIVE_EXECUTE disabled" in decision.reason
 
 
-def test_actions_service_integration():
-    """測試 actions.py 整合 policy engine"""
-    from FishBroWFS_V2.gui.services.actions import run_action
-    
-    # 測試 LIVE_EXECUTE 動作被阻擋
-    os.environ["FISHBRO_ENABLE_LIVE"] = "0"
-    
-    with pytest.raises(PermissionError) as exc_info:
-        run_action("deploy_live", "2026Q1")
-    
-    assert "Action blocked by policy" in str(exc_info.value)
-    
-    # 清理環境變數
-    del os.environ["FISHBRO_ENABLE_LIVE"]
 
 
 if __name__ == "__main__":

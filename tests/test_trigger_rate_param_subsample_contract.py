@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import os
 
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from pipeline.runner_grid import run_grid
 
 
 def test_selected_params_count_reasonable() -> None:

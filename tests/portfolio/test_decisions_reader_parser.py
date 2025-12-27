@@ -5,7 +5,7 @@ Phase 11: Test tolerant parsing of decisions.log files.
 """
 
 import pytest
-from FishBroWFS_V2.portfolio.decisions_reader import parse_decisions_log_lines
+from portfolio.decisions_reader import parse_decisions_log_lines
 
 
 def test_parse_jsonl_normal():

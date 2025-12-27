@@ -9,9 +9,9 @@ from pathlib import Path
 from datetime import datetime, timezone
 sys.path.insert(0, "src")
 
-from FishBroWFS_V2.control.job_api import list_jobs_with_progress, get_job_status
-from FishBroWFS_V2.control.jobs_db import init_db, create_job, get_job
-from FishBroWFS_V2.control.types import DBJobSpec, JobStatus
+from control.job_api import list_jobs_with_progress, get_job_status
+from control.jobs_db import init_db, create_job, get_job
+from control.types import DBJobSpec, JobStatus
 
 def test_jobs_list_progress():
     """Test that jobs list shows units_done/units_total."""
@@ -127,7 +127,7 @@ def test_jobs_list_progress():
         print("-" * 50)
         
         # Check that jobs.py uses the correct fields
-        jobs_path = Path("src/FishBroWFS_V2/gui/nicegui/pages/jobs.py")
+        jobs_path = Path("src/gui/nicegui/pages/jobs.py")
         if jobs_path.exists():
             with open(jobs_path, 'r') as f:
                 content = f.read()
@@ -158,7 +158,7 @@ def test_jobs_list_progress():
         print("Test 4: Verify job_detail.py shows units progress")
         print("-" * 50)
         
-        job_detail_path = Path("src/FishBroWFS_V2/gui/nicegui/pages/job_detail.py")
+        job_detail_path = Path("src/gui/nicegui/pages/job_detail.py")
         if job_detail_path.exists():
             with open(job_detail_path, 'r') as f:
                 content = f.read()

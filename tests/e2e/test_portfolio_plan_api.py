@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 def _create_mock_export(tmp_path: Path, season: str, export_name: str) -> Path:
@@ -57,8 +57,8 @@ def test_full_plan_creation_and_retrieval():
         tmp_path = Path(tmp)
         exports_root = _create_mock_export(tmp_path, "season1", "export1")
 
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
-            with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api._get_outputs_root", return_value=tmp_path):
                 client = TestClient(app)
 
                 # 1. List plans (should be empty)
@@ -136,8 +136,8 @@ def test_plan_deterministic_across_api_calls():
         tmp_path = Path(tmp)
         exports_root = _create_mock_export(tmp_path, "season1", "export1")
 
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
-            with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api._get_outputs_root", return_value=tmp_path):
                 client = TestClient(app)
 
                 payload = {
@@ -173,8 +173,8 @@ def test_missing_export_returns_404():
         exports_root = tmp_path / "exports"
         exports_root.mkdir()
 
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
-            with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api._get_outputs_root", return_value=tmp_path):
                 client = TestClient(app)
                 payload = {
                     "season": "season1",
@@ -196,7 +196,7 @@ def test_invalid_payload_returns_400():
     """POST with invalid payload returns 400."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api._get_outputs_root", return_value=tmp_path):
             client = TestClient(app)
             # Missing required field 'season'
             payload = {
@@ -224,7 +224,7 @@ def test_list_plans_returns_correct_structure():
         }
         (plan_dir / "plan_manifest.json").write_text(json.dumps(manifest, separators=(",", ":")))
 
-        with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api._get_outputs_root", return_value=tmp_path):
             client = TestClient(app)
             resp = client.get("/portfolio/plans")
             assert resp.status_code == 200

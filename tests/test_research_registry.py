@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.research.registry import build_research_index
+from research.registry import build_research_index
 
 
 def test_build_research_index_empty(tmp_path: Path) -> None:
@@ -165,7 +165,7 @@ def test_build_research_index_preserves_decisions(tmp_path: Path) -> None:
         json.dump(winners, f)
     
     # Add a decision
-    from FishBroWFS_V2.research.decision import append_decision
+    from research.decision import append_decision
     
     append_decision(out_dir, "run-1", "KEEP", "Good results")
     

@@ -13,9 +13,9 @@ from __future__ import annotations
 import os
 import numpy as np
 
-from FishBroWFS_V2.strategy.kernel import run_kernel_arrays, DonchianAtrParams
-from FishBroWFS_V2.engine.types import BarArrays
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from strategy.kernel import run_kernel_arrays, DonchianAtrParams
+from engine.types import BarArrays
+from pipeline.runner_grid import run_grid
 
 
 def test_perf_breakdown_keys_existence() -> None:

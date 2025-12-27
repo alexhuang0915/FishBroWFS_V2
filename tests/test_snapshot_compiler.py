@@ -17,7 +17,7 @@ import hashlib
 from pathlib import Path
 import pytest
 
-from FishBroWFS_V2.control.snapshot_compiler import (
+from control.snapshot_compiler import (
     compile_full_snapshot,
     verify_deterministic,
 )

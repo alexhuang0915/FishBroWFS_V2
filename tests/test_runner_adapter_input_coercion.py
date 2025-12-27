@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.pipeline.runner_adapter import run_stage_job
+from pipeline.runner_adapter import run_stage_job
 
 
 def test_stage0_coercion_with_lists() -> None:

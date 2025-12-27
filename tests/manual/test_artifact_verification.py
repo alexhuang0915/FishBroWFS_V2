@@ -8,7 +8,7 @@ def test_artifact_api():
     """Test that artifact API functions work correctly."""
     print("=== Testing Artifact API ===")
     
-    from FishBroWFS_V2.control.artifacts_api import (
+    from control.artifacts_api import (
         list_research_units,
         get_research_artifacts,
         get_portfolio_index
@@ -109,7 +109,7 @@ def test_ui_artifact_rendering():
     
     # Check if artifacts page exists
     from pathlib import Path
-    artifacts_page = Path("src/FishBroWFS_V2/gui/nicegui/pages/artifacts.py")
+    artifacts_page = Path("src/gui/nicegui/pages/artifacts.py")
     if artifacts_page.exists():
         print(f"✓ Artifacts page exists: {artifacts_page}")
         

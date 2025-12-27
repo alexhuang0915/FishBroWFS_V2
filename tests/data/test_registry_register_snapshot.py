@@ -14,12 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.data_snapshot import create_snapshot
-from FishBroWFS_V2.control.dataset_registry_mutation import (
+from control.data_snapshot import create_snapshot
+from control.dataset_registry_mutation import (
     register_snapshot_as_dataset,
     _get_dataset_registry_root,
 )
-from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+from data.dataset_registry import DatasetIndex, DatasetRecord
 
 
 def test_register_snapshot_as_dataset():
@@ -116,7 +116,7 @@ def test_register_snapshot_deterministic_dataset_id():
 
         # Same snapshot yields same dataset_id
         # (cannot register twice, but we can compute manually)
-        from FishBroWFS_V2.control.dataset_registry_mutation import _compute_dataset_id
+        from control.dataset_registry_mutation import _compute_dataset_id
         computed_id = _compute_dataset_id(meta.symbol, meta.timeframe, meta.normalized_sha256)
         assert computed_id == expected_prefix
 

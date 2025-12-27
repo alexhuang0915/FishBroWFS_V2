@@ -7,12 +7,12 @@ import pytest
 import asyncio
 from datetime import date
 
-from FishBroWFS_V2.core.intents import (
+from core.intents import (
     CreateJobIntent, CalculateUnitsIntent, DataSpecIntent,
     IntentStatus
 )
-from FishBroWFS_V2.control.action_queue import ActionQueue, reset_action_queue
-from FishBroWFS_V2.core.processor import StateProcessor
+from control.action_queue import ActionQueue, reset_action_queue
+from core.processor import StateProcessor
 
 
 @pytest.fixture

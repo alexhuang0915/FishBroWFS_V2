@@ -1,0 +1,18 @@
+{
+  "generated_at": "2025-12-27T15:51:00Z",
+  "datasets": [
+    {
+      "id": "CME.MNQ.60m.2020-2024",
+      "symbol": "CME.MNQ",
+      "exchange": "CME",
+      "timeframe": "60m",
+      "path": "CME.MNQ/60m/2020-2024.parquet",
+      "start_date": "2020-01-01",
+      "end_date": "2024-12-31",
+      "fingerprint_sha1": "abc123",
+      "fingerprint_sha256_40": "def4567890",
+      "tz_provider": "IANA",
+      "tz_version": "unknown"
+    }
+  ]
+}

@@ -9,12 +9,12 @@ These tests ensure:
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.config.dtypes import (
+from config.dtypes import (
     INDEX_DTYPE,
     INTENT_ENUM_DTYPE,
     INTENT_PRICE_DTYPE,
 )
-from FishBroWFS_V2.engine.constants import (
+from engine.constants import (
     KIND_LIMIT,
     KIND_STOP,
     ROLE_ENTRY,
@@ -22,13 +22,13 @@ from FishBroWFS_V2.engine.constants import (
     SIDE_BUY,
     SIDE_SELL,
 )
-from FishBroWFS_V2.engine.engine_jit import (
+from engine.engine_jit import (
     SIDE_BUY_CODE,
     SIDE_SELL_CODE,
     _pack_intents,
     simulate_arrays,
 )
-from FishBroWFS_V2.engine.types import BarArrays, OrderIntent, OrderKind, OrderRole, Side
+from engine.types import BarArrays, OrderIntent, OrderKind, OrderRole, Side
 
 
 class TestIndexDtypeSafety:
@@ -224,7 +224,7 @@ class TestUint8EnumConsistency:
             assert int(val) in ALLOWED_SIDE_VALUES, f"Side value {val} not in allowed set {ALLOWED_SIDE_VALUES}"
         
         # Test that invalid values raise ValueError (strict decoding)
-        from FishBroWFS_V2.engine.engine_jit import _role_from_int, _kind_from_int, _side_from_int
+        from engine.engine_jit import _role_from_int, _kind_from_int, _side_from_int
         
         # Test invalid role values
         with pytest.raises(ValueError, match="Invalid role enum value"):
@@ -398,7 +398,7 @@ class TestUint8EnumConsistency:
         With strict mode, invalid values will raise ValueError instead of silently
         decoding to SELL.
         """
-        from FishBroWFS_V2.engine.engine_jit import _side_from_int
+        from engine.engine_jit import _side_from_int
         
         # Test that _side_from_int correctly handles allowed values
         assert _side_from_int(SIDE_BUY_CODE) == Side.BUY

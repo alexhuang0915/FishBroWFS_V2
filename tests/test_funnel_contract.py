@@ -18,10 +18,10 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.core.audit_schema import compute_params_effective
-from FishBroWFS_V2.pipeline.funnel_plan import build_default_funnel_plan
-from FishBroWFS_V2.pipeline.funnel_runner import run_funnel
-from FishBroWFS_V2.pipeline.funnel_schema import StageName
+from core.audit_schema import compute_params_effective
+from pipeline.funnel_plan import build_default_funnel_plan
+from pipeline.funnel_runner import run_funnel
+from pipeline.funnel_schema import StageName
 
 
 def test_funnel_build_default_plan_has_three_stages():

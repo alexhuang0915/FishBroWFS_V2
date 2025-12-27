@@ -5,8 +5,8 @@ import numpy as np
 import pytest
 from pathlib import Path
 
-from FishBroWFS_V2.engine.signal_exporter import build_signal_series_v1, REQUIRED_COLUMNS
-from FishBroWFS_V2.portfolio.instruments import load_instruments_config
+from engine.signal_exporter import build_signal_series_v1, REQUIRED_COLUMNS
+from portfolio.instruments import load_instruments_config
 
 
 def test_mnq_usd_fx_to_base_32():

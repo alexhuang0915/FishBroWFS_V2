@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.data_snapshot import (
+from control.data_snapshot import (
     compute_snapshot_id,
     normalize_bars,
     create_snapshot,

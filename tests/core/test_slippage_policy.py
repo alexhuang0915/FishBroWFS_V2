@@ -3,7 +3,7 @@
 測試 slippage_policy 模組
 """
 import pytest
-from FishBroWFS_V2.core.slippage_policy import (
+from core.slippage_policy import (
     SlippagePolicy,
     apply_slippage_to_price,
     round_to_tick,

@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.contracts.portfolio.plan_payloads import PlanCreatePayload
-from FishBroWFS_V2.portfolio.plan_builder import build_portfolio_plan_from_export
+from contracts.portfolio.plan_payloads import PlanCreatePayload
+from portfolio.plan_builder import build_portfolio_plan_from_export
 
 
 def _create_mock_export_with_candidates(

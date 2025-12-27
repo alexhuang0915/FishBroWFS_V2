@@ -1,4 +1,4 @@
-"""Policy test: No non-legacy test may reference legacy src/FishBroWFS_V2/data/profiles paths."""
+"""Policy test: No non-legacy test may reference legacy src/data/profiles paths."""
 
 from __future__ import annotations
 

@@ -5,7 +5,7 @@ import json
 import tempfile
 from pathlib import Path
 
-from FishBroWFS_V2.control.artifacts import (
+from control.artifacts import (
     canonical_json_bytes,
     compute_sha256,
     write_atomic_json,

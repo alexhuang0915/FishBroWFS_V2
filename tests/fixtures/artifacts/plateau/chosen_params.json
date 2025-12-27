@@ -1,0 +1,21 @@
+{
+  "main": {
+    "candidate_id": "donchian_atr:123",
+    "strategy_id": "donchian_atr",
+    "symbol": "CME.MNQ",
+    "timeframe": "60m",
+    "params": {
+      "LE": 8,
+      "LX": 4
+    },
+    "score": 1.234,
+    "metrics": {
+      "net_profit": 100.0,
+      "max_dd": -10.0,
+      "trades": 10,
+      "param_id": 123
+    }
+  },
+  "backups": [],
+  "generated_at": ""
+}

@@ -7,9 +7,9 @@ Ensures that features with dishonest window specifications are rejected.
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.features.models import FeatureSpec
-from FishBroWFS_V2.features.registry import FeatureRegistry
-from FishBroWFS_V2.features.causality import WindowDishonestyError
+from features.models import FeatureSpec
+from features.registry import FeatureRegistry
+from features.causality import WindowDishonestyError
 
 
 def test_honest_window_feature():
@@ -158,7 +158,7 @@ def test_specs_for_tf_excludes_dishonest():
 
 def test_verification_report_includes_window_honesty():
     """Test that verification reports include window honesty information."""
-    from FishBroWFS_V2.features.causality import verify_feature_causality
+    from features.causality import verify_feature_causality
     
     # Define a function
     def test_func(o, h, l, c):
@@ -219,7 +219,7 @@ def test_get_dishonest_window_features():
     # Run verification to detect dishonesty
     # First, need to create a verification report that indicates dishonesty
     # Since our simple verification may not detect it, we'll manually add a report
-    from FishBroWFS_V2.features.models import CausalityReport
+    from features.models import CausalityReport
     import time
     
     # Create a report indicating dishonesty
@@ -307,7 +307,7 @@ def test_clear_registry():
     )
     
     # Add some verification reports
-    from FishBroWFS_V2.features.models import CausalityReport
+    from features.models import CausalityReport
     import time
     
     registry.verification_reports["feature1"] = CausalityReport(

@@ -4,7 +4,7 @@
 """
 import pytest
 import numpy as np
-from FishBroWFS_V2.control.research_slippage_stress import (
+from control.research_slippage_stress import (
     StressResult,
     CommissionConfig,
     compute_stress_matrix,
@@ -12,7 +12,7 @@ from FishBroWFS_V2.control.research_slippage_stress import (
     compute_stress_test_passed,
     generate_stress_report,
 )
-from FishBroWFS_V2.core.slippage_policy import SlippagePolicy
+from core.slippage_policy import SlippagePolicy
 
 
 class TestStressResult:

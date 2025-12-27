@@ -6,7 +6,7 @@ import json
 import hashlib
 from pathlib import Path
 
-from FishBroWFS_V2.utils.manifest_verify import (
+from utils.manifest_verify import (
     compute_files_listing,
     compute_files_sha256,
     verify_manifest,
@@ -39,7 +39,7 @@ def test_manifest_tree_completeness_basic():
         # Compute manifest_sha256 (excluding the hash field)
         manifest_without_hash = dict(manifest)
         # Use canonical JSON from project
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest_without_hash)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -76,7 +76,7 @@ def test_tamper_extra_file():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -116,7 +116,7 @@ def test_tamper_delete_file():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -156,7 +156,7 @@ def test_tamper_modify_content():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -195,7 +195,7 @@ def test_tamper_manifest_sha256():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -234,7 +234,7 @@ def test_tamper_files_sha256():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256
@@ -263,7 +263,7 @@ def test_real_plan_manifest_tamper():
         (plan_dir / "plan_checksums.json").write_text('{"portfolio_plan.json": "hash1", "plan_metadata.json": "hash2"}')
         
         # Compute SHA256 for each file
-        from FishBroWFS_V2.control.artifacts import compute_sha256
+        from control.artifacts import compute_sha256
         files = []
         for rel_path in ["portfolio_plan.json", "plan_metadata.json", "plan_checksums.json"]:
             file_path = plan_dir / rel_path
@@ -293,7 +293,7 @@ def test_real_plan_manifest_tamper():
         }
         
         # Compute manifest_sha256
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes
+        from control.artifacts import canonical_json_bytes
         canonical = canonical_json_bytes(manifest)
         manifest_sha256 = compute_sha256(canonical)
         manifest["manifest_sha256"] = manifest_sha256

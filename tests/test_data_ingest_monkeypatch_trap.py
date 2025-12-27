@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
+from data.raw_ingest import ingest_raw_txt
 
 
 def test_raw_ingest_forbidden_methods_trap(monkeypatch: pytest.MonkeyPatch, sample_raw_txt: Path) -> None:

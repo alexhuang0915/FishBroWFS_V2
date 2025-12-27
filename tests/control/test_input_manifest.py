@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch, MagicMock
 from pathlib import Path
 from datetime import datetime, timezone
 
-from FishBroWFS_V2.control.input_manifest import (
+from control.input_manifest import (
     FileManifest,
     DatasetManifest,
     InputManifest,
@@ -118,9 +118,9 @@ def test_create_file_manifest_exists():
     mock_dt_instance.isoformat.return_value = "2024-01-01T00:00:00+00:00"
     mock_datetime.fromtimestamp.return_value = mock_dt_instance
     
-    with patch('FishBroWFS_V2.control.input_manifest.compute_file_signature', return_value="sha256:abc123"):
-        with patch('FishBroWFS_V2.control.input_manifest.Path', return_value=mock_path):
-            with patch('FishBroWFS_V2.control.input_manifest.datetime', mock_datetime):
+    with patch('control.input_manifest.compute_file_signature', return_value="sha256:abc123"):
+        with patch('control.input_manifest.Path', return_value=mock_path):
+            with patch('control.input_manifest.datetime', mock_datetime):
                 manifest = create_file_manifest("/test/file.txt")
                 
                 assert manifest.path == "/test/file.txt"
@@ -154,8 +154,8 @@ def test_create_dataset_manifest():
     mock_descriptor.parquet_root = "/data/parquet"
     mock_descriptor.parquet_expected_paths = ["/data/parquet/file1.parquet"]
     
-    with patch('FishBroWFS_V2.control.input_manifest.get_descriptor', return_value=mock_descriptor):
-        with patch('FishBroWFS_V2.control.input_manifest.create_file_manifest') as mock_create_file:
+    with patch('control.input_manifest.get_descriptor', return_value=mock_descriptor):
+        with patch('control.input_manifest.create_file_manifest') as mock_create_file:
             mock_file_manifest = FileManifest(
                 path="/test/file.txt",
                 exists=True,
@@ -184,7 +184,7 @@ def test_create_dataset_manifest_not_found():
     """Test creating dataset manifest for non-existent dataset."""
     dataset_id = "nonexistent"
     
-    with patch('FishBroWFS_V2.control.input_manifest.get_descriptor', return_value=None):
+    with patch('control.input_manifest.get_descriptor', return_value=None):
         manifest = create_dataset_manifest(dataset_id)
         
         assert manifest.dataset_id == dataset_id
@@ -201,7 +201,7 @@ def test_create_input_manifest():
     data1_dataset_id = "dataset1"
     data2_dataset_id = "dataset2"
     
-    with patch('FishBroWFS_V2.control.input_manifest.create_dataset_manifest') as mock_create_dataset:
+    with patch('control.input_manifest.create_dataset_manifest') as mock_create_dataset:
         mock_dataset_manifest = DatasetManifest(
             dataset_id="test_dataset",
             kind="test_kind",
@@ -210,7 +210,7 @@ def test_create_input_manifest():
         )
         mock_create_dataset.return_value = mock_dataset_manifest
         
-        with patch('FishBroWFS_V2.control.input_manifest.get_system_snapshot') as mock_get_snapshot:
+        with patch('control.input_manifest.get_system_snapshot') as mock_get_snapshot:
             mock_snapshot = Mock()
             mock_snapshot.created_at = datetime(2024, 1, 1, 0, 0, 0)
             mock_snapshot.total_datasets = 10

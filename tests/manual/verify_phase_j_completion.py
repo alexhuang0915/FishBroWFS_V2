@@ -46,9 +46,9 @@ def check_strategy_implementations():
     print("\n=== 2. Checking 3 Standard Strategy Implementations ===")
     
     strategies = [
-        "src/FishBroWFS_V2/strategy/builtin/rsi_reversal_v1.py",
-        "src/FishBroWFS_V2/strategy/builtin/bollinger_breakout_v1.py", 
-        "src/FishBroWFS_V2/strategy/builtin/atr_trailing_stop_v1.py"
+        "src/strategy/builtin/rsi_reversal_v1.py",
+        "src/strategy/builtin/bollinger_breakout_v1.py", 
+        "src/strategy/builtin/atr_trailing_stop_v1.py"
     ]
     
     all_exist = True
@@ -69,7 +69,7 @@ def check_strategy_implementations():
             all_exist = False
     
     # Check registry loads them
-    registry_path = Path("src/FishBroWFS_V2/strategy/registry.py")
+    registry_path = Path("src/strategy/registry.py")
     if registry_path.exists():
         with open(registry_path, 'r') as f:
             content = f.read()
@@ -200,11 +200,11 @@ def check_overall_pipeline():
     
     # Check key files
     key_files = [
-        "src/FishBroWFS_V2/gui/nicegui/pages/wizard.py",
-        "src/FishBroWFS_V2/gui/nicegui/pages/artifacts.py",
-        "src/FishBroWFS_V2/gui/nicegui/pages/jobs.py",
-        "src/FishBroWFS_V2/control/research_runner.py",
-        "src/FishBroWFS_V2/control/portfolio_builder.py"
+        "src/gui/nicegui/pages/wizard.py",
+        "src/gui/nicegui/pages/artifacts.py",
+        "src/gui/nicegui/pages/jobs.py",
+        "src/control/research_runner.py",
+        "src/control/portfolio_builder.py"
     ]
     
     for file_path in key_files:
@@ -221,7 +221,7 @@ def check_overall_pipeline():
         # Try to import strategy registry
         spec = importlib.util.spec_from_file_location(
             "strategy_registry", 
-            "src/FishBroWFS_V2/strategy/registry.py"
+            "src/strategy/registry.py"
         )
         if spec:
             print("✓ Strategy registry module can be loaded")

@@ -12,9 +12,9 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from FishBroWFS_V2.control.jobs_db import create_job, get_job, get_job_logs, init_db
-from FishBroWFS_V2.control.types import DBJobSpec, JobStatus
-from FishBroWFS_V2.control.worker import run_one_job
+from control.jobs_db import create_job, get_job, get_job_logs, init_db
+from control.types import DBJobSpec, JobStatus
+from control.worker import run_one_job
 
 
 def test_worker_writes_traceback_to_log(tmp_path: Path) -> None:
@@ -39,7 +39,7 @@ def test_worker_writes_traceback_to_log(tmp_path: Path) -> None:
     job_id = create_job(db, spec)
     
     # Mock run_funnel to raise exception with traceback
-    with patch("FishBroWFS_V2.control.worker.run_funnel", side_effect=ValueError("Test error with long message " * 20)):
+    with patch("control.worker.run_funnel", side_effect=ValueError("Test error with long message " * 20)):
         # Run job (should catch exception and write traceback)
         run_one_job(db, job_id)
     

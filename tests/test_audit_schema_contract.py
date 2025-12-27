@@ -15,12 +15,12 @@ from datetime import datetime, timezone
 
 import pytest
 
-from FishBroWFS_V2.core.audit_schema import (
+from core.audit_schema import (
     AuditSchema,
     compute_params_effective,
 )
-from FishBroWFS_V2.core.config_hash import stable_config_hash
-from FishBroWFS_V2.core.run_id import make_run_id
+from core.config_hash import stable_config_hash
+from core.run_id import make_run_id
 
 
 def test_audit_schema_json_serializable():

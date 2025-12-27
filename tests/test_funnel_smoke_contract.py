@@ -6,7 +6,7 @@ Basic smoke tests to ensure the complete funnel pipeline works end-to-end.
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.funnel import FunnelResult, run_funnel
+from pipeline.funnel import FunnelResult, run_funnel
 
 
 def test_funnel_smoke_basic():

@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.pipeline.runner_adapter import run_stage_job
+from pipeline.runner_adapter import run_stage_job
 
 
 def test_runner_adapter_returns_no_files_written():

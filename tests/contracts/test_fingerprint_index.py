@@ -19,14 +19,14 @@ from unittest.mock import patch, mock_open
 import pytest
 import numpy as np
 
-from FishBroWFS_V2.contracts.fingerprint import FingerprintIndex
-from FishBroWFS_V2.core.fingerprint import (
+from contracts.fingerprint import FingerprintIndex
+from core.fingerprint import (
     canonical_bar_line,
     compute_day_hash,
     build_fingerprint_index_from_bars,
     compare_fingerprint_indices,
 )
-from FishBroWFS_V2.control.fingerprint_store import (
+from control.fingerprint_store import (
     write_fingerprint_index,
     load_fingerprint_index,
     fingerprint_index_path,
@@ -398,17 +398,17 @@ def test_fingerprint_index_path():
 def test_no_mtime_size_usage():
     """確保沒有使用檔案 mtime/size 來判斷"""
     import os
-    import FishBroWFS_V2.contracts.fingerprint
-    import FishBroWFS_V2.core.fingerprint
-    import FishBroWFS_V2.control.fingerprint_store
-    import FishBroWFS_V2.control.fingerprint_cli
+    import contracts.fingerprint
+    import core.fingerprint
+    import control.fingerprint_store
+    import control.fingerprint_cli
     
     # 檢查模組中是否有 os.stat().st_mtime 或 st_size
     modules = [
-        FishBroWFS_V2.contracts.fingerprint,
-        FishBroWFS_V2.core.fingerprint,
-        FishBroWFS_V2.control.fingerprint_store,
-        FishBroWFS_V2.control.fingerprint_cli,
+        contracts.fingerprint,
+        core.fingerprint,
+        control.fingerprint_store,
+        control.fingerprint_cli,
     ]
     
     for module in modules:

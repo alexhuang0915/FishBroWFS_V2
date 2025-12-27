@@ -21,7 +21,7 @@ pytest.skip("Streamlit tests skipped - streamlit removed from project", allow_mo
 def test_kpi_table_missing_name() -> None:
     """Test KPI table handles missing name field."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.kpi_table import render_kpi_table
+    from gui.viewer.components.kpi_table import render_kpi_table
     
     with patch("streamlit.subheader"), \
          patch("streamlit.columns"), \
@@ -41,7 +41,7 @@ def test_kpi_table_missing_name() -> None:
 def test_kpi_table_missing_value() -> None:
     """Test KPI table handles missing value field."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.kpi_table import render_kpi_table
+    from gui.viewer.components.kpi_table import render_kpi_table
     
     with patch("streamlit.subheader"), \
          patch("streamlit.columns"), \
@@ -61,7 +61,7 @@ def test_kpi_table_missing_value() -> None:
 def test_kpi_table_empty_rows() -> None:
     """Test KPI table handles empty rows list."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.kpi_table import render_kpi_table
+    from gui.viewer.components.kpi_table import render_kpi_table
     
     with patch("streamlit.info"):
         # Empty list
@@ -73,7 +73,7 @@ def test_kpi_table_empty_rows() -> None:
 def test_kpi_table_unknown_kpi() -> None:
     """Test KPI table handles unknown KPI (not in registry)."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.kpi_table import render_kpi_table
+    from gui.viewer.components.kpi_table import render_kpi_table
     
     with patch("streamlit.subheader"), \
          patch("streamlit.columns"), \
@@ -93,7 +93,7 @@ def test_kpi_table_unknown_kpi() -> None:
 def test_evidence_panel_missing_artifact() -> None:
     """Test evidence panel handles missing artifact."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     with patch("streamlit.subheader"), \
          patch("streamlit.markdown"), \
@@ -120,7 +120,7 @@ def test_evidence_panel_missing_artifact() -> None:
 def test_evidence_panel_wrong_pointer() -> None:
     """Test evidence panel handles wrong JSON pointer."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     with patch("streamlit.subheader"), \
          patch("streamlit.markdown"), \
@@ -152,7 +152,7 @@ def test_evidence_panel_wrong_pointer() -> None:
 def test_evidence_panel_empty_session_state() -> None:
     """Test evidence panel handles empty session_state."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     with patch("streamlit.subheader"):
         # Empty session state
@@ -168,7 +168,7 @@ def test_evidence_panel_empty_session_state() -> None:
 def test_evidence_panel_invalid_session_state() -> None:
     """Test evidence panel handles invalid session_state structure."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     with patch("streamlit.subheader"), \
          patch("streamlit.markdown"), \
@@ -187,7 +187,7 @@ def test_evidence_panel_invalid_session_state() -> None:
 def test_evidence_panel_missing_fields() -> None:
     """Test evidence panel handles missing fields in session_state."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     with patch("streamlit.subheader"), \
          patch("streamlit.markdown"), \
@@ -209,7 +209,7 @@ def test_evidence_panel_missing_fields() -> None:
 def test_kpi_table_exception_handling() -> None:
     """Test KPI table handles exceptions gracefully."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.kpi_table import render_kpi_table
+    from gui.viewer.components.kpi_table import render_kpi_table
     
     # Mock streamlit to raise exception
     with patch("streamlit.subheader", side_effect=Exception("Streamlit error")):
@@ -226,7 +226,7 @@ def test_kpi_table_exception_handling() -> None:
 def test_evidence_panel_exception_handling() -> None:
     """Test evidence panel handles exceptions gracefully."""
     # Import inside test function to prevent collection errors
-    from FishBroWFS_V2.gui.viewer.components.evidence_panel import render_evidence_panel
+    from gui.viewer.components.evidence_panel import render_evidence_panel
     
     # Mock streamlit to raise exception
     with patch("streamlit.subheader", side_effect=Exception("Streamlit error")):

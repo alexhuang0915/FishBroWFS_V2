@@ -9,9 +9,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.strategy.runner import run_strategy
-from FishBroWFS_V2.strategy.registry import load_builtin_strategies, clear
-from FishBroWFS_V2.engine.types import OrderIntent, OrderRole, OrderKind, Side
+from strategy.runner import run_strategy
+from strategy.registry import load_builtin_strategies, clear
+from engine.types import OrderIntent, OrderRole, OrderKind, Side
 
 
 @pytest.fixture(autouse=True)
@@ -116,8 +116,8 @@ def test_runner_allows_extra_params() -> None:
 
 def test_runner_invalid_output_raises() -> None:
     """Test runner raises ValueError for invalid strategy output."""
-    from FishBroWFS_V2.strategy.registry import register
-    from FishBroWFS_V2.strategy.spec import StrategySpec
+    from strategy.registry import register
+    from strategy.spec import StrategySpec
     
     # Create a bad strategy that returns invalid output
     def bad_strategy(context: dict, params: dict) -> dict:
@@ -137,7 +137,7 @@ def test_runner_invalid_output_raises() -> None:
         run_strategy("bad_strategy", {}, {}, {"bar_index": 0})
     
     # Cleanup
-    from FishBroWFS_V2.strategy.registry import unregister
+    from strategy.registry import unregister
     unregister("bad_strategy")
 
 

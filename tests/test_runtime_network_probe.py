@@ -7,7 +7,7 @@ Validates dual-probe strategy for port occupancy detection in runtime context.
 
 import pytest
 
-from src.FishBroWFS_V2.gui.services.runtime_context import (
+from src.gui.services.runtime_context import (
     _probe_ss,
     _probe_lsof,
     _analyze_port_occupancy,
@@ -21,7 +21,7 @@ def test_probe_ss_mocked_empty(monkeypatch):
         return ""  # Empty output
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._run",
+        "src.gui.services.runtime_context._run",
         mock_run
     )
     
@@ -42,7 +42,7 @@ def test_probe_lsof_mocked_pid(monkeypatch):
         return ""
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._run",
+        "src.gui.services.runtime_context._run",
         mock_run
     )
     
@@ -62,11 +62,11 @@ def test_analyze_port_occupancy_both_fail(monkeypatch):
         return "NOT AVAILABLE (lsof command failed)"
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_ss",
+        "src.gui.services.runtime_context._probe_ss",
         mock_probe_ss
     )
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_lsof",
+        "src.gui.services.runtime_context._probe_lsof",
         mock_probe_lsof
     )
     
@@ -88,11 +88,11 @@ def test_analyze_port_occupancy_ss_has_pid(monkeypatch):
         return "NOT AVAILABLE (lsof command failed)"
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_ss",
+        "src.gui.services.runtime_context._probe_ss",
         mock_probe_ss
     )
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_lsof",
+        "src.gui.services.runtime_context._probe_lsof",
         mock_probe_lsof
     )
     
@@ -114,11 +114,11 @@ def test_analyze_port_occupancy_lsof_has_pid(monkeypatch):
         return "python3   12345  user    3u  IPv4  12345      0t0  TCP *:8080 (LISTEN)"
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_ss",
+        "src.gui.services.runtime_context._probe_ss",
         mock_probe_ss
     )
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_lsof",
+        "src.gui.services.runtime_context._probe_lsof",
         mock_probe_lsof
     )
     
@@ -140,11 +140,11 @@ def test_analyze_port_occupancy_bound_no_pid(monkeypatch):
         return "COMMAND  PID USER   FD   TYPE DEVICE SIZE/OFF NODE NAME"
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_ss",
+        "src.gui.services.runtime_context._probe_ss",
         mock_probe_ss
     )
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_lsof",
+        "src.gui.services.runtime_context._probe_lsof",
         mock_probe_lsof
     )
     
@@ -166,16 +166,16 @@ def test_write_runtime_context_integration(monkeypatch, tmp_path):
         return "lsof output"
     
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_ss",
+        "src.gui.services.runtime_context._probe_ss",
         mock_probe_ss
     )
     monkeypatch.setattr(
-        "src.FishBroWFS_V2.gui.services.runtime_context._probe_lsof",
+        "src.gui.services.runtime_context._probe_lsof",
         mock_probe_lsof
     )
     
     # Import after monkeypatching
-    from src.FishBroWFS_V2.gui.services.runtime_context import write_runtime_context
+    from src.gui.services.runtime_context import write_runtime_context
     
     out_path = tmp_path / "RUNTIME_CONTEXT.md"
     

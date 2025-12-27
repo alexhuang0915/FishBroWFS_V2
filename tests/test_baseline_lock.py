@@ -1,10 +1,10 @@
 
 import numpy as np
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import simulate as simulate_jit
-from FishBroWFS_V2.engine.matcher_core import simulate as simulate_py
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
+from data.layout import normalize_bars
+from engine.engine_jit import simulate as simulate_jit
+from engine.matcher_core import simulate as simulate_py
+from engine.types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def _fills_to_matrix(fills):

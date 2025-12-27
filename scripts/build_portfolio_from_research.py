@@ -9,8 +9,8 @@ from pathlib import Path
 src_dir = Path(__file__).parent.parent / "src"
 sys.path.insert(0, str(src_dir))
 
-from FishBroWFS_V2.portfolio.research_bridge import build_portfolio_from_research
-from FishBroWFS_V2.portfolio.writer import write_portfolio_artifacts
+from portfolio.research_bridge import build_portfolio_from_research
+from portfolio.writer import write_portfolio_artifacts
 import json
 import pandas as pd
 from pathlib import Path
@@ -141,7 +141,7 @@ def main():
         # Add src to path
         src_dir = Path(__file__).parent.parent / "src"
         sys.path.insert(0, str(src_dir))
-        from FishBroWFS_V2.core.season_state import check_season_not_frozen
+        from core.season_state import check_season_not_frozen
         check_season_not_frozen(args.season, action="build_portfolio_from_research")
     except ImportError:
         # If season_state module is not available, skip check (backward compatibility)

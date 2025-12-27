@@ -9,8 +9,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.strategy.registry import get, load_builtin_strategies, clear
-from FishBroWFS_V2.engine.types import OrderIntent
+from strategy.registry import get, load_builtin_strategies, clear
+from engine.types import OrderIntent
 
 
 @pytest.fixture(autouse=True)

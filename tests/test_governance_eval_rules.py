@@ -13,8 +13,8 @@ from datetime import datetime, timezone
 
 import pytest
 
-from FishBroWFS_V2.core.governance_schema import Decision
-from FishBroWFS_V2.pipeline.governance_eval import evaluate_governance
+from core.governance_schema import Decision
+from pipeline.governance_eval import evaluate_governance
 
 
 def _create_fake_manifest(run_id: str, stage_name: str, season: str = "test") -> dict:

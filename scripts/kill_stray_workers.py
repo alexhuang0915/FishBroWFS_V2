@@ -14,7 +14,7 @@ from pathlib import Path
 # Add src to path to import internal modules
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from FishBroWFS_V2.control.worker_spawn_policy import validate_pidfile
+from control.worker_spawn_policy import validate_pidfile
 
 
 def find_pidfiles(root_dir: Path, pattern="*.pid"):
@@ -111,7 +111,7 @@ def scan_and_kill_strays(root_dir: Path, dry_run=False):
             continue
 
         # Extract db_path from cmdline (simplistic)
-        # cmdline format: python -m FishBroWFS_V2.control.worker_main /path/to/db
+        # cmdline format: python -m control.worker_main /path/to/db
         parts = cmdline.split("\x00")
         db_arg = None
         for part in parts:

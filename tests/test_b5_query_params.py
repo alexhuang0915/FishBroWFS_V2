@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.core.artifact_reader import read_artifact
+from core.artifact_reader import read_artifact
 
 
 @pytest.fixture
@@ -73,7 +73,7 @@ def sample_run_dir(temp_outputs_root: Path) -> Path:
 
 def test_report_link_format() -> None:
     """Test that report_link format is correct."""
-    from FishBroWFS_V2.control.report_links import make_report_link
+    from control.report_links import make_report_link
     
     season = "2026Q1"
     run_id = "stage0_coarse-20251218T093512Z-d3caa754"

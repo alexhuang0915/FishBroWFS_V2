@@ -5,14 +5,14 @@ import tempfile
 import json
 from pathlib import Path
 
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
-from FishBroWFS_V2.contracts.portfolio.plan_quality_models import (
+from contracts.portfolio.plan_quality_models import (
     PlanQualityReport, QualityMetrics, QualitySourceRef, QualityThresholds
 )
-from FishBroWFS_V2.portfolio.plan_quality import compute_quality_from_plan_dir
+from portfolio.plan_quality import compute_quality_from_plan_dir
 
 
 def create_test_plan(plan_id: str, top1_score: float, effective_n: float, bucket_coverage: float):

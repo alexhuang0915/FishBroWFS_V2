@@ -13,7 +13,7 @@ from __future__ import annotations
 import numpy as np
 import os
 
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from pipeline.runner_grid import run_grid
 
 
 def test_entry_only_fills_metrics_behavior() -> None:

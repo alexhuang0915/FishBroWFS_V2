@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from FishBroWFS_V2.control.preflight import PreflightResult, run_preflight
+from control.preflight import PreflightResult, run_preflight
 
 
 def test_run_preflight_returns_required_keys() -> None:

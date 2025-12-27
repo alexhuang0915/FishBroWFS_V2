@@ -9,9 +9,9 @@ Tests use simulate_run() unified entry point to ensure we test the actual API us
 
 import numpy as np
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.simulate import simulate_run
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
+from data.layout import normalize_bars
+from engine.simulate import simulate_run
+from engine.types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def _bars1(o, h, l, c):

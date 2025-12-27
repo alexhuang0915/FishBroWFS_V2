@@ -9,9 +9,9 @@ import sys
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
-from FishBroWFS_V2.core.schemas.portfolio_v1 import PortfolioPolicyV1, PortfolioSpecV1
-from FishBroWFS_V2.portfolio.artifacts_writer_v1 import compute_policy_sha256, compute_spec_sha256
-from FishBroWFS_V2.portfolio.instruments import load_instruments_config
+from core.schemas.portfolio_v1 import PortfolioPolicyV1, PortfolioSpecV1
+from portfolio.artifacts_writer_v1 import compute_policy_sha256, compute_spec_sha256
+from portfolio.instruments import load_instruments_config
 
 def create_policy() -> PortfolioPolicyV1:
     """Create a test portfolio policy."""
@@ -90,10 +90,10 @@ def main():
     print(f"Saved spec (YAML) to: {spec_yaml_path}")
     
     print("\nTo validate:")
-    print(f"  python -m FishBroWFS_V2.portfolio.cli validate --spec {spec_path} --outputs-root outputs")
+    print(f"  python -m portfolio.cli validate --spec {spec_path} --outputs-root outputs")
     
     print("\nTo run:")
-    print(f"  python -m FishBroWFS_V2.portfolio.cli run --spec {spec_path} --equity 1000000 --outputs-root outputs")
+    print(f"  python -m portfolio.cli run --spec {spec_path} --equity 1000000 --outputs-root outputs")
 
 if __name__ == "__main__":
     main()

@@ -12,8 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.core.oom_gate import decide_oom_action
-from FishBroWFS_V2.core.oom_cost_model import estimate_memory_bytes, summarize_estimates
+from core.oom_gate import decide_oom_action
+from core.oom_cost_model import estimate_memory_bytes, summarize_estimates
 
 
 def test_oom_gate_pass_when_under_limit():
@@ -87,7 +87,7 @@ def test_oom_gate_auto_downsample_when_allowed(monkeypatch):
         return int(total_mem)
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.core.oom_cost_model.estimate_memory_bytes",
+        "core.oom_cost_model.estimate_memory_bytes",
         mock_estimate_memory_bytes,
     )
     
@@ -142,7 +142,7 @@ def test_oom_gate_block_when_min_still_over_limit(monkeypatch):
         return 100 * 1024 * 1024  # Always 100MB
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.core.oom_cost_model.estimate_memory_bytes",
+        "core.oom_cost_model.estimate_memory_bytes",
         mock_estimate_memory_bytes,
     )
     

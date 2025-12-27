@@ -17,18 +17,18 @@ from unittest.mock import patch
 
 import pytest
 
-from FishBroWFS_V2.contracts.dimensions import (
+from contracts.dimensions import (
     SessionSpec,
     InstrumentDimension,
     DimensionRegistry,
     canonical_json,
 )
-from FishBroWFS_V2.contracts.dimensions_loader import (
+from contracts.dimensions_loader import (
     load_dimension_registry,
     write_dimension_registry,
     default_registry_path,
 )
-from FishBroWFS_V2.core.dimensions import (
+from core.dimensions import (
     get_dimension_for_dataset,
     clear_dimension_cache,
 )
@@ -237,7 +237,7 @@ def test_get_dimension_for_dataset():
         by_symbol={"CME.MNQ": dim},
     )
     
-    with patch("FishBroWFS_V2.core.dimensions._get_cached_registry") as mock_get:
+    with patch("core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 查詢存在的 dataset_id
@@ -274,7 +274,7 @@ def test_get_dimension_for_dataset_cache():
     )
     
     # 使用 return_value 而不是 side_effect，因為 @lru_cache 會快取返回值
-    with patch("FishBroWFS_V2.core.dimensions._get_cached_registry") as mock_get:
+    with patch("core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 第一次呼叫
@@ -297,15 +297,15 @@ def test_get_dimension_for_dataset_cache():
 
 def test_no_streamlit_imports():
     """確保沒有引入 streamlit"""
-    import FishBroWFS_V2.contracts.dimensions
-    import FishBroWFS_V2.contracts.dimensions_loader
-    import FishBroWFS_V2.core.dimensions
+    import contracts.dimensions
+    import contracts.dimensions_loader
+    import core.dimensions
     
     # 檢查模組中是否有 streamlit
     for module in [
-        FishBroWFS_V2.contracts.dimensions,
-        FishBroWFS_V2.contracts.dimensions_loader,
-        FishBroWFS_V2.core.dimensions,
+        contracts.dimensions,
+        contracts.dimensions_loader,
+        core.dimensions,
     ]:
         source = module.__file__
         if source and source.endswith(".py"):

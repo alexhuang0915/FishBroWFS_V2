@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 @pytest.fixture
@@ -29,9 +29,9 @@ def mock_governance_store():
         artifacts_root = Path(tmpdir) / "artifacts"
         artifacts_root.mkdir(parents=True, exist_ok=True)
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root") as mock_root, \
-             patch("FishBroWFS_V2.control.api._get_governance_store") as mock_store:
-            from FishBroWFS_V2.control.governance import BatchGovernanceStore
+        with patch("control.api._get_artifacts_root") as mock_root, \
+             patch("control.api._get_governance_store") as mock_store:
+            from control.governance import BatchGovernanceStore
             real_store = BatchGovernanceStore(artifacts_root)
             mock_root.return_value = artifacts_root
             mock_store.return_value = real_store
@@ -41,7 +41,7 @@ def mock_governance_store():
 def test_get_batch_metadata(client, mock_governance_store):
     """GET /batches/{batch_id}/metadata returns metadata."""
     # Create metadata
-    from FishBroWFS_V2.control.governance import BatchMetadata
+    from control.governance import BatchMetadata
     meta = BatchMetadata(
         batch_id="batch1",
         season="2026Q1",
@@ -74,7 +74,7 @@ def test_get_batch_metadata_not_found(client, mock_governance_store):
 def test_update_batch_metadata(client, mock_governance_store):
     """PATCH /batches/{batch_id}/metadata updates metadata."""
     # First create
-    from FishBroWFS_V2.control.governance import BatchMetadata
+    from control.governance import BatchMetadata
     meta = BatchMetadata(
         batch_id="batch1",
         season="2026Q1",
@@ -102,7 +102,7 @@ def test_update_batch_metadata(client, mock_governance_store):
 def test_update_batch_metadata_frozen_restrictions(client, mock_governance_store):
     """PATCH respects frozen rules."""
     # Create frozen batch
-    from FishBroWFS_V2.control.governance import BatchMetadata
+    from control.governance import BatchMetadata
     meta = BatchMetadata(
         batch_id="frozenbatch",
         season="2026Q1",
@@ -140,7 +140,7 @@ def test_update_batch_metadata_frozen_restrictions(client, mock_governance_store
 def test_freeze_batch(client, mock_governance_store):
     """POST /batches/{batch_id}/freeze freezes batch."""
     # Create unfrozen batch
-    from FishBroWFS_V2.control.governance import BatchMetadata
+    from control.governance import BatchMetadata
     meta = BatchMetadata(
         batch_id="batch1",
         season="2026Q1",
@@ -172,7 +172,7 @@ def test_freeze_batch_not_found(client, mock_governance_store):
 def test_retry_batch_frozen(client, mock_governance_store):
     """POST /batches/{batch_id}/retry rejects frozen batch."""
     # Create frozen batch
-    from FishBroWFS_V2.control.governance import BatchMetadata
+    from control.governance import BatchMetadata
     meta = BatchMetadata(
         batch_id="frozenbatch",
         season="2026Q1",
@@ -196,7 +196,7 @@ def test_batch_status_not_implemented(client):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "artifacts"
         root.mkdir(parents=True, exist_ok=True)
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=root):
+        with patch("control.api._get_artifacts_root", return_value=root):
             response = client.get("/batches/batch1/status")
             assert response.status_code == 404
             assert "execution.json not found" in response.json()["detail"]
@@ -207,7 +207,7 @@ def test_batch_summary_not_implemented(client):
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp) / "artifacts"
         root.mkdir(parents=True, exist_ok=True)
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=root):
+        with patch("control.api._get_artifacts_root", return_value=root):
             response = client.get("/batches/batch1/summary")
             assert response.status_code == 404
             assert "summary.json not found" in response.json()["detail"]

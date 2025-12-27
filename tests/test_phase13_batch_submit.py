@@ -2,15 +2,15 @@
 """Unit tests for batch_submit module (Phase 13)."""
 
 import pytest
-from FishBroWFS_V2.control.batch_submit import (
+from control.batch_submit import (
     BatchSubmitRequest,
     BatchSubmitResponse,
     compute_batch_id,
     wizard_to_db_jobspec,
     submit_batch,
 )
-from FishBroWFS_V2.control.job_spec import WizardJobSpec, DataSpec, WFSSpec
-from FishBroWFS_V2.control.types import DBJobSpec
+from control.job_spec import WizardJobSpec, DataSpec, WFSSpec
+from control.types import DBJobSpec
 from datetime import date
 
 
@@ -124,7 +124,7 @@ def test_submit_batch_mocked(monkeypatch):
         call_count += 1
         return result
     
-    import FishBroWFS_V2.control.batch_submit as batch_module
+    import control.batch_submit as batch_module
     monkeypatch.setattr(batch_module, "create_job", mock_create_job)
     
     # Prepare request

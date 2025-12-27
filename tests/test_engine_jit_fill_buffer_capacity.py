@@ -8,9 +8,9 @@ import os
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import STATUS_BUFFER_FULL, simulate as simulate_jit
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
+from data.layout import normalize_bars
+from engine.engine_jit import STATUS_BUFFER_FULL, simulate as simulate_jit
+from engine.types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def test_fill_buffer_scales_with_intents():
@@ -76,7 +76,7 @@ def test_fill_buffer_protection_prevents_segfault():
     
     This test ensures STATUS_BUFFER_FULL is returned gracefully instead of segfaulting.
     """
-    import FishBroWFS_V2.engine.engine_jit as ej
+    import engine.engine_jit as ej
     
     # Skip if JIT is disabled (buffer protection is in JIT kernel)
     if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":

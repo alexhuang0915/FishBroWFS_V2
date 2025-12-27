@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 @pytest.fixture
@@ -53,8 +53,8 @@ def test_compare_batches_cards_and_robust_summary(client):
 
         # batchC: missing summary
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get(f"/seasons/{season}/compare/batches")
             assert r.status_code == 200
             data = r.json()
@@ -117,8 +117,8 @@ def test_compare_leaderboard_grouping_and_determinism(client):
             },
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get(f"/seasons/{season}/compare/leaderboard?group_by=strategy_id&per_group=3")
             assert r.status_code == 200
             data = r.json()
@@ -141,8 +141,8 @@ def test_compare_endpoints_404_when_season_index_missing(client):
     with tempfile.TemporaryDirectory() as tmp:
         artifacts_root = Path(tmp) / "artifacts"
         season_root = Path(tmp) / "season_index"
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get("/seasons/NOPE/compare/batches")
             assert r.status_code == 404
             r = client.get("/seasons/NOPE/compare/leaderboard")

@@ -20,7 +20,7 @@ import shutil
 from pathlib import Path
 import pytest
 
-from FishBroWFS_V2.control.local_scan import (
+from control.local_scan import (
     LocalScanPolicy,
     default_local_strict_policy,
     iter_repo_files_local_strict,

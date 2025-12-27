@@ -5,12 +5,12 @@ import tempfile
 import json
 from pathlib import Path
 
-from FishBroWFS_V2.utils.fs_snapshot import snapshot_tree, diff_snap
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from utils.fs_snapshot import snapshot_tree, diff_snap
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
-from FishBroWFS_V2.portfolio.plan_view_renderer import render_plan_view
+from portfolio.plan_view_renderer import render_plan_view
 
 
 def test_plan_view_zero_write_read_path():

@@ -9,7 +9,7 @@ from typing import Any, Dict
 
 import pytest
 
-from FishBroWFS_V2.control.job_spec import DataSpec, WizardJobSpec, WFSSpec
+from control.job_spec import DataSpec, WizardJobSpec, WFSSpec
 
 
 def test_jobspec_schema_validation() -> None:

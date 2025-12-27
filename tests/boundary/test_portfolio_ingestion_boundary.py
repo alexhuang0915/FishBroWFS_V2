@@ -15,8 +15,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from FishBroWFS_V2.contracts.portfolio.plan_payloads import PlanCreatePayload
-from FishBroWFS_V2.portfolio.plan_builder import (
+from contracts.portfolio.plan_payloads import PlanCreatePayload
+from portfolio.plan_builder import (
     build_portfolio_plan_from_export,
     write_plan_package,
 )
@@ -99,7 +99,7 @@ def test_write_only_under_plan_directory():
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         # Create a dummy plan
-        from FishBroWFS_V2.contracts.portfolio.plan_models import (
+        from contracts.portfolio.plan_models import (
             ConstraintsReport,
             PlanSummary,
             PlannedCandidate,

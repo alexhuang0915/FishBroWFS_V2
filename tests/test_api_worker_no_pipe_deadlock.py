@@ -9,7 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from FishBroWFS_V2.control.api import _ensure_worker_running
+from control.api import _ensure_worker_running
 
 
 def test_worker_spawn_not_using_pipes(monkeypatch, tmp_path):
@@ -24,8 +24,8 @@ def test_worker_spawn_not_using_pipes(monkeypatch, tmp_path):
         p.pid = 123
         return p
     
-    monkeypatch.setattr("FishBroWFS_V2.control.api.subprocess.Popen", fake_popen)
-    monkeypatch.setattr("FishBroWFS_V2.control.api.os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("control.api.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("control.api.os.kill", lambda pid, sig: None)
     
     # Allow worker spawn in tests and allow /tmp DB paths
     monkeypatch.setenv("FISHBRO_ALLOW_SPAWN_IN_TESTS", "1")
@@ -39,7 +39,7 @@ def test_worker_spawn_not_using_pipes(monkeypatch, tmp_path):
     assert not pidfile.exists()
     
     # Mock init_db to avoid actual DB creation
-    monkeypatch.setattr("FishBroWFS_V2.control.api.init_db", lambda _: None)
+    monkeypatch.setattr("control.api.init_db", lambda _: None)
     
     _ensure_worker_running(db_path)
     

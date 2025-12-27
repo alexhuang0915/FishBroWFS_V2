@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from FishBroWFS_V2.strategy.registry import (
+from strategy.registry import (
     register,
     get,
     list_strategies,
@@ -16,7 +16,7 @@ from FishBroWFS_V2.strategy.registry import (
     clear,
     load_builtin_strategies,
 )
-from FishBroWFS_V2.strategy.spec import StrategySpec
+from strategy.spec import StrategySpec
 
 
 def test_register_and_get() -> None:

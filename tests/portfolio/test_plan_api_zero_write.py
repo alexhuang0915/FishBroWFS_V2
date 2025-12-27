@@ -16,7 +16,7 @@ from unittest.mock import Mock, patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 def test_get_portfolio_plans_zero_write():
@@ -24,7 +24,7 @@ def test_get_portfolio_plans_zero_write():
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         # Mock outputs root to point to empty directory
-        with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api._get_outputs_root", return_value=tmp_path):
             client = TestClient(app)
             response = client.get("/portfolio/plans")
             assert response.status_code == 200
@@ -45,7 +45,7 @@ def test_get_portfolio_plan_by_id_zero_write():
         plan_dir.mkdir(parents=True)
         (plan_dir / "portfolio_plan.json").write_text(json.dumps({"plan_id": "plan_abc123"}))
 
-        with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api._get_outputs_root", return_value=tmp_path):
             client = TestClient(app)
             response = client.get("/portfolio/plans/plan_abc123")
             assert response.status_code == 200
@@ -89,8 +89,8 @@ def test_post_portfolio_plan_writes_only_under_plan_dir():
             }
         ], sort_keys=True))
 
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
-            with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api._get_outputs_root", return_value=tmp_path):
                 client = TestClient(app)
                 payload = {
                     "season": "season1",
@@ -165,8 +165,8 @@ def test_post_portfolio_plan_idempotent():
             }
         ], sort_keys=True))
 
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
-            with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api._get_outputs_root", return_value=tmp_path):
                 client = TestClient(app)
                 payload = {
                     "season": "season1",
@@ -197,7 +197,7 @@ def test_get_nonexistent_plan_returns_404():
     """GET /portfolio/plans/{plan_id} with non‑existent plan returns 404."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        with patch("FishBroWFS_V2.control.api._get_outputs_root", return_value=tmp_path):
+        with patch("control.api._get_outputs_root", return_value=tmp_path):
             client = TestClient(app)
             response = client.get("/portfolio/plans/nonexistent")
             assert response.status_code == 404

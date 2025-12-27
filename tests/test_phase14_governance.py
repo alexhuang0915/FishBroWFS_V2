@@ -4,7 +4,7 @@
 import tempfile
 from pathlib import Path
 
-from FishBroWFS_V2.control.governance import (
+from control.governance import (
     BatchGovernanceStore,
     BatchMetadata,
 )

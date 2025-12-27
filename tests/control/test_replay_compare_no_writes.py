@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from FishBroWFS_V2.control.season_export_replay import (
+from control.season_export_replay import (
     replay_season_topk,
     replay_season_batch_cards,
     replay_season_leaderboard,
@@ -127,7 +127,7 @@ def test_replay_compare_no_writes(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     # The replay functions will try to read the file, but our dummy content
     # will cause JSON decode errors. Instead, we should mock the load_replay_index
     # function to return our prepared index.
-    from FishBroWFS_V2.control import season_export_replay
+    from control import season_export_replay
 
     def mock_load_replay_index(exports_root: Path, season: str) -> dict[str, Any]:
         if season == "test_season" and exports_root == exports_root:

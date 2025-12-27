@@ -143,7 +143,7 @@ def with_zero_write_patch(func: Callable) -> Callable:
 
 # Convenience context manager for snapshot equality checking
 import contextlib
-from FishBroWFS_V2.utils.fs_snapshot import snapshot_tree, diff_snap
+from utils.fs_snapshot import snapshot_tree, diff_snap
 
 
 @contextlib.contextmanager

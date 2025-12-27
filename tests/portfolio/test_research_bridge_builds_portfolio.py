@@ -9,8 +9,8 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from FishBroWFS_V2.portfolio.research_bridge import build_portfolio_from_research
-from FishBroWFS_V2.portfolio.spec import PortfolioSpec
+from portfolio.research_bridge import build_portfolio_from_research
+from portfolio.spec import PortfolioSpec
 
 
 def test_build_portfolio_from_research_basic():

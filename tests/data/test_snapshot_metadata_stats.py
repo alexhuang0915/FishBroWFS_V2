@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.data_snapshot import create_snapshot, SnapshotMetadata
-from FishBroWFS_V2.contracts.data.snapshot_models import SnapshotStats
+from control.data_snapshot import create_snapshot, SnapshotMetadata
+from contracts.data.snapshot_models import SnapshotStats
 
 
 def test_snapshot_metadata_fields():
@@ -97,7 +97,7 @@ def test_snapshot_manifest_hash_chain():
         # manifest_sha256 should be excluded from the hash computation
         # The create_snapshot function already ensures this; we can verify
         # that the manifest_sha256 field matches the computed hash of the rest.
-        from FishBroWFS_V2.control.artifacts import compute_sha256, canonical_json_bytes
+        from control.artifacts import compute_sha256, canonical_json_bytes
 
         # Create a copy without manifest_sha256
         manifest_without_hash = {k: v for k, v in manifest.items() if k != "manifest_sha256"}
@@ -150,7 +150,7 @@ def test_snapshot_empty_bars():
 
 def test_snapshot_malformed_timestamp():
     """Non‑ISO timestamp is accepted as a string (no validation)."""
-    from FishBroWFS_V2.control.data_snapshot import normalize_bars
+    from control.data_snapshot import normalize_bars
 
     raw_bars = [
         {"timestamp": "not-a-timestamp", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000},

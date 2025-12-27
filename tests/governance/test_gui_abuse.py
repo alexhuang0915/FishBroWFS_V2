@@ -15,7 +15,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def test_gui_cannot_inject_execution_semantics(client):
         )
 
         # Mock dataset index
-        from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+        from data.dataset_registry import DatasetIndex, DatasetRecord
         mock_dataset = DatasetRecord(
             id="CME_MNQ_v2",
             symbol="CME.MNQ",
@@ -58,9 +58,9 @@ def test_gui_cannot_inject_execution_semantics(client):
         )
         mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[mock_dataset])
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.api.load_dataset_index", return_value=mock_index):
             
             # Attempt to submit batch with injected execution semantics
             # The API should reject or ignore fields that are not part of the contract
@@ -110,9 +110,9 @@ def test_gui_cannot_bypass_freeze_requirement(client):
         _wjson(artifacts_root / "batchA" / "index.json", {"x": 1})
         _wjson(artifacts_root / "batchA" / "summary.json", {"topk": [], "metrics": {}})
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.season_export.get_exports_root", return_value=exports_root):
             
             # Attempt to export without freezing
             r = client.post(f"/seasons/{season}/export")
@@ -134,8 +134,8 @@ def test_gui_cannot_access_internal_research_details(client):
             {"season": season, "generated_at": "Z", "batches": []},
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             
             # GUI should not have endpoints that expose internal Research OS details
             # Test that certain internal endpoints are not accessible or return minimal info
@@ -177,7 +177,7 @@ def test_gui_cannot_modify_frozen_season(client):
         )
 
         # Mock dataset index
-        from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+        from data.dataset_registry import DatasetIndex, DatasetRecord
         mock_dataset = DatasetRecord(
             id="CME_MNQ_v2",
             symbol="CME.MNQ",
@@ -193,9 +193,9 @@ def test_gui_cannot_modify_frozen_season(client):
         )
         mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[mock_dataset])
 
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index), \
-             patch("FishBroWFS_V2.control.api._check_worker_status", return_value={
+        with patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.api.load_dataset_index", return_value=mock_index), \
+             patch("control.api._check_worker_status", return_value={
                  "alive": True,
                  "pid": 12345,
                  "last_heartbeat_age_sec": None,
@@ -229,7 +229,7 @@ def test_gui_cannot_modify_frozen_season(client):
 
 def test_gui_contract_enforces_boundaries():
     """GUI contract fields enforce boundaries (length, pattern, etc.)."""
-    from FishBroWFS_V2.contracts.gui import (
+    from contracts.gui import (
         SubmitBatchPayload,
         FreezeSeasonPayload,
         ExportSeasonPayload,

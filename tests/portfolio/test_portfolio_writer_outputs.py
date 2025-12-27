@@ -9,8 +9,8 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from FishBroWFS_V2.portfolio.writer import write_portfolio_artifacts
-from FishBroWFS_V2.portfolio.spec import PortfolioSpec, PortfolioLeg
+from portfolio.writer import write_portfolio_artifacts
+from portfolio.spec import PortfolioSpec, PortfolioLeg
 
 
 def test_writer_creates_files():

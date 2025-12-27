@@ -13,7 +13,7 @@ from pathlib import Path
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from FishBroWFS_V2.research.registry import build_research_index
+from research.registry import build_research_index
 
 
 def main() -> int:

@@ -7,7 +7,7 @@ import json
 import tempfile
 import shutil
 from pathlib import Path
-from FishBroWFS_V2.control.deploy_package_mc import (
+from control.deploy_package_mc import (
     CostModel,
     DeployPackageConfig,
     generate_deploy_package,
@@ -16,7 +16,7 @@ from FishBroWFS_V2.control.deploy_package_mc import (
     _atomic_write_text,
     _compute_file_sha256,
 )
-from FishBroWFS_V2.core.slippage_policy import SlippagePolicy
+from core.slippage_policy import SlippagePolicy
 
 
 class TestCostModel:

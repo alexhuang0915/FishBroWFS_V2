@@ -19,19 +19,19 @@ import pytest
 import numpy as np
 import pandas as pd
 
-from FishBroWFS_V2.control.shared_build import (
+from control.shared_build import (
     BuildMode,
     IncrementalBuildRejected,
     build_shared,
 )
-from FishBroWFS_V2.control.bars_store import (
+from control.bars_store import (
     normalized_bars_path,
     resampled_bars_path,
     load_npz,
 )
-from FishBroWFS_V2.control.bars_manifest import load_bars_manifest
-from FishBroWFS_V2.data.raw_ingest import RawIngestResult, IngestPolicy
-from FishBroWFS_V2.core.resampler import (
+from control.bars_manifest import load_bars_manifest
+from data.raw_ingest import RawIngestResult, IngestPolicy
+from core.resampler import (
     SessionSpecTaipei,
     compute_safe_recompute_start,
 )
@@ -103,7 +103,7 @@ def test_full_build_produces_bars_cache(tmp_path):
     
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
         # 執行 FULL 模式，啟用 bars cache
@@ -199,7 +199,7 @@ def test_incremental_append_only_consistent_with_full(tmp_path):
     combined_result = _create_mock_raw_ingest_result(base_txt, combined_bars)
     
     # 路徑 1: FULL（一次處理所有資料）
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = combined_result
         
         full_report = build_shared(
@@ -215,7 +215,7 @@ def test_incremental_append_only_consistent_with_full(tmp_path):
     
     # 路徑 2: INCREMENTAL（先 base，再 append）
     # 第一步：建立 base
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = base_result
         
         base_report = build_shared(
@@ -230,11 +230,11 @@ def test_incremental_append_only_consistent_with_full(tmp_path):
         )
     
     # 第二步：append（INCREMENTAL 模式）
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = append_result
         
         # 模擬 compare_fingerprint_indices 回傳 append_only=True
-        from FishBroWFS_V2.core.fingerprint import compare_fingerprint_indices
+        from core.fingerprint import compare_fingerprint_indices
         
         def mock_compare(old_index, new_index):
             return {
@@ -249,7 +249,7 @@ def test_incremental_append_only_consistent_with_full(tmp_path):
                 "is_new": False,
             }
         
-        with patch("FishBroWFS_V2.control.shared_build.compare_fingerprint_indices", mock_compare):
+        with patch("control.shared_build.compare_fingerprint_indices", mock_compare):
             incremental_report = build_shared(
                 season="2026Q1",
                 dataset_id="TEST.DATASET",
@@ -357,15 +357,15 @@ def test_breaks_behavior_deterministic(tmp_path):
     mock_result = _create_mock_raw_ingest_result(txt_file, bars)
     
     # 模擬 get_session_spec_for_dataset 回傳有 breaks 的 session
-    from FishBroWFS_V2.core.resampler import get_session_spec_for_dataset
+    from core.resampler import get_session_spec_for_dataset
     
     def mock_get_session_spec(dataset_id: str):
         return session, True
     
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
-        with patch("FishBroWFS_V2.core.resampler.get_session_spec_for_dataset", mock_get_session_spec):
+        with patch("core.resampler.get_session_spec_for_dataset", mock_get_session_spec):
             # 執行 FULL 模式
             report = build_shared(
                 season="2026Q1",
@@ -394,10 +394,10 @@ def test_breaks_behavior_deterministic(tmp_path):
     
     # 確保結果是 deterministic 的：重跑一次應該得到相同結果
     # 我們可以重跑一次並比較
-    with patch("FishBroWFS_V2.control.shared_build.ingest_raw_txt") as mock_ingest:
+    with patch("control.shared_build.ingest_raw_txt") as mock_ingest:
         mock_ingest.return_value = mock_result
         
-        with patch("FishBroWFS_V2.core.resampler.get_session_spec_for_dataset", mock_get_session_spec):
+        with patch("core.resampler.get_session_spec_for_dataset", mock_get_session_spec):
             report2 = build_shared(
                 season="2026Q1",
                 dataset_id="TEST.DATASET",
@@ -428,21 +428,21 @@ def test_breaks_behavior_deterministic(tmp_path):
 def test_no_mtime_size_usage():
     """確保沒有使用檔案 mtime/size 來判斷"""
     import os
-    import FishBroWFS_V2.control.shared_build
-    import FishBroWFS_V2.control.shared_manifest
-    import FishBroWFS_V2.control.shared_cli
-    import FishBroWFS_V2.control.bars_store
-    import FishBroWFS_V2.control.bars_manifest
-    import FishBroWFS_V2.core.resampler
+    import control.shared_build
+    import control.shared_manifest
+    import control.shared_cli
+    import control.bars_store
+    import control.bars_manifest
+    import core.resampler
     
     # 檢查模組中是否有 os.stat().st_mtime 或 st_size
     modules = [
-        FishBroWFS_V2.control.shared_build,
-        FishBroWFS_V2.control.shared_manifest,
-        FishBroWFS_V2.control.shared_cli,
-        FishBroWFS_V2.control.bars_store,
-        FishBroWFS_V2.control.bars_manifest,
-        FishBroWFS_V2.core.resampler,
+        control.shared_build,
+        control.shared_manifest,
+        control.shared_cli,
+        control.bars_store,
+        control.bars_manifest,
+        core.resampler,
     ]
     
     for module in modules:
@@ -457,20 +457,20 @@ def test_no_mtime_size_usage():
 
 def test_no_streamlit_imports():
     """確保沒有新增任何 streamlit import"""
-    import FishBroWFS_V2.control.shared_build
-    import FishBroWFS_V2.control.shared_manifest
-    import FishBroWFS_V2.control.shared_cli
-    import FishBroWFS_V2.control.bars_store
-    import FishBroWFS_V2.control.bars_manifest
-    import FishBroWFS_V2.core.resampler
+    import control.shared_build
+    import control.shared_manifest
+    import control.shared_cli
+    import control.bars_store
+    import control.bars_manifest
+    import core.resampler
     
     modules = [
-        FishBroWFS_V2.control.shared_build,
-        FishBroWFS_V2.control.shared_manifest,
-        FishBroWFS_V2.control.shared_cli,
-        FishBroWFS_V2.control.bars_store,
-        FishBroWFS_V2.control.bars_manifest,
-        FishBroWFS_V2.core.resampler,
+        control.shared_build,
+        control.shared_manifest,
+        control.shared_cli,
+        control.bars_store,
+        control.bars_manifest,
+        core.resampler,
     ]
     
     for module in modules:

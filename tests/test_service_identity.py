@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch, mock_open
 import pytest
 
-from FishBroWFS_V2.core.service_identity import (
+from core.service_identity import (
     get_service_identity,
     _safe_cmdline,
     _safe_git_commit,
@@ -101,8 +101,8 @@ def test_git_commit_extracts_from_head():
             return mock_ref
     mock_exists.side_effect = exists_side
     mock_read_text.side_effect = read_text_side
-    with patch("FishBroWFS_V2.core.service_identity.Path.exists", mock_exists):
-        with patch("FishBroWFS_V2.core.service_identity.Path.read_text", mock_read_text):
+    with patch("core.service_identity.Path.exists", mock_exists):
+        with patch("core.service_identity.Path.read_text", mock_read_text):
             commit = _safe_git_commit(Path("/repo"))
             assert commit == "abc123"
 

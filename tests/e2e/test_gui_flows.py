@@ -14,8 +14,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.contracts.gui import (
+from control.api import app
+from contracts.gui import (
     SubmitBatchPayload,
     FreezeSeasonPayload,
     ExportSeasonPayload,
@@ -65,11 +65,11 @@ def test_submit_batch_flow(client):
         dataset_index_path.write_text(json.dumps(dataset_index, indent=2), encoding="utf-8")
 
         # Mock the necessary roots and dataset index loading
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root), \
-             patch("FishBroWFS_V2.control.api._load_dataset_index_from_file") as mock_load, \
-             patch("FishBroWFS_V2.control.api._check_worker_status") as mock_check:
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.season_export.get_exports_root", return_value=exports_root), \
+             patch("control.api._load_dataset_index_from_file") as mock_load, \
+             patch("control.api._check_worker_status") as mock_check:
             # Mock worker as alive to avoid 503
             mock_check.return_value = {
                 "alive": True,
@@ -79,7 +79,7 @@ def test_submit_batch_flow(client):
                 "expected_db": str(Path(tmp) / "jobs.db"),
             }
             # Make the mock return the dataset index we created
-            from FishBroWFS_V2.data.dataset_registry import DatasetIndex
+            from data.dataset_registry import DatasetIndex
             mock_load.return_value = DatasetIndex.model_validate(dataset_index)
             
             # First, create a season index
@@ -90,8 +90,8 @@ def test_submit_batch_flow(client):
             )
 
             # Import the actual models used by the API
-            from FishBroWFS_V2.control.batch_submit import BatchSubmitRequest
-            from FishBroWFS_V2.control.job_spec import WizardJobSpec, DataSpec, WFSSpec
+            from control.batch_submit import BatchSubmitRequest
+            from control.job_spec import WizardJobSpec, DataSpec, WFSSpec
             
             # Create a valid JobSpec using the actual schema
             job = WizardJobSpec(
@@ -130,7 +130,7 @@ def test_freeze_season_flow(client):
             {"season": season, "generated_at": "Z", "batches": []},
         )
 
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_season_index_root", return_value=season_root):
             # Freeze season
             r = client.post(f"/seasons/{season}/freeze")
             assert r.status_code == 200
@@ -165,14 +165,14 @@ def test_export_season_flow(client):
         _wjson(artifacts_root / "batchA" / "summary.json", {"topk": [], "metrics": {}})
 
         # Freeze season first
-        with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_season_index_root", return_value=season_root):
             r = client.post(f"/seasons/{season}/freeze")
             assert r.status_code == 200
 
         # Export season
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root), \
+             patch("control.season_export.get_exports_root", return_value=exports_root):
             
             r = client.post(f"/seasons/{season}/export")
             assert r.status_code == 200
@@ -227,8 +227,8 @@ def test_compare_flow(client):
             },
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             
             # Test compare topk
             r = client.get(f"/seasons/{season}/compare/topk?k=5")

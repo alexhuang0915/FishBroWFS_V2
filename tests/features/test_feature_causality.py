@@ -5,8 +5,8 @@ Tests for feature causality verification (impulse response test).
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.features.models import FeatureSpec
-from FishBroWFS_V2.features.causality import (
+from features.models import FeatureSpec
+from features.causality import (
     generate_impulse_signal,
     compute_impulse_response,
     detect_lookahead,
@@ -285,7 +285,7 @@ def test_verify_feature_causality_no_compute_func():
 
 def test_batch_verify_features():
     """Test batch verification of multiple features."""
-    from FishBroWFS_V2.features.causality import batch_verify_features
+    from features.causality import batch_verify_features
 
     # Create causal feature
     def causal_func(o, h, l, c):

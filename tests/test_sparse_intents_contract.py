@@ -13,8 +13,8 @@ from dataclasses import asdict, is_dataclass
 import numpy as np
 import os
 
-from FishBroWFS_V2.engine.types import Fill
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from engine.types import Fill
+from pipeline.runner_grid import run_grid
 
 
 def _fill_to_tuple(f: Fill) -> tuple:

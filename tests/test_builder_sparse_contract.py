@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import os
 
-from FishBroWFS_V2.strategy.builder_sparse import build_intents_sparse
+from strategy.builder_sparse import build_intents_sparse
 
 
 def test_builder_intent_scaling_with_intent_sparse_rate() -> None:

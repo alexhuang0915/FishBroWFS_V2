@@ -8,14 +8,13 @@ import sys
 from pathlib import Path
 from typing import Any, Dict
 
-# --- Ensure src/ is on sys.path so `import FishBroWFS_V2` works even when running as a script.
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SRC_DIR = REPO_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from FishBroWFS_V2.core.winners_builder import build_winners_v2  # noqa: E402
-from FishBroWFS_V2.core.winners_schema import is_winners_v2      # noqa: E402
+from core.winners_builder import build_winners_v2  # noqa: E402
+from core.winners_schema import is_winners_v2      # noqa: E402
 
 
 def _read_json(path: Path) -> Dict[str, Any]:

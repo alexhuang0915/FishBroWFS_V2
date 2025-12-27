@@ -4,7 +4,7 @@ Test that replay sorting uses deterministic key (-score, batch_id, job_id).
 P1-2: Replay/Compare 排序規則固定（determinism）
 """
 
-from FishBroWFS_V2.control.season_export_replay import (
+from control.season_export_replay import (
     replay_season_topk,
     replay_season_leaderboard,
 )
@@ -39,7 +39,7 @@ def test_replay_topk_sort_key_determinism() -> None:
     }
     
     # We'll test by mocking load_replay_index
-    import FishBroWFS_V2.control.season_export_replay as replay_module
+    import control.season_export_replay as replay_module
     
     original_load = replay_module.load_replay_index
     replay_module.load_replay_index = lambda exports_root, season: mock_index
@@ -110,7 +110,7 @@ def test_replay_leaderboard_sort_key_determinism() -> None:
         ],
     }
     
-    import FishBroWFS_V2.control.season_export_replay as replay_module
+    import control.season_export_replay as replay_module
     
     original_load = replay_module.load_replay_index
     replay_module.load_replay_index = lambda exports_root, season: mock_index
@@ -176,7 +176,7 @@ def test_sort_key_with_missing_fields() -> None:
         ],
     }
     
-    import FishBroWFS_V2.control.season_export_replay as replay_module
+    import control.season_export_replay as replay_module
     
     original_load = replay_module.load_replay_index
     replay_module.load_replay_index = lambda exports_root, season: mock_index

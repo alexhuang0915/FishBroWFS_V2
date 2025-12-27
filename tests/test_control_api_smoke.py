@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app, get_db_path
-from FishBroWFS_V2.control.jobs_db import init_db
+from control.api import app, get_db_path
+from control.jobs_db import init_db
 
 
 @pytest.fixture
@@ -29,7 +29,7 @@ def test_client() -> TestClient:
         os.environ["FISHBRO_ALLOW_TMP_DB"] = "1"
         
         # Re-import to get new DB path
-        from FishBroWFS_V2.control import api
+        from control import api
         
         # Reinitialize
         api.init_db(db_path)
@@ -205,7 +205,7 @@ def test_log_tail_endpoint(test_client: TestClient) -> None:
     job_id = create_resp.json()["job_id"]
     
     # Create log file manually
-    from FishBroWFS_V2.control.paths import run_log_path
+    from control.paths import run_log_path
     
     outputs_root = Path.cwd() / "outputs"
     log_path = run_log_path(outputs_root, "test_season", job_id)
@@ -248,7 +248,7 @@ def test_log_tail_missing_file(test_client: TestClient) -> None:
 
 def test_report_link_endpoint(test_client: TestClient) -> None:
     """Test report_link endpoint."""
-    from FishBroWFS_V2.control.jobs_db import set_report_link
+    from control.jobs_db import set_report_link
     
     # Create a job
     req = {

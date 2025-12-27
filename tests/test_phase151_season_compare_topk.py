@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
+from control.api import app
 
 
 @pytest.fixture
@@ -61,8 +61,8 @@ def test_season_compare_topk_merge_and_tiebreak(client):
             },
         )
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get(f"/seasons/{season}/compare/topk?k=10")
             assert r.status_code == 200
             data = r.json()
@@ -109,8 +109,8 @@ def test_season_compare_skips_missing_or_corrupt_summaries(client):
         bad_path.parent.mkdir(parents=True, exist_ok=True)
         bad_path.write_text("{not-json", encoding="utf-8")
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get(f"/seasons/{season}/compare/topk?k=20")
             assert r.status_code == 200
             data = r.json()
@@ -126,8 +126,8 @@ def test_season_compare_404_when_season_index_missing(client):
         artifacts_root = Path(tmp) / "artifacts"
         season_root = Path(tmp) / "season_index"
 
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
-             patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root):
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root), \
+             patch("control.api._get_season_index_root", return_value=season_root):
             r = client.get("/seasons/NOPE/compare/topk?k=20")
             assert r.status_code == 404
 

@@ -14,7 +14,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
+from data.raw_ingest import ingest_raw_txt
 
 
 def test_row_order_preserved(temp_dir: Path) -> None:

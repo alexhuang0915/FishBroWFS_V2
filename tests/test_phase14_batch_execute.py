@@ -5,7 +5,7 @@ import tempfile
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from FishBroWFS_V2.control.batch_execute import (
+from control.batch_execute import (
     BatchExecutor,
     BatchExecutionState,
     JobExecutionState,
@@ -97,7 +97,7 @@ def test_batch_executor_skipped_jobs():
     assert executor.state == BatchExecutionState.DONE
 
 
-@patch("FishBroWFS_V2.control.batch_execute.BatchExecutor")
+@patch("control.batch_execute.BatchExecutor")
 def test_run_batch_mock(mock_executor_cls):
     """run_batch creates executor and runs jobs."""
     mock_executor = Mock()
@@ -114,7 +114,7 @@ def test_run_batch_mock(mock_executor_cls):
     assert result == mock_executor
 
 
-@patch("FishBroWFS_V2.control.batch_execute.BatchExecutor")
+@patch("control.batch_execute.BatchExecutor")
 def test_retry_failed_mock(mock_executor_cls):
     """retry_failed creates executor and retries failed jobs."""
     mock_executor = Mock()

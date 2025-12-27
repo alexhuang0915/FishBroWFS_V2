@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.core.feature_bundle import FeatureSeries, FeatureBundle
-import FishBroWFS_V2.wfs.runner as wfs_runner
+from core.feature_bundle import FeatureSeries, FeatureBundle
+import wfs.runner as wfs_runner
 
 
 class _DummySpec:
@@ -43,13 +43,13 @@ def test_run_wfs_with_features_disallows_file_io_without_real_strategy(monkeypat
     # If get_strategy_spec isn't used in this repo layout, add fallback patches:
     # These should be kept harmless by raising=False.
     try:
-        import FishBroWFS_V2.strategy.registry as strat_registry
+        import strategy.registry as strat_registry
         monkeypatch.setattr(strat_registry, "get", lambda strategy_id: _DummySpec(), raising=False)
     except Exception:
         pass
 
     try:
-        import FishBroWFS_V2.strategy.runner as strat_runner
+        import strategy.runner as strat_runner
         monkeypatch.setattr(strat_runner, "get", lambda strategy_id: _DummySpec(), raising=False)
     except Exception:
         pass

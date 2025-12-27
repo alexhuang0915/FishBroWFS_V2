@@ -4,12 +4,12 @@ import pytest
 from datetime import datetime
 from typing import List
 
-from FishBroWFS_V2.core.schemas.portfolio_v1 import (
+from core.schemas.portfolio_v1 import (
     PortfolioPolicyV1,
     SignalCandidateV1,
     OpenPositionV1,
 )
-from FishBroWFS_V2.portfolio.engine_v1 import PortfolioEngineV1, admit_candidates
+from portfolio.engine_v1 import PortfolioEngineV1, admit_candidates
 
 
 def create_test_policy() -> PortfolioPolicyV1:
@@ -266,7 +266,7 @@ def test_sortkey_priority_then_score_then_sha():
     
     # Test 2: priority/score相同，sha不同 → sha字典序小者先 admit
     # Need to create candidates with different signal_series_sha256
-    from FishBroWFS_V2.core.schemas.portfolio_v1 import SignalCandidateV1
+    from core.schemas.portfolio_v1 import SignalCandidateV1
     from datetime import datetime
     
     candidate_a = SignalCandidateV1(

@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import pytest
 
-from FishBroWFS_V2.core.oom_gate import decide_gate, decide_oom_action, estimate_bytes
-from FishBroWFS_V2.core.schemas.oom_gate import OomGateInput
+from core.oom_gate import decide_gate, decide_oom_action, estimate_bytes
+from core.schemas.oom_gate import OomGateInput
 
 
 def test_estimate_bytes() -> None:

@@ -1,8 +1,8 @@
 
 import numpy as np
 
-from FishBroWFS_V2.strategy.kernel import DonchianAtrParams, run_kernel, _max_drawdown
-from FishBroWFS_V2.engine.types import BarArrays
+from strategy.kernel import DonchianAtrParams, run_kernel, _max_drawdown
+from engine.types import BarArrays
 
 
 def _bars():

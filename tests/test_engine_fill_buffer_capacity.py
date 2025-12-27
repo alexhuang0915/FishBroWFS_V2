@@ -6,9 +6,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import STATUS_BUFFER_FULL, STATUS_OK, simulate as simulate_jit
-from FishBroWFS_V2.engine.types import OrderIntent, OrderKind, OrderRole, Side
+from data.layout import normalize_bars
+from engine.engine_jit import STATUS_BUFFER_FULL, STATUS_OK, simulate as simulate_jit
+from engine.types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def test_engine_fill_buffer_capacity_extreme_intents() -> None:

@@ -11,10 +11,10 @@ from typing import Any, Dict
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
-from FishBroWFS_V2.strategy.registry import StrategyRegistryResponse, StrategySpecForGUI
-from FishBroWFS_V2.strategy.param_schema import ParamSpec
+from control.api import app
+from data.dataset_registry import DatasetIndex, DatasetRecord
+from strategy.registry import StrategyRegistryResponse, StrategySpecForGUI
+from strategy.param_schema import ParamSpec
 
 
 @pytest.fixture
@@ -124,7 +124,7 @@ def test_meta_datasets_endpoint(
         return mock_dataset_index
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_dataset_index",
+        "control.api.load_dataset_index",
         mock_load_dataset_index
     )
     
@@ -163,7 +163,7 @@ def test_meta_strategies_endpoint(
         return mock_strategy_registry
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_strategy_registry",
+        "control.api.load_strategy_registry",
         mock_load_strategy_registry
     )
     
@@ -241,16 +241,16 @@ def test_api_startup_registry_loading(
     monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Test API startup loads registries."""
-    from FishBroWFS_V2.control.api import load_dataset_index, load_strategy_registry
+    from control.api import load_dataset_index, load_strategy_registry
     
     # Mock the loading functions
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_dataset_index",
+        "control.api.load_dataset_index",
         lambda: mock_dataset_index
     )
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_strategy_registry",
+        "control.api.load_strategy_registry",
         lambda: mock_strategy_registry
     )
     
@@ -264,7 +264,7 @@ def test_api_startup_registry_loading(
 
 def test_dataset_index_missing_file(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test error when dataset index file is missing."""
-    from FishBroWFS_V2.control.api import load_dataset_index
+    from control.api import load_dataset_index
     
     # Mock Path.exists to return False
     monkeypatch.setattr(Path, "exists", lambda self: False)
@@ -283,12 +283,12 @@ def test_meta_endpoints_response_schema(
     """Test that meta endpoints return valid Pydantic models."""
     # Mock the loading functions
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_dataset_index",
+        "control.api.load_dataset_index",
         lambda: mock_dataset_index
     )
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_strategy_registry",
+        "control.api.load_strategy_registry",
         lambda: mock_strategy_registry
     )
     
@@ -322,12 +322,12 @@ def test_meta_endpoints_deterministic_ordering(
     """Test that meta endpoints return data in deterministic order."""
     # Mock the loading functions
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_dataset_index",
+        "control.api.load_dataset_index",
         lambda: mock_dataset_index
     )
 
     monkeypatch.setattr(
-        "FishBroWFS_V2.control.api.load_strategy_registry",
+        "control.api.load_strategy_registry",
         lambda: mock_strategy_registry
     )
 

@@ -9,11 +9,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from FishBroWFS_V2.control.jobs_db import create_job, get_job, init_db
-from FishBroWFS_V2.control.report_links import make_report_link
-from FishBroWFS_V2.control.types import DBJobSpec, JobStatus
-from FishBroWFS_V2.control.worker import run_one_job
-from FishBroWFS_V2.pipeline.funnel_schema import (
+from control.jobs_db import create_job, get_job, init_db
+from control.report_links import make_report_link
+from control.types import DBJobSpec, JobStatus
+from control.worker import run_one_job
+from pipeline.funnel_schema import (
     FunnelPlan,
     FunnelResultIndex,
     FunnelStageIndex,
@@ -70,7 +70,7 @@ def test_worker_completes_job_with_run_id_and_report_link(
         stages=[fake_stage_index],
     )
     
-    with patch("FishBroWFS_V2.control.worker.run_funnel") as mock_run_funnel:
+    with patch("control.worker.run_funnel") as mock_run_funnel:
         mock_run_funnel.return_value = fake_result_index
         
         # Run the job
@@ -107,7 +107,7 @@ def test_worker_handles_empty_funnel_result(
         stages=[],
     )
     
-    with patch("FishBroWFS_V2.control.worker.run_funnel") as mock_run_funnel:
+    with patch("control.worker.run_funnel") as mock_run_funnel:
         mock_run_funnel.return_value = fake_result_index
         
         # Run the job

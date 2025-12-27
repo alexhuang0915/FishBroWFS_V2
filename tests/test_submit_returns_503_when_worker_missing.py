@@ -17,8 +17,8 @@ from unittest.mock import patch, MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app, get_db_path
-from FishBroWFS_V2.control.jobs_db import init_db
+from control.api import app, get_db_path
+from control.jobs_db import init_db
 
 
 @pytest.fixture
@@ -41,14 +41,14 @@ def test_client_no_worker() -> TestClient:
         os.environ["FISHBRO_ALLOW_SPAWN_IN_TESTS"] = "0"
         
         # Re-import to get new DB path
-        from FishBroWFS_V2.control import api
+        from control import api
         
         # Reinitialize
         api.init_db(db_path)
         
         # Mock worker status to simulate no worker
-        with patch('FishBroWFS_V2.control.api._check_worker_status') as mock_check, \
-             patch('FishBroWFS_V2.control.api.load_dataset_index') as mock_load_dataset:
+        with patch('control.api._check_worker_status') as mock_check, \
+             patch('control.api.load_dataset_index') as mock_load_dataset:
             mock_check.return_value = {
                 "alive": False,
                 "pid": None,
@@ -57,7 +57,7 @@ def test_client_no_worker() -> TestClient:
                 "expected_db": str(db_path),
             }
             # Mock dataset index to avoid FileNotFoundError
-            from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+            from data.dataset_registry import DatasetIndex, DatasetRecord
             from datetime import date
             mock_index = DatasetIndex(
                 generated_at="2024-01-01T00:00:00Z",
@@ -113,14 +113,14 @@ def test_client_with_worker() -> TestClient:
         os.environ["FISHBRO_ALLOW_TMP_DB"] = "1"
         
         # Re-import to get new DB path
-        from FishBroWFS_V2.control import api
+        from control import api
         
         # Reinitialize
         api.init_db(db_path)
         
         # Mock worker status to simulate worker running
-        with patch('FishBroWFS_V2.control.api._check_worker_status') as mock_check, \
-             patch('FishBroWFS_V2.control.api.load_dataset_index') as mock_load_dataset:
+        with patch('control.api._check_worker_status') as mock_check, \
+             patch('control.api.load_dataset_index') as mock_load_dataset:
             mock_check.return_value = {
                 "alive": True,
                 "pid": 12345,
@@ -129,7 +129,7 @@ def test_client_with_worker() -> TestClient:
                 "expected_db": str(db_path),
             }
             # Mock dataset index to avoid FileNotFoundError
-            from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+            from data.dataset_registry import DatasetIndex, DatasetRecord
             from datetime import date
             mock_index = DatasetIndex(
                 generated_at="2024-01-01T00:00:00Z",
@@ -311,18 +311,18 @@ def test_batch_submit_succeeds_when_worker_running(test_client_with_worker: Test
 
 def test_worker_status_check_integration() -> None:
     """Test that _check_worker_status function works correctly."""
-    from FishBroWFS_V2.control.api import _check_worker_status
+    from control.api import _check_worker_status
     from pathlib import Path
     
     # Create a temporary DB path for testing
     db_path = Path("/tmp/test.db")
     
     # Mock the dependencies
-    with patch('FishBroWFS_V2.control.api.validate_pidfile') as mock_validate, \
-         patch('FishBroWFS_V2.control.api.time.time') as mock_time, \
-         patch('FishBroWFS_V2.control.api.Path.exists') as mock_exists, \
-         patch('FishBroWFS_V2.control.api.Path.read_text') as mock_read_text, \
-         patch('FishBroWFS_V2.control.api.Path.stat') as mock_stat:
+    with patch('control.api.validate_pidfile') as mock_validate, \
+         patch('control.api.time.time') as mock_time, \
+         patch('control.api.Path.exists') as mock_exists, \
+         patch('control.api.Path.read_text') as mock_read_text, \
+         patch('control.api.Path.stat') as mock_stat:
         
         # Test case 1: pidfile doesn't exist
         mock_exists.return_value = False
@@ -374,7 +374,7 @@ def test_worker_status_check_integration() -> None:
 
 def test_error_message_includes_diagnostics() -> None:
     """Test that 503 error message includes diagnostic details."""
-    from FishBroWFS_V2.control.api import require_worker_or_503
+    from control.api import require_worker_or_503
     from pathlib import Path
     import os
     
@@ -382,7 +382,7 @@ def test_error_message_includes_diagnostics() -> None:
     db_path = Path("/tmp/test.db")
     
     # Mock _check_worker_status to return False with specific reason
-    with patch('FishBroWFS_V2.control.api._check_worker_status') as mock_check:
+    with patch('control.api._check_worker_status') as mock_check:
         mock_check.return_value = {
             "alive": False,
             "pid": None,

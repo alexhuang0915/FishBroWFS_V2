@@ -6,10 +6,10 @@ import os
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.data.layout import normalize_bars
-from FishBroWFS_V2.engine.engine_jit import _simulate_with_ttl, simulate as simulate_jit
-from FishBroWFS_V2.engine.matcher_core import simulate as simulate_py
-from FishBroWFS_V2.engine.types import Fill, OrderIntent, OrderKind, OrderRole, Side
+from data.layout import normalize_bars
+from engine.engine_jit import _simulate_with_ttl, simulate as simulate_jit
+from engine.matcher_core import simulate as simulate_py
+from engine.types import Fill, OrderIntent, OrderKind, OrderRole, Side
 
 
 def _assert_fills_equal(a: list[Fill], b: list[Fill]) -> None:
@@ -84,7 +84,7 @@ def test_one_bar_max_one_entry_one_exit_defense() -> None:
 
 def test_ttl_one_shot_vs_gtc_extension_point() -> None:
     # Skip if JIT is disabled; ttl=0 is a JIT-only extension behavior.
-    import FishBroWFS_V2.engine.engine_jit as ej
+    import engine.engine_jit as ej
 
     if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
         pytest.skip("numba not available or disabled; ttl=0 extension tested only under JIT")
@@ -121,7 +121,7 @@ def test_ttl_one_expires_before_fill_opportunity() -> None:
       - bar1: high >= stop (would trigger, but order expired)
       - ttl_bars=1: order should expire after bar0, not fill on bar1
     """
-    import FishBroWFS_V2.engine.engine_jit as ej
+    import engine.engine_jit as ej
 
     if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
         pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
@@ -157,7 +157,7 @@ def test_ttl_zero_gtc_never_expires() -> None:
       - bar1: high >= stop (triggers)
       - ttl_bars=0: order should remain active and fill on bar1
     """
-    import FishBroWFS_V2.engine.engine_jit as ej
+    import engine.engine_jit as ej
 
     if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
         pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")
@@ -192,7 +192,7 @@ def test_ttl_semantics_three_bars() -> None:
       - bar2: high >= stop (would trigger, but order expired)
       - ttl_bars=1: order should expire after bar0, not fill on bar2
     """
-    import FishBroWFS_V2.engine.engine_jit as ej
+    import engine.engine_jit as ej
 
     if ej.nb is None or os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
         pytest.skip("numba not available or disabled; ttl semantics tested only under JIT")

@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.research.extract import extract_canonical_metrics, ExtractionError
-from FishBroWFS_V2.research.metrics import CanonicalMetrics
+from research.extract import extract_canonical_metrics, ExtractionError
+from research.metrics import CanonicalMetrics
 
 
 def test_extract_canonical_metrics_success(tmp_path: Path) -> None:

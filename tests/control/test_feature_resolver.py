@@ -20,25 +20,25 @@ from typing import Dict, Any
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.contracts.strategy_features import (
+from contracts.strategy_features import (
     StrategyFeatureRequirements,
     FeatureRef,
     save_requirements_to_json,
 )
-from FishBroWFS_V2.control.feature_resolver import (
+from control.feature_resolver import (
     resolve_features,
     MissingFeaturesError,
     ManifestMismatchError,
     BuildNotAllowedError,
     FeatureResolutionError,
 )
-from FishBroWFS_V2.control.build_context import BuildContext
-from FishBroWFS_V2.control.features_manifest import (
+from control.build_context import BuildContext
+from control.features_manifest import (
     write_features_manifest,
     build_features_manifest_data,
 )
-from FishBroWFS_V2.control.features_store import write_features_npz_atomic
-from FishBroWFS_V2.contracts.features import FeatureSpec, FeatureRegistry
+from control.features_store import write_features_npz_atomic
+from contracts.features import FeatureSpec, FeatureRegistry
 
 
 def create_test_features_cache(
@@ -236,7 +236,7 @@ def test_manifest_mismatch():
     
     直接測試 _validate_manifest_contracts 函數
     """
-    from FishBroWFS_V2.control.feature_resolver import _validate_manifest_contracts
+    from control.feature_resolver import _validate_manifest_contracts
     
     # 測試 ts_dtype 錯誤
     manifest_bad_ts = {
@@ -318,7 +318,7 @@ def test_resolver_no_txt_reading(monkeypatch, tmp_path: Path):
         return {"success": True, "build_features": True}
     
     # monkeypatch build_shared
-    import FishBroWFS_V2.control.feature_resolver as resolver_module
+    import control.feature_resolver as resolver_module
     monkeypatch.setattr(resolver_module, "build_shared", mock_build_shared)
     
     # 建立需求
@@ -363,7 +363,7 @@ def test_feature_bundle_validation(tmp_path: Path):
     """
     測試 FeatureBundle 的驗證邏輯
     """
-    from FishBroWFS_V2.core.feature_bundle import FeatureBundle, FeatureSeries
+    from core.feature_bundle import FeatureBundle, FeatureSeries
     
     # 建立測試資料
     n = 10
@@ -475,7 +475,7 @@ def test_strategy_features_contract():
     """
     測試 Strategy Feature Declaration 合約
     """
-    from FishBroWFS_V2.contracts.strategy_features import (
+    from contracts.strategy_features import (
         StrategyFeatureRequirements,
         FeatureRef,
         canonical_json_requirements,

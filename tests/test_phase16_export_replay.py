@@ -13,8 +13,8 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.control.season_export_replay import (
+from control.api import app
+from control.season_export_replay import (
     load_replay_index,
     replay_season_topk,
     replay_season_batch_cards,
@@ -235,7 +235,7 @@ def test_export_season_compare_topk_endpoint(client):
         
         _wjson(exports_root / "seasons" / season / "replay_index.json", replay_index)
         
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+        with patch("control.api.get_exports_root", return_value=exports_root):
             r = client.get(f"/exports/seasons/{season}/compare/topk?k=5")
             assert r.status_code == 200
             data = r.json()
@@ -268,7 +268,7 @@ def test_export_season_compare_batches_endpoint(client):
         
         _wjson(exports_root / "seasons" / season / "replay_index.json", replay_index)
         
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+        with patch("control.api.get_exports_root", return_value=exports_root):
             r = client.get(f"/exports/seasons/{season}/compare/batches")
             assert r.status_code == 200
             data = r.json()
@@ -301,7 +301,7 @@ def test_export_season_compare_leaderboard_endpoint(client):
         
         _wjson(exports_root / "seasons" / season / "replay_index.json", replay_index)
         
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+        with patch("control.api.get_exports_root", return_value=exports_root):
             r = client.get(f"/exports/seasons/{season}/compare/leaderboard?group_by=strategy_id")
             assert r.status_code == 200
             data = r.json()
@@ -317,7 +317,7 @@ def test_export_endpoints_missing_replay_index(client):
         exports_root = Path(tmp) / "exports"
         season = "2026Q1"
         
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+        with patch("control.api.get_exports_root", return_value=exports_root):
             r = client.get(f"/exports/seasons/{season}/compare/topk")
             assert r.status_code == 404
             assert "replay_index.json" in r.json()["detail"]
@@ -430,7 +430,7 @@ def test_replay_endpoint_zero_write_guarantee(client):
         
         initial_state = get_file_state()
         
-        with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+        with patch("control.api.get_exports_root", return_value=exports_root):
             # Call each replay endpoint
             r1 = client.get(f"/exports/seasons/{season}/compare/topk?k=5")
             assert r1.status_code == 200

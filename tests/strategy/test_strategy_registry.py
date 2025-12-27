@@ -7,8 +7,8 @@ from typing import Any, Dict
 
 import pytest
 
-from FishBroWFS_V2.strategy.param_schema import ParamSpec
-from FishBroWFS_V2.strategy.registry import (
+from strategy.param_schema import ParamSpec
+from strategy.registry import (
     StrategySpecForGUI,
     StrategyRegistryResponse,
     convert_to_gui_spec,
@@ -17,7 +17,7 @@ from FishBroWFS_V2.strategy.registry import (
     clear,
     load_builtin_strategies,
 )
-from FishBroWFS_V2.strategy.spec import StrategySpec
+from strategy.spec import StrategySpec
 
 
 def create_dummy_strategy_fn(context: Dict[str, Any], params: Dict[str, float]) -> Dict[str, Any]:

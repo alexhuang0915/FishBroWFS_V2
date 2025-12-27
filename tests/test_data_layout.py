@@ -1,7 +1,7 @@
 
 import numpy as np
 import pytest
-from FishBroWFS_V2.data.layout import normalize_bars
+from data.layout import normalize_bars
 
 
 def test_normalize_bars_dtype_and_contiguous():

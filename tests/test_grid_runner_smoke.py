@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from pipeline.runner_grid import run_grid
 
 
 def _ohlc():

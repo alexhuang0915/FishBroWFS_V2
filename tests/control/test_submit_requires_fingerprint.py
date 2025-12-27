@@ -7,12 +7,12 @@ P0-2: fingerprint 必填（禁止 DIRTY job 進治理鏈）
 import pytest
 from unittest.mock import Mock, patch
 
-from FishBroWFS_V2.control.batch_submit import (
+from control.batch_submit import (
     wizard_to_db_jobspec,
     submit_batch,
 )
-from FishBroWFS_V2.control.job_spec import WizardJobSpec, DataSpec, WFSSpec
-from FishBroWFS_V2.control.types import DBJobSpec
+from control.job_spec import WizardJobSpec, DataSpec, WFSSpec
+from control.types import DBJobSpec
 
 
 def test_wizard_to_db_jobspec_requires_fingerprint() -> None:
@@ -61,7 +61,7 @@ def test_wizard_to_db_jobspec_requires_fingerprint() -> None:
 
 def test_submit_batch_requires_fingerprint() -> None:
     """submit_batch must fail when dataset index lacks fingerprint."""
-    from FishBroWFS_V2.control.batch_submit import submit_batch, BatchSubmitRequest
+    from control.batch_submit import submit_batch, BatchSubmitRequest
     from datetime import date
     
     wizard = WizardJobSpec(
@@ -84,7 +84,7 @@ def test_submit_batch_requires_fingerprint() -> None:
         }
     }
     
-    with patch("FishBroWFS_V2.control.batch_submit.create_job", return_value="job123"):
+    with patch("control.batch_submit.create_job", return_value="job123"):
         # This should not raise
         result = submit_batch(
             db_path=":memory:",
@@ -101,7 +101,7 @@ def test_submit_batch_requires_fingerprint() -> None:
         }
     }
     
-    with patch("FishBroWFS_V2.control.batch_submit.create_job", return_value="job123"):
+    with patch("control.batch_submit.create_job", return_value="job123"):
         with pytest.raises(ValueError, match="fingerprint required"):
             submit_batch(
                 db_path=":memory:",
@@ -116,7 +116,7 @@ def test_submit_batch_requires_fingerprint() -> None:
         }
     }
     
-    with patch("FishBroWFS_V2.control.batch_submit.create_job", return_value="job123"):
+    with patch("control.batch_submit.create_job", return_value="job123"):
         with pytest.raises(ValueError, match="data_fingerprint_sha256_40 is required"):
             submit_batch(
                 db_path=":memory:",
@@ -128,8 +128,8 @@ def test_submit_batch_requires_fingerprint() -> None:
 def test_api_endpoint_enforces_fingerprint() -> None:
     """The batch submit API endpoint should return 400 when fingerprint missing."""
     from fastapi.testclient import TestClient
-    from FishBroWFS_V2.control.api import app
-    from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+    from control.api import app
+    from data.dataset_registry import DatasetIndex, DatasetRecord
     from datetime import date
     
     client = TestClient(app)
@@ -151,7 +151,7 @@ def test_api_endpoint_enforces_fingerprint() -> None:
     mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[dataset_record])
     
     # Mock the dataset index loading
-    import FishBroWFS_V2.control.api as api_module
+    import control.api as api_module
     
     with patch.object(api_module, "load_dataset_index", return_value=mock_index), \
          patch.object(api_module, "_check_worker_status") as mock_check:

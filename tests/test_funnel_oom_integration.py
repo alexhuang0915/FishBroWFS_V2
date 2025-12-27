@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.pipeline.funnel_runner import run_funnel
+from pipeline.funnel_runner import run_funnel
 
 
 def test_funnel_metrics_include_oom_gate_fields():
@@ -109,7 +109,7 @@ def test_auto_downsample_updates_snapshot_and_hash(monkeypatch):
         return int(total_mem)
     
     monkeypatch.setattr(
-        "FishBroWFS_V2.core.oom_cost_model.estimate_memory_bytes",
+        "core.oom_cost_model.estimate_memory_bytes",
         mock_estimate_memory_bytes,
     )
     

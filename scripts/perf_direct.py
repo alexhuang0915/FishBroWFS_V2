@@ -18,9 +18,8 @@ print(f"python_path: {sys.path[0]}")
 
 try:
     # Correct src-based package name in this repo:
-    # src/FishBroWFS_V2/pipeline/runner_grid.py
-    from FishBroWFS_V2.pipeline.runner_grid import run_grid  # type: ignore
-    print("✅ Engine imported successfully (FishBroWFS_V2.pipeline.runner_grid).")
+    from pipeline.runner_grid import run_grid  # type: ignore
+    print("✅ Engine imported successfully (pipeline.runner_grid).")
 except ImportError as e:
     print(f"❌ FATAL: Cannot import engine: {e}")
     sys.exit(1)

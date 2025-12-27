@@ -36,9 +36,9 @@ from typing import List, Tuple, Optional, Dict, Any
 # ------------------------------------------------------------------------------
 
 PROJECT_ROOT = Path(__file__).parent.parent.parent.resolve()
-SNAPSHOT_DIR = PROJECT_ROOT / "SYSTEM_FULL_SNAPSHOT"
+SNAPSHOT_DIR = PROJECT_ROOT / "SNAPSHOT"
 SNAPSHOT_MANIFEST = SNAPSHOT_DIR / "MANIFEST.json"
-GENERATE_SNAPSHOT_SCRIPT = PROJECT_ROOT / "scripts" / "no_fog" / "generate_full_snapshot.py"
+GENERATE_SNAPSHOT_SCRIPT = PROJECT_ROOT / "scripts" / "dump_context.py"
 
 # Core contract tests to run (relative to project root)
 CORE_CONTRACT_TESTS = [
@@ -132,8 +132,6 @@ def regenerate_snapshot(force: bool = True) -> bool:
     print_step("Regenerating full repository snapshot", "📸")
     
     cmd = [sys.executable, str(GENERATE_SNAPSHOT_SCRIPT)]
-    if force:
-        cmd.append("--force")
     
     print(f"Running: {' '.join(cmd)}")
     
@@ -159,9 +157,10 @@ def regenerate_snapshot(force: bool = True) -> bool:
     # Print summary
     manifest = load_manifest()
     if manifest:
-        chunks = len(manifest.get("chunks", []))
-        files = len(manifest.get("files", []))
-        skipped = len(manifest.get("skipped", []))
+        # New manifest format (dump_context.py vNext)
+        chunks = manifest.get("stats", {}).get("total_chunks", 0)
+        files = manifest.get("files_complete", 0)
+        skipped = manifest.get("files_skipped", 0)
         print(f"  • {chunks} chunk(s)")
         print(f"  • {files} file(s) included")
         print(f"  • {skipped} file(s) skipped")
@@ -245,7 +244,7 @@ def verify_snapshot_current() -> bool:
         print_error("Could not load manifest")
         return False
     
-    generated_at = manifest.get("generated_at", "unknown")
+    generated_at = manifest.get("run_id", "unknown")
     print(f"Snapshot generated at: {generated_at}")
     
     # Note: A more sophisticated implementation would:

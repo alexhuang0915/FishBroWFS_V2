@@ -5,15 +5,15 @@ import tempfile
 import json
 from pathlib import Path
 
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
-from FishBroWFS_V2.contracts.portfolio.plan_quality_models import (
+from contracts.portfolio.plan_quality_models import (
     PlanQualityReport, QualityMetrics, QualitySourceRef, QualityThresholds
 )
-from FishBroWFS_V2.portfolio.plan_quality import compute_quality_from_plan_dir
-from FishBroWFS_V2.portfolio.plan_quality_writer import write_plan_quality_files
+from portfolio.plan_quality import compute_quality_from_plan_dir
+from portfolio.plan_quality_writer import write_plan_quality_files
 
 
 def test_plan_quality_contract_lock():
@@ -122,7 +122,7 @@ def test_plan_quality_contract_lock():
             assert field in manifest, f"Missing required field {field} in manifest"
         
         # 4. Verify manifest_sha256 matches canonical JSON of manifest (excluding that field)
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
         
         # Create a copy without manifest_sha256
         manifest_copy = manifest.copy()

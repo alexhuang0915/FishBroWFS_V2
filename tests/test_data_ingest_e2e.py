@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.data.cache import cache_paths, read_parquet_cache, write_parquet_cache
-from FishBroWFS_V2.data.fingerprint import compute_txt_fingerprint
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
+from data.cache import cache_paths, read_parquet_cache, write_parquet_cache
+from data.fingerprint import compute_txt_fingerprint
+from data.raw_ingest import ingest_raw_txt
 
 # Note: sample_raw_txt fixture is defined in conftest.py for all tests
 

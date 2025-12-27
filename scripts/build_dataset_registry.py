@@ -14,7 +14,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional
 
-from FishBroWFS_V2.data.dataset_registry import DatasetIndex, DatasetRecord
+from data.dataset_registry import DatasetIndex, DatasetRecord
 
 
 def parse_filename_to_dates(filename: str) -> Optional[tuple[date, date]]:

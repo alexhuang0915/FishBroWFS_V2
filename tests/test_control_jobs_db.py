@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.jobs_db import (
+from control.jobs_db import (
     create_job,
     get_job,
     get_requested_pause,
@@ -22,7 +22,7 @@ from FishBroWFS_V2.control.jobs_db import (
     request_stop,
     update_running,
 )
-from FishBroWFS_V2.control.types import DBJobSpec, JobStatus, StopMode
+from control.types import DBJobSpec, JobStatus, StopMode
 
 
 @pytest.fixture

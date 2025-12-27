@@ -2,7 +2,7 @@
 """Unit tests for param_grid module (Phase 13)."""
 
 import pytest
-from FishBroWFS_V2.control.param_grid import GridMode, ParamGridSpec, values_for_param, count_for_param, validate_grid_for_param
+from control.param_grid import GridMode, ParamGridSpec, values_for_param, count_for_param, validate_grid_for_param
 
 
 def test_grid_mode_enum():

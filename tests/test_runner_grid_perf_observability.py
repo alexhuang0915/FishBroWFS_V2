@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from pipeline.runner_grid import run_grid
 
 
 def test_run_grid_perf_fields_present_and_non_negative(monkeypatch) -> None:

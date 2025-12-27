@@ -19,9 +19,9 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from FishBroWFS_V2.control.api import app
-from FishBroWFS_V2.control.data_snapshot import compute_snapshot_id, normalize_bars
-from FishBroWFS_V2.control.dataset_registry_mutation import register_snapshot_as_dataset
+from control.api import app
+from control.data_snapshot import compute_snapshot_id, normalize_bars
+from control.dataset_registry_mutation import register_snapshot_as_dataset
 
 
 @pytest.fixture
@@ -80,7 +80,7 @@ def test_snapshot_endpoint_creates_manifest(client):
             "transform_version": "v1",
         }
 
-        with patch("FishBroWFS_V2.control.api._get_snapshots_root", return_value=root):
+        with patch("control.api._get_snapshots_root", return_value=root):
             r = client.post("/datasets/snapshots", json=payload)
             if r.status_code != 200:
                 print(f"Response status: {r.status_code}")
@@ -118,16 +118,16 @@ def test_register_snapshot_endpoint(client):
         raw_bars = [
             {"timestamp": "2025-01-01T00:00:00Z", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000},
         ]
-        from FishBroWFS_V2.control.data_snapshot import create_snapshot
+        from control.data_snapshot import create_snapshot
         meta = create_snapshot(snapshots_root, raw_bars, "TEST", "1h", "v1")
         snapshot_id = meta.snapshot_id
 
         # Mock both roots
-        with patch("FishBroWFS_V2.control.api._get_snapshots_root", return_value=snapshots_root):
+        with patch("control.api._get_snapshots_root", return_value=snapshots_root):
             # Registry root also needs to be mocked (inside dataset_registry_mutation)
             registry_root = Path(tmp) / "datasets"
             registry_root.mkdir(parents=True)
-            with patch("FishBroWFS_V2.control.dataset_registry_mutation._get_dataset_registry_root", return_value=registry_root):
+            with patch("control.dataset_registry_mutation._get_dataset_registry_root", return_value=registry_root):
                 r = client.post("/datasets/registry/register_snapshot", json={"snapshot_id": snapshot_id})
                 if r.status_code != 200:
                     print(f"Response status: {r.status_code}")
@@ -175,12 +175,12 @@ def test_snapshot_to_batch_to_export_e2e(client):
             {"timestamp": "2025-01-01T00:00:00Z", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.5, "volume": 1000},
             {"timestamp": "2025-01-01T01:00:00Z", "open": 100.5, "high": 102.0, "low": 100.0, "close": 101.5, "volume": 1200},
         ]
-        from FishBroWFS_V2.control.data_snapshot import create_snapshot
+        from control.data_snapshot import create_snapshot
         meta = create_snapshot(snapshots_root, raw_bars, "TEST", "1h", "v1")
         snapshot_id = meta.snapshot_id
 
         # Register snapshot as dataset
-        from FishBroWFS_V2.control.dataset_registry_mutation import register_snapshot_as_dataset
+        from control.dataset_registry_mutation import register_snapshot_as_dataset
         snapshot_dir = snapshots_root / snapshot_id
         entry = register_snapshot_as_dataset(snapshot_dir=snapshot_dir, registry_root=dataset_registry_root)
         dataset_id = entry.id
@@ -243,20 +243,20 @@ def test_snapshot_to_batch_to_export_e2e(client):
         )
 
         # Freeze batch
-        with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root):
-            store_patch = patch("FishBroWFS_V2.control.api._get_governance_store")
+        with patch("control.api._get_artifacts_root", return_value=artifacts_root):
+            store_patch = patch("control.api._get_governance_store")
             mock_store = store_patch.start()
             mock_store.return_value.is_frozen.return_value = False
             mock_store.return_value.freeze.return_value = None
 
             # Freeze season
-            season_store_patch = patch("FishBroWFS_V2.control.api._get_season_store")
+            season_store_patch = patch("control.api._get_season_store")
             mock_season_store = season_store_patch.start()
             mock_season_store.return_value.is_frozen.return_value = False
             mock_season_store.return_value.freeze.return_value = None
 
             # Export season (mock export function to avoid heavy copying)
-            export_patch = patch("FishBroWFS_V2.control.api.export_season_package")
+            export_patch = patch("control.api.export_season_package")
             mock_export = export_patch.start()
             mock_export.return_value = type(
                 "ExportResult",
@@ -272,7 +272,7 @@ def test_snapshot_to_batch_to_export_e2e(client):
             )()
 
             # Replay endpoints (read‑only) should work without touching artifacts
-            with patch("FishBroWFS_V2.control.api.get_exports_root", return_value=exports_root):
+            with patch("control.api.get_exports_root", return_value=exports_root):
                 # Mock replay_index.json (format matches season_export.py)
                 replay_index_path = exports_root / "seasons" / "test_season" / "replay_index.json"
                 replay_index_path.parent.mkdir(parents=True, exist_ok=True)
@@ -373,7 +373,7 @@ def test_list_snapshots_endpoint(client):
             },
         )
 
-        with patch("FishBroWFS_V2.control.api._get_snapshots_root", return_value=root):
+        with patch("control.api._get_snapshots_root", return_value=root):
             r = client.get("/datasets/snapshots")
             assert r.status_code == 200
             data = r.json()

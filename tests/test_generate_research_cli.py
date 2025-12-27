@@ -103,8 +103,8 @@ def test_generate_research_import_fixed():
     # Note: conftest.py already adds src/ to sys.path, so no need to modify it here
     
     try:
-        from FishBroWFS_V2.research.__main__ import generate_canonical_results
-        from FishBroWFS_V2.research.registry import build_research_index
+        from research.__main__ import generate_canonical_results
+        from research.registry import build_research_index
         
         # If we get here, imports succeeded
         assert True

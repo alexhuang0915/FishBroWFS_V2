@@ -7,8 +7,8 @@ import tempfile
 from pathlib import Path
 sys.path.insert(0, "src")
 
-from FishBroWFS_V2.control.job_api import create_job_from_wizard, calculate_units
-from FishBroWFS_V2.control.jobs_db import init_db, get_job
+from control.job_api import create_job_from_wizard, calculate_units
+from control.jobs_db import init_db, get_job
 
 def test_job_submission_and_redirection():
     """Test that job submission creates job and returns correct job_id for redirection."""
@@ -115,7 +115,7 @@ def test_job_submission_and_redirection():
         print("-" * 40)
         
         # Check that job_detail.py exists and has the correct route
-        job_detail_path = Path("src/FishBroWFS_V2/gui/nicegui/pages/job_detail.py")
+        job_detail_path = Path("src/gui/nicegui/pages/job_detail.py")
         if job_detail_path.exists():
             with open(job_detail_path, 'r') as f:
                 content = f.read()
@@ -136,7 +136,7 @@ def test_job_submission_and_redirection():
         print("Test 4: Jobs list route")
         print("-" * 40)
         
-        jobs_path = Path("src/FishBroWFS_V2/gui/nicegui/pages/jobs.py")
+        jobs_path = Path("src/gui/nicegui/pages/jobs.py")
         if jobs_path.exists():
             with open(jobs_path, 'r') as f:
                 content = f.read()

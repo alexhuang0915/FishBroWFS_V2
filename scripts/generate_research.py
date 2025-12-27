@@ -63,8 +63,8 @@ def generate_for_season(outputs_root: Path, season: str, verbose: bool) -> Path:
     sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
     
     try:
-        from FishBroWFS_V2.research.registry import build_research_index
-        from FishBroWFS_V2.research.__main__ import generate_canonical_results
+        from research.registry import build_research_index
+        from research.__main__ import generate_canonical_results
     except ImportError as e:
         raise ImportError(f"Failed to import research modules: {e}")
     
@@ -89,7 +89,7 @@ def main() -> int:
     if args.season:
         try:
             sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-            from FishBroWFS_V2.core.season_state import check_season_not_frozen
+            from core.season_state import check_season_not_frozen
             check_season_not_frozen(args.season, action="generate_research")
         except ImportError:
             # If season_state module is not available, skip check (backward compatibility)
@@ -120,8 +120,8 @@ def main() -> int:
         # Add src to path (must be done before imports)
         sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
         
-        from FishBroWFS_V2.research.registry import build_research_index
-        from FishBroWFS_V2.research.__main__ import generate_canonical_results
+        from research.registry import build_research_index
+        from research.__main__ import generate_canonical_results
         
         # Generate canonical results
         print(f"Generating canonical_results.json...")

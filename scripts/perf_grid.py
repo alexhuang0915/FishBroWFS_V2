@@ -25,8 +25,8 @@ from typing import List, Dict, Any, Optional
 
 import numpy as np
 
-from FishBroWFS_V2.perf.cost_model import estimate_seconds
-from FishBroWFS_V2.perf.profile_report import _format_profile_report
+from perf.cost_model import estimate_seconds
+from perf.profile_report import _format_profile_report
 
 # ==========================================
 # 1. 配置與常數 (Tiers)
@@ -75,7 +75,7 @@ def generate_synthetic_data(n_bars: int, seed: int = 42) -> Dict[str, np.ndarray
     
     Uses float32 for Stage0/perf optimization (memory bandwidth reduction).
     """
-    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    from config.dtypes import PRICE_DTYPE_STAGE0
     
     rng = np.random.default_rng(seed)
     close = 10000 + np.cumsum(rng.standard_normal(n_bars)) * 10
@@ -105,7 +105,7 @@ def generate_params(n_params: int, seed: int = 999) -> np.ndarray:
     
     Uses float32 for Stage0 optimization (memory bandwidth reduction).
     """
-    from FishBroWFS_V2.config.dtypes import PRICE_DTYPE_STAGE0
+    from config.dtypes import PRICE_DTYPE_STAGE0
     
     rng = np.random.default_rng(seed)
     w1 = rng.integers(10, 100, size=n_params)
@@ -144,7 +144,6 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-# NOTE: _format_profile_report moved to src/FishBroWFS_V2/perf/profile_report.py
 
 def _run_microbench_numba_indicators(closes: np.ndarray, hot_runs: int) -> Dict[str, Any]:
     """
@@ -157,7 +156,7 @@ def _run_microbench_numba_indicators(closes: np.ndarray, hot_runs: int) -> Dict[
     except Exception:  # pragma: no cover
         return {"microbench": "numba_missing"}
 
-    from FishBroWFS_V2.indicators import numba_indicators as ni  # type: ignore
+    from indicators import numba_indicators as ni  # type: ignore
 
     # Use a fixed window; keep deterministic and cheap.
     length = 14
@@ -222,9 +221,8 @@ def run_worker(
         
         try:
             # Phase 3B Grid Runner (correct target)
-            # src/FishBroWFS_V2/pipeline/runner_grid.py
-            from FishBroWFS_V2.pipeline.runner_grid import run_grid  # type: ignore
-            worker_log("Grid runner imported successfully (FishBroWFS_V2.pipeline.runner_grid).")
+            from pipeline.runner_grid import run_grid  # type: ignore
+            worker_log("Grid runner imported successfully (pipeline.runner_grid).")
             # Enable runner_grid observability payload in returned dict (timings + jit truth + counts).
             os.environ["FISHBRO_PROFILE_GRID"] = "1"
 
@@ -757,8 +755,8 @@ def run_matcherbench() -> None:
       - Measure true throughput of cursor-based matcher kernel
       - Avoid runner_grid / Python orchestration overhead
     """
-    from FishBroWFS_V2.engine.engine_jit import simulate
-    from FishBroWFS_V2.engine.types import (
+    from engine.engine_jit import simulate
+    from engine.types import (
         BarArrays,
         OrderIntent,
         OrderKind,

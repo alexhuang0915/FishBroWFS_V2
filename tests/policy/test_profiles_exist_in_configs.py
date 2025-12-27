@@ -50,7 +50,7 @@ def test_profiles_loader_preference() -> None:
     
     This test imports the actual loader and tests its behavior.
     """
-    from FishBroWFS_V2.data.session.loader import load_session_profile
+    from data.session.loader import load_session_profile
     
     # Try to load a profile by name (not path)
     # The loader should find it in configs/profiles/
@@ -68,7 +68,7 @@ if __name__ == "__main__":
     import sys
     sys.path.insert(0, "src")
     
-    from FishBroWFS_V2.data.session.loader import load_session_profile
+    from data.session.loader import load_session_profile
     
     # Test loading from configs/profiles
     repo_root = Path(__file__).parent.parent

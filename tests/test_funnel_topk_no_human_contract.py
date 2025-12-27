@@ -7,9 +7,9 @@ with no possibility of human intervention or manual filtering.
 
 import numpy as np
 
-from FishBroWFS_V2.pipeline.funnel import run_funnel
-from FishBroWFS_V2.pipeline.stage0_runner import Stage0Result, run_stage0
-from FishBroWFS_V2.pipeline.topk import select_topk
+from pipeline.funnel import run_funnel
+from pipeline.stage0_runner import Stage0Result, run_stage0
+from pipeline.topk import select_topk
 
 
 def test_topk_only_uses_proxy_value():

@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from FishBroWFS_V2.core.governance_schema import (
+from core.governance_schema import (
     Decision,
     EvidenceRef,
     GovernanceItem,

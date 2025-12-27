@@ -7,8 +7,8 @@ Tests that Research OS cannot leak trading details through CandidateSpec.
 
 import pytest
 
-from FishBroWFS_V2.portfolio.candidate_spec import CandidateSpec, CandidateExport
-from FishBroWFS_V2.portfolio.candidate_export import export_candidates, load_candidates
+from portfolio.candidate_spec import CandidateSpec, CandidateExport
+from portfolio.candidate_export import export_candidates, load_candidates
 
 
 def test_candidate_spec_rejects_trading_details():
@@ -263,7 +263,7 @@ def test_load_candidates_file_not_found(tmp_path):
 
 def test_create_candidate_from_research():
     """Test create_candidate_from_research helper."""
-    from FishBroWFS_V2.portfolio.candidate_spec import create_candidate_from_research
+    from portfolio.candidate_spec import create_candidate_from_research
     
     candidate = create_candidate_from_research(
         candidate_id="candidate1",

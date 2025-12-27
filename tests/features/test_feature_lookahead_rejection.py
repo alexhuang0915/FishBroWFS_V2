@@ -7,9 +7,9 @@ Ensures that features with lookahead behavior are rejected by the registry.
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.features.models import FeatureSpec
-from FishBroWFS_V2.features.registry import FeatureRegistry
-from FishBroWFS_V2.features.causality import LookaheadDetectedError
+from features.models import FeatureSpec
+from features.registry import FeatureRegistry
+from features.causality import LookaheadDetectedError
 
 
 def test_registry_rejects_lookahead_feature():

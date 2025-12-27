@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.data.cache import CachePaths, cache_paths, read_parquet_cache, write_parquet_cache
-from FishBroWFS_V2.data.fingerprint import compute_txt_fingerprint
-from FishBroWFS_V2.data.raw_ingest import ingest_raw_txt
+from data.cache import CachePaths, cache_paths, read_parquet_cache, write_parquet_cache
+from data.fingerprint import compute_txt_fingerprint
+from data.raw_ingest import ingest_raw_txt
 
 
 def test_cache_rebuild_fingerprint_stable(temp_dir: Path, sample_raw_txt: Path) -> None:

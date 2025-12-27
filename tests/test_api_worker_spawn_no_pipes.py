@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.api import _ensure_worker_running
+from control.api import _ensure_worker_running
 
 
 def test_api_worker_spawn_no_pipes(monkeypatch, tmp_path: Path) -> None:
@@ -21,9 +21,9 @@ def test_api_worker_spawn_no_pipes(monkeypatch, tmp_path: Path) -> None:
             pid = 123
         return P()
 
-    monkeypatch.setattr("FishBroWFS_V2.control.api.subprocess.Popen", fake_popen)
-    monkeypatch.setattr("FishBroWFS_V2.control.api.os.kill", lambda pid, sig: None)
-    monkeypatch.setattr("FishBroWFS_V2.control.api.init_db", lambda _: None)
+    monkeypatch.setattr("control.api.subprocess.Popen", fake_popen)
+    monkeypatch.setattr("control.api.os.kill", lambda pid, sig: None)
+    monkeypatch.setattr("control.api.init_db", lambda _: None)
     # Allow worker spawn in tests and allow /tmp DB paths
     monkeypatch.setenv("FISHBRO_ALLOW_SPAWN_IN_TESTS", "1")
     monkeypatch.setenv("FISHBRO_ALLOW_TMP_DB", "1")

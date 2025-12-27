@@ -78,7 +78,7 @@ def collect_evidence() -> PhaseAAudit:
     candidate_cleanup = run_rg("GM_Huang|launch_b5\.sh|restore_from_release_txt_force", ".", extra_args=["--glob", "!TEST_SNAPSHOT*", "--glob", "!SYSTEM_FULL_SNAPSHOT*"])
     
     # 2. Runner Schism (Single Truth Audit)
-    print("2. Searching for runner patterns in src/FishBroWFS_V2...", file=sys.stderr)
+    print("2. Searching for runner patterns in src/..", file=sys.stderr)
     runner_schism = run_rg(
         "funnel_runner|wfs_runner|research_runner|run_funnel|run_wfs|run_research",
         "src/FishBroWFS_V2"
@@ -88,23 +88,22 @@ def collect_evidence() -> PhaseAAudit:
     print("3. Searching for database operations in GUI...", file=sys.stderr)
     ui_bypass = run_rg(
         "commit\(|execute\(|insert\(|update\(|delete\(|\.write\(",
-        "src/FishBroWFS_V2/gui"
+        "src/gui"
     )
     
     # 4. ActionQueue/Intent patterns in GUI
     print("4. Searching for ActionQueue/Intent patterns in GUI...", file=sys.stderr)
     action_queue = run_rg(
         "ActionQueue|UserIntent|submit_intent|enqueue\(",
-        "src/FishBroWFS_V2/gui"
+        "src/gui"
     )
     
     # 5. Test Inventory & Obsolescence Candidates
     print("5. Searching for stage0 tests...", file=sys.stderr)
     test_inventory = run_rg("tests/test_stage0_|stage0_", "tests")
     
-    # 6. Imports audit (FishBroWFS_V2 within GUI)
     print("6. Searching for FishBroWFS_V2 imports in GUI...", file=sys.stderr)
-    imports_audit = run_rg("^from FishBroWFS_V2|^import FishBroWFS_V2", "src/FishBroWFS_V2/gui")
+    imports_audit = run_rg("^from FishBroWFS_V2|^import FishBroWFS_V2", "src/gui")
     
     # 7. Tooling Rules Drift (.continue/rules, Makefile, .github)
     print("7. Searching for tooling patterns...", file=sys.stderr)

@@ -8,7 +8,7 @@ propagated from kernel to perf JSON output.
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.pipeline.runner_grid import run_grid
+from pipeline.runner_grid import run_grid
 
 
 def test_perf_obs_entry_sparse_fields():

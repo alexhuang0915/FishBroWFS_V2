@@ -12,8 +12,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from FishBroWFS_V2.data.session.kbar import aggregate_kbar
-from FishBroWFS_V2.data.session.loader import load_session_profile
+from data.session.kbar import aggregate_kbar
+from data.session.loader import load_session_profile
 
 
 @pytest.fixture

@@ -10,13 +10,13 @@ import time
 from datetime import date, datetime
 from concurrent.futures import ThreadPoolExecutor
 
-from FishBroWFS_V2.core.intents import (
+from core.intents import (
     CreateJobIntent, CalculateUnitsIntent, DataSpecIntent,
     IntentStatus, IntentType
 )
-from FishBroWFS_V2.control.action_queue import ActionQueue, reset_action_queue
-from FishBroWFS_V2.core.processor import StateProcessor, ProcessingError, get_processor
-from FishBroWFS_V2.core.state import SystemState, JobStatus, create_initial_state
+from control.action_queue import ActionQueue, reset_action_queue
+from core.processor import StateProcessor, ProcessingError, get_processor
+from core.state import SystemState, JobStatus, create_initial_state
 
 
 @pytest.fixture
@@ -139,7 +139,7 @@ async def test_processor_error_handling(processor, action_queue):
     
     # Submit an invalid intent (missing required fields)
     # We'll create a malformed intent by directly manipulating a valid one
-    from FishBroWFS_V2.core.intents import CreateJobIntent, DataSpecIntent
+    from core.intents import CreateJobIntent, DataSpecIntent
     
     # Create a data spec with empty symbols (should fail validation)
     invalid_data_spec = DataSpecIntent(
@@ -232,7 +232,7 @@ def test_state_snapshot_creation():
     state = create_initial_state()
     
     # Create snapshot with updates
-    from FishBroWFS_V2.core.state import create_state_snapshot, SystemMetrics
+    from core.state import create_state_snapshot, SystemMetrics
     
     new_metrics = SystemMetrics(
         total_jobs=5,
@@ -339,8 +339,8 @@ def test_processor_singleton():
 @pytest.mark.skip(reason="Async tests require pytest-asyncio")
 async def test_processor_stop_before_start():
     """Test that processor can be stopped even if not started."""
-    from FishBroWFS_V2.control.action_queue import ActionQueue
-    from FishBroWFS_V2.core.processor import StateProcessor
+    from control.action_queue import ActionQueue
+    from core.processor import StateProcessor
     
     queue = ActionQueue()
     processor = StateProcessor(queue)

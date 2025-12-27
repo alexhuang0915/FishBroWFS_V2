@@ -13,8 +13,8 @@ import pytest
 
 import os
 
-from FishBroWFS_V2.control.jobs_db import append_log, create_job, init_db, mark_done, update_running
-from FishBroWFS_V2.control.types import DBJobSpec
+from control.jobs_db import append_log, create_job, init_db, mark_done, update_running
+from control.types import DBJobSpec
 
 
 def _worker(db_path: str, n: int) -> None:

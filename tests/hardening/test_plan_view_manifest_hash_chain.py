@@ -6,12 +6,12 @@ import json
 import hashlib
 from pathlib import Path
 
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
-from FishBroWFS_V2.portfolio.plan_view_renderer import render_plan_view, write_plan_view_files
-from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+from portfolio.plan_view_renderer import render_plan_view, write_plan_view_files
+from control.artifacts import canonical_json_bytes, compute_sha256
 
 
 def test_plan_view_manifest_hash_chain():
@@ -151,7 +151,7 @@ def test_plan_view_manifest_hash_chain():
             "Manifest checksum should not match tampered file"
         
         # 5. Optional: verify loader can detect tampering
-        from FishBroWFS_V2.portfolio.plan_view_loader import verify_view_integrity
+        from portfolio.plan_view_loader import verify_view_integrity
         assert not verify_view_integrity(plan_dir), \
             "verify_view_integrity should return False for tampered files"
 

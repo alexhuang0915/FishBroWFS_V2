@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 
-from FishBroWFS_V2.core.winners_schema import (
+from core.winners_schema import (
     WinnerItemV2,
     build_winners_v2_dict,
     is_winners_legacy,

@@ -1,7 +1,7 @@
 
 import numpy as np
 
-from FishBroWFS_V2.indicators.numba_indicators import (
+from indicators.numba_indicators import (
     rolling_max,
     rolling_min,
     atr_wilder,

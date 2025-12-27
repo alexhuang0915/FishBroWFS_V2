@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.season_api import SeasonStore, get_season_index_root
+from control.season_api import SeasonStore, get_season_index_root
 
 
 def test_season_store_creates_root(tmp_path: Path) -> None:
@@ -71,7 +71,7 @@ def test_season_dir_creation_on_write(tmp_path: Path) -> None:
     assert index_path.parent.name == season
     
     # Write metadata – should reuse existing season directory
-    from FishBroWFS_V2.control.season_api import SeasonMetadata
+    from control.season_api import SeasonMetadata
     meta = SeasonMetadata(
         season=season,
         frozen=False,

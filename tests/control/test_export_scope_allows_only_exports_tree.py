@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.utils.write_scope import create_season_export_scope, WriteScope
+from utils.write_scope import create_season_export_scope, WriteScope
 
 
 def test_export_scope_allows_exports_tree(tmp_path: Path) -> None:

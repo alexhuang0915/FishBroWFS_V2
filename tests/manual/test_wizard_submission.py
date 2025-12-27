@@ -4,14 +4,14 @@
 import sys
 sys.path.insert(0, 'src')
 
-from FishBroWFS_V2.strategy.registry import load_builtin_strategies
+from strategy.registry import load_builtin_strategies
 
 def test_strategy_registration():
     """Test that strategies are properly registered."""
     print("=== Testing Strategy Registration ===")
     load_builtin_strategies()
     
-    from FishBroWFS_V2.strategy.registry import list_strategies
+    from strategy.registry import list_strategies
     strategies = list_strategies()
     
     print(f"Total strategies: {len(strategies)}")
@@ -26,7 +26,7 @@ def test_strategy_catalog():
     """Test that strategies are available in the catalog for UI."""
     print("\n=== Testing Strategy Catalog ===")
     
-    from FishBroWFS_V2.control.strategy_catalog import get_strategy_catalog
+    from control.strategy_catalog import get_strategy_catalog
     catalog = get_strategy_catalog()
     
     # Load strategies first

@@ -7,27 +7,27 @@ import re
 PATCH_MAPPINGS = {
     # invalidate_feature_cache
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.invalidate_feature_cache'": 
-        "patch('FishBroWFS_V2.control.feature_resolver.invalidate_feature_cache'",
+        "patch('control.feature_resolver.invalidate_feature_cache'",
     
     # get_dataset_catalog
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.get_dataset_catalog'": 
-        "patch('FishBroWFS_V2.control.dataset_catalog.get_dataset_catalog'",
+        "patch('control.dataset_catalog.get_dataset_catalog'",
     
     # get_strategy_catalog
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.get_strategy_catalog'": 
-        "patch('FishBroWFS_V2.control.strategy_catalog.get_strategy_catalog'",
+        "patch('control.strategy_catalog.get_strategy_catalog'",
     
     # get_descriptor
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.get_descriptor'": 
-        "patch('FishBroWFS_V2.control.dataset_descriptor.get_descriptor'",
+        "patch('control.dataset_descriptor.get_descriptor'",
     
     # list_descriptors
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.list_descriptors'": 
-        "patch('FishBroWFS_V2.control.dataset_descriptor.list_descriptors'",
+        "patch('control.dataset_descriptor.list_descriptors'",
     
     # build_parquet_from_txt
     r"patch\('FishBroWFS_V2\.gui\.services\.reload_service\.build_parquet_from_txt'": 
-        "patch('FishBroWFS_V2.control.data_build.build_parquet_from_txt'",
+        "patch('control.data_build.build_parquet_from_txt'",
 }
 
 def update_test_file():

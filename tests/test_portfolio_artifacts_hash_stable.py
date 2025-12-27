@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.portfolio.artifacts import compute_portfolio_hash, write_portfolio_artifacts
-from FishBroWFS_V2.portfolio.compiler import compile_portfolio
-from FishBroWFS_V2.portfolio.loader import load_portfolio_spec
-from FishBroWFS_V2.strategy.registry import load_builtin_strategies, clear
+from portfolio.artifacts import compute_portfolio_hash, write_portfolio_artifacts
+from portfolio.compiler import compile_portfolio
+from portfolio.loader import load_portfolio_spec
+from strategy.registry import load_builtin_strategies, clear
 
 
 @pytest.fixture(autouse=True)

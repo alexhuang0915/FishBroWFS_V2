@@ -5,12 +5,12 @@ import tempfile
 import json
 from pathlib import Path
 
-from FishBroWFS_V2.utils.fs_snapshot import snapshot_tree, diff_snap
-from FishBroWFS_V2.contracts.portfolio.plan_models import (
+from utils.fs_snapshot import snapshot_tree, diff_snap
+from contracts.portfolio.plan_models import (
     PortfolioPlan, SourceRef, PlannedCandidate, PlannedWeight,
     PlanSummary, ConstraintsReport
 )
-from FishBroWFS_V2.portfolio.plan_quality import compute_quality_from_plan_dir
+from portfolio.plan_quality import compute_quality_from_plan_dir
 
 
 def test_plan_quality_zero_write_read_path():

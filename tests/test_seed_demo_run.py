@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.seed_demo_run import main, get_db_path
+from control.seed_demo_run import main, get_db_path
 
 
 def test_seed_demo_run_no_raise(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

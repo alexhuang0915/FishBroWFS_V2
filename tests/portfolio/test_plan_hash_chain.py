@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.contracts.portfolio.plan_payloads import PlanCreatePayload
-from FishBroWFS_V2.portfolio.plan_builder import (
+from contracts.portfolio.plan_payloads import PlanCreatePayload
+from portfolio.plan_builder import (
     build_portfolio_plan_from_export,
     write_plan_package,
 )
@@ -78,7 +78,7 @@ def test_plan_manifest_includes_self_hash():
         assert "manifest_sha256" in manifest
 
         # Compute SHA256 of manifest excluding the manifest_sha256 field
-        from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+        from control.artifacts import canonical_json_bytes, compute_sha256
 
         manifest_without_hash = {k: v for k, v in manifest.items() if k != "manifest_sha256"}
         canonical = canonical_json_bytes(manifest_without_hash)

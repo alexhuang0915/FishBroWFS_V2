@@ -13,7 +13,7 @@ import tempfile
 import pytest
 from pathlib import Path
 
-from FishBroWFS_V2.utils.write_scope import WriteScope, create_plan_scope
+from utils.write_scope import WriteScope, create_plan_scope
 
 
 def test_scope_allows_exact_match() -> None:

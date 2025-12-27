@@ -20,23 +20,23 @@ from typing import Dict, Any
 import numpy as np
 import pytest
 
-from FishBroWFS_V2.contracts.strategy_features import (
+from contracts.strategy_features import (
     StrategyFeatureRequirements,
     FeatureRef,
     save_requirements_to_json,
 )
-from FishBroWFS_V2.control.research_runner import (
+from control.research_runner import (
     run_research,
     ResearchRunError,
     _load_strategy_feature_requirements,
 )
-from FishBroWFS_V2.control.build_context import BuildContext
-from FishBroWFS_V2.control.features_manifest import (
+from control.build_context import BuildContext
+from control.features_manifest import (
     write_features_manifest,
     build_features_manifest_data,
 )
-from FishBroWFS_V2.control.features_store import write_features_npz_atomic
-from FishBroWFS_V2.contracts.features import FeatureSpec, FeatureRegistry
+from control.features_store import write_features_npz_atomic
+from contracts.features import FeatureSpec, FeatureRegistry
 
 
 def create_test_features_cache(
@@ -146,7 +146,7 @@ def test_research_run_success(tmp_path: Path, monkeypatch):
     cache = create_test_features_cache(tmp_path, season, dataset_id, tf=60)
     
     # 檢查 manifest 檔案是否存在
-    from FishBroWFS_V2.control.features_manifest import features_manifest_path, load_features_manifest
+    from control.features_manifest import features_manifest_path, load_features_manifest
     manifest_path = features_manifest_path(tmp_path / "outputs", season, dataset_id)
     assert manifest_path.exists(), f"manifest 檔案不存在: {manifest_path}"
     
@@ -166,8 +166,8 @@ def test_research_run_success(tmp_path: Path, monkeypatch):
     assert "session_vwap" in spec_names
     
     # 直接測試 _check_missing_features
-    from FishBroWFS_V2.control.feature_resolver import _check_missing_features
-    from FishBroWFS_V2.contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
+    from control.feature_resolver import _check_missing_features
+    from contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
     
     requirements = StrategyFeatureRequirements(
         strategy_id=strategy_id,
@@ -186,7 +186,7 @@ def test_research_run_success(tmp_path: Path, monkeypatch):
     create_test_strategy_requirements(tmp_path, strategy_id, tmp_path / "outputs")
     
     # Monkeypatch 策略註冊表，讓 get 返回一個假的策略 spec
-    from FishBroWFS_V2.contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
+    from contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
     class FakeStrategySpec:
         def __init__(self):
             self.strategy_id = strategy_id
@@ -210,15 +210,15 @@ def test_research_run_success(tmp_path: Path, monkeypatch):
                 notes="測試需求",
             )
     
-    import FishBroWFS_V2.strategy.registry as registry_module
+    import strategy.registry as registry_module
     monkeypatch.setattr(registry_module, "get", lambda sid: FakeStrategySpec())
     
     # 也需要 monkeypatch wfs.runner.get_strategy_spec，因為它從 registry 導入 get
-    import FishBroWFS_V2.wfs.runner as wfs_runner_module
+    import wfs.runner as wfs_runner_module
     monkeypatch.setattr(wfs_runner_module, "get_strategy_spec", lambda sid: FakeStrategySpec())
     
     # 還需要 monkeypatch strategy.runner.get，因為它直接從 registry 導入 get
-    import FishBroWFS_V2.strategy.runner as runner_module
+    import strategy.runner as runner_module
     monkeypatch.setattr(runner_module, "get", lambda sid: FakeStrategySpec())
     
     # 執行研究（不允許 build）
@@ -291,7 +291,7 @@ def test_research_missing_features_with_build(monkeypatch, tmp_path: Path):
     create_test_strategy_requirements(tmp_path, strategy_id, tmp_path / "outputs")
     
     # Monkeypatch 策略註冊表，讓 get 返回一個假的策略 spec
-    from FishBroWFS_V2.contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
+    from contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
     class FakeStrategySpec:
         def __init__(self):
             self.strategy_id = strategy_id
@@ -315,15 +315,15 @@ def test_research_missing_features_with_build(monkeypatch, tmp_path: Path):
                 notes="測試需求",
             )
     
-    import FishBroWFS_V2.strategy.registry as registry_module
+    import strategy.registry as registry_module
     monkeypatch.setattr(registry_module, "get", lambda sid: FakeStrategySpec())
     
     # 也需要 monkeypatch wfs.runner.get_strategy_spec，因為它從 registry 導入 get
-    import FishBroWFS_V2.wfs.runner as wfs_runner_module
+    import wfs.runner as wfs_runner_module
     monkeypatch.setattr(wfs_runner_module, "get_strategy_spec", lambda sid: FakeStrategySpec())
     
     # 還需要 monkeypatch strategy.runner.get
-    import FishBroWFS_V2.strategy.runner as runner_module
+    import strategy.runner as runner_module
     monkeypatch.setattr(runner_module, "get", lambda sid: FakeStrategySpec())
     
     # 建立一個假的 build_shared 函數，模擬成功建立 cache
@@ -333,10 +333,10 @@ def test_research_missing_features_with_build(monkeypatch, tmp_path: Path):
         return {"success": True, "build_features": True}
     
     # monkeypatch build_shared（從 shared_build 模組）
-    import FishBroWFS_V2.control.shared_build as shared_build_module
+    import control.shared_build as shared_build_module
     monkeypatch.setattr(shared_build_module, "build_shared", mock_build_shared)
     # 同時 monkeypatch feature_resolver 中的 build_shared 引用
-    import FishBroWFS_V2.control.feature_resolver as feature_resolver_module
+    import control.feature_resolver as feature_resolver_module
     monkeypatch.setattr(feature_resolver_module, "build_shared", mock_build_shared)
     
     # 建立 build_ctx
@@ -395,7 +395,7 @@ def test_research_runner_no_direct_txt_reading(monkeypatch, tmp_path: Path):
     create_test_strategy_requirements(tmp_path, strategy_id, tmp_path / "outputs")
     
     # Monkeypatch 策略註冊表，讓 get 返回一個假的策略 spec
-    from FishBroWFS_V2.contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
+    from contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
     class FakeStrategySpec:
         def __init__(self):
             self.strategy_id = strategy_id
@@ -418,15 +418,15 @@ def test_research_runner_no_direct_txt_reading(monkeypatch, tmp_path: Path):
                 notes="測試需求",
             )
     
-    import FishBroWFS_V2.strategy.registry as registry_module
+    import strategy.registry as registry_module
     monkeypatch.setattr(registry_module, "get", lambda sid: FakeStrategySpec())
     
     # 也需要 monkeypatch wfs.runner.get_strategy_spec，因為它從 registry 導入 get
-    import FishBroWFS_V2.wfs.runner as wfs_runner_module
+    import wfs.runner as wfs_runner_module
     monkeypatch.setattr(wfs_runner_module, "get_strategy_spec", lambda sid: FakeStrategySpec())
     
     # 還需要 monkeypatch strategy.runner.get
-    import FishBroWFS_V2.strategy.runner as runner_module
+    import strategy.runner as runner_module
     monkeypatch.setattr(runner_module, "get", lambda sid: FakeStrategySpec())
     
     # 建立一個假的 raw_ingest 模組，如果被呼叫則失敗
@@ -436,8 +436,8 @@ def test_research_runner_no_direct_txt_reading(monkeypatch, tmp_path: Path):
             raise AssertionError(f"raw_ingest 模組被呼叫了 {name}，但 runner 不應直接讀 TXT")
     
     # 替換可能的導入
-    monkeypatch.setitem(sys.modules, "FishBroWFS_V2.data.raw_ingest", FakeRawIngest())
-    monkeypatch.setitem(sys.modules, "FishBroWFS_V2.control.raw_ingest", FakeRawIngest())
+    monkeypatch.setitem(sys.modules, "data.raw_ingest", FakeRawIngest())
+    monkeypatch.setitem(sys.modules, "control.raw_ingest", FakeRawIngest())
     
     # 建立 build_ctx（但我們不會允許 build，因為 features
 

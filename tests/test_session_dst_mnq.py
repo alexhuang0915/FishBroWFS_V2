@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from zoneinfo import ZoneInfo
 
-from FishBroWFS_V2.data.session.classify import classify_session
-from FishBroWFS_V2.data.session.loader import load_session_profile
+from data.session.classify import classify_session
+from data.session.loader import load_session_profile
 
 
 @pytest.fixture

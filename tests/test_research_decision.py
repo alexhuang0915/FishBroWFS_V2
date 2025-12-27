@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.research.decision import append_decision, load_decisions
+from research.decision import append_decision, load_decisions
 
 
 def test_append_decision_new(tmp_path: Path) -> None:

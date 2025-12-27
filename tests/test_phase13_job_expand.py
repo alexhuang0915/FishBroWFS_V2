@@ -2,9 +2,9 @@
 """Unit tests for job_expand module (Phase 13)."""
 
 import pytest
-from FishBroWFS_V2.control.param_grid import GridMode, ParamGridSpec
-from FishBroWFS_V2.control.job_expand import JobTemplate, expand_job_template, estimate_total_jobs, validate_template
-from FishBroWFS_V2.control.job_spec import WFSSpec
+from control.param_grid import GridMode, ParamGridSpec
+from control.job_expand import JobTemplate, expand_job_template, estimate_total_jobs, validate_template
+from control.job_spec import WFSSpec
 
 
 def test_job_template_creation():

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fix profile paths in test files to use configs/profiles instead of src/FishBroWFS_V2/data/profiles."""
+"""Fix profile paths in test files to use configs/profiles instead of src/data/profiles."""
 
 import re
 from pathlib import Path
@@ -8,12 +8,11 @@ def fix_file(file_path: Path):
     """Fix profile paths in a single file."""
     content = file_path.read_text(encoding="utf-8")
     
-    # Replace src/FishBroWFS_V2/data/profiles with configs/profiles
     # Handle both quoted and unquoted paths
     patterns = [
-        (r'"src/FishBroWFS_V2/data/profiles/([^"]+)"', r'"configs/profiles/\1"'),
-        (r"'src/FishBroWFS_V2/data/profiles/([^']+)'", r"'configs/profiles/\1'"),
-        (r'src/FishBroWFS_V2/data/profiles/(\w+\.yaml)', r'configs/profiles/\1'),
+        (r'"src/data/profiles/([^"]+)"', r'"configs/profiles/\1"'),
+        (r"'src/data/profiles/([^']+)'", r"'configs/profiles/\1'"),
+        (r'src/data/profiles/(\w+\.yaml)', r'configs/profiles/\1'),
         (r'FishBroWFS_V2/data/profiles', r'configs/profiles'),
         (r'/data/profiles/', r'/profiles/'),
     ]

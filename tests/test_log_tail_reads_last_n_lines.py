@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from FishBroWFS_V2.control.api import read_tail
+from control.api import read_tail
 
 
 def test_read_tail_returns_last_n_lines(tmp_path: Path) -> None:

@@ -11,13 +11,13 @@ import tempfile
 from pathlib import Path
 from datetime import datetime, timezone
 
-from FishBroWFS_V2.core.governance_schema import (
+from core.governance_schema import (
     Decision,
     EvidenceRef,
     GovernanceItem,
     GovernanceReport,
 )
-from FishBroWFS_V2.core.governance_writer import write_governance_artifacts
+from core.governance_writer import write_governance_artifacts
 
 
 def test_governance_writer_creates_expected_tree() -> None:

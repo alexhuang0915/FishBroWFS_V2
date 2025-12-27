@@ -5,8 +5,8 @@ import json
 import tempfile
 from pathlib import Path
 
-from FishBroWFS_V2.control.batch_index import build_batch_index
-from FishBroWFS_V2.control.artifacts import canonical_json_bytes, compute_sha256
+from control.batch_index import build_batch_index
+from control.artifacts import canonical_json_bytes, compute_sha256
 
 
 def test_build_batch_index_deterministic():

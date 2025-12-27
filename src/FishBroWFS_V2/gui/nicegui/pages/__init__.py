@@ -12,6 +12,8 @@ from .history import register as register_history
 from .candidates import register as register_candidates
 from .wizard import register as register_wizard
 from .portfolio import register as register_portfolio
+from .portfolio_governance import register as register_portfolio_governance
+from .execution_governance import register as register_execution_governance
 from .run_detail import register as register_run_detail
 from .settings import register as register_settings
 from .status import register as register_status
@@ -28,6 +30,8 @@ __all__ = [
     "register_candidates",
     "register_wizard",
     "register_portfolio",
+    "register_portfolio_governance",
+    "register_execution_governance",
     "register_run_detail",
     "register_settings",
     "register_status",

@@ -134,3 +134,22 @@ and the reasoning behind them.
 - Enable deterministic registry state
 
 **Status:** FROZEN
+
+---
+
+## ADR-011: Snapshot Flattening
+
+**Decision:**
+- Snapshot output MUST be flattened to exactly two human-facing files:
+  1. `outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md` (static, contains all embedded audit artifacts)
+  2. `outputs/snapshots/RUNTIME_CONTEXT.md` (runtime, overwritten on dashboard startup)
+- No intermediate audit artifacts may remain as standalone files
+- No subdirectories (`full/`, `runtime/`) allowed in `outputs/snapshots/`
+
+**Reason:**
+- Snapshots are forensic evidence packages, not project trees
+- All raw audit artifacts are implementation details and must not be exposed
+- Flattened structure simplifies artifact distribution and inspection
+- Reduces filesystem clutter and prevents accidental exposure of intermediate data
+
+**Status:** FROZEN

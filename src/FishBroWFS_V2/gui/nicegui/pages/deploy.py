@@ -13,19 +13,11 @@ from typing import Dict, List, Any
 from nicegui import ui
 
 from ..layout import render_shell
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import (
-    migrate_ui_imports,
-)
+# Use Domain Bridges for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.nicegui.bridge.jobs_bridge import get_jobs_bridge
+from FishBroWFS_V2.gui.nicegui.bridge.deploy_bridge import get_deploy_bridge
 from FishBroWFS_V2.core.season_context import current_season
 from FishBroWFS_V2.core.season_state import load_season_state
-
-# Migrate imports to use intent bridge
-migrate_ui_imports()
-
-# The migrate_ui_imports() function replaces the following imports
-# with intent-based implementations:
-# - list_jobs_with_progress
 
 
 def _check_live_execute_status() -> tuple[bool, str]:
@@ -95,8 +87,11 @@ def render_deploy_list() -> None:
                 if not live_enabled:
                     ui.label("• 🚫 Live execution is disabled by server-side policy.").classes("text-amber-300 mt-2")
             
-            # Fetch jobs and filter DONE
-            jobs = list_jobs_with_progress(limit=100)
+            # Fetch jobs and filter DONE using JobsBridge
+            jobs_bridge = get_jobs_bridge()
+            jobs = jobs_bridge.list_jobs()
+            # Apply limit of 100 jobs
+            jobs = jobs[:100]
             done_jobs = [j for j in jobs if j.get("status", "").lower() == "done"]
             
             if not done_jobs:

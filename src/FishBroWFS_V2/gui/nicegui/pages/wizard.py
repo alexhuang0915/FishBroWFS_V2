@@ -5,22 +5,31 @@ Step2: DATA2 (optional; single filter)
 Step3: Strategies (schema-driven)
 Step4: Cost
 Step5: Summary (must show Units formula and number)
+
+Wizard pages MUST use WizardBridge ONLY - no direct migrate_ui_imports() usage.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from datetime import date
 
 from nicegui import ui
 
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import (
-    migrate_ui_imports,
+# Use WizardBridge as the ONLY dependency entrypoint
+from FishBroWFS_V2.gui.nicegui.bridge.wizard_bridge import (
+    WizardBridge,
+    WizardBridgeError,
+    get_wizard_bridge,
+)
+
+# Import error types from UI bridge for compatibility
+from FishBroWFS_V2.gui.adapters.ui_bridge import (
     SeasonFrozenError,
     ValidationError,
+    WorkerUnavailableError,
 )
 
 # --- Pydantic strict validation guard (Wizard UI may be incomplete during render) ---
@@ -33,19 +42,34 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Migrate imports to use intent bridge
-migrate_ui_imports()
+# Get WizardBridge instance (single entrypoint)
+_wizard_bridge = get_wizard_bridge()
 
-# The migrate_ui_imports() function replaces the following imports
-# with intent-based implementations:
-# - create_job_from_wizard
-# - calculate_units
-# - check_season_not_frozen
-# - get_dataset_catalog
-# - get_strategy_catalog
-# - get_descriptor
-# - ValidationError (re-exported)
-# - SeasonFrozenError (re-exported)
+
+def _wizard_dataset_options() -> List[Tuple[str, str]]:
+    """
+    Returns list of (value,label) pairs for dataset selection.
+    Must be safe to call during page render.
+    Must not do network IO.
+    Must not mutate outputs/.
+    
+    Uses WizardBridge as the ONLY dependency entrypoint.
+    """
+    try:
+        # Use WizardBridge to get dataset options
+        options = _wizard_bridge.get_dataset_options()
+        
+        # WizardBridge returns (value, label) tuples; ensure they're strings
+        validated_options = []
+        for value, label in options:
+            if isinstance(value, str) and isinstance(label, str):
+                validated_options.append((value, label))
+        
+        return validated_options
+    except Exception as e:
+        logger.exception("Wizard dataset options failed")
+        # Return empty list on failure - UI will show empty dropdown
+        return []
 
 
 class M1WizardState:
@@ -120,10 +144,13 @@ def create_step1_data1(state: M1WizardState) -> None:
             season_input.bind_value(state, 'season')
         
         # Dataset selection
-        catalog = get_dataset_catalog()
-        datasets = catalog.list_datasets()
-        dataset_options = {d.id: f"{d.symbol} ({d.timeframe}) {d.start_date}-{d.end_date}"
-                          for d in datasets}
+        try:
+            options = _wizard_dataset_options()
+            dataset_options = {value: label for value, label in options}
+        except Exception as e:
+            logging.exception("Wizard dataset options failed")
+            dataset_options = {}
+            ui.notify(f"Dataset catalog unavailable: {type(e).__name__}", type="negative")
         
         with ui.column().classes("gap-1 w-full mb-4"):
             ui.label("Dataset")
@@ -204,9 +231,13 @@ def create_step2_data2(state: M1WizardState) -> None:
             
             with data2_container:
                 # Dataset selection for DATA2
-                catalog = get_dataset_catalog()
-                datasets = catalog.list_datasets()
-                dataset_options = {d.id: f"{d.symbol} ({d.timeframe})" for d in datasets}
+                try:
+                    options = _wizard_dataset_options()
+                    dataset_options = {value: f"{label.split('(')[0].strip()}" for value, label in options}
+                except Exception as e:
+                    logging.exception("Wizard dataset options failed")
+                    dataset_options = {}
+                    ui.notify(f"Dataset catalog unavailable: {type(e).__name__}", type="negative")
                 
                 with ui.column().classes("gap-1 w-full mb-4"):
                     ui.label("DATA2 Dataset")
@@ -246,10 +277,14 @@ def create_step3_strategies(state: M1WizardState) -> None:
     with state.step_containers[3]:
         ui.label("Step 3: Strategy Selection").classes("text-xl font-bold mb-4")
         
-        # Strategy selection
-        catalog = get_strategy_catalog()
-        strategies = catalog.list_strategies()
-        strategy_options = {s.strategy_id: s.strategy_id for s in strategies}
+        # Strategy selection - use WizardBridge to get strategy options
+        try:
+            strategy_options_list = _wizard_bridge.get_strategy_options()
+            strategy_options = {value: label for value, label in strategy_options_list}
+        except Exception as e:
+            logger.exception("Wizard strategy options failed")
+            strategy_options = {}
+            ui.notify(f"Strategy catalog unavailable: {type(e).__name__}", type="negative")
         
         with ui.column().classes("gap-1 w-full mb-4"):
             ui.label("Strategy")
@@ -270,69 +305,81 @@ def create_step3_strategies(state: M1WizardState) -> None:
             if not selected_id:
                 return
             
-            strategy = catalog.get_strategy(selected_id)
-            if not strategy:
-                return
-            
-            ui.label("Parameters").classes("font-bold mt-2 mb-2")
-            
-            # Create UI for each parameter
-            for param in strategy.params:
-                with ui.row().classes("w-full items-center mb-3"):
-                    ui.label(f"{param.name}:").classes("w-1/3 font-medium")
-                    
-                    if param.type == "int" or param.type == "float":
-                        # Number input
-                        min_val = param.min if param.min is not None else 0
-                        max_val = param.max if param.max is not None else 100
-                        step = param.step if param.step is not None else (1 if param.type == "int" else 0.1)
+            # Try to get strategy details via WizardBridge
+            try:
+                # Get the get_strategy_catalog function from bridge
+                get_strategy_catalog_func = _wizard_bridge.get_function("get_strategy_catalog")
+                if not get_strategy_catalog_func:
+                    logger.warning("get_strategy_catalog not available via WizardBridge")
+                    return
+                
+                catalog = get_strategy_catalog_func()
+                strategy = catalog.get_strategy(selected_id)
+                if not strategy:
+                    return
+                
+                ui.label("Parameters").classes("font-bold mt-2 mb-2")
+                
+                # Create UI for each parameter
+                for param in strategy.params:
+                    with ui.row().classes("w-full items-center mb-3"):
+                        ui.label(f"{param.name}:").classes("w-1/3 font-medium")
                         
-                        input_field = ui.number(
-                            value=param.default,
-                            min=min_val,
-                            max=max_val,
-                            step=step
-                        ).classes("w-2/3")
+                        if param.type == "int" or param.type == "float":
+                            # Number input
+                            min_val = param.min if param.min is not None else 0
+                            max_val = param.max if param.max is not None else 100
+                            step = param.step if param.step is not None else (1 if param.type == "int" else 0.1)
+                            
+                            input_field = ui.number(
+                                value=param.default,
+                                min=min_val,
+                                max=max_val,
+                                step=step
+                            ).classes("w-2/3")
+                            
+                            # Use on('update:model-value') for immediate updates
+                            def make_param_handler(pname: str, field):
+                                def handler(e):
+                                    state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                                return handler
+                            
+                            input_field.on('update:model-value', make_param_handler(param.name, input_field))
+                            state.params[param.name] = param.default
+                            
+                        elif param.type == "enum" and param.choices:
+                            # Dropdown for enum
+                            dropdown = ui.select(
+                                options=param.choices,
+                                value=param.default
+                            ).classes("w-2/3")
+                            
+                            def make_enum_handler(pname: str, field):
+                                def handler(e):
+                                    state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                                return handler
+                            
+                            dropdown.on('update:model-value', make_enum_handler(param.name, dropdown))
+                            state.params[param.name] = param.default
+                            
+                        elif param.type == "bool":
+                            # Switch for boolean
+                            switch = ui.switch(value=param.default).classes("w-2/3")
+                            
+                            def make_bool_handler(pname: str, field):
+                                def handler(e):
+                                    state.params[pname] = e.args if hasattr(e, 'args') else field.value
+                                return handler
+                            
+                            switch.on('update:model-value', make_bool_handler(param.name, switch))
+                            state.params[param.name] = param.default
                         
-                        # Use on('update:model-value') for immediate updates
-                        def make_param_handler(pname: str, field):
-                            def handler(e):
-                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
-                            return handler
-                        
-                        input_field.on('update:model-value', make_param_handler(param.name, input_field))
-                        state.params[param.name] = param.default
-                        
-                    elif param.type == "enum" and param.choices:
-                        # Dropdown for enum
-                        dropdown = ui.select(
-                            options=param.choices,
-                            value=param.default
-                        ).classes("w-2/3")
-                        
-                        def make_enum_handler(pname: str, field):
-                            def handler(e):
-                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
-                            return handler
-                        
-                        dropdown.on('update:model-value', make_enum_handler(param.name, dropdown))
-                        state.params[param.name] = param.default
-                        
-                    elif param.type == "bool":
-                        # Switch for boolean
-                        switch = ui.switch(value=param.default).classes("w-2/3")
-                        
-                        def make_bool_handler(pname: str, field):
-                            def handler(e):
-                                state.params[pname] = e.args if hasattr(e, 'args') else field.value
-                            return handler
-                        
-                        switch.on('update:model-value', make_bool_handler(param.name, switch))
-                        state.params[param.name] = param.default
-                    
-                    # Help text
-                    if param.help:
-                        ui.tooltip(param.help).classes("ml-2")
+                        # Help text
+                        if param.help:
+                            ui.tooltip(param.help).classes("ml-2")
+            except Exception as e:
+                logger.exception(f"Failed to load strategy details for {selected_id}")
+                ui.label(f"⚠️ Could not load strategy parameters: {type(e).__name__}").classes("text-yellow-600")
         
         # Use timer to update UI when strategy_id changes
         def update_strategy_from_state():
@@ -345,11 +392,12 @@ def create_step3_strategies(state: M1WizardState) -> None:
         # Initialize if strategy is selected
         if state.strategy_id:
             update_strategy_ui(state.strategy_id)
-        elif strategies:
+        elif strategy_options:
             # Select first strategy by default
-            first_strategy = strategies[0].strategy_id
-            state.strategy_id = first_strategy
-            update_strategy_ui(first_strategy)
+            first_strategy = list(strategy_options.keys())[0] if strategy_options else ""
+            if first_strategy:
+                state.strategy_id = first_strategy
+                update_strategy_ui(first_strategy)
 
 
 def create_step4_cost(state: M1WizardState) -> None:
@@ -398,11 +446,16 @@ def create_step4_cost(state: M1WizardState) -> None:
                     }
                     payload["enable_data2"] = True
                 
-                # Calculate units
+                # Calculate units using WizardBridge
                 # Wizard payload may be incomplete during render; calculate_units performs strict validation.
                 # We only suppress expected validation failures; unexpected bugs must still explode.
                 try:
-                    units = calculate_units(payload)
+                    calculate_units_func = _wizard_bridge.get_function("calculate_units")
+                    if calculate_units_func:
+                        units = calculate_units_func(payload)
+                    else:
+                        # Fallback: manual calculation
+                        units = len(state.symbols) * len(state.timeframes) * (1 if state.enable_data2 else 1)
                 except (PydanticValidationError, ValueError, TypeError):
                     # Incomplete wizard input => show 0 units, do not crash
                     units = 0
@@ -451,50 +504,54 @@ def create_step4_cost(state: M1WizardState) -> None:
             # Check DATA1 dataset Parquet status
             if state.dataset_id:
                 try:
-                    descriptor = get_descriptor(state.dataset_id)
-                    if descriptor:
-                        from pathlib import Path
-                        parquet_missing = []
-                        for parquet_path_str in descriptor.parquet_expected_paths:
-                            parquet_path = Path(parquet_path_str)
-                            if not parquet_path.exists():
-                                parquet_missing.append(parquet_path_str)
-                        
-                        if parquet_missing:
-                            with parquet_warning_container:
-                                with ui.card().classes("w-full bg-yellow-50 border-yellow-200"):
-                                    ui.label("⚠️ DATA1 Parquet Files Missing").classes("text-yellow-800 font-bold mb-2")
-                                    ui.label(f"Dataset '{state.dataset_id}' is missing {len(parquet_missing)} Parquet file(s)").classes("text-yellow-700 mb-2")
-                                    ui.label("This may cause job failures or slower performance.").classes("text-sm text-yellow-600 mb-2")
-                                    
-                                    with ui.row().classes("w-full gap-2"):
-                                        ui.button("Build Parquet",
-                                                 on_click=lambda: ui.navigate.to("/status"),
-                                                 icon="build").props("outline color=warning")
-                                        ui.button("Check Status",
-                                                 on_click=lambda: ui.navigate.to("/status"),
-                                                 icon="info").props("outline")
+                    get_descriptor_func = _wizard_bridge.get_function("get_descriptor")
+                    if get_descriptor_func:
+                        descriptor = get_descriptor_func(state.dataset_id)
+                        if descriptor:
+                            from pathlib import Path
+                            parquet_missing = []
+                            for parquet_path_str in descriptor.parquet_expected_paths:
+                                parquet_path = Path(parquet_path_str)
+                                if not parquet_path.exists():
+                                    parquet_missing.append(parquet_path_str)
+                            
+                            if parquet_missing:
+                                with parquet_warning_container:
+                                    with ui.card().classes("w-full bg-yellow-50 border-yellow-200"):
+                                        ui.label("⚠️ DATA1 Parquet Files Missing").classes("text-yellow-800 font-bold mb-2")
+                                        ui.label(f"Dataset '{state.dataset_id}' is missing {len(parquet_missing)} Parquet file(s)").classes("text-yellow-700 mb-2")
+                                        ui.label("This may cause job failures or slower performance.").classes("text-sm text-yellow-600 mb-2")
+                                        
+                                        with ui.row().classes("w-full gap-2"):
+                                            ui.button("Build Parquet",
+                                                     on_click=lambda: ui.navigate.to("/status"),
+                                                     icon="build").props("outline color=warning")
+                                            ui.button("Check Status",
+                                                     on_click=lambda: ui.navigate.to("/status"),
+                                                     icon="info").props("outline")
                 except Exception:
                     pass
             
             # Check DATA2 dataset Parquet status if enabled
             if state.enable_data2 and state.data2_dataset_id:
                 try:
-                    descriptor = get_descriptor(state.data2_dataset_id)
-                    if descriptor:
-                        from pathlib import Path
-                        parquet_missing = []
-                        for parquet_path_str in descriptor.parquet_expected_paths:
-                            parquet_path = Path(parquet_path_str)
-                            if not parquet_path.exists():
-                                parquet_missing.append(parquet_path_str)
-                        
-                        if parquet_missing:
-                            with parquet_warning_container:
-                                with ui.card().classes("w-full bg-yellow-50 border-yellow-200 mt-2"):
-                                    ui.label("⚠️ DATA2 Parquet Files Missing").classes("text-yellow-800 font-bold mb-2")
-                                    ui.label(f"Dataset '{state.data2_dataset_id}' is missing {len(parquet_missing)} Parquet file(s)").classes("text-yellow-700 mb-2")
-                                    ui.label("DATA2 validation may fail without Parquet files.").classes("text-sm text-yellow-600")
+                    get_descriptor_func = _wizard_bridge.get_function("get_descriptor")
+                    if get_descriptor_func:
+                        descriptor = get_descriptor_func(state.data2_dataset_id)
+                        if descriptor:
+                            from pathlib import Path
+                            parquet_missing = []
+                            for parquet_path_str in descriptor.parquet_expected_paths:
+                                parquet_path = Path(parquet_path_str)
+                                if not parquet_path.exists():
+                                    parquet_missing.append(parquet_path_str)
+                            
+                            if parquet_missing:
+                                with parquet_warning_container:
+                                    with ui.card().classes("w-full bg-yellow-50 border-yellow-200 mt-2"):
+                                        ui.label("⚠️ DATA2 Parquet Files Missing").classes("text-yellow-800 font-bold mb-2")
+                                        ui.label(f"Dataset '{state.data2_dataset_id}' is missing {len(parquet_missing)} Parquet file(s)").classes("text-yellow-700 mb-2")
+                                        ui.label("DATA2 validation may fail without Parquet files.").classes("text-sm text-yellow-600")
                 except Exception:
                     pass
         
@@ -555,11 +612,16 @@ def create_step5_summary(state: M1WizardState) -> None:
                 payload_json = json.dumps(payload, indent=2)
                 ui.textarea(payload_json).classes("w-full h-48 font-mono text-xs").props("readonly")
                 
-                # Units display
+                # Units display using WizardBridge
                 # Wizard payload may be incomplete during render; calculate_units performs strict validation.
                 # We only suppress expected validation failures; unexpected bugs must still explode.
                 try:
-                    units = calculate_units(payload)
+                    calculate_units_func = _wizard_bridge.get_function("calculate_units")
+                    if calculate_units_func:
+                        units = calculate_units_func(payload)
+                    else:
+                        # Fallback: manual calculation
+                        units = len(state.symbols) * len(state.timeframes) * (1 if state.enable_data2 else 1)
                 except (PydanticValidationError, ValueError, TypeError):
                     units = 0
                 except Exception:
@@ -602,11 +664,19 @@ def create_step5_summary(state: M1WizardState) -> None:
                     }
                     payload["enable_data2"] = True
                 
-                # Check season not frozen
-                check_season_not_frozen(state.season, action="submit_job")
+                # Check season not frozen using WizardBridge
+                check_season_not_frozen_func = _wizard_bridge.get_function("check_season_not_frozen")
+                if check_season_not_frozen_func:
+                    check_season_not_frozen_func(state.season, action="submit_job")
+                else:
+                    logger.warning("check_season_not_frozen not available via WizardBridge")
                 
-                # Submit job
-                result = create_job_from_wizard(payload)
+                # Submit job using WizardBridge
+                create_job_from_wizard_func = _wizard_bridge.get_function("create_job_from_wizard")
+                if create_job_from_wizard_func:
+                    result = create_job_from_wizard_func(payload)
+                else:
+                    raise RuntimeError("create_job_from_wizard not available via WizardBridge")
                 state.job_id = result["job_id"]
                 
                 # Show success message
@@ -638,6 +708,20 @@ def create_step5_summary(state: M1WizardState) -> None:
                     with ui.card().classes("w-full bg-red-50 border-red-200"):
                         ui.label("❌ Validation Error").classes("text-red-800 font-bold mb-2")
                         ui.label(f"Please check your inputs: {str(e)}").classes("text-red-700")
+            except WorkerUnavailableError as e:
+                with result_container:
+                    with ui.card().classes("w-full bg-orange-50 border-orange-200"):
+                        ui.label("⚠️ Worker Unavailable").classes("text-orange-800 font-bold mb-2")
+                        ui.label("Cannot submit job: Worker process is not running.").classes("text-orange-700 mb-2")
+                        ui.label("Please start the worker before submitting jobs:").classes("text-sm text-orange-600 mb-2")
+                        with ui.column().classes("gap-2"):
+                            ui.label("1. Go to the Deploy page").classes("text-sm")
+                            ui.label("2. Click 'Start Worker' button").classes("text-sm")
+                            ui.label("3. Wait for worker status to show 'Running'").classes("text-sm")
+                        with ui.row().classes("mt-4 gap-2"):
+                            ui.button("Go to Deploy Page",
+                                     on_click=lambda: ui.navigate.to("/deploy"),
+                                     icon="rocket_launch").props("outline color=orange")
             except Exception as e:
                 with result_container:
                     with ui.card().classes("w-full bg-red-50 border-red-200"):

@@ -17,6 +17,8 @@ def register_pages() -> None:
         register_candidates,
         register_wizard,
         register_portfolio,
+        register_portfolio_governance,
+        register_execution_governance,
         register_run_detail,
         register_settings,
         register_status,
@@ -33,6 +35,8 @@ def register_pages() -> None:
     register_candidates()
     register_wizard()
     register_portfolio()
+    register_portfolio_governance()
+    register_execution_governance()
     register_run_detail()
     register_settings()
     register_status()

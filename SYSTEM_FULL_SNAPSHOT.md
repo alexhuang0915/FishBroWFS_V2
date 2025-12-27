@@ -217,6 +217,58 @@ The topology observability and worker spawn governance foundations are now in pl
 4. Extend the topology probe with health‑check integration.
 
 ---
-**Generated**: 2025-12-26T08:06:49Z
-**Phase**: A+B - Topology Observability & Worker Spawn Governance
-**Status**: COMPLETED ✅
+
+# Phase C: Zero‑Violation Split‑Brain Architecture (UI HTTP Client + Control API Authority)
+
+## Summary
+Completed Phase C: Zero‑Violation Split‑Brain Architecture. The UI now communicates with the Control API exclusively via HTTP; zero direct references to DB/spawn symbols. This eliminates the last architectural violation where UI components could import backend modules directly.
+
+## Key Achievements
+
+### Phase C0: Create Control API Client
+- **C0.1**: Created `src/FishBroWFS_V2/gui/adapters/control_client.py` – async HTTP client that maps all Control API endpoints to Python methods.
+- **C0.2**: Client supports all endpoints: job submission, job status, logs, meta endpoints (datasets, strategies), season metadata, etc.
+- **C0.3**: Includes proper error handling with `ControlAPIError` and status‑code‑specific exceptions.
+
+### Phase C1: Create UI Bridge (replaces Intent Bridge)
+- **C1.1**: Created `src/FishBroWFS_V2/gui/adapters/ui_bridge.py` – provides the same interface as the old `IntentBackendAdapter` but uses HTTP client.
+- **C1.2**: Includes `UIBridge`, `DatasetCatalog`, `StrategyCatalog` classes that fetch data from `/meta/datasets` and `/meta/strategies` endpoints.
+- **C1.3**: Re‑exports `SeasonFrozenError`, `ValidationError`, `JobAPIError` for drop‑in replacement.
+- **C1.4**: Provides migration helper `migrate_ui_imports()` that replaces the calling module’s namespace with sync‑wrapped bridge methods.
+
+### Phase C2: Update Wizard to use UI Bridge
+- **C2.1**: Updated `src/FishBroWFS_V2/gui/nicegui/pages/wizard.py` – replaced `intent_bridge` import with `ui_bridge` and migration call.
+- **C2.2**: Updated `src/FishBroWFS_V2/gui/nicegui/pages/wizard_m1.py` – same migration.
+- **C2.3**: Updated `src/FishBroWFS_V2/gui/nicegui/pages/jobs.py`, `job_detail.py`, `deploy.py`, `artifacts.py`, `reload_service.py`, `viewer/app.py` – all UI pages now import from `ui_bridge` instead of `intent_bridge`.
+
+### Phase C3: Add Control API server entrypoint
+- **C3.1**: Created `src/FishBroWFS_V2/control/server_main.py` – standalone FastAPI server that runs with uvicorn, exposing the same Control API as the integrated NiceGUI server.
+- **C3.2**: Entrypoint can be launched via `python -m FishBroWFS_V2.control.server_main` or `make control-api`.
+
+### Phase C4: Update Makefile and create launch_dashboard.py script
+- **C4.1**: Updated `Makefile` with new targets:
+  - `control-api` – starts the Control API server on port 8000.
+  - `split-brain-dashboard` – starts both Control API server and NiceGUI UI (UI connects via HTTP).
+  - Modified `dashboard` target to use the new launch script.
+- **C4.2**: Created `scripts/launch_dashboard.py` – supervisor script that starts the Control API server and the NiceGUI UI, ensuring the UI connects via HTTP.
+
+### Phase C5: Add policy tests for UI zero violation
+- **C5.1**: Created `tests/policy/test_ui_zero_violation_split_brain.py` – verifies that UI modules cannot import forbidden symbols (`FishBroWFS_V2.control.*`, `FishBroWFS_V2.data.*`, `FishBroWFS_V2.outputs.*`).
+- **C5.2**: Policy test passes after migration.
+
+### Phase C6: Verification and final snapshot update
+- **C6.1**: Ran `make check` – all 1054 tests pass (26 skipped, 1 xfailed, 101 warnings).
+- **C6.2**: Fixed migration bug where `module` variable was incorrectly referenced (now `module_globals`).
+- **C6.3**: Extended `DatasetRecord` class with fields required by reload‑service tests (`txt_root`, `txt_required_paths`, `parquet_root`, `parquet_expected_paths`, `kind`).
+- **C6.4**: Updated `BuildParquetRequest` and `BuildParquetResult` classes to have proper constructors.
+
+## Technical Details
+
+### HTTP‑Based Architecture
+- UI components now communicate with the Control API via HTTP requests to `http://localhost:8000`.
+- The `control_client` uses `httpx` with async/await; the `ui_bridge` provides sync wrappers for compatibility with existing UI code.
+- The migration helper injects sync functions into the module’s namespace, making the transition transparent to the UI code.
+
+### Migration Helper
+The `migrate_ui_imports()` function:
+- Accepts an optional

@@ -194,7 +194,14 @@ def test_gui_cannot_modify_frozen_season(client):
         mock_index = DatasetIndex(generated_at="2025-12-23T00:00:00Z", datasets=[mock_dataset])
 
         with patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
-             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index):
+             patch("FishBroWFS_V2.control.api.load_dataset_index", return_value=mock_index), \
+             patch("FishBroWFS_V2.control.api._check_worker_status", return_value={
+                 "alive": True,
+                 "pid": 12345,
+                 "last_heartbeat_age_sec": None,
+                 "reason": "worker alive",
+                 "expected_db": "outputs/jobs.db",
+             }):
             # Attempt to rebuild index (should fail)
             r = client.post(f"/seasons/{season}/rebuild_index")
             assert r.status_code == 403

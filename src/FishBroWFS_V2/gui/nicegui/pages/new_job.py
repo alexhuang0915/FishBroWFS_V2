@@ -3,8 +3,9 @@
 
 from pathlib import Path
 from nicegui import ui
-import httpx
 
+# Use Domain Bridges for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.nicegui.bridge.meta_bridge import get_meta_bridge
 from ..api import JobSubmitRequest, list_datasets, list_strategies, submit_job
 from ..state import app_state
 
@@ -239,22 +240,21 @@ def register() -> None:
                 def preload_registries():
                     """手動觸發 registry preload"""
                     try:
-                        response = httpx.post("http://127.0.0.1:8000/meta/prime", timeout=10.0)
-                        if response.status_code == 200:
-                            result = response.json()
-                            if result.get("success"):
-                                ui.notify("Registries preloaded successfully!", type="positive")
-                            else:
-                                errors = []
-                                if result.get("dataset_error"):
-                                    errors.append(f"Dataset: {result['dataset_error']}")
-                                if result.get("strategy_error"):
-                                    errors.append(f"Strategy: {result['strategy_error']}")
-                                ui.notify(f"Preload partially failed: {', '.join(errors)}", type="warning")
+                        meta_bridge = get_meta_bridge()
+                        result = meta_bridge.prime()
+                        
+                        if result.get("success"):
+                            ui.notify("Registries preloaded successfully!", type="positive")
                         else:
-                            ui.notify(f"Failed to preload registries: {response.status_code}", type="negative")
-                    except httpx.ConnectError:
-                        ui.notify("Cannot connect to Control API (127.0.0.1:8000)", type="negative")
+                            errors = []
+                            if result.get("dataset_error"):
+                                errors.append(f"Dataset: {result['dataset_error']}")
+                            if result.get("strategy_error"):
+                                errors.append(f"Strategy: {result['strategy_error']}")
+                            if errors:
+                                ui.notify(f"Preload partially failed: {', '.join(errors)}", type="warning")
+                            else:
+                                ui.notify(f"Preload failed: {result.get('error', 'Unknown error')}", type="negative")
                     except Exception as e:
                         ui.notify(f"Error: {e}", type="negative")
                 

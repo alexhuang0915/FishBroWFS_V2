@@ -17,11 +17,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple
 
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import migrate_ui_imports
+# Use HTTP-based UI Bridge for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.adapters.ui_bridge import migrate_ui_imports
 
-# Migrate imports to use intent bridge
-migrate_ui_imports()
+# Migrate imports to use HTTP bridge
+try:
+    migrate_ui_imports(globals())
+except Exception as e:
+    print(f"ERROR in migrate_ui_imports: {e}")
+    import traceback
+    traceback.print_exc()
+    # Continue anyway, but functions will be missing
 
 # The migrate_ui_imports() function provides:
 # - get_dataset_catalog

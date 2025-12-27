@@ -68,7 +68,16 @@ def test_submit_batch_flow(client):
         with patch("FishBroWFS_V2.control.api._get_artifacts_root", return_value=artifacts_root), \
              patch("FishBroWFS_V2.control.api._get_season_index_root", return_value=season_root), \
              patch("FishBroWFS_V2.control.season_export.get_exports_root", return_value=exports_root), \
-             patch("FishBroWFS_V2.control.api._load_dataset_index_from_file") as mock_load:
+             patch("FishBroWFS_V2.control.api._load_dataset_index_from_file") as mock_load, \
+             patch("FishBroWFS_V2.control.api._check_worker_status") as mock_check:
+            # Mock worker as alive to avoid 503
+            mock_check.return_value = {
+                "alive": True,
+                "pid": 12345,
+                "last_heartbeat_age_sec": 1.0,
+                "reason": "worker alive",
+                "expected_db": str(Path(tmp) / "jobs.db"),
+            }
             # Make the mock return the dataset index we created
             from FishBroWFS_V2.data.dataset_registry import DatasetIndex
             mock_load.return_value = DatasetIndex.model_validate(dataset_index)

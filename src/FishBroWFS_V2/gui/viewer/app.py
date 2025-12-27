@@ -19,10 +19,10 @@ from FishBroWFS_V2.gui.viewer.pages.governance import render_page as render_gove
 from FishBroWFS_V2.gui.viewer.pages.artifacts import render_page as render_artifacts_page
 from FishBroWFS_V2.gui.research.page import render as render_research_page
 
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import migrate_ui_imports
+# Use HTTP-based UI Bridge for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.adapters.ui_bridge import migrate_ui_imports
 
-# Migrate imports to use intent bridge
+# Migrate imports to use HTTP bridge
 migrate_ui_imports()
 
 # The migrate_ui_imports() function provides get_paths() which returns the paths module

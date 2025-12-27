@@ -15,7 +15,7 @@ SAFE_PYTEST_ADDOPTS ?=
 # pytest command using venv pytest (not python3 -m pytest)
 PYTEST := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/pytest
 
-.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip dashboard gui demo contract research-season portfolio-season phase3 phase4 full-snapshot no-fog
+.PHONY: help check test research perf perf-mid perf-heavy clean-caches clean-caches-dry clean-data compile release-txt release-zip dashboard gui demo contract research-season portfolio-season phase3 phase4 snapshot full-snapshot no-fog control-api split-brain-dashboard dashboard-status dashboard-stop dashboard-restart-ui dashboard-restart-all
 
 help:
 	@echo ""
@@ -35,6 +35,12 @@ help:
 	@echo "  make release-txt       Generate release TXT (structure + code)"
 	@echo "  make release-zip       Generate release ZIP (excludes .git)"
 	@echo "  make dashboard         Start FishBroWFS_V2 Dashboard (Official Entry Point)"
+	@echo "  make dashboard-status  Show dashboard service status (identity-aware)"
+	@echo "  make dashboard-stop    Stop FishBro services (identity-aware)"
+	@echo "  make dashboard-restart-ui  Restart UI only (keep Control if valid)"
+	@echo "  make dashboard-restart-all Restart both UI and Control (identity-aware)"
+	@echo "  make control-api       Start Control API server only (port 8000)"
+	@echo "  make split-brain-dashboard  Start both Control API + UI (split‑brain architecture)"
 	@echo "  make demo              Create demo job for Viewer validation"
 	@echo "  make contract          Run critical contract tests (regression prevention)"
 	@echo "  make research-season   Generate research artifacts for season 2026Q1"
@@ -42,7 +48,8 @@ help:
 	@echo "  make phase3            Run research-season → portfolio-season → smoke check"
 	@echo "  make phase4            Validate Phase 4: Operational closed loop (UI Actions + Governance)"
 	@echo "  make phase5            Validate Phase 5: Deterministic Governance & Reproducibility Lock"
-	@echo "  make full-snapshot     Generate full repository snapshot (SYSTEM_FULL_SNAPSHOT/)"
+	@echo "  make snapshot          Generate full repository snapshot (Local-Strict filesystem truth)"
+	@echo "  make full-snapshot     Alias for 'make snapshot' (backward compatibility)"
 	@echo "  make no-fog            Run No-Fog Gate (core contracts + snapshot integrity)"
 	@echo ""
 
@@ -138,20 +145,96 @@ release-zip:
 # ---------------------------------------------------------
 # Dashboard stack (Official Dashboard Entry Point)
 # ---------------------------------------------------------
+VENV_PYTHON := PYTHONPATH=src .venv/bin/python
+
 dashboard:
-	@echo "==> Starting FishBroWFS_V2 Dashboard (Official Entry Point)"
+	@echo "==> Starting FishBroWFS_V2 Dashboard (Single-User Default)"
 	@echo " - URL            : http://localhost:8080"
 	@echo " - Health endpoint: http://localhost:8080/health"
+	@echo " - Control API    : http://localhost:8000"
+	@echo " - Mode           : restart-ui --single-user (Worker-safe)"
 	@echo "Press Ctrl+C to stop"
 	@if [ ! -f ".venv/bin/python" ]; then \
 		echo "❌ .venv not found. Run make venv first."; \
 		exit 1; \
 	fi
 	@.venv/bin/python -c "import nicegui" 2>/dev/null || { echo "ERROR: nicegui not installed in venv (pip install nicegui)"; exit 1; }
-	@PYTHONPATH=src .venv/bin/python -m FishBroWFS_V2.gui.nicegui.app
+	@$(VENV_PYTHON) scripts/launch_dashboard.py restart-ui --single-user --log-level info
+
+dashboard-restart-ui:
+	@echo "==> Restarting UI only (keep Control if valid)"
+	@echo " - Stops UI if it's a FishBro process"
+	@echo " - Keeps Control API running if valid"
+	@echo " - Starts new UI instance"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) scripts/launch_dashboard.py restart-ui --single-user --log-level info
+
+dashboard-restart-all:
+	@echo "==> Restarting both UI and Control (identity-aware)"
+	@echo " - Stops both UI and Control if they are FishBro processes"
+	@echo " - Starts fresh instances"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) scripts/launch_dashboard.py restart-all --single-user --log-level info
+
+dashboard-force:
+	@echo "==> Force restart UI and Control (dangerous)"
+	@echo " - Force kills port occupants if needed"
+	@echo " - Use only when ports are stuck"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) scripts/launch_dashboard.py restart-all --single-user --force-kill-ports --log-level info
+
+control-api:
+	@echo "==> Starting Control API server only (port 8000)"
+	@echo " - API endpoint   : http://localhost:8000"
+	@echo " - Health endpoint: http://localhost:8000/health"
+	@echo "Press Ctrl+C to stop"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@PYTHONPATH=src .venv/bin/python -m FishBroWFS_V2.control.server_main
+
+split-brain-dashboard:
+	@echo "==> Starting both Control API + UI (split‑brain architecture)"
+	@echo " - UI URL         : http://localhost:8080"
+	@echo " - Control API    : http://localhost:8000"
+	@echo "Press Ctrl+C to stop"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@.venv/bin/python -c "import nicegui" 2>/dev/null || { echo "ERROR: nicegui not installed in venv (pip install nicegui)"; exit 1; }
+	@PYTHONPATH=src .venv/bin/python scripts/launch_dashboard.py
 
 gui: dashboard
 	@# Alias for dashboard (not advertised in help)
+
+dashboard-status:
+	@echo "==> Showing dashboard service status (identity-aware)"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) scripts/launch_dashboard.py status
+
+dashboard-stop:
+	@echo "==> Stopping FishBro services (identity-aware)"
+	@echo " - Will stop UI (8080) and Control API (8000) if they are FishBro processes"
+	@echo " - Worker processes are never killed by default"
+	@if [ ! -f ".venv/bin/python" ]; then \
+		echo "❌ .venv not found. Run make venv first."; \
+		exit 1; \
+	fi
+	@$(VENV_PYTHON) scripts/launch_dashboard.py stop
 
 demo:
 	@echo "==> Creating demo job for Viewer validation"
@@ -259,13 +342,14 @@ phase4:
 # ---------------------------------------------------------
 # Full repository snapshot (Carpet Audit / Forensic Kit)
 # ---------------------------------------------------------
-full-snapshot:
-	@echo "==> Generating full repository forensic snapshot (Carpet Audit Kit)"
-	@echo " - Canonical source: git ls-files (100% tracked files)"
+snapshot:
+	@echo "==> Generating full repository forensic snapshot (Local-Strict filesystem truth)"
+	@echo " - Canonical source: Local-Strict scanner (filesystem truth, includes untracked)"
 	@echo " - Skip large (>2MB) and binary files"
 	@echo " - SHA256 per file, deterministic ordering"
-	@echo " - Output: outputs/snapshots/full/ (10 forensic artifacts)"
-	@echo "   • REPO_TREE.txt          (git tracked list + tree view)"
+	@echo " - Flattened output: outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md (single file)"
+	@echo "   • LOCAL_SCAN_RULES.json  (Local-Strict scan policy)"
+	@echo "   • REPO_TREE.txt          (Local-Strict list + tree view)"
 	@echo "   • MANIFEST.json          (SHA256 for all tracked files)"
 	@echo "   • SKIPPED_FILES.txt      (skip policies + skipped files)"
 	@echo "   • AUDIT_GREP.txt         (pattern matches across code)"
@@ -276,7 +360,11 @@ full-snapshot:
 	@echo "   • AUDIT_TEST_SURFACE.txt (test file classification)"
 	@echo "   • AUDIT_RUNTIME_MUTATIONS.txt (state mutation ops)"
 	@echo "   • AUDIT_STATE_FLOW.md    (architectural layer flow)"
-	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/no_fog/generate_full_snapshot.py --force
+	@echo " - Intermediate artifacts are compiled into SYSTEM_FULL_SNAPSHOT.md and cleaned up"
+	@PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -B scripts/no_fog/generate_full_snapshot_v2.py --force
+
+full-snapshot: snapshot
+	@# Alias for snapshot (backward compatibility)
 
 # ---------------------------------------------------------
 # No-Fog Gate (Core Contracts + Snapshot Integrity)

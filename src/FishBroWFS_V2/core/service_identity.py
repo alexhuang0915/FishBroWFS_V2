@@ -17,6 +17,28 @@ import json
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional
+from pydantic import BaseModel
+
+
+class ServiceIdentity(BaseModel):
+    """Pydantic model for service identity payload."""
+    service_name: str
+    pid: int
+    ppid: int
+    cmdline: str
+    cwd: str
+    python: str
+    python_version: str
+    platform: str
+    repo_root: str
+    git_commit: str
+    build_time_utc: str
+    env: Dict[str, Optional[str]]
+    jobs_db_path: str
+    jobs_db_parent: str
+    worker_pidfile_path: str
+    worker_log_path: str
+
 
 _ALLOWED_ENV_KEYS = {
     "PYTHONPATH",

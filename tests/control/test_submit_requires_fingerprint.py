@@ -153,7 +153,16 @@ def test_api_endpoint_enforces_fingerprint() -> None:
     # Mock the dataset index loading
     import FishBroWFS_V2.control.api as api_module
     
-    with patch.object(api_module, "load_dataset_index", return_value=mock_index):
+    with patch.object(api_module, "load_dataset_index", return_value=mock_index), \
+         patch.object(api_module, "_check_worker_status") as mock_check:
+        # Mock worker as alive to avoid 503
+        mock_check.return_value = {
+            "alive": True,
+            "pid": 12345,
+            "last_heartbeat_age_sec": 1.0,
+            "reason": "worker alive",
+            "expected_db": "some/path.db",
+        }
         # Prime registries first (required by API)
         client.post("/meta/prime")
         
@@ -182,6 +191,6 @@ def test_api_endpoint_enforces_fingerprint() -> None:
         
         response = client.post("/jobs/batch", json=payload)
         # Should be 400 Bad Request because fingerprint missing
-        assert response.status_code == 400
+        assert response.status_code == 400, f"Expected 400, got {response.status_code}: {response.text}"
         # Check that error mentions fingerprint
         assert "fingerprint" in response.text.lower() or "required" in response.text.lower()

@@ -7,6 +7,7 @@ import os
 import signal
 import subprocess
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Optional
@@ -408,7 +409,7 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     2) Wrapped: {"spec": <JobSpec>}
     """
     db_path = get_db_path()
-    _ensure_worker_running(db_path)
+    require_worker_or_503(db_path)
 
     # Accept both { ...JobSpec... } and {"spec": {...JobSpec...}}
     if "spec" in payload and isinstance(payload["spec"], dict):
@@ -532,6 +533,128 @@ async def get_report_link_endpoint(job_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail=str(e))
 
 
+def _check_worker_status(db_path: Path) -> dict[str, Any]:
+    """
+    Check worker status (pidfile existence, process alive, heartbeat age).
+    
+    Returns dict with:
+        - alive: bool
+        - pid: int or None
+        - last_heartbeat_age_sec: float or None
+        - reason: str (diagnostic)
+        - expected_db: str
+    """
+    pidfile = db_path.parent / "worker.pid"
+    heartbeat_file = db_path.parent / "worker.heartbeat"
+    
+    if not pidfile.exists():
+        return {
+            "alive": False,
+            "pid": None,
+            "last_heartbeat_age_sec": None,
+            "reason": "pidfile missing",
+            "expected_db": str(db_path),
+        }
+    
+    # Validate pidfile
+    valid, reason = validate_pidfile(pidfile, db_path)
+    if not valid:
+        return {
+            "alive": False,
+            "pid": None,
+            "last_heartbeat_age_sec": None,
+            "reason": reason,
+            "expected_db": str(db_path),
+        }
+    
+    # Read PID
+    try:
+        pid = int(pidfile.read_text().strip())
+    except (ValueError, OSError):
+        return {
+            "alive": False,
+            "pid": None,
+            "last_heartbeat_age_sec": None,
+            "reason": "pidfile corrupted",
+            "expected_db": str(db_path),
+        }
+    
+    # Check heartbeat file age if exists
+    last_heartbeat_age_sec = None
+    if heartbeat_file.exists():
+        try:
+            mtime = heartbeat_file.stat().st_mtime
+            last_heartbeat_age_sec = time.time() - mtime
+        except OSError:
+            pass
+    
+    return {
+        "alive": True,
+        "pid": pid,
+        "last_heartbeat_age_sec": last_heartbeat_age_sec,
+        "reason": "worker alive",
+        "expected_db": str(db_path),
+    }
+
+
+def require_worker_or_503(db_path: Path) -> None:
+    """
+    If worker not alive, raise HTTPException(status_code=503, detail=...)
+    
+    Precondition check before accepting job submissions.
+    
+    Special case: In test mode with FISHBRO_ALLOW_SPAWN_IN_TESTS=1,
+    allow submission even without worker (tests assume worker auto-spawn).
+    """
+    import os
+    
+    # Check if we're in test mode with override
+    if os.getenv("FISHBRO_ALLOW_SPAWN_IN_TESTS") == "1":
+        # Test mode: skip worker check, assume worker will be auto-spawned
+        # or test doesn't need a real worker
+        return
+    
+    status = _check_worker_status(db_path)
+    
+    if not status["alive"]:
+        # Worker not alive
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "WORKER_UNAVAILABLE",
+                "message": "No active worker daemon detected. Start worker and retry.",
+                "worker": {
+                    "alive": False,
+                    "pid": None,
+                    "last_heartbeat_age_sec": None,
+                    "expected_db": str(db_path),
+                },
+                "action": f"Run: PYTHONPATH=src .venv/bin/python3 -u -m FishBroWFS_V2.control.worker_main {db_path}"
+            }
+        )
+    
+    # Check heartbeat age if available
+    if status["last_heartbeat_age_sec"] is not None and status["last_heartbeat_age_sec"] > 5.0:
+        # Worker exists but heartbeat is stale
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "WORKER_UNAVAILABLE",
+                "message": "Worker heartbeat stale (>5s). Restart worker.",
+                "worker": {
+                    "alive": True,
+                    "pid": status["pid"],
+                    "last_heartbeat_age_sec": status["last_heartbeat_age_sec"],
+                    "expected_db": str(db_path),
+                },
+                "action": f"Run: PYTHONPATH=src .venv/bin/python3 -u -m FishBroWFS_V2.control.worker_main {db_path}"
+            }
+        )
+    
+    # Worker is alive and responsive
+    return
+
+
 def _ensure_worker_running(db_path: Path) -> None:
     """
     Ensure worker process is running (start if not).
@@ -599,6 +722,7 @@ async def batch_submit_endpoint(req: BatchSubmitRequest) -> BatchSubmitResponse:
     4) return response model (200)
     """
     db_path = get_db_path()
+    require_worker_or_503(db_path)
     
     # Prepare dataset index for fingerprint lookup with reload-once fallback
     dataset_index = {}
@@ -1438,6 +1562,220 @@ async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
         return data
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to read plan: {e}")
+
+
+# Worker Status API (Phase 4: DEEPSEEK — NUCLEAR SPEC)
+@app.get("/worker/status")
+async def worker_status() -> dict[str, Any]:
+    """
+    Get worker daemon status (read‑only).
+    
+    Returns:
+        - alive: bool (worker process is alive and responsive)
+        - pid: int or None
+        - last_heartbeat_age_sec: float or None (seconds since last heartbeat)
+        - reason: str (diagnostic message)
+        - expected_db: str (database path worker is attached to)
+        - can_spawn: bool (whether worker can be spawned according to policy)
+        - spawn_reason: str (if can_spawn is False, explains why)
+    
+    Safety Contract:
+    - Never kills or modifies worker state
+    - Read‑only: only checks pidfile, heartbeat, process existence
+    - Returns 200 even if worker is dead (alive: false)
+    - Worker daemon is never killed by default
+    """
+    db_path = get_db_path()
+    status = _check_worker_status(db_path)
+    
+    # Check if worker can be spawned according to policy
+    try:
+        from FishBroWFS_V2.control.worker_spawn_policy import can_spawn_worker
+        allowed, reason = can_spawn_worker(db_path)
+        status["can_spawn"] = allowed
+        status["spawn_reason"] = reason
+    except Exception:
+        # If policy check fails, default to False
+        status["can_spawn"] = False
+        status["spawn_reason"] = "policy check failed"
+    
+    return status
+
+
+# Worker Emergency Stop API (Phase 5: DEEPSEEK — NUCLEAR SPEC)
+class WorkerStopRequest(BaseModel):
+    """Request for emergency worker stop."""
+    force: bool = False
+    reason: Optional[str] = None
+
+
+@app.post("/worker/stop")
+async def worker_stop(req: WorkerStopRequest) -> dict[str, Any]:
+    """
+    Emergency stop worker daemon (controlled mutation).
+    
+    Safety Contract:
+    - Must validate worker is alive before attempting stop
+    - Must validate worker belongs to this control API instance (pidfile validation)
+    - Must NOT kill worker if there are active jobs (unless force=True)
+    - Must clean up pidfile and heartbeat file after successful stop
+    - Returns detailed status of what was stopped
+    
+    Validation Rules:
+    1. Worker must be alive (alive: true in status)
+    2. Worker must belong to this control API (pidfile validation passes)
+    3. If force=False, check for active jobs (jobs with status RUNNING)
+    4. If active jobs exist and force=False → 409 Conflict
+    5. If validation passes, send SIGTERM, wait up to 5s, then SIGKILL if needed
+    6. Clean up pidfile and heartbeat file after stop
+    
+    Returns:
+        - stopped: bool (whether worker was stopped)
+        - pid: int or None
+        - signal: str (TERM or KILL)
+        - active_jobs_count: int (number of active jobs at time of stop)
+        - force_used: bool (whether force=True was required)
+        - cleanup_performed: bool (whether pidfile/heartbeat were cleaned up)
+    """
+    import signal
+    import psutil
+    
+    db_path = get_db_path()
+    status = _check_worker_status(db_path)
+    
+    # 1. Check if worker is alive
+    if not status["alive"]:
+        return {
+            "stopped": False,
+            "pid": None,
+            "signal": None,
+            "active_jobs_count": 0,
+            "force_used": req.force,
+            "cleanup_performed": False,
+            "error": "Worker not alive",
+            "status": status
+        }
+    
+    pid = status["pid"]
+    if pid is None:
+        return {
+            "stopped": False,
+            "pid": None,
+            "signal": None,
+            "active_jobs_count": 0,
+            "force_used": req.force,
+            "cleanup_performed": False,
+            "error": "No PID found",
+            "status": status
+        }
+    
+    # 2. Validate pidfile (ensure worker belongs to this control API)
+    pidfile = db_path.parent / "worker.pid"
+    valid, reason = validate_pidfile(pidfile, db_path)
+    if not valid:
+        return {
+            "stopped": False,
+            "pid": pid,
+            "signal": None,
+            "active_jobs_count": 0,
+            "force_used": req.force,
+            "cleanup_performed": False,
+            "error": f"PID validation failed: {reason}",
+            "status": status
+        }
+    
+    # 3. Check for active jobs (unless force=True)
+    active_jobs_count = 0
+    if not req.force:
+        try:
+            from FishBroWFS_V2.control.jobs_db import list_jobs
+            jobs = list_jobs(db_path)
+            active_jobs_count = sum(1 for job in jobs if job.status == "RUNNING")
+            if active_jobs_count > 0:
+                raise HTTPException(
+                    status_code=409,
+                    detail={
+                        "error": "ACTIVE_JOBS_RUNNING",
+                        "message": f"Cannot stop worker with {active_jobs_count} active jobs",
+                        "active_jobs_count": active_jobs_count,
+                        "action": "Use force=True to override, or stop jobs first"
+                    }
+                )
+        except Exception as e:
+            # If we can't check jobs, be conservative and require force
+            if not req.force:
+                raise HTTPException(
+                    status_code=500,
+                    detail={
+                        "error": "JOB_CHECK_FAILED",
+                        "message": "Cannot verify active jobs status",
+                        "action": "Use force=True to override"
+                    }
+                )
+    
+    # 4. Attempt to stop worker
+    stopped = False
+    signal_used = None
+    cleanup_performed = False
+    
+    try:
+        # Send SIGTERM first
+        os.kill(pid, signal.SIGTERM)
+        signal_used = "TERM"
+        
+        # Wait up to 5 seconds for graceful shutdown
+        for _ in range(50):  # 50 * 0.1 = 5 seconds
+            try:
+                os.kill(pid, 0)  # Check if process exists
+                time.sleep(0.1)
+            except ProcessLookupError:
+                # Process terminated
+                stopped = True
+                break
+        
+        # If still alive after SIGTERM, send SIGKILL
+        if not stopped:
+            try:
+                os.kill(pid, signal.SIGKILL)
+                signal_used = "KILL"
+                time.sleep(0.5)
+                stopped = True
+            except ProcessLookupError:
+                stopped = True
+    except ProcessLookupError:
+        # Process already dead
+        stopped = True
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "STOP_FAILED",
+                "message": f"Failed to stop worker: {str(e)}",
+                "pid": pid
+            }
+        )
+    
+    # 5. Clean up pidfile and heartbeat file
+    if stopped:
+        try:
+            pidfile.unlink(missing_ok=True)
+            heartbeat_file = db_path.parent / "worker.heartbeat"
+            heartbeat_file.unlink(missing_ok=True)
+            cleanup_performed = True
+        except Exception:
+            # Cleanup failed, but worker is stopped
+            pass
+    
+    return {
+        "stopped": stopped,
+        "pid": pid,
+        "signal": signal_used,
+        "active_jobs_count": active_jobs_count,
+        "force_used": req.force,
+        "cleanup_performed": cleanup_performed,
+        "status": status,
+        "reason": req.reason
+    }
 
 
 # Phase PV.1: Plan Quality endpoints

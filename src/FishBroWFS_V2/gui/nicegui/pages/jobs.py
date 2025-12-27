@@ -9,17 +9,8 @@ from typing import List, Dict, Any
 from datetime import datetime
 
 from nicegui import ui
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import (
-    migrate_ui_imports,
-)
-
-# Migrate imports to use intent bridge
-migrate_ui_imports()
-
-# The migrate_ui_imports() function replaces the following imports
-# with intent-based implementations:
-# - list_jobs_with_progress
+# Use JobsBridge for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.nicegui.bridge.jobs_bridge import get_jobs_bridge
 
 
 def create_job_card(job: Dict[str, Any]) -> None:
@@ -31,18 +22,20 @@ def create_job_card(job: Dict[str, Any]) -> None:
             with ui.column().classes("flex-1"):
                 with ui.row().classes("items-center gap-2"):
                     # Status badge
+                    status = job.get("status", "").lower()
                     status_color = {
                         "queued": "bg-yellow-100 text-yellow-800",
                         "running": "bg-green-100 text-green-800",
                         "done": "bg-blue-100 text-blue-800",
                         "failed": "bg-red-100 text-red-800",
                         "killed": "bg-gray-100 text-gray-800",
-                    }.get(job["status"].lower(), "bg-gray-100 text-gray-800")
+                    }.get(status, "bg-gray-100 text-gray-800")
                     
-                    ui.badge(job["status"].upper(), color=status_color).classes("font-mono text-xs")
+                    ui.badge(job.get("status", "UNKNOWN").upper(), color=status_color).classes("font-mono text-xs")
                     
                     # Job ID
-                    ui.label(f"Job: {job['job_id'][:8]}...").classes("font-mono text-sm")
+                    job_id = job.get("job_id", "unknown")
+                    ui.label(f"Job: {job_id[:8]}...").classes("font-mono text-sm")
                 
                 # Season and dataset
                 with ui.row().classes("items-center gap-4 text-sm text-gray-600"):
@@ -50,7 +43,7 @@ def create_job_card(job: Dict[str, Any]) -> None:
                     ui.label(f"Dataset: {job.get('dataset_id', 'N/A')}")
             
             # Right: Timestamp
-            ui.label(job["created_at"]).classes("text-xs text-gray-500")
+            ui.label(job.get("created_at", "")).classes("text-xs text-gray-500")
         
         # Progress section
         with ui.column().classes("w-full mt-3"):
@@ -73,14 +66,14 @@ def create_job_card(job: Dict[str, Any]) -> None:
         
         # Footer with actions
         with ui.row().classes("w-full justify-end mt-3 pt-3 border-t"):
-            ui.button("View Details", 
-                     on_click=lambda j=job: ui.navigate.to(f"/jobs/{j['job_id']}"),
+            ui.button("View Details",
+                     on_click=lambda j=job: ui.navigate.to(f"/jobs/{j.get('job_id', 'unknown')}"),
                      icon="visibility").props("size=sm outline")
             
             # Action buttons based on status
-            if job["status"].lower() == "running":
+            if status == "running":
                 ui.button("Pause", icon="pause", color="warning").props("size=sm outline disabled").tooltip("Not implemented in M1")
-            elif job["status"].lower() == "queued":
+            elif status == "queued":
                 ui.button("Start", icon="play_arrow", color="positive").props("size=sm outline disabled").tooltip("Not implemented in M1")
 
 
@@ -89,7 +82,11 @@ def refresh_jobs_list(container: ui.column) -> None:
     container.clear()
     
     try:
-        jobs = list_jobs_with_progress(limit=50)
+        bridge = get_jobs_bridge()
+        jobs = bridge.list_jobs()
+        
+        # Apply limit of 50 jobs
+        jobs = jobs[:50]
         
         if not jobs:
             with container:
@@ -101,7 +98,7 @@ def refresh_jobs_list(container: ui.column) -> None:
         
         # Sort jobs: running first, then by creation time
         status_order = {"running": 0, "queued": 1, "done": 2, "failed": 3, "killed": 4}
-        jobs.sort(key=lambda j: (status_order.get(j["status"].lower(), 5), j["created_at"]), reverse=True)
+        jobs.sort(key=lambda j: (status_order.get(j.get("status", "").lower(), 5), j.get("created_at", "")), reverse=True)
         
         # Create job cards
         for job in jobs:
@@ -138,12 +135,16 @@ def jobs_page() -> None:
         # Stats summary
         with ui.row().classes("w-full gap-4 mb-6"):
             try:
-                jobs = list_jobs_with_progress(limit=100)
+                bridge = get_jobs_bridge()
+                jobs = bridge.list_jobs()
+                
+                # Apply limit of 100 jobs for stats
+                jobs = jobs[:100]
                 
                 # Calculate stats
                 total_jobs = len(jobs)
-                running_jobs = sum(1 for j in jobs if j["status"].lower() == "running")
-                done_jobs = sum(1 for j in jobs if j["status"].lower() == "done")
+                running_jobs = sum(1 for j in jobs if j.get("status", "").lower() == "running")
+                done_jobs = sum(1 for j in jobs if j.get("status", "").lower() == "done")
                 total_units = sum(j.get("units_total", 0) for j in jobs)
                 completed_units = sum(j.get("units_done", 0) for j in jobs)
                 
@@ -192,8 +193,10 @@ def jobs_page() -> None:
         def auto_refresh():
             # Check if any jobs are running
             try:
-                jobs = list_jobs_with_progress(limit=10)
-                has_running = any(j["status"].lower() == "running" for j in jobs)
+                bridge = get_jobs_bridge()
+                jobs = bridge.list_jobs()
+                jobs = jobs[:10]  # Limit to 10 for performance
+                has_running = any(j.get("status", "").lower() == "running" for j in jobs)
                 if has_running:
                     refresh_jobs_list(jobs_container)
             except Exception:

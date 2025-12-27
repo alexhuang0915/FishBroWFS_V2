@@ -9,20 +9,9 @@ import json
 from typing import Dict, Any
 
 from nicegui import ui
-# Use intent-based system for Attack #9 - Headless Intent-State Contract
-from FishBroWFS_V2.gui.adapters.intent_bridge import (
-    migrate_ui_imports,
-)
-
-# Migrate imports to use intent bridge
-migrate_ui_imports()
-
-# The migrate_ui_imports() function replaces the following imports
-# with intent-based implementations:
-# - get_job_summary
-# - get_job_status
-# Note: start_job_async is not available through intent bridge yet
-# TODO: Add start_job intent to IntentBridge
+# Use Domain Bridges for Zero-Violation Split-Brain Architecture
+from FishBroWFS_V2.gui.nicegui.bridge.job_detail_bridge import get_job_detail_bridge
+from FishBroWFS_V2.gui.nicegui.bridge.jobs_bridge import get_jobs_bridge
 
 
 def create_status_badge(status: str) -> ui.badge:
@@ -64,23 +53,24 @@ def create_units_progress(units_done: int, units_total: int) -> None:
             ui.label(f"{remaining} units remaining").classes("text-xs text-gray-500")
 
 
-def refresh_job_detail(job_id: str, 
+def refresh_job_detail(job_id: str,
                       status_container: ui.column,
                       logs_container: ui.column,
                       config_container: ui.column) -> None:
     """Refresh job detail information."""
     try:
-        # Get job summary
-        summary = get_job_summary(job_id)
+        # Get job summary from JobDetailBridge
+        job_detail_bridge = get_job_detail_bridge()
+        summary = job_detail_bridge.get_job_summary(job_id)
         
         # Update status container
         status_container.clear()
         with status_container:
             # Status badge and basic info
             with ui.row().classes("w-full items-center gap-4 mb-4"):
-                create_status_badge(summary["status"])
+                create_status_badge(summary.get("status", "unknown"))
                 
-                ui.label(f"Job ID: {summary['job_id'][:8]}...").classes("font-mono")
+                ui.label(f"Job ID: {summary.get('job_id', job_id)[:8]}...").classes("font-mono")
                 ui.label(f"Season: {summary.get('season', 'N/A')}").classes("text-gray-600")
                 ui.label(f"Created: {summary.get('created_at', 'N/A')}").classes("text-gray-600")
             
@@ -92,13 +82,14 @@ def refresh_job_detail(job_id: str,
             
             # Action buttons based on status
             with ui.row().classes("w-full gap-2 mt-4"):
-                if summary["status"].lower() == "queued":
-                    ui.button("Start Job", 
-                             on_click=lambda: start_job_async(job_id),
+                if summary.get("status", "").lower() == "queued":
+                    jobs_bridge = get_jobs_bridge()
+                    ui.button("Start Job",
+                             on_click=lambda: jobs_bridge.start_job(job_id),
                              icon="play_arrow",
                              color="positive").tooltip("Start job execution")
                 
-                ui.button("Refresh", 
+                ui.button("Refresh",
                          icon="refresh",
                          on_click=lambda: refresh_job_detail(job_id, status_container, logs_container, config_container))
                 
@@ -112,7 +103,8 @@ def refresh_job_detail(job_id: str,
         with logs_container:
             ui.label("Logs").classes("font-bold mb-2")
             
-            logs = summary.get("logs", [])
+            # Get logs from JobDetailBridge
+            logs = job_detail_bridge.get_job_logs(job_id, lines=20)
             if logs:
                 # Show last 20 lines
                 log_text = "\n".join(logs[-20:])
@@ -136,10 +128,10 @@ def refresh_job_detail(job_id: str,
             # Show basic config info
             with ui.grid(columns=2).classes("w-full gap-2 text-sm"):
                 ui.label("Job ID:").classes("font-medium")
-                ui.label(summary["job_id"]).classes("font-mono text-xs")
+                ui.label(summary.get("job_id", job_id)).classes("font-mono text-xs")
                 
                 ui.label("Status:").classes("font-medium")
-                ui.label(summary["status"].upper())
+                ui.label(summary.get("status", "UNKNOWN").upper())
                 
                 ui.label("Season:").classes("font-medium")
                 ui.label(summary.get("season", "N/A"))
@@ -205,9 +197,10 @@ def job_detail_page(job_id: str) -> None:
         # Auto-refresh timer for running jobs
         def auto_refresh():
             try:
-                # Check if job is still running
-                status = get_job_status(job_id)
-                if status["status"].lower() == "running":
+                # Check if job is still running using JobDetailBridge
+                job_detail_bridge = get_job_detail_bridge()
+                status = job_detail_bridge.get_job_status(job_id)
+                if status.lower() == "running":
                     refresh_job_detail(job_id, status_container, logs_container, config_container)
             except Exception:
                 pass  # Ignore errors in auto-refresh

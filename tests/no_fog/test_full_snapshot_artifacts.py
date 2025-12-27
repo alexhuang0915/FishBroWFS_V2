@@ -2,8 +2,9 @@
 """
 Test the full snapshot forensic kit artifacts.
 
-Validates that `make full-snapshot` generates all 10 required artifacts
-with correct formatting, deterministic sorting, and non-empty content.
+Validates that `make snapshot` generates SYSTEM_FULL_SNAPSHOT.md with all
+required artifacts embedded, with correct formatting, deterministic sorting,
+and non-empty content.
 """
 
 import csv
@@ -23,7 +24,7 @@ import sys
 @pytest.fixture
 def snapshot_output_dir(tmp_path):
     """Create a temporary output directory for snapshot generation."""
-    output_dir = tmp_path / "outputs" / "snapshots" / "full"
+    output_dir = tmp_path / "outputs" / "snapshots"
     output_dir.mkdir(parents=True)
     return output_dir
 
@@ -32,7 +33,7 @@ def snapshot_output_dir(tmp_path):
 def run_snapshot_script(snapshot_output_dir, monkeypatch):
     """Run the snapshot script with monkeypatched output directory."""
     # Use subprocess to run the script, avoiding sys.path hacks
-    script_path = Path.cwd() / "scripts" / "no_fog" / "generate_full_snapshot.py"
+    script_path = Path.cwd() / "scripts" / "no_fog" / "generate_full_snapshot_v2.py"
     
     # Set environment variable to override OUTPUT_DIR
     env = os.environ.copy()
@@ -58,14 +59,121 @@ def run_snapshot_script(snapshot_output_dir, monkeypatch):
 
 
 # ------------------------------------------------------------------------------
+# Helper functions
+# ------------------------------------------------------------------------------
+
+def extract_section(content: str, section_header: str) -> str:
+    """
+    Extract the content of a section from SYSTEM_FULL_SNAPSHOT.md.
+    The section is assumed to be a markdown header like '## MANIFEST'
+    and continues until the next '##' header that is NOT inside a code block.
+    Returns the raw text including the header and the code block.
+    """
+    lines = content.splitlines(keepends=True)
+    in_code_block = False
+    code_block_delimiter = None  # stores the delimiter (e.g., '```')
+    section_start = -1
+    result_lines = []
+    
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        # Detect code block start/end
+        if stripped.startswith('```'):
+            if not in_code_block:
+                in_code_block = True
+                code_block_delimiter = stripped
+            else:
+                # Check if this is the matching delimiter (same number of backticks)
+                if stripped == code_block_delimiter:
+                    in_code_block = False
+                    code_block_delimiter = None
+        # If we haven't found the section yet, look for the header
+        if section_start == -1:
+            if stripped.startswith(section_header):
+                section_start = i
+                result_lines.append(line)
+        else:
+            # We are inside the section, collect lines until we encounter a new section header
+            # that is NOT inside a code block.
+            if not in_code_block and line.strip().startswith('## ') and line.strip() != section_header:
+                # This is a new section header, stop collecting
+                break
+            result_lines.append(line)
+    
+    if section_start == -1:
+        return ""
+    return ''.join(result_lines)
+
+def extract_code_block(section_content: str) -> str:
+    """
+    Extract the code block content from a section (between ```lang and ```).
+    Handles nested code blocks by matching the outermost pair.
+    Returns the raw text inside the code block, excluding the backticks.
+    """
+    lines = section_content.splitlines(keepends=True)
+    stack = []  # stores True for each nesting level (we just need depth)
+    start_line = -1
+    for i, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith('```'):
+            # Determine if it's an opening (has language) or closing (just backticks)
+            # If after removing backticks there's non-whitespace, it's an opening.
+            after = stripped.lstrip('`').strip()
+            if after:
+                # Opening code block
+                if not stack:
+                    start_line = i
+                stack.append(True)
+            else:
+                # Closing code block
+                if stack:
+                    stack.pop()
+                    if not stack:
+                        # Found the matching closing for the outermost block
+                        # Collect content between start_line+1 and i-1
+                        content_lines = lines[start_line + 1:i]
+                        return ''.join(content_lines).rstrip('\n')
+    # If we never found a closing, return empty
+    return ""
+
+# ------------------------------------------------------------------------------
 # Core validation tests
 # ------------------------------------------------------------------------------
 
-def test_all_required_artifacts_exist(run_snapshot_script):
-    """Verify all 10 required artifacts are generated."""
+def test_system_full_snapshot_exists(run_snapshot_script):
+    """Verify SYSTEM_FULL_SNAPSHOT.md is generated and contains all embedded artifacts."""
     output_dir = run_snapshot_script
     
-    required_files = [
+    # Check SYSTEM_FULL_SNAPSHOT.md exists
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    assert snapshot_file.exists(), "SYSTEM_FULL_SNAPSHOT.md not created"
+    assert snapshot_file.stat().st_size > 0, "SYSTEM_FULL_SNAPSHOT.md is empty"
+    
+    # Read the content
+    content = snapshot_file.read_text()
+    
+    # Verify it contains all required sections
+    required_sections = [
+        "# SYSTEM FULL SNAPSHOT",
+        "## MANIFEST",
+        "## LOCAL_SCAN_RULES",
+        "## REPO_TREE",
+        "## AUDIT_GREP",
+        "## AUDIT_IMPORTS",
+        "## AUDIT_ENTRYPOINTS",
+        "## AUDIT_CONFIG_REFERENCES",
+        "## AUDIT_CALL_GRAPH",
+        "## AUDIT_TEST_SURFACE",
+        "## AUDIT_RUNTIME_MUTATIONS",
+        "## AUDIT_STATE_FLOW",
+        "## SKIPPED_FILES",
+    ]
+    
+    for section in required_sections:
+        assert section in content, f"Missing section in SYSTEM_FULL_SNAPSHOT.md: {section}"
+    
+    # Verify no intermediate audit files exist as standalone files
+    for audit_file in [
         "REPO_TREE.txt",
         "MANIFEST.json",
         "SKIPPED_FILES.txt",
@@ -77,39 +185,116 @@ def test_all_required_artifacts_exist(run_snapshot_script):
         "AUDIT_TEST_SURFACE.txt",
         "AUDIT_RUNTIME_MUTATIONS.txt",
         "AUDIT_STATE_FLOW.md",
-    ]
-    
-    for filename in required_files:
-        path = output_dir / filename
-        assert path.exists(), f"Missing required artifact: {filename}"
-        assert path.stat().st_size > 0, f"Artifact {filename} is empty"
+    ]:
+        assert not (output_dir / audit_file).exists(), \
+            f"Intermediate audit file {audit_file} should not exist as standalone file"
 
 
-def test_repo_tree_structure(run_snapshot_script):
-    """Verify REPO_TREE.txt contains both sections."""
+def test_repo_tree_structure_embedded(run_snapshot_script):
+    """Verify REPO_TREE section in SYSTEM_FULL_SNAPSHOT.md contains both sections."""
     output_dir = run_snapshot_script
-    content = (output_dir / "REPO_TREE.txt").read_text()
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
+    
+    # Find REPO_TREE section
+    repo_tree_start = content.find("## REPO_TREE")
+    assert repo_tree_start != -1, "REPO_TREE section not found"
+    
+    # Find next section to isolate REPO_TREE content
+    sections = ["## REPO_TREE", "## AUDIT_GREP", "## AUDIT_IMPORTS", "## AUDIT_ENTRYPOINTS"]
+    section_starts = []
+    for section in sections:
+        pos = content.find(section)
+        if pos != -1:
+            section_starts.append((pos, section))
+    
+    # Sort by position
+    section_starts.sort(key=lambda x: x[0])
+    
+    # Find REPO_TREE and next section
+    repo_tree_idx = -1
+    for i, (pos, section) in enumerate(section_starts):
+        if section == "## REPO_TREE":
+            repo_tree_idx = i
+            break
+    
+    assert repo_tree_idx != -1, "REPO_TREE section not found in sections list"
+    
+    # Extract REPO_TREE content
+    repo_tree_start_pos = section_starts[repo_tree_idx][0]
+    if repo_tree_idx + 1 < len(section_starts):
+        next_section_start = section_starts[repo_tree_idx + 1][0]
+        repo_tree_content = content[repo_tree_start_pos:next_section_start]
+    else:
+        repo_tree_content = content[repo_tree_start_pos:]
     
     # Must contain both section headers
-    assert "== GIT_TRACKED_FILES ==" in content
-    assert "== TREE_VIEW (approx) ==" in content
+    assert "== LOCAL_STRICT_FILES ==" in repo_tree_content
+    assert "== TREE_VIEW (approx) ==" in repo_tree_content
     
-    # Git tracked list should have at least some files
-    lines = content.splitlines()
-    git_section_start = lines.index("== GIT_TRACKED_FILES ==")
-    tree_section_start = lines.index("== TREE_VIEW (approx) ==")
+    # Local strict list should have at least some files
+    lines = repo_tree_content.splitlines()
+    local_section_start = -1
+    tree_section_start = -1
+    for i, line in enumerate(lines):
+        if "== LOCAL_STRICT_FILES ==" in line:
+            local_section_start = i
+        if "== TREE_VIEW (approx) ==" in line:
+            tree_section_start = i
+    
+    assert local_section_start != -1, "LOCAL_STRICT_FILES section not found"
+    assert tree_section_start != -1, "TREE_VIEW section not found"
     
     # There should be files between the sections
-    assert tree_section_start > git_section_start + 1
+    assert tree_section_start > local_section_start + 1
 
 
-def test_manifest_json_schema(run_snapshot_script):
-    """Verify MANIFEST.json has correct schema and SHA256 for all files."""
+def test_manifest_json_schema_embedded(run_snapshot_script):
+    """Verify MANIFEST section in SYSTEM_FULL_SNAPSHOT.md has correct schema."""
     output_dir = run_snapshot_script
-    manifest_path = output_dir / "MANIFEST.json"
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
     
-    with open(manifest_path, "r") as f:
-        manifest = json.load(f)
+    # Find MANIFEST section
+    manifest_start = content.find("## MANIFEST")
+    assert manifest_start != -1, "MANIFEST section not found"
+    
+    # Find next section to isolate MANIFEST content
+    sections = ["## MANIFEST", "## LOCAL_SCAN_RULES", "## REPO_TREE"]
+    section_starts = []
+    for section in sections:
+        pos = content.find(section)
+        if pos != -1:
+            section_starts.append((pos, section))
+    
+    # Sort by position
+    section_starts.sort(key=lambda x: x[0])
+    
+    # Find MANIFEST and next section
+    manifest_idx = -1
+    for i, (pos, section) in enumerate(section_starts):
+        if section == "## MANIFEST":
+            manifest_idx = i
+            break
+    
+    assert manifest_idx != -1, "MANIFEST section not found in sections list"
+    
+    # Extract MANIFEST content
+    manifest_start_pos = section_starts[manifest_idx][0]
+    if manifest_idx + 1 < len(section_starts):
+        next_section_start = section_starts[manifest_idx + 1][0]
+        manifest_content = content[manifest_start_pos:next_section_start]
+    else:
+        manifest_content = content[manifest_start_pos:]
+    
+    # The MANIFEST section should contain JSON
+    # Look for JSON content between ```json and ``` markers
+    import re
+    json_match = re.search(r'```json\s*(.*?)\s*```', manifest_content, re.DOTALL)
+    assert json_match is not None, "No JSON code block found in MANIFEST section"
+    
+    json_str = json_match.group(1)
+    manifest = json.loads(json_str)
     
     # Required top-level keys
     assert "generated_at_utc" in manifest
@@ -138,30 +323,51 @@ def test_manifest_json_schema(run_snapshot_script):
 
 
 def test_skipped_files_format(run_snapshot_script):
-    """Verify SKIPPED_FILES.txt has proper sections and format."""
+    """Verify SKIPPED_FILES section in SYSTEM_FULL_SNAPSHOT.md has proper sections and format."""
     output_dir = run_snapshot_script
-    content = (output_dir / "SKIPPED_FILES.txt").read_text()
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
     
-    # Must contain both section headers
-    assert "== SKIP_POLICIES ==" in content
-    assert "== SKIPPED_TRACKED_FILES ==" in content
+    # Extract SKIPPED_FILES section
+    section = extract_section(content, "## SKIPPED_FILES")
+    assert section, "SKIPPED_FILES section not found"
+    
+    # Extract code block content
+    skipped_content = extract_code_block(section)
+    assert skipped_content, "No code block in SKIPPED_FILES section"
+    
+    # Must contain expected section headers (new Local-Strict format)
+    assert "== LOCAL_STRICT_POLICY ==" in skipped_content
+    assert "== CONTENT_SKIP_POLICIES ==" in skipped_content
+    assert "== SKIPPED_FILES_CONTENT_SCAN ==" in skipped_content
     
     # Skip policies should list directories
-    lines = content.splitlines()
-    policies_start = lines.index("== SKIP_POLICIES ==")
-    skipped_start = lines.index("== SKIPPED_TRACKED_FILES ==")
+    lines = skipped_content.splitlines()
+    policy_start = lines.index("== LOCAL_STRICT_POLICY ==")
+    content_skip_start = lines.index("== CONTENT_SKIP_POLICIES ==")
+    scan_start = lines.index("== SKIPPED_FILES_CONTENT_SCAN ==")
     
     # There should be some policy lines
-    assert skipped_start > policies_start + 1
+    assert content_skip_start > policy_start + 1
+    assert scan_start > content_skip_start + 1
 
 
 def test_audit_grep_format(run_snapshot_script):
-    """Verify AUDIT_GREP.txt has pattern sections."""
+    """Verify AUDIT_GREP section in SYSTEM_FULL_SNAPSHOT.md has pattern sections."""
     output_dir = run_snapshot_script
-    content = (output_dir / "AUDIT_GREP.txt").read_text()
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
+    
+    # Extract AUDIT_GREP section
+    section = extract_section(content, "## AUDIT_GREP")
+    assert section, "AUDIT_GREP section not found"
+    
+    # Extract code block content
+    grep_content = extract_code_block(section)
+    assert grep_content, "No code block in AUDIT_GREP section"
     
     # Should contain at least one pattern header
-    assert "== PATTERN:" in content
+    assert "== PATTERN:" in grep_content
     
     # Check for known patterns (at least some)
     patterns = [
@@ -172,19 +378,29 @@ def test_audit_grep_format(run_snapshot_script):
     
     for pattern in patterns:
         # Pattern should appear in a header
-        if f"== PATTERN: {pattern} ==" in content:
+        if f"== PATTERN: {pattern} ==" in grep_content:
             # Should have either matches or "0 matches"
             pass  # Acceptable
 
 
 def test_audit_imports_csv_format(run_snapshot_script):
-    """Verify AUDIT_IMPORTS.csv has correct header and rows."""
+    """Verify AUDIT_IMPORTS section in SYSTEM_FULL_SNAPSHOT.md has correct CSV format."""
     output_dir = run_snapshot_script
-    csv_path = output_dir / "AUDIT_IMPORTS.csv"
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
     
-    with open(csv_path, "r", newline="") as f:
-        reader = csv.reader(f)
-        rows = list(reader)
+    # Extract AUDIT_IMPORTS section
+    section = extract_section(content, "## AUDIT_IMPORTS")
+    assert section, "AUDIT_IMPORTS section not found"
+    
+    # Extract code block content
+    csv_content = extract_code_block(section)
+    assert csv_content, "No code block in AUDIT_IMPORTS section"
+    
+    # Parse CSV content
+    import io
+    reader = csv.reader(io.StringIO(csv_content))
+    rows = list(reader)
     
     # Should have header
     assert len(rows) >= 1
@@ -204,18 +420,27 @@ def test_audit_imports_csv_format(run_snapshot_script):
 
 
 def test_audit_entrypoints_md_format(run_snapshot_script):
-    """Verify AUDIT_ENTRYPOINTS.md has required sections."""
+    """Verify AUDIT_ENTRYPOINTS section in SYSTEM_FULL_SNAPSHOT.md has required sections."""
     output_dir = run_snapshot_script
-    content = (output_dir / "AUDIT_ENTRYPOINTS.md").read_text()
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    content = snapshot_file.read_text()
+    
+    # Extract AUDIT_ENTRYPOINTS section
+    section = extract_section(content, "## AUDIT_ENTRYPOINTS")
+    assert section, "AUDIT_ENTRYPOINTS section not found"
+    
+    # Extract code block content
+    entrypoints_content = extract_code_block(section)
+    assert entrypoints_content, "No code block in AUDIT_ENTRYPOINTS section"
     
     # Required sections
-    assert "## Git HEAD" in content
-    assert "## Makefile Targets Extract" in content
-    assert "## Detected Python Entrypoints" in content
-    assert "## Notes / Risk Flags" in content
+    assert "## Git HEAD" in entrypoints_content
+    assert "## Makefile Targets Extract" in entrypoints_content
+    assert "## Detected Python Entrypoints" in entrypoints_content
+    assert "## Notes / Risk Flags" in entrypoints_content
     
     # Git HEAD should show a commit hash
-    lines = content.splitlines()
+    lines = entrypoints_content.splitlines()
     for i, line in enumerate(lines):
         if line.startswith("## Git HEAD"):
             # Next line should contain a hash (maybe in backticks)
@@ -225,45 +450,111 @@ def test_audit_entrypoints_md_format(run_snapshot_script):
                 assert len(next_line.strip()) >= 7  # at least short hash
 
 
+def redact_timestamps(content: str) -> str:
+    """
+    Replace all non-deterministic elements in the snapshot with 'REDACTED' to allow deterministic comparison.
+    This includes:
+    - ISO 8601 timestamps (MANIFEST.json, LOCAL_SCAN_RULES.json, header 'Generated:' line)
+    - Temporary directory paths (fishbro_snapshot_*)
+    """
+    import re
+    # Pattern for ISO 8601 with optional microseconds and timezone
+    iso_pattern = r'\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})'
+    redacted = re.sub(iso_pattern, 'REDACTED', content)
+    # Pattern for temporary directory paths (fishbro_snapshot_ followed by any non-whitespace)
+    temp_dir_pattern = r'(/tmp/)?fishbro_snapshot_[^\s]*'
+    redacted = re.sub(temp_dir_pattern, 'fishbro_snapshot_REDACTED', redacted)
+    return redacted
+
+
 def test_deterministic_output(run_snapshot_script):
     """
-    Verify that running the snapshot twice produces identical artifacts
-    (except for timestamps in MANIFEST.json).
+    Verify that running the snapshot twice produces identical SYSTEM_FULL_SNAPSHOT.md
+    (except for timestamps in MANIFEST.json and LOCAL_SCAN_RULES.json).
     """
     output_dir = run_snapshot_script
+    snapshot_file = output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+    assert snapshot_file.exists()
     
-    # Capture artifact contents (excluding MANIFEST.json timestamps)
-    artifact_contents = {}
-    for filename in [
-        "REPO_TREE.txt",
-        "SKIPPED_FILES.txt",
-        "AUDIT_GREP.txt",
-        "AUDIT_IMPORTS.csv",
-        "AUDIT_ENTRYPOINTS.md",
-        "AUDIT_CONFIG_REFERENCES.txt",
-        "AUDIT_CALL_GRAPH.txt",
-        "AUDIT_TEST_SURFACE.txt",
-        "AUDIT_RUNTIME_MUTATIONS.txt",
-        "AUDIT_STATE_FLOW.md",
-    ]:
-        path = output_dir / filename
-        artifact_contents[filename] = path.read_text()
+    # Read the snapshot content
+    content1 = snapshot_file.read_text()
     
-    # For MANIFEST.json, parse and remove generated_at_utc
-    manifest_path = output_dir / "MANIFEST.json"
-    manifest = json.loads(manifest_path.read_text())
-    manifest["generated_at_utc"] = "REDACTED"
-    artifact_contents["MANIFEST.json"] = json.dumps(manifest, indent=2, sort_keys=True)
+    # Redact all timestamps
+    redacted_content = redact_timestamps(content1)
     
-    # Run snapshot again (clean output directory first)
-    for file in output_dir.glob("*"):
-        file.unlink()
-    
-    # Re-run (using the same fixture would be tricky; we'll just trust
-    # that the fixture runs deterministically)
-    # Instead, we'll just verify that the artifacts we have are well-formed
-    # and leave full determinism test for integration.
-    pass
+    # Run the snapshot script again in a fresh directory
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmpdir_path = Path(tmpdir)
+        new_output_dir = tmpdir_path / "outputs" / "snapshots"
+        new_output_dir.mkdir(parents=True)
+        
+        env = os.environ.copy()
+        env["FISHBRO_SNAPSHOT_OUTPUT_DIR"] = str(new_output_dir)
+        script_path = Path.cwd() / "scripts" / "no_fog" / "generate_full_snapshot_v2.py"
+        
+        result = subprocess.run(
+            [sys.executable, str(script_path), "--force"],
+            env=env,
+            capture_output=True,
+            text=True,
+            cwd=Path.cwd(),
+        )
+        assert result.returncode == 0, f"Second run failed: {result.stderr}"
+        
+        new_snapshot_file = new_output_dir / "SYSTEM_FULL_SNAPSHOT.md"
+        assert new_snapshot_file.exists()
+        content2 = new_snapshot_file.read_text()
+        
+        # Redact timestamps in second snapshot
+        redacted_content2 = redact_timestamps(content2)
+        
+        # Compare redacted contents
+        if redacted_content != redacted_content2:
+            # Debug helper: write diff files if env var is set
+            if os.environ.get("FISHBRO_DEBUG_SNAPSHOT_DIFF") == "1":
+                # Write diff files into the first output_dir (not the temp one)
+                diff_head_path = output_dir / "DIFF_HEAD.txt"
+                diff_sections_path = output_dir / "DIFF_SECTIONS.txt"
+                
+                import difflib
+                diff_lines = list(difflib.unified_diff(
+                    redacted_content.splitlines(keepends=True),
+                    redacted_content2.splitlines(keepends=True),
+                    fromfile="first",
+                    tofile="second",
+                    n=3,
+                ))
+                diff_head_path.write_text("".join(diff_lines[:300]), encoding="utf-8")
+                
+                # Extract section headers that differ
+                lines1 = redacted_content.splitlines()
+                lines2 = redacted_content2.splitlines()
+                section_headers1 = [line for line in lines1 if line.startswith("## ")]
+                section_headers2 = [line for line in lines2 if line.startswith("## ")]
+                diff_sections = []
+                for h1, h2 in zip(section_headers1, section_headers2):
+                    if h1 != h2:
+                        diff_sections.append(f"{h1} != {h2}")
+                diff_sections_path.write_text("\n".join(diff_sections), encoding="utf-8")
+            
+            # Print diff for debugging (always)
+            import difflib
+            diff = list(difflib.unified_diff(
+                redacted_content.splitlines(keepends=True),
+                redacted_content2.splitlines(keepends=True),
+                fromfile="first",
+                tofile="second",
+                n=3,
+            ))
+            print("".join(diff))
+            # Also print first differing line numbers
+            for i, (line1, line2) in enumerate(zip(redacted_content.splitlines(), redacted_content2.splitlines())):
+                if line1 != line2:
+                    print(f"First difference at line {i+1}:")
+                    print(f"  first:  {line1[:100]}")
+                    print(f"  second: {line2[:100]}")
+                    break
+        assert redacted_content == redacted_content2, "Snapshot output is not deterministic"
 
 
 # ------------------------------------------------------------------------------

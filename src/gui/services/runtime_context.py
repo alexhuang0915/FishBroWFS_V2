@@ -1,135 +1,254 @@
 #!/usr/bin/env python3
 """
-Runtime Truth Block - auto-written on dashboard start.
+Runtime context generation for auditability.
 
-Contract:
-- MUST be generated automatically on make dashboard startup.
-- MUST include PID / command / entrypoint module / git commit+dirty / port occupancy / governance state.
-- MUST never crash startup; failures degrade to UNKNOWN with short error snippet.
-- Output path: outputs/snapshots/RUNTIME_CONTEXT.md (flattened).
-- SHOULD include hash of Local-Strict scan rules (LOCAL_SCAN_RULES.json) to bind runtime-to-scan-policy.
+Generates a markdown file documenting the runtime environment:
+- Timestamp
+- Process information
+- Build metadata (git)
+- Entrypoint
+- Network port occupancy
+- Snapshot policy binding
+- Notes
 """
 
 from __future__ import annotations
-import datetime
-import hashlib
-import json
-import os
-import platform
-import subprocess
-import sys
-from pathlib import Path
-from typing import Optional, Dict, Any
 
-# psutil is optional for port/process info
+import json
+import subprocess
+import hashlib
+import time
+import os
+import sys
+import platform
+import socket
+from datetime import datetime, timezone
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple, Optional, Dict, Any, List
+
 try:
     import psutil  # type: ignore
-    HAS_PSUTIL = True
-except ImportError:
-    HAS_PSUTIL = False
+except ModuleNotFoundError:  # pragma: no cover
+    psutil = None  # type: ignore
 
 
-def _run(cmd: list[str]) -> str:
-    """Run command and return output, never raise."""
+# ----------------------------------------------------------------------
+# Runtime context data model (optional)
+# ----------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class RuntimeContext:
+    platform: str
+    python_version: str
+    hostname: str
+    pid: int
+    is_wsl: bool
+    cpu_count: int
+    memory_total_mb: int
+
+
+def get_runtime_context() -> RuntimeContext:
+    hostname = socket.gethostname()
+    is_wsl = "microsoft" in platform.release().lower() or "wsl" in platform.release().lower()
+
+    cpu_count = os.cpu_count() or 1
+
+    mem_total_mb = 0
+    if psutil is not None:
+        try:
+            mem_total_mb = int(psutil.virtual_memory().total / (1024 * 1024))
+        except Exception:
+            mem_total_mb = 0
+    else:
+        # stdlib fallback: /proc/meminfo (Linux)
+        try:
+            with open("/proc/meminfo", "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.startswith("MemTotal:"):
+                        kb = int(line.split()[1])
+                        mem_total_mb = int(kb / 1024)
+                        break
+        except Exception:
+            mem_total_mb = 0
+
+    return RuntimeContext(
+        platform=platform.platform(),
+        python_version=platform.python_version(),
+        hostname=hostname,
+        pid=os.getpid(),
+        is_wsl=is_wsl,
+        cpu_count=cpu_count,
+        memory_total_mb=mem_total_mb,
+    )
+
+
+def probe_local_ipv4_addrs() -> List[str]:
+    addrs: List[str] = []
+
+    if psutil is not None:
+        try:
+            for ifname, infos in psutil.net_if_addrs().items():
+                for info in infos:
+                    if getattr(info, "family", None) == socket.AF_INET:
+                        ip = getattr(info, "address", "")
+                        if ip and not ip.startswith("127."):
+                            addrs.append(ip)
+        except Exception:
+            pass
+
+    # fallback (works even without psutil)
+    if not addrs:
+        try:
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            if ip and not ip.startswith("127."):
+                addrs.append(ip)
+        except Exception:
+            pass
+
+    # stable ordering for tests
+    return sorted(set(addrs))
+
+
+# ----------------------------------------------------------------------
+# Internal helpers
+# ----------------------------------------------------------------------
+
+def _run(cmd) -> str:
+    """Run a shell command and return its stdout as string."""
     try:
-        out = subprocess.check_output(cmd, stderr=subprocess.STDOUT, shell=False)
-        return out.decode("utf-8", errors="replace").strip()
+        result = subprocess.run(
+            cmd,
+            shell=False,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=2
+        )
+        return result.stdout.strip()
     except Exception as e:
-        return f"ERROR: {e!r}"
+        return f"ERROR: {e}"
 
 
 def _probe_ss(port: int) -> str:
-    """Return raw ss output or explicit failure reason."""
-    cmd = ["bash", "-lc", f"ss -ltnp '( sport = :{port} )'"]
-    result = _run(cmd)
-    if not result or "ERROR" in result:
-        return "NOT AVAILABLE (ss command failed or returned empty)"
-    return result
+    """Probe port occupancy using ss command."""
+    cmd = ["ss", "-tlnp", f"sport = :{port}"]
+    out = _run(cmd)
+    if not out or "LISTEN" not in out:
+        return "NOT AVAILABLE (ss command failed or no LISTEN)"
+    return out
 
 
 def _probe_lsof(port: int) -> str:
-    """Return raw lsof output or explicit failure reason."""
+    """Probe port occupancy using lsof command."""
     cmd = ["bash", "-lc", f"lsof -i :{port} -sTCP:LISTEN -n -P"]
-    result = _run(cmd)
-    if not result or "ERROR" in result:
-        return "NOT AVAILABLE (lsof command failed or returned empty)"
-    return result
+    out = _run(cmd)
+    if not out or "LISTEN" not in out:
+        return "NOT AVAILABLE (lsof command failed or no LISTEN)"
+    return out
 
 
-def _analyze_port_occupancy(port: int) -> tuple[str, str, str, str]:
-    """
-    Dual-probe port occupancy analysis.
-    
-    WSL and restricted environments may prevent single-tool socket attribution.
-    Dual-probe with explicit resolution guarantees runtime truth without guesswork.
+def _analyze_port_occupancy(port: int) -> Tuple[str, str, str, str]:
+    """Analyze port occupancy using both probes.
     
     Returns:
-        (ss_output, lsof_output, bound_status, resolution_verdict)
+        ss_output, lsof_output, bound ("yes"/"no"), verdict string
     """
-    ss_output = _probe_ss(port)
-    lsof_output = _probe_lsof(port)
+    ss_out = _probe_ss(port)
+    lsof_out = _probe_lsof(port)
+    
+    bound = "no"
+    verdict = ""
     
     # Determine if port is bound
-    bound = "no"
-    process_identified = "no"
+    if "LISTEN" in ss_out or "LISTEN" in lsof_out:
+        bound = "yes"
+    
+    # Try to extract PID
     pid = None
+    if "pid=" in ss_out:
+        import re
+        m = re.search(r'pid=(\d+)', ss_out)
+        if m:
+            pid = m.group(1)
+    elif lsof_out and lsof_out.strip():
+        # lsof output format: COMMAND PID USER ...
+        parts = lsof_out.split()
+        if len(parts) >= 2:
+            pid_candidate = parts[1]
+            if pid_candidate.isdigit():
+                pid = pid_candidate
     
-    import re
-    
-    # Check ss output for actual binding (not just header)
-    # Look for a line containing the port number and LISTEN state
-    ss_lines = ss_output.splitlines()
-    for line in ss_lines:
-        if f":{port}" in line and "LISTEN" in line:
-            bound = "yes"
-            # Try to extract PID from this line
-            ss_pid_match = re.search(r'pid=(\d+)', line)
-            if ss_pid_match:
-                pid = ss_pid_match.group(1)
-                process_identified = "yes"
-            break
-    
-    # Check lsof output if ss didn't find it
-    if bound == "no" or process_identified == "no":
-        lsof_lines = lsof_output.splitlines()
-        for line in lsof_lines:
-            if f":{port}" in line and "LISTEN" in line:
-                bound = "yes"
-                # Try to extract PID from lsof output
-                # lsof pattern: python3 12345 user 3u IPv4 12345 0t0 TCP *:8080 (LISTEN)
-                lsof_pid_match = re.search(r'^\S+\s+(\d+)\s+', line)
-                if lsof_pid_match and not pid:  # Only if PID not already found
-                    pid = lsof_pid_match.group(1)
-                    process_identified = "yes"
-                break
-    
-    # Build resolution verdict
-    if bound == "no":
-        verdict = "PORT NOT BOUND"
-    elif process_identified == "yes":
-        verdict = f"PID {pid}"
+    if pid:
+        verdict = f"PORT BOUND with PID {pid}"
+    elif bound == "yes":
+        verdict = "bound but no PID (UNRESOLVED)"
     else:
-        verdict = "UNRESOLVED (bound but no PID identified)"
+        verdict = "PORT NOT BOUND"
     
-    return ss_output, lsof_output, bound, verdict
+    return ss_out, lsof_out, bound, verdict
 
 
-def get_git_info() -> tuple[str, str]:
-    """Get git commit hash and dirty status."""
+def get_snapshot_timestamp() -> str:
+    """Get timestamp of latest snapshot.
+    
+    Looks for outputs/snapshots/full/MANIFEST.json first,
+    then outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md.
+    Returns ISO UTC string or "UNKNOWN".
+    """
+    manifest_path = Path("outputs/snapshots/full/MANIFEST.json")
+    if manifest_path.exists():
+        try:
+            with open(manifest_path, encoding='utf-8') as f:
+                data = json.load(f)
+                ts = data.get("generated_at_utc")
+                if ts:
+                    return ts
+        except Exception:
+            pass
+    
+    snapshot_path = Path("outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md")
+    if snapshot_path.exists():
+        try:
+            mtime = snapshot_path.stat().st_mtime
+            dt = datetime.fromtimestamp(mtime, timezone.utc)
+            return dt.isoformat().replace("+00:00", "Z")
+        except Exception:
+            pass
+    
+    return "UNKNOWN"
+
+
+def get_git_info() -> Tuple[str, str]:
+    """Get current git commit hash and dirty status.
+    
+    Returns:
+        (commit_hash, dirty_flag) where dirty_flag is "yes" or "no"
+    """
     try:
-        commit = subprocess.check_output(
+        output = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"],
-            stderr=subprocess.DEVNULL,
-        ).decode("utf-8").strip()
+            cwd=Path(__file__).parent.parent.parent,
+            stderr=subprocess.DEVNULL
+        )
+        # output may be bytes or str depending on text param (default bytes)
+        if isinstance(output, bytes):
+            commit = output.decode('utf-8').strip()
+        else:
+            commit = output.strip()
     except Exception:
         commit = "UNKNOWN"
     
     try:
-        dirty_out = subprocess.check_output(
-            ["git", "status", "--porcelain"],
-            stderr=subprocess.DEVNULL,
-        ).decode("utf-8").strip()
-        dirty = "yes" if dirty_out else "no"
+        subprocess.check_output(
+            ["git", "diff", "--quiet"],
+            cwd=Path(__file__).parent.parent.parent,
+            stderr=subprocess.DEVNULL
+        )
+        dirty = "no"
+    except subprocess.CalledProcessError:
+        dirty = "yes"
     except Exception:
         dirty = "UNKNOWN"
     
@@ -137,292 +256,136 @@ def get_git_info() -> tuple[str, str]:
 
 
 def get_policy_hash(policy_path: Path) -> str:
-    """Compute SHA256 hash of LOCAL_SCAN_RULES.json."""
-    if not policy_path.exists():
+    """Compute SHA256 of policy file, or "UNKNOWN"."""
+    if not policy_path.exists() or not policy_path.is_file():
         return "UNKNOWN"
-    
     try:
-        with open(policy_path, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()
+        with open(policy_path, 'rb') as f:
+            content = f.read()
+        return hashlib.sha256(content).hexdigest()
     except Exception:
         return "UNKNOWN"
 
 
-def get_season_state() -> tuple[str, str]:
-    """Get current season state and ID if available."""
-    # Try to import SeasonState if available
-    try:
-        from core.season_state import SeasonState
-        state = SeasonState.load_current()
-        season_id = state.season_id if hasattr(state, "season_id") else "UNKNOWN"
-        frozen = "FROZEN" if state.is_frozen() else "ACTIVE"
-        return frozen, season_id
-    except Exception:
-        return "UNKNOWN", "UNKNOWN"
-
+# ----------------------------------------------------------------------
+# Public API
+# ----------------------------------------------------------------------
 
 def write_runtime_context(
-    out_path: str | Path = "outputs/snapshots/RUNTIME_CONTEXT.md",
-    *,
+    out_path: str,
     entrypoint: str,
-    listen_host: str | None = None,
-    listen_port: int | None = 8080,
+    listen_host: str = "0.0.0.0",
+    listen_port: Optional[int] = None,
 ) -> Path:
-    """
-    Write runtime truth block; never raise; always returns out_path.
+    """Write runtime context markdown file.
     
     Args:
-        out_path: Path to write the runtime context file.
-        entrypoint: Entrypoint module name (e.g., "scripts/launch_dashboard.py").
-        listen_host: Host the service is listening on (optional).
-        listen_port: Port the service is listening on (default 8080).
-    
-    Returns:
-        Path to the written file.
+        out_path: Path to output markdown file
+        entrypoint: Script that launched the runtime
+        listen_host: Host interface (default 0.0.0.0)
+        listen_port: Optional port for network section
     """
-    out_path = Path(out_path)
+    path = Path(out_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
     
-    # Never crash - catch all exceptions
+    lines = []
+    
+    # Header
+    lines.append("# Runtime Context")
+    lines.append("")
+    lines.append("## Timestamp")
+    lines.append(f"- Generated: {datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')}")
+    lines.append("")
+    
+    # Process
+    lines.append("## Process")
+    lines.append(f"- PID: {os.getpid()}")
     try:
-        lines = []
-        lines.append("# Runtime Context")
-        lines.append("")
-        
-        # Timestamp
-        lines.append("## Timestamp")
-        lines.append(datetime.datetime.now(datetime.timezone.utc).isoformat())
-        lines.append("")
-        
-        # Process
-        lines.append("## Process")
-        lines.append(f"PID: {os.getpid()}")
-        lines.append(f"PPID: {os.getppid()}")
-        cmdline = "UNKNOWN"
-        if HAS_PSUTIL:
-            try:
-                proc = psutil.Process()
-                cmdline = " ".join(proc.cmdline())
-            except Exception:
-                pass
+        if psutil is not None:
+            p = psutil.Process()
+            lines.append(f"- Command: {' '.join(p.cmdline())}")
+            lines.append(f"- CPU count: {psutil.cpu_count()}")
+            lines.append(f"- Memory total: {psutil.virtual_memory().total:,} bytes")
         else:
-            # Fallback to sys.argv
-            cmdline = " ".join(sys.argv)
-        lines.append(f"Command: {cmdline}")
-        lines.append(f"Working directory: {os.getcwd()}")
-        lines.append("")
-        
-        # Build
-        lines.append("## Build")
-        git_commit, git_dirty = get_git_info()
-        lines.append(f"Git commit: {git_commit}")
-        lines.append(f"Dirty: {git_dirty}")
-        lines.append(f"Python: {sys.version.split()[0]}")
-        lines.append(f"Platform: {platform.platform()}")
-        lines.append("")
-        
-        # Entrypoint
-        lines.append("## Entrypoint")
-        lines.append(f"Module: {entrypoint}")
-        lines.append("")
-        
-        # Network
-        lines.append("## Network")
-        if listen_host:
-            lines.append(f"Listen: {listen_host}:{listen_port}")
-        else:
-            lines.append(f"Listen: :{listen_port}")
-        
-        if listen_port:
-            lines.append("")
-            lines.append(f"Port occupancy ({listen_port}):")
-            lines.append("")
-            
-            # Dual-probe strategy
-            ss_output, lsof_output, bound_status, resolution_verdict = _analyze_port_occupancy(listen_port)
-            
-            lines.append("### ss")
-            for line in ss_output.splitlines():
-                lines.append(line)
-            lines.append("")
-            
-            lines.append("### lsof")
-            for line in lsof_output.splitlines():
-                lines.append(line)
-            lines.append("")
-            
-            lines.append("### Resolution")
-            lines.append(f"- Bound: {bound_status}")
-            lines.append(f"- Process identified: {'yes' if 'PID' in resolution_verdict else 'no'}")
-            lines.append(f"- Final verdict: {resolution_verdict}")
-        lines.append("")
-        
-        # Governance
-        lines.append("## Governance")
-        season_state, season_id = get_season_state()
-        lines.append(f"Season state: {season_state}")
-        lines.append(f"Season id (if any): {season_id}")
-        lines.append("")
-        
-        # Snapshot Policy Binding
-        lines.append("## Snapshot Policy Binding")
-        # Look for LOCAL_SCAN_RULES.json embedded in SYSTEM_FULL_SNAPSHOT.md
-        # or in the old location for backward compatibility
-        policy_paths = [
-            Path("outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md"),  # Embedded in flattened snapshot
-            Path("outputs/snapshots/full/LOCAL_SCAN_RULES.json"),  # Old location (backward compat)
-        ]
-        
-        policy_hash = "UNKNOWN"
-        policy_source = "NOT_FOUND"
-        
-        for policy_path in policy_paths:
-            if policy_path.exists():
-                if policy_path.name == "SYSTEM_FULL_SNAPSHOT.md":
-                    # Try to extract LOCAL_SCAN_RULES from embedded content
-                    try:
-                        content = policy_path.read_text(encoding="utf-8")
-                        # Look for LOCAL_SCAN_RULES section
-                        import re
-                        json_match = re.search(r'```json\s*({.*?})\s*```', content, re.DOTALL)
-                        if json_match:
-                            # Compute hash of the JSON content
-                            json_str = json_match.group(1)
-                            policy_hash = hashlib.sha256(json_str.encode("utf-8")).hexdigest()
-                            policy_source = f"embedded in {policy_path.name}"
-                            break
-                    except Exception:
-                        pass
-                else:
-                    # Direct JSON file
-                    policy_hash = get_policy_hash(policy_path)
-                    policy_source = str(policy_path)
-                    break
-        
-        lines.append(f"Local scan rules sha256: {policy_hash}")
-        lines.append(f"Local scan rules source: {policy_source}")
-        lines.append("")
-        
-        # Notes
-        lines.append("## Notes")
-        lines.append("Generated automatically on dashboard startup.")
-        lines.append("This file is part of the Local-Strict snapshot system.")
-        lines.append("")
-        
-        # Write file
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        content = "\n".join(lines)
-        out_path.write_text(content, encoding="utf-8")
-        
+            # fallback using stdlib
+            lines.append(f"- Command: {' '.join(sys.argv)}")
+            lines.append(f"- CPU count: {os.cpu_count() or 1}")
+            # memory total unknown
+            lines.append("- Memory total: unknown (psutil not available)")
     except Exception as e:
-        # Degrade gracefully - write minimal content with error
-        try:
-            error_content = f"""# Runtime Context
-
-## Error
-Failed to generate full runtime context: {e!r}
-
-## Timestamp
-{datetime.datetime.now(datetime.timezone.utc).isoformat()}
-
-## Minimal Info
-PID: {os.getpid()}
-Entrypoint: {entrypoint}
-"""
-            out_path.parent.mkdir(parents=True, exist_ok=True)
-            out_path.write_text(error_content, encoding="utf-8")
-        except Exception:
-            # Last resort - create empty file
-            try:
-                out_path.parent.mkdir(parents=True, exist_ok=True)
-                out_path.write_text("# Runtime Context - Generation Failed", encoding="utf-8")
-            except Exception:
-                pass
+        lines.append(f"- Process info unavailable: {e}")
+    lines.append("")
     
-    return out_path
-
-
-def get_snapshot_timestamp() -> str:
-    """
-    Get snapshot timestamp for UI banner.
+    # Build
+    lines.append("## Build")
+    commit, dirty = get_git_info()
+    lines.append(f"- Git commit: {commit}")
+    lines.append(f"- Dirty working tree: {dirty}")
+    snapshot_ts = get_snapshot_timestamp()
+    lines.append(f"- Snapshot timestamp: {snapshot_ts}")
+    lines.append("")
     
-    Priority:
-    1. MANIFEST.json generation time (embedded in SYSTEM_FULL_SNAPSHOT.md)
-    2. mtime of outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md
-    3. UNKNOWN
-    """
-    # Check SYSTEM_FULL_SNAPSHOT.md for embedded MANIFEST
-    snapshot_path = Path("outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md")
-    if snapshot_path.exists():
-        try:
-            content = snapshot_path.read_text(encoding="utf-8")
-            # Look for MANIFEST section with JSON
-            import re
-            # Find the MANIFEST section
-            manifest_section_match = re.search(r'## MANIFEST\s*(.*?)(?=##|\Z)', content, re.DOTALL)
-            if manifest_section_match:
-                manifest_section = manifest_section_match.group(1)
-                # Look for JSON code block
-                json_match = re.search(r'```json\s*({.*?})\s*```', manifest_section, re.DOTALL)
-                if json_match:
-                    json_str = json_match.group(1)
-                    data = json.loads(json_str)
-                    if "generated_at_utc" in data:
-                        return data["generated_at_utc"]
-        except Exception:
-            pass
-        
-        # Fallback to file modification time
-        try:
-            mtime = snapshot_path.stat().st_mtime
-            dt = datetime.datetime.fromtimestamp(mtime, tz=datetime.timezone.utc)
-            return dt.isoformat()
-        except Exception:
-            pass
+    # Entrypoint
+    lines.append("## Entrypoint")
+    lines.append(f"- Script: {entrypoint}")
+    lines.append(f"- Python: {sys.version}")
+    lines.append(f"- CWD: {os.getcwd()}")
+    lines.append("")
     
-    # Check old location for backward compatibility
-    manifest_path = Path("outputs/snapshots/full/MANIFEST.json")
-    if manifest_path.exists():
-        try:
-            with open(manifest_path, "r") as f:
-                data = json.load(f)
-                if "generated_at_utc" in data:
-                    return data["generated_at_utc"]
-        except Exception:
-            pass
+    # Network
+    lines.append("## Network")
+    if listen_port is not None:
+        if listen_host == "0.0.0.0":
+            lines.append(f"- Listen: :{listen_port}")
+        else:
+            lines.append(f"- Listen: {listen_host}:{listen_port}")
+        ss_out, lsof_out, bound, verdict = _analyze_port_occupancy(listen_port)
+        lines.append(f"- Port occupancy ({listen_port}):")
+        lines.append(f"  - Bound: {bound}")
+        lines.append(f"  - Process identified: {'yes' if 'PID' in verdict else 'no'}")
+        lines.append(f"  - Final verdict: {verdict}")
+        lines.append("### ss")
+        lines.append("```")
+        lines.append(ss_out)
+        lines.append("```")
+        lines.append("### lsof")
+        lines.append("```")
+        lines.append(lsof_out)
+        lines.append("```")
+        lines.append("### Resolution")
+        lines.append(verdict)
+    else:
+        lines.append("- No listen port specified")
+    lines.append("")
     
-    return "UNKNOWN"
+    # Governance
+    lines.append("## Governance")
+    lines.append("- Runtime context itself is non‑authoritative.")
+    lines.append("- For auditability, see manifest and snapshot logs.")
+    lines.append("")
+    
+    # Snapshot Policy Binding
+    lines.append("## Snapshot Policy Binding")
+    policy_path = Path("outputs/snapshots/full/LOCAL_SCAN_RULES.json")
+    if policy_path.exists():
+        policy_hash = get_policy_hash(policy_path)
+        lines.append(f"- Local scan rules sha256: {policy_hash}")
+        lines.append(f"- Local scan rules source: {policy_path.resolve()}")
+    else:
+        lines.append("- Local scan rules file not found.")
+    lines.append("")
+    
+    # Notes
+    lines.append("## Notes")
+    lines.append("- This file is generated automatically at runtime.")
+    lines.append("- It reflects a best‑effort snapshot of the environment.")
+    lines.append("- Values may be UNKNOWN if underlying commands fail.")
+    lines.append("")
+    
+    # Write file
+    path.write_text("\n".join(lines), encoding="utf-8")
+    return path
 
 
-if __name__ == "__main__":
-    # Test when run directly
-    import argparse
-    
-    parser = argparse.ArgumentParser(
-        description="Write runtime context file for testing."
-    )
-    parser.add_argument(
-        "--out-path",
-        default="outputs/snapshots/RUNTIME_CONTEXT.md",
-        help="Output path for runtime context."
-    )
-    parser.add_argument(
-        "--entrypoint",
-        default="test",
-        help="Entrypoint module name."
-    )
-    parser.add_argument(
-        "--port",
-        type=int,
-        default=8080,
-        help="Port to check occupancy for."
-    )
-    
-    args = parser.parse_args()
-    
-    path = write_runtime_context(
-        out_path=args.out_path,
-        entrypoint=args.entrypoint,
-        listen_port=args.port,
-    )
-    print(f"Runtime context written to: {path}")
-    print(f"Size: {path.stat().st_size:,} bytes")
+# For backward compatibility
+port_occupancy = _analyze_port_occupancy  # alias

@@ -5,7 +5,7 @@
 PYTHON := .venv/bin/python
 ENV := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
 
-.PHONY: help check test precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui war-room run-research run-plateau run-freeze run-compile run-season snapshot
+.PHONY: help check test precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics
 
 help:
 	@echo ""
@@ -45,6 +45,18 @@ run-season: run-research run-plateau run-freeze run-compile
 snapshot:
 	@echo "==> Generating Context Snapshot..."
 	$(ENV) $(PYTHON) -B scripts/dump_context.py
+
+forensics ui-forensics:
+	@echo "==> Generating UI Forensics Dump..."
+	$(ENV) $(PYTHON) -B scripts/ui_forensics_dump.py
+
+autopass:
+	@echo "==> Running UI Autopass..."
+	$(ENV) $(PYTHON) -B scripts/ui_autopass.py
+
+render-probe:
+	@echo "==> Running UI Render Probe..."
+	$(ENV) $(PYTHON) -B scripts/ui_render_probe.py
 
 check:
 	@echo "==> Running fast CI-safe tests (excluding slow research-grade tests)..."

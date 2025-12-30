@@ -7,7 +7,7 @@ Feature Registry 合約
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
 
 
@@ -20,11 +20,21 @@ class FeatureSpec(BaseModel):
         timeframe_min: 適用的 timeframe 分鐘數（15, 30, 60, 120, 240）
         lookback_bars: 計算所需的最大 lookback bar 數（例如 ATR(14) 需要 14）
         params: 參數字典（例如 {"window": 14, "method": "log"}）
+        window: 滾動視窗大小（window=1 表示非視窗特徵）
+        min_warmup_bars: 暖機所需的最小 bar 數（暖機期間輸出 NaN）
+        dtype: 輸出資料型別（目前僅支援 float64）
+        div0_policy: 除零處理策略（目前僅支援 DIV0_RET_NAN）
+        family: 特徵家族（可選，例如 "ma", "volatility", "momentum"）
     """
     name: str
     timeframe_min: int
     lookback_bars: int = Field(default=0, ge=0)
     params: Dict[str, str | int | float] = Field(default_factory=dict)
+    window: int = Field(default=1, ge=1)
+    min_warmup_bars: int = Field(default=0, ge=0)
+    dtype: Literal["float64"] = Field(default="float64")
+    div0_policy: Literal["DIV0_RET_NAN"] = Field(default="DIV0_RET_NAN")
+    family: Optional[str] = Field(default=None)
 
 
 class FeatureRegistry(BaseModel):
@@ -87,7 +97,12 @@ def default_feature_registry() -> FeatureRegistry:
             name="atr_14",
             timeframe_min=tf,
             lookback_bars=14,
-            params={"window": 14}
+            params={"window": 14},
+            window=14,
+            min_warmup_bars=14,
+            dtype="float64",
+            div0_policy="DIV0_RET_NAN",
+            family="volatility"
         ))
         
         # ret_z_200
@@ -95,7 +110,12 @@ def default_feature_registry() -> FeatureRegistry:
             name="ret_z_200",
             timeframe_min=tf,
             lookback_bars=200,
-            params={"window": 200, "method": "log"}
+            params={"window": 200, "method": "log"},
+            window=200,
+            min_warmup_bars=200,
+            dtype="float64",
+            div0_policy="DIV0_RET_NAN",
+            family="return"
         ))
         
         # session_vwap
@@ -103,7 +123,12 @@ def default_feature_registry() -> FeatureRegistry:
             name="session_vwap",
             timeframe_min=tf,
             lookback_bars=0,
-            params={}
+            params={},
+            window=1,
+            min_warmup_bars=0,
+            dtype="float64",
+            div0_policy="DIV0_RET_NAN",
+            family="session"
         ))
     
     return FeatureRegistry(specs=specs)

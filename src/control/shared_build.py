@@ -15,7 +15,8 @@ import pandas as pd
 
 from contracts.dimensions import canonical_json
 from contracts.fingerprint import FingerprintIndex
-from contracts.features import FeatureRegistry, default_feature_registry
+from contracts.features import FeatureRegistry, FeatureSpec, default_feature_registry
+from features.registry import get_default_registry
 from core.fingerprint import (
     build_fingerprint_index_from_raw_ingest,
     compare_fingerprint_indices,
@@ -199,7 +200,7 @@ def build_shared(
                 )
         
         # 使用預設或提供的 feature registry
-        registry = feature_registry or default_feature_registry()
+        registry = feature_registry or get_default_registry()
         
         features_cache_report = _build_features_cache(
             season=season,
@@ -837,6 +838,30 @@ def _build_features_cache(
     features_specs = []
     for spec in registry.specs:
         if spec.timeframe_min in tfs:
+            features_specs.append(feature_spec_to_dict(spec))
+    
+    # 加入 baseline 特徵規格（不在 registry 中但必須存在）
+    baseline_specs = []
+    for tf in tfs:
+        # ret_z_200
+        baseline_specs.append(FeatureSpec(
+            name="ret_z_200",
+            timeframe_min=tf,
+            lookback_bars=200,
+            params={"window": 200, "method": "log"}
+        ))
+        # session_vwap
+        baseline_specs.append(FeatureSpec(
+            name="session_vwap",
+            timeframe_min=tf,
+            lookback_bars=0,
+            params={}
+        ))
+    # 轉換為字典並加入 features_specs（避免重複）
+    existing_names = {(spec["name"], spec["timeframe_min"]) for spec in features_specs}
+    for spec in baseline_specs:
+        key = (spec.name, spec.timeframe_min)
+        if key not in existing_names:
             features_specs.append(feature_spec_to_dict(spec))
     
     features_manifest_data = build_features_manifest_data(

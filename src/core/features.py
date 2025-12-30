@@ -8,6 +8,7 @@ Feature 計算核心
 
 from __future__ import annotations
 
+import inspect
 import numpy as np
 from typing import Dict, Literal, Optional
 from datetime import datetime
@@ -226,6 +227,27 @@ def compute_session_vwap(
     return vwap
 
 
+def _apply_feature_postprocessing(values: np.ndarray, spec) -> np.ndarray:
+    """
+    Apply warmup NaN and dtype enforcement according to FeatureSpec.
+    If spec is None, only enforce dtype float64.
+    """
+    # Ensure dtype float64
+    if values.dtype != np.float64:
+        values = values.astype(np.float64)
+    
+    # Apply warmup NaN if spec is provided and has min_warmup_bars
+    if spec is not None and hasattr(spec, 'min_warmup_bars') and spec.min_warmup_bars > 0:
+        n = len(values)
+        if spec.min_warmup_bars <= n:
+            values[:spec.min_warmup_bars] = np.nan
+        else:
+            # If min_warmup_bars exceeds length, set all to NaN
+            values[:] = np.nan
+    
+    return values
+
+
 def compute_features_for_tf(
     ts: np.ndarray,
     o: np.ndarray,
@@ -274,28 +296,159 @@ def compute_features_for_tf(
     
     # 建立結果字典
     result = {"ts": ts}  # ts 必須是相同的物件/值
-    
     # 計算每個特徵
     for spec in specs:
-        if spec.name == "atr_14":
-            result["atr_14"] = compute_atr_14(o, h, l, c)
-        elif spec.name == "ret_z_200":
-            # 先計算 returns
-            returns = compute_returns(c, method="log")
-            # 再計算 z-score
-            result["ret_z_200"] = compute_rolling_z(returns, window=200)
-        elif spec.name == "session_vwap":
-            result["session_vwap"] = compute_session_vwap(
-                ts, c, v, session_spec, breaks_policy
-            )
+        # 檢查是否有 compute_func
+        if hasattr(spec, 'compute_func') and spec.compute_func is not None:
+            # 使用 compute_func
+            sig = inspect.signature(spec.compute_func)
+            params = list(sig.parameters.values())
+            # 只考慮沒有預設值的參數（必需參數）
+            required_params = [p for p in params if p.default is inspect.Parameter.empty]
+            # 映射參數名稱到對應的陣列
+            arg_map = {
+                "ts": ts,
+                "o": o,
+                "h": h,
+                "l": l,
+                "c": c,
+                "v": v,
+            }
+            args = []
+            for param in required_params:
+                if param.name in arg_map:
+                    args.append(arg_map[param.name])
+                else:
+                    # 可能是 window 參數，從 spec.params 取得
+                    if param.name in spec.params:
+                        args.append(spec.params[param.name])
+                    else:
+                        raise ValueError(f"Cannot map parameter {param.name} for feature {spec.name}")
+            # 呼叫 compute_func
+            try:
+                values = spec.compute_func(*args)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            except Exception as e:
+                raise
         else:
-            raise ValueError(f"不支援的特徵名稱: {spec.name}")
+            # 根據特徵名稱使用預設計算函數
+            from indicators.numba_indicators import (
+                sma, hh, ll, atr_wilder, percentile_rank, bbands_pb, bbands_width,
+                atr_channel_upper, atr_channel_lower, atr_channel_pos,
+                donchian_width, dist_to_hh, dist_to_ll
+            )
+            if spec.name.startswith("sma_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = sma(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("hh_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = hh(h, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("ll_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = ll(l, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("atr_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = atr_wilder(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("vx_percentile_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = percentile_rank(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("percentile_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = percentile_rank(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("bb_pb_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = bbands_pb(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("bb_width_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = bbands_width(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("atr_ch_upper_"):
+                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                values = atr_channel_upper(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("atr_ch_lower_"):
+                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                values = atr_channel_lower(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("atr_ch_pos_"):
+                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                values = atr_channel_pos(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("donchian_width_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = donchian_width(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("dist_hh_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = dist_to_hh(h, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("dist_ll_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                values = dist_to_ll(l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name == "atr_14":
+                # fallback to compute_atr_14 (already defined)
+                values = compute_atr_14(o, h, l, c)
+                values = _apply_feature_postprocessing(values, spec)
+                result["atr_14"] = values
+            elif spec.name == "ret_z_200":
+                returns = compute_returns(c, method="log")
+                values = compute_rolling_z(returns, window=200)
+                values = _apply_feature_postprocessing(values, spec)
+                result["ret_z_200"] = values
+            elif spec.name == "session_vwap":
+                values = compute_session_vwap(
+                    ts, c, v, session_spec, breaks_policy
+                )
+                values = _apply_feature_postprocessing(values, spec)
+                result["session_vwap"] = values
+            else:
+                raise ValueError(f"不支援的特徵名稱: {spec.name}")
     
-    # 確保所有必要特徵都存在
-    required_features = ["atr_14", "ret_z_200", "session_vwap"]
-    for feat in required_features:
+    
+    # 確保 baseline 特徵存在（若尚未計算）
+    if "ret_z_200" not in result:
+        returns = compute_returns(c, method="log")
+        values = compute_rolling_z(returns, window=200)
+        values = _apply_feature_postprocessing(values, None)
+        result["ret_z_200"] = values
+    if "session_vwap" not in result:
+        values = compute_session_vwap(
+            ts, c, v, session_spec, breaks_policy
+        )
+        values = _apply_feature_postprocessing(values, None)
+        result["session_vwap"] = values
+    if "atr_14" not in result:
+        values = compute_atr_14(o, h, l, c)
+        values = _apply_feature_postprocessing(values, None)
+        result["atr_14"] = values
+    
+    # 確保所有必要特徵都存在（baseline + registry）
+    for feat in ["ts", "atr_14", "ret_z_200", "session_vwap"]:
         if feat not in result:
-            raise ValueError(f"registry 缺少必要特徵: {feat}")
+            raise ValueError(f"Missing required feature: {feat}")
     
     return result
 

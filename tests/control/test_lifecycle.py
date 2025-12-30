@@ -225,6 +225,8 @@ class TestKillProcess:
 
     def test_kill_process_success(self, monkeypatch):
         """Process killed successfully."""
+        # Force fallback path by disabling psutil
+        monkeypatch.setattr("control.lifecycle.HAS_PSUTIL", False)
         mock_kill = MagicMock()
         monkeypatch.setattr(os, "kill", mock_kill)
         
@@ -246,6 +248,8 @@ class TestKillProcess:
 
     def test_kill_process_permission_error(self, monkeypatch):
         """Permission error when killing."""
+        # Force fallback path by disabling psutil
+        monkeypatch.setattr("control.lifecycle.HAS_PSUTIL", False)
         mock_kill = MagicMock(side_effect=PermissionError("Operation not permitted"))
         monkeypatch.setattr(os, "kill", mock_kill)
         

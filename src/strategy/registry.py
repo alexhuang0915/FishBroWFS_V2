@@ -155,25 +155,25 @@ def clear() -> None:
 
 def load_builtin_strategies() -> None:
     """Load built-in strategies (explicit, no import side effects).
-    
+
     This function must be called explicitly to register built-in strategies.
     """
     from strategy.builtin import (
         sma_cross_v1,
         breakout_channel_v1,
         mean_revert_zscore_v1,
-        rsi_reversal_v1,
-        bollinger_breakout_v1,
-        atr_trailing_stop_v1,
+        s1_v1,
+        s2_v1,
+        s3_v1,
     )
     
     # Register built-in strategies
     register(sma_cross_v1.SPEC)
     register(breakout_channel_v1.SPEC)
     register(mean_revert_zscore_v1.SPEC)
-    register(rsi_reversal_v1.SPEC)
-    register(bollinger_breakout_v1.SPEC)
-    register(atr_trailing_stop_v1.SPEC)
+    register(s1_v1.SPEC)
+    register(s2_v1.SPEC)
+    register(s3_v1.SPEC)
 
 
 def generate_manifest() -> StrategyManifest:

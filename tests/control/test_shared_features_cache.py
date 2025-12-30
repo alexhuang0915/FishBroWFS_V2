@@ -296,7 +296,15 @@ def test_full_build_features_integration(tmp_path: Path):
             
             # 載入 features 並驗證結構
             features = load_features_npz(feat_path)
-            required_keys = {"ts", "atr_14", "ret_z_200", "session_vwap"}
+            # 動態計算該 timeframe 應有的特徵 keys
+            # 使用與 build_shared 相同的 registry
+            from src.features.registry import get_default_registry
+            registry = get_default_registry()
+            specs = registry.specs_for_tf(tf)
+            spec_names = {spec.name for spec in specs}
+            # 加上 baseline 特徵（ts 已由 compute_features_for_tf 確保）
+            baseline = {"ts", "atr_14", "ret_z_200", "session_vwap"}
+            required_keys = spec_names.union(baseline)
             assert set(features.keys()) == required_keys
             
             # 檢查 ts dtype

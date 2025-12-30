@@ -153,13 +153,15 @@ def run_grid(
     # Pre-compute Donchian indicators for unique channel_len values
     for ch_len in unique_ch:
         ch_len_int = int(ch_len)
-        donch_cache_hi[ch_len_int] = rolling_max(bars.high, ch_len_int)
-        donch_cache_lo[ch_len_int] = rolling_min(bars.low, ch_len_int)
+        clamped_ch = max(1, ch_len_int)
+        donch_cache_hi[ch_len_int] = rolling_max(bars.high, clamped_ch)
+        donch_cache_lo[ch_len_int] = rolling_min(bars.low, clamped_ch)
     
     # Pre-compute ATR indicators for unique atr_len values
     for atr_len in unique_atr:
         atr_len_int = int(atr_len)
-        atr_cache[atr_len_int] = atr_wilder(bars.high, bars.low, bars.close, atr_len_int)
+        clamped_atr = max(1, atr_len_int)
+        atr_cache[atr_len_int] = atr_wilder(bars.high, bars.low, bars.close, clamped_atr)
     
     t_precompute_end = time.perf_counter() if profile else 0.0
     

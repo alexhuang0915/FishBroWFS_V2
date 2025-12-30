@@ -70,14 +70,14 @@ def write_features_npz_atomic(
 ) -> None:
     """
     Write features NPZ via tmp + replace. Deterministic keys order.
-    
+
     重用 bars_store.write_npz_atomic 但確保 keys 順序固定：
     ts, atr_14, ret_z_200, session_vwap
-    
+
     Args:
         path: 目標檔案路徑
         features_dict: 特徵字典，必須包含所有必要 keys
-        
+
     Raises:
         ValueError: 缺少必要 keys
         IOError: 寫入失敗

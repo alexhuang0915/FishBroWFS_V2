@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 def run_strategy(
     strategy_id: str,
     features: Dict[str, Any],
-    params: Dict[str, float],
+    params: Dict[str, Any],
     context: Dict[str, Any],
 ) -> List[OrderIntent]:
     """Run a strategy and return order intents.
@@ -32,7 +32,7 @@ def run_strategy(
     Args:
         strategy_id: Strategy identifier
         features: Features/indicators dict (e.g., {"sma_fast": array, "sma_slow": array})
-        params: Strategy parameters dict (e.g., {"fast_period": 10, "slow_period": 20})
+        params: Strategy parameters dict (can include strings, numbers, etc.)
         context: Execution context (e.g., {"bar_index": 100, "order_qty": 1})
         
     Returns:
@@ -75,13 +75,13 @@ def run_strategy(
     return intents
 
 
-def _validate_params(params: Dict[str, float], spec: StrategySpec) -> Dict[str, float]:
+def _validate_params(params: Dict[str, Any], spec: StrategySpec) -> Dict[str, Any]:
     """Validate and merge params with defaults.
     
     Rules:
     - Missing params use defaults
     - Extra keys allowed but logged
-    - Type validation (minimal)
+    - Type validation: numeric parameters must be numeric, string parameters can be strings
     
     Args:
         params: User-provided parameters
@@ -102,14 +102,21 @@ def _validate_params(params: Dict[str, float], spec: StrategySpec) -> Dict[str, 
             )
             continue
         
-        # Type validation (minimal - just check it's numeric)
-        if not isinstance(value, (int, float)):
-            raise ValueError(
-                f"Strategy '{spec.strategy_id}': parameter '{key}' must be numeric, "
-                f"got {type(value)}"
-            )
+        # Get default value to infer expected type
+        default_value = spec.defaults.get(key)
         
-        validated[key] = float(value)
+        # Type validation based on default value type
+        if isinstance(default_value, (int, float)):
+            # Numeric parameter
+            if not isinstance(value, (int, float)):
+                raise ValueError(
+                    f"Strategy '{spec.strategy_id}': parameter '{key}' must be numeric, "
+                    f"got {type(value)}"
+                )
+            validated[key] = float(value)
+        else:
+            # Non-numeric parameter (string, etc.) - accept as-is
+            validated[key] = value
     
     return validated
 

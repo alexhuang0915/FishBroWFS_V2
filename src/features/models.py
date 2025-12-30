@@ -6,7 +6,7 @@ Defines FeatureSpec with window metadata and causality contract.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import numpy as np
 
@@ -23,19 +23,35 @@ class FeatureSpec(BaseModel):
         timeframe_min: Applicable timeframe in minutes (15, 30, 60, 120, 240)
         lookback_bars: Maximum lookback bars required for computation (e.g., ATR(14) needs 14)
         params: Parameter dictionary (e.g., {"window": 14, "method": "log"})
+        window: Rolling window size (window=1 for non‑windowed features)
+        min_warmup_bars: Minimum bars required for warm‑up (output NaN during warm‑up)
+        dtype: Output data type (currently only float64)
+        div0_policy: Division‑by‑zero policy (currently only DIV0_RET_NAN)
+        family: Feature family (optional, e.g., "ma", "volatility", "momentum")
         compute_func: Optional reference to the compute function (for runtime verification)
         window_honest: Whether the window specification is honest (no lookahead)
         causality_verified: Whether this feature has passed causality verification
         verification_timestamp: When causality verification was performed
+        deprecated: Whether this feature is deprecated (should not be used in new strategies)
+        notes: Optional notes about the feature (e.g., deprecation reason, usage guidance)
+        canonical_name: For deprecated aliases, the canonical feature name to use instead
     """
     name: str
     timeframe_min: int
     lookback_bars: int = Field(default=0, ge=0)
     params: Dict[str, str | int | float] = Field(default_factory=dict)
+    window: int = Field(default=1, ge=1)
+    min_warmup_bars: int = Field(default=0, ge=0)
+    dtype: Literal["float64"] = Field(default="float64")
+    div0_policy: Literal["DIV0_RET_NAN"] = Field(default="DIV0_RET_NAN")
+    family: Optional[str] = Field(default=None)
     compute_func: Optional[Callable[..., np.ndarray]] = Field(default=None, exclude=True)
     window_honest: bool = Field(default=True)
     causality_verified: bool = Field(default=False)
     verification_timestamp: Optional[float] = Field(default=None)
+    deprecated: bool = Field(default=False)
+    notes: Optional[str] = Field(default=None)
+    canonical_name: Optional[str] = Field(default=None)
     
     @field_validator('lookback_bars')
     @classmethod
@@ -77,13 +93,18 @@ class FeatureSpec(BaseModel):
             name=self.name,
             timeframe_min=self.timeframe_min,
             lookback_bars=self.lookback_bars,
-            params=self.params.copy()
+            params=self.params.copy(),
+            window=self.window,
+            min_warmup_bars=self.min_warmup_bars,
+            dtype=self.dtype,
+            div0_policy=self.div0_policy,
+            family=self.family
         )
     
     @classmethod
     def from_contract_spec(
-        cls, 
-        contract_spec: 'FeatureSpec', 
+        cls,
+        contract_spec: 'FeatureSpec',
         compute_func: Optional[Callable[..., np.ndarray]] = None
     ) -> 'FeatureSpec':
         """
@@ -92,7 +113,7 @@ class FeatureSpec(BaseModel):
         Args:
             contract_spec: The contract FeatureSpec to convert
             compute_func: Optional compute function reference
-            
+        
         Returns:
             A new FeatureSpec with causality fields
         """
@@ -101,10 +122,18 @@ class FeatureSpec(BaseModel):
             timeframe_min=contract_spec.timeframe_min,
             lookback_bars=contract_spec.lookback_bars,
             params=contract_spec.params.copy(),
+            window=contract_spec.window,
+            min_warmup_bars=contract_spec.min_warmup_bars,
+            dtype=contract_spec.dtype,
+            div0_policy=contract_spec.div0_policy,
+            family=contract_spec.family,
             compute_func=compute_func,
             window_honest=True,  # Assume honest until verified
             causality_verified=False,
-            verification_timestamp=None
+            verification_timestamp=None,
+            deprecated=False,
+            notes=None,
+            canonical_name=None
         )
 
 

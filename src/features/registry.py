@@ -9,7 +9,7 @@ Registry cannot be bypassed.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Callable, Any
+from typing import Dict, List, Optional, Callable, Any, Literal
 import threading
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -52,7 +52,15 @@ class FeatureRegistry(BaseModel):
         lookback_bars: int,
         params: Dict[str, str | int | float],
         compute_func: Optional[Callable[..., np.ndarray]] = None,
-        skip_verification: bool = False
+        skip_verification: bool = False,
+        window: int = 1,
+        min_warmup_bars: int = 0,
+        dtype: Literal["float64"] = "float64",
+        div0_policy: Literal["DIV0_RET_NAN"] = "DIV0_RET_NAN",
+        family: Optional[str] = None,
+        deprecated: bool = False,
+        notes: Optional[str] = None,
+        canonical_name: Optional[str] = None
     ) -> FeatureSpec:
         """
         Register a new feature with causality verification.
@@ -64,22 +72,40 @@ class FeatureRegistry(BaseModel):
             params: Feature parameters
             compute_func: Feature compute function (required for verification)
             skip_verification: If True, skip causality verification (dangerous!)
-            
+            window: Rolling window size (default 1)
+            min_warmup_bars: Minimum bars required for warm‑up (default 0)
+            dtype: Output data type (must be "float64")
+            div0_policy: Division‑by‑zero policy (must be "DIV0_RET_NAN")
+            family: Feature family (optional)
+            deprecated: Whether this feature is deprecated (default False)
+            notes: Optional notes about the feature (e.g., deprecation reason)
+            canonical_name: For deprecated aliases, the canonical feature name to use instead
+        
         Returns:
             Registered FeatureSpec
-            
+        
         Raises:
             LookaheadDetectedError: If lookahead detected during verification
             WindowDishonestyError: If window specification is dishonest
-            ValueError: If feature with same name/timeframe already exists
+            ValueError: If feature with same name/timeframe already exists and not deprecated
         """
         with self.lock:
-            # Check for duplicates
+            # Check for duplicates (allow deprecated aliases)
             for spec in self.specs:
                 if spec.name == name and spec.timeframe_min == timeframe_min:
-                    raise ValueError(
-                        f"Feature '{name}' already registered for timeframe {timeframe_min}min"
-                    )
+                    # If either existing or new spec is deprecated, allow duplicate
+                    # with a warning
+                    if spec.deprecated or deprecated:
+                        warnings.warn(
+                            f"Feature '{name}' (timeframe {timeframe_min}min) already registered "
+                            f"as {'deprecated' if spec.deprecated else 'non-deprecated'}. "
+                            f"Registering duplicate as {'deprecated' if deprecated else 'non-deprecated'}.",
+                            UserWarning
+                        )
+                    else:
+                        raise ValueError(
+                            f"Feature '{name}' already registered for timeframe {timeframe_min}min"
+                        )
             
             # Create feature spec
             feature_spec = FeatureSpec(
@@ -88,9 +114,17 @@ class FeatureRegistry(BaseModel):
                 lookback_bars=lookback_bars,
                 params=params.copy(),
                 compute_func=compute_func,
+                window=window,
+                min_warmup_bars=min_warmup_bars,
+                dtype=dtype,
+                div0_policy=div0_policy,
+                family=family,
                 window_honest=True,  # Assume honest until verified
                 causality_verified=False,
-                verification_timestamp=None
+                verification_timestamp=None,
+                deprecated=deprecated,
+                notes=notes,
+                canonical_name=canonical_name
             )
             
             # Perform causality verification if enabled and not skipped
@@ -148,7 +182,7 @@ class FeatureRegistry(BaseModel):
         Args:
             feature_spec: FeatureSpec to register
             skip_verification: If True, skip causality verification
-            
+        
         Returns:
             Registered FeatureSpec (same object)
         """
@@ -158,7 +192,15 @@ class FeatureRegistry(BaseModel):
             lookback_bars=feature_spec.lookback_bars,
             params=feature_spec.params,
             compute_func=feature_spec.compute_func,
-            skip_verification=skip_verification
+            skip_verification=skip_verification,
+            window=feature_spec.window,
+            min_warmup_bars=feature_spec.min_warmup_bars,
+            dtype=feature_spec.dtype,
+            div0_policy=feature_spec.div0_policy,
+            family=feature_spec.family,
+            deprecated=feature_spec.deprecated,
+            notes=feature_spec.notes,
+            canonical_name=feature_spec.canonical_name
         )
     
     def register_from_contract(
@@ -267,41 +309,49 @@ class FeatureRegistry(BaseModel):
             self.specs.clear()
             self.verification_reports.clear()
     
-    def to_contract_registry(self) -> ContractFeatureRegistry:
+    def to_contract_registry(self, include_deprecated: bool = False) -> ContractFeatureRegistry:
         """
         Convert to contract FeatureRegistry (without causality fields).
         
+        Args:
+            include_deprecated: Whether to include deprecated features (default False)
+        
         Returns:
-            Contract FeatureRegistry with only verified features
+            Contract FeatureRegistry with only verified features (and optionally deprecated)
         """
         # Only include features that have passed causality verification
         verified_specs = [
             spec.to_contract_spec()
             for spec in self.specs
-            if spec.causality_verified
+            if spec.causality_verified and (include_deprecated or not spec.deprecated)
         ]
         
         return ContractFeatureRegistry(specs=verified_specs)
     
-    def specs_for_tf(self, tf_min: int) -> List[FeatureSpec]:
+    def specs_for_tf(self, tf_min: int, include_deprecated: bool = True) -> List[FeatureSpec]:
         """
         Get all feature specs for a given timeframe.
         
         Args:
             tf_min: Timeframe in minutes
-            
+            include_deprecated: Whether to include deprecated features (default True)
+        
         Returns:
             List of FeatureSpecs for the timeframe (only verified features if enabled)
         """
         if self.verification_enabled:
             # Only return verified features
             filtered = [
-                spec for spec in self.specs 
+                spec for spec in self.specs
                 if spec.timeframe_min == tf_min and spec.causality_verified
             ]
         else:
             # Return all features
             filtered = [spec for spec in self.specs if spec.timeframe_min == tf_min]
+        
+        # Filter out deprecated features if requested
+        if not include_deprecated:
+            filtered = [spec for spec in filtered if not spec.deprecated]
         
         # Sort by name for deterministic ordering
         return sorted(filtered, key=lambda s: s.name)
@@ -355,6 +405,9 @@ def get_default_registry() -> FeatureRegistry:
     with _default_registry_lock:
         if _default_registry is None:
             _default_registry = FeatureRegistry()
+            from features.seed_default import seed_default_registry
+            seed_default_registry(_default_registry)
+
             
             # Optionally register default features with verification
             # This would require compute functions for default features

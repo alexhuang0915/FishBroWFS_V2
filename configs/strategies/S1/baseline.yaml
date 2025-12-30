@@ -1,0 +1,52 @@
+# S1 Baseline Configuration
+# Version: v1
+# Dataset: CME.MNQ
+# Timeframe: 60 minutes
+# Features: Required features for S1 strategy with canonical names
+
+version: "v1"
+strategy_id: "S1"
+dataset_id: "CME.MNQ"
+timeframe: 60
+features:
+  required:
+    - name: "sma_5"
+      timeframe_min: 60
+    - name: "sma_10"
+      timeframe_min: 60
+    - name: "sma_20"
+      timeframe_min: 60
+    - name: "sma_40"
+      timeframe_min: 60
+    - name: "hh_5"
+      timeframe_min: 60
+    - name: "hh_10"
+      timeframe_min: 60
+    - name: "hh_20"
+      timeframe_min: 60
+    - name: "hh_40"
+      timeframe_min: 60
+    - name: "ll_5"
+      timeframe_min: 60
+    - name: "ll_10"
+      timeframe_min: 60
+    - name: "ll_20"
+      timeframe_min: 60
+    - name: "ll_40"
+      timeframe_min: 60
+    - name: "atr_10"
+      timeframe_min: 60
+    - name: "atr_14"
+      timeframe_min: 60
+    - name: "percentile_126"
+      timeframe_min: 60
+    - name: "percentile_252"
+      timeframe_min: 60
+    - name: "ret_z_200"
+      timeframe_min: 60
+    - name: "session_vwap"
+      timeframe_min: 60
+  optional: []
+params: {}
+# S1 has no parameters in its param_schema
+notes: "S1 baseline configuration using canonical feature names. Raw bars (open/high/low/close/volume) are provided via outputs/shared/.../bars/resampled_60m.npz, not via features cache."

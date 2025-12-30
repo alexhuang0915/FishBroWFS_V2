@@ -1,0 +1,40 @@
+# S2 Baseline Configuration (Pullback Continuation)
+# Version: v1
+# Dataset: CME.MNQ
+# Timeframe: 60 minutes
+# Features: Context feature (trend) + Value feature (pullback indicator)
+
+version: "v1"
+strategy_id: "S2"
+dataset_id: "CME.MNQ"
+timeframe: 60
+features:
+  required:
+    - name: "context_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.context_feature_name
+    - name: "value_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.value_feature_name
+  optional:
+    - name: "filter_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.filter_feature_name (optional)
+params:
+  filter_mode: "NONE"
+  trigger_mode: "NONE"
+  entry_mode: "MARKET_NEXT_OPEN"
+  context_threshold: 0.0
+  value_threshold: 0.2  # Near lower band for pullback continuation
+  filter_threshold: 0.0
+  context_feature_name: "ema_40"  # Trend-ish feature (exponential moving average)
+  value_feature_name: "bb_pb_20"  # Pullback indicator (Bollinger %b)
+  filter_feature_name: ""  # No filter feature when filter_mode=NONE
+  order_qty: 1.0
+notes: |
+  S2 baseline configuration for pullback continuation.
+  Context feature: ema_40 (trend indicator)
+  Value feature: bb_pb_20 (Bollinger %b, pullback indicator)
+  Value threshold: 0.2 (near lower band, expecting bounce)
+  Filter mode: NONE (no additional filtering)
+  Trigger mode: NONE (market next open entry)

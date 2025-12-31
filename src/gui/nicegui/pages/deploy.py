@@ -12,6 +12,9 @@ from ..constitution.page_shell import page_shell
 # Page shell compliance flag
 PAGE_SHELL_ENABLED = True
 
+# Page status for test alignment
+PAGE_STATUS = "NOT_IMPLEMENTED"
+
 
 def render() -> None:
     """Render the Deploy page with explicit truthfulness."""

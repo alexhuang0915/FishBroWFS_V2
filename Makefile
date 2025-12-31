@@ -5,7 +5,7 @@
 PYTHON := .venv/bin/python
 ENV := PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
 
-.PHONY: help check test precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics
+.PHONY: help check test precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics ui-contract
 
 help:
 	@echo ""
@@ -57,6 +57,12 @@ autopass:
 render-probe:
 	@echo "==> Running UI Render Probe..."
 	$(ENV) $(PYTHON) -B scripts/ui_render_probe.py
+
+ui-contract:
+	@echo "==> Running UI Style Contract Tests..."
+	@echo "Checking/installing Playwright browsers..."
+	./scripts/_dev/install_playwright.sh
+	FISHBRO_UI_CONTRACT=1 $(ENV) $(PYTHON) -B -m pytest -q -m ui_contract
 
 check:
 	@echo "==> Running fast CI-safe tests (excluding slow research-grade tests)..."

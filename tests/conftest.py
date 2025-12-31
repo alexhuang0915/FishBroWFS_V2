@@ -6,6 +6,7 @@ Ensures PYTHONPATH is set correctly for imports.
 """
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -78,5 +79,27 @@ def sample_raw_txt(tmp_path: Path) -> Path:
 """
     txt_path.write_text(txt_content, encoding="utf-8")
     return txt_path
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip UI contract tests unless FISHBRO_UI_CONTRACT=1 is set."""
+    ui_contract_enabled = os.getenv("FISHBRO_UI_CONTRACT") == "1"
+    skip_ui = pytest.mark.skip(reason="UI contract tests require FISHBRO_UI_CONTRACT=1")
+    for item in items:
+        if "ui_contract" in item.keywords and not ui_contract_enabled:
+            item.add_marker(skip_ui)
+
+
+@pytest.fixture(scope="session")
+def playwright_available():
+    """Check if Playwright is installed and browsers are available."""
+    import sys
+    try:
+        import playwright
+    except ImportError:
+        pytest.skip("Playwright not installed")
+    # Optionally check browser installation
+    # We'll rely on pytest-playwright's built-in checks
+    pass
 
 

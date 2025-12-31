@@ -8,15 +8,27 @@ from typing import Optional
 
 from nicegui import ui
 
-from .nexus_tokens import TOKENS
+from .nexus_tokens import TOKENS, SHADOW_ELEVATED
 
 logger = logging.getLogger(__name__)
+NEXUS_THEME_VERSION = "v1"
 _THEME_APPLIED = False
 _THEME_APPLY_COUNT = 0
 
 
-def inject_global_css() -> None:
-    """Inject Nexus global CSS as a style tag."""
+def build_global_css() -> str:
+    """Build Nexus global CSS as a string (pure function).
+    
+    Includes BOTH Quasar and NiceGUI wrapper failsafes:
+    - Standard base selectors: html, body, #q-app, .q-layout, .q-page, .q-page-container
+    - Dynamic Quasar/SPA selectors: .q-page--active, .q-layout-padding, .q-scrollarea, .q-scrollarea__content, .q-page-sticky
+    - Root Wrapper Failsafe (KEY): #q-app > div, #q-app > div > div, #q-app > div > div > div, [role="main"]
+    - All must have background-color: var(--bg-primary) !important; color: var(--text-primary); min-height: 100vh;
+    - Utility classes: .bg-nexus-primary, .bg-nexus-panel-dark, .bg-nexus-panel-medium, .bg-nexus-panel-light
+    
+    Returns:
+        CSS string ready for injection
+    """
     css = f"""
     :root {{
         /* Backgrounds */
@@ -55,15 +67,57 @@ def inject_global_css() -> None:
         --radius-md: {TOKENS['radii']['md']};
         --radius-lg: {TOKENS['radii']['lg']};
         --radius-xl: {TOKENS['radii']['xl']};
+        
+        /* Shadows */
+        --shadow-elevated: {SHADOW_ELEVATED};
     }}
     
-    /* Base styles */
-    body {{
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
+    /* Base styles - ensure full coverage */
+    html, body {{
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
         font-family: var(--font-ui);
         margin: 0;
         overflow-x: hidden;
+        height: 100%;
+        min-height: 100vh;
+    }}
+    
+    /* Quasar/NiceGUI container selectors */
+    #q-app, .q-layout, .q-page, .q-page-container,
+    .nicegui-content, .nicegui-page {{
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        min-height: 100vh;
+    }}
+    
+    /* Dynamic Quasar/SPA selectors */
+    .q-page--active, .q-layout-padding,
+    .q-scrollarea, .q-scrollarea__content,
+    .q-page-sticky, .q-page-sticky--active {{
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+    }}
+    
+    /* ROOT WRAPPER FAILSAFE (KEY) - covers all nested divs */
+    #q-app > div,
+    #q-app > div > div,
+    #q-app > div > div > div,
+    #q-app > div > div > div > div,
+    [role="main"],
+    .q-page-container > div,
+    .q-page-container > div > div,
+    .nicegui-content > div,
+    .nicegui-content > div > div {{
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        /* min-height removed from nested selectors - only top-level containers have it */
+    }}
+    
+    /* Ensure any nested containers also inherit */
+    .q-drawer, .q-header, .q-footer, .q-toolbar {{
+        background-color: var(--bg-panel-dark) !important;
+        color: var(--text-primary) !important;
     }}
     
     /* Cyber scrollbar */
@@ -138,10 +192,16 @@ def inject_global_css() -> None:
     .bg-panel-medium {{ background-color: var(--bg-panel-medium); }}
     .bg-panel-light {{ background-color: var(--bg-panel-light); }}
     
-    .text-primary {{ color: var(--text-primary); }}
-    .text-secondary {{ color: var(--text-secondary); }}
-    .text-tertiary {{ color: var(--text-tertiary); }}
-    .text-muted {{ color: var(--text-muted); }}
+    /* Nexus-specific background utilities */
+    .bg-nexus-primary {{ background-color: var(--bg-primary) !important; }}
+    .bg-nexus-panel-dark {{ background-color: var(--bg-panel-dark) !important; }}
+    .bg-nexus-panel-medium {{ background-color: var(--bg-panel-medium) !important; }}
+    .bg-nexus-panel-light {{ background-color: var(--bg-panel-light) !important; }}
+    
+    .text-primary {{ color: var(--text-primary) !important; }}
+    .text-secondary {{ color: var(--text-secondary) !important; }}
+    .text-tertiary {{ color: var(--text-tertiary) !important; }}
+    .text-muted {{ color: var(--text-muted) !important; }}
     
     .text-purple {{ color: var(--accent-purple); }}
     .text-cyan {{ color: var(--accent-cyan); }}
@@ -156,7 +216,79 @@ def inject_global_css() -> None:
     .hover-glow:hover {{
         box-shadow: 0 0 15px var(--accent-purple);
     }}
+
+    /* Global dark overrides for Quasar content components */
+    .q-card, .q-stepper, .q-stepper__content, .q-panel,
+    .q-stepper__step-content, .q-item {{
+        background-color: var(--bg-panel-dark) !important;
+        color: var(--text-primary) !important;
+    }}
+
+    /* Layout constitution classes */
+    .nexus-page-fill {{
+        width: 100%;
+        min-height: 100vh;
+        background-color: var(--bg-primary) !important;
+        color: var(--text-primary) !important;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 24px;
+    }}
+
+    .nexus-content {{
+        width: 100%;
+        max-width: 1200px;
+        flex-grow: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 24px;
+    }}
+
+    .nexus-page-title {{
+        width: 100%;
+        margin-bottom: 24px;
+        border-bottom: 2px solid var(--accent-purple);
+        padding-bottom: 12px;
+    }}
+
+    /* Nexus islands grid CSS with responsive breakpoints */
+    .nexus-islands {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+        width: 100%;
+        min-height: 200px;
+        margin-top: 24px;
+        margin-bottom: 24px;
+    }}
+
+    @media (max-width: 768px) {{
+        .nexus-islands {{
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }}
+    }}
+
+    @media (min-width: 769px) and (max-width: 1024px) {{
+        .nexus-islands {{
+            grid-template-columns: repeat(2, 1fr);
+        }}
+    }}
+
+    /* Toast notifications */
+    .nicegui-toast {{
+        font-family: var(--font-ui);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow-elevated);
+    }}
     """
+    return css
+
+
+def inject_global_css() -> None:
+    """Inject Nexus global CSS as a style tag."""
+    css = build_global_css()
     ui.add_head_html(f"<style>{css}</style>")
 
 
@@ -206,10 +338,11 @@ def inject_tailwind() -> None:
     ui.add_head_html(tailwind_cdn)
 
 
-def apply_nexus_theme(use_tailwind: bool = False) -> None:
-    """Apply the Nexus theme globally.
+def inject_nexus_theme(use_tailwind: bool = False) -> None:
+    """Inject Nexus theme CSS globally (single source of truth).
     
     This function should be called once at app startup.
+    It injects all theme CSS via ui.add_head_html() in one place.
     
     Args:
         use_tailwind: Whether to include Tailwind CSS (CDN). Default False.
@@ -219,10 +352,14 @@ def apply_nexus_theme(use_tailwind: bool = False) -> None:
         logger.debug("Nexus theme already applied, skipping")
         return
     _THEME_APPLY_COUNT += 1
-    logger.info("Applying Nexus theme (pid=%d, call #%d)", os.getpid(), _THEME_APPLY_COUNT)
+    logger.info("Injecting Nexus theme v%s (pid=%d, call #%d)", NEXUS_THEME_VERSION, os.getpid(), _THEME_APPLY_COUNT)
     inject_fonts()
     inject_global_css()
     if use_tailwind:
         inject_tailwind()
-    logger.info("Nexus theme applied")
+    logger.info("Nexus theme injected")
     _THEME_APPLIED = True
+
+
+# Backward compatibility alias
+apply_nexus_theme = inject_nexus_theme

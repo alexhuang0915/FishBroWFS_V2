@@ -47,10 +47,10 @@ def main() -> None:
     print(f"[OK] {txt_path.resolve()}")
 
     # Optional: print a short summary
-    status = snapshot.get("status", {})
+    system_status = snapshot.get("system_status", {})
     print(
-        f"[SUMMARY] System state: {status.get('state', 'UNKNOWN')} "
-        f"({status.get('summary', 'No summary')})"
+        f"[SUMMARY] System state: {system_status.get('state', 'UNKNOWN')} "
+        f"({system_status.get('summary', 'No summary')})"
     )
 
 

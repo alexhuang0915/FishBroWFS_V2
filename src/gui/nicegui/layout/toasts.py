@@ -15,16 +15,9 @@ class ToastType(str, Enum):
 
 
 def init_toast_system() -> None:
-    """Initialize the toast system (currently just sets up CSS)."""
-    # Custom CSS for toast positioning
-    css = """
-    .nicegui-toast {
-        font-family: var(--font-ui);
-        border-radius: var(--radius-md);
-        box-shadow: var(--shadow-elevated);
-    }
-    """
-    ui.add_head_html(f"<style>{css}</style>")
+    """Initialize the toast system (CSS is now injected via nexus_theme)."""
+    # CSS is injected globally by inject_nexus_theme()
+    pass
 
 
 def show_toast(

@@ -479,7 +479,33 @@ def build_autopass_report(outputs_dir: Path = Path("outputs/autopass")) -> Dict[
     if deploy_path:
         pages["deploy"]["export_saved"] = True
         pages["deploy"]["path"] = str(deploy_path)
-    # 8. Acceptance
+    
+    # 8. Interaction probe
+    interaction_report = None
+    interaction_failures = []
+    try:
+        from gui.nicegui.autopass.interaction_probe import generate_interaction_report
+        interaction_report = generate_interaction_report()
+        if interaction_report["overall"]["status"] != "PASS":
+            for page_id, page_result in interaction_report["pages"].items():
+                if page_result["status"] == "FAIL":
+                    interaction_failures.append({
+                        "code": "BUTTON_COVERAGE_FAIL",
+                        "detail": f"{page_id}: button coverage missing (ratio {page_result.get('coverage_ratio', 0)})",
+                    })
+                elif page_result["status"] == "ERROR":
+                    interaction_failures.append({
+                        "code": "BUTTON_COVERAGE_ERROR",
+                        "detail": f"{page_id}: {page_result.get('error', 'unknown error')}",
+                    })
+    except Exception as e:
+        logging.warning(f"Interaction probe failed: {e}")
+        interaction_failures.append({
+            "code": "INTERACTION_PROBE_FAILED",
+            "detail": f"Interaction probe raised exception: {e}",
+        })
+    
+    # 9. Acceptance
     failures = []
 
     # Gate A: Status service errors in summary
@@ -558,10 +584,13 @@ def build_autopass_report(outputs_dir: Path = Path("outputs/autopass")) -> Dict[
                 "detail": f"{key}: file is zero length",
             })
 
+    # Gate G: Interaction probe failures
+    failures.extend(interaction_failures)
+
     passed = len(failures) == 0
     
     
-    # 9. Build final report
+    # 10. Build final report
     report = {
         "meta": meta,
         "system_status": system_status,
@@ -569,6 +598,7 @@ def build_autopass_report(outputs_dir: Path = Path("outputs/autopass")) -> Dict[
             "forensics_json_path": forensics_paths.get("json_path"),
             "forensics_txt_path": forensics_paths.get("txt_path"),
         },
+        "interaction": interaction_report,
         "pages": pages,
         "artifacts": {
             "intent_json": str(artifacts_dir / "intent.json") if intent_path else None,

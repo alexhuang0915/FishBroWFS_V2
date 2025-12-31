@@ -37,6 +37,7 @@ class TestBootstrapSingleton:
 
     @patch("gui.nicegui.theme.nexus_theme.ui.add_head_html")
     @patch("gui.nicegui.services.status_service.ui.timer")
+    @patch("gui.nicegui.app.apply_ui_constitution")
     @patch("gui.nicegui.app.apply_nexus_theme")
     @patch("gui.nicegui.app.create_app_shell")
     @patch("gui.nicegui.app.start_polling")
@@ -45,6 +46,7 @@ class TestBootstrapSingleton:
         mock_start_polling,
         mock_create_app_shell,
         mock_apply_nexus_theme,
+        mock_apply_ui_constitution,
         mock_timer,
         mock_add_head_html,
     ):
@@ -57,6 +59,7 @@ class TestBootstrapSingleton:
         bootstrap_app_shell_and_services()
         
         # Verify each function called once
+        mock_apply_ui_constitution.assert_called_once()
         mock_apply_nexus_theme.assert_called_once_with(use_tailwind=False)
         mock_create_app_shell.assert_called_once()
         mock_start_polling.assert_called_once()
@@ -65,6 +68,7 @@ class TestBootstrapSingleton:
         bootstrap_app_shell_and_services()
         
         # Calls must stay at one
+        mock_apply_ui_constitution.assert_called_once()
         mock_apply_nexus_theme.assert_called_once()
         mock_create_app_shell.assert_called_once()
         mock_start_polling.assert_called_once()

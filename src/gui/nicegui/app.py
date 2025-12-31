@@ -3,7 +3,7 @@
 Responsibilities:
 - Apply Nexus Theme once
 - Render Global Header
-- Render Primary Tab Bar (7 tabs EXACT)
+- Render Primary Tab Bar (filtered by UI capabilities)
 - Render active page content
 """
 import logging
@@ -17,6 +17,7 @@ from .layout.header import render_header
 from .layout.tabs import render_tab_bar, TAB_IDS, get_tab_content
 from .layout.toasts import init_toast_system
 from .services.status_service import start_polling
+from .constitution.ui_constitution import apply_ui_constitution, UIConstitutionConfig
 # Hidden forensic page (requires import to register the route)
 from .pages import forensics
 
@@ -45,18 +46,33 @@ def _on_tab_change(tab_id: str) -> None:
 
 
 def bootstrap_app_shell_and_services() -> None:
-    """Bootstrap theme, shell, and polling exactly once per process."""
+    """Bootstrap UI constitution, theme, shell, and polling exactly once per process."""
     global _BOOTSTRAP_COUNT
     if _BOOTSTRAP_COUNT > 0:
         logger.debug("UI already bootstrapped, skipping bootstrap")
         return
     _BOOTSTRAP_COUNT += 1
-    logger.debug("Starting UI bootstrap (count = %d)", _BOOTSTRAP_COUNT)
+    logger.debug("Starting UI bootstrap with constitution (count = %d)", _BOOTSTRAP_COUNT)
     
-    # Theme, shell, polling are idempotent internally
+    # Apply UI Constitution FIRST (guarantees dark theme coverage, page wrapper invariants, etc.)
+    constitution_config = UIConstitutionConfig(
+        enforce_dark_root=True,
+        enforce_page_shell=True,
+        enforce_truth_providers=True,
+        enforce_evidence=True,
+    )
+    apply_ui_constitution(constitution_config)
+    
+    # Then apply theme (which now includes constitution-enhanced CSS)
     apply_nexus_theme(use_tailwind=False)
+    
+    # Create app shell (which will use constitution-wrapped pages)
     create_app_shell()
+    
+    # Start polling for status updates
     start_polling()
+    
+    logger.info("UI Constitution applied successfully with all guarantees")
 
 
 def create_app_shell() -> None:
@@ -79,17 +95,24 @@ def create_app_shell() -> None:
     
     # Main content area (everything below header)
     with ui.column().classes("w-full h-full min-h-screen bg-nexus-primary"):
-        # Primary Tab Bar (7 tabs EXACT)
-        initial_tab = TAB_IDS[0]
-        tab_bar = render_tab_bar(value=initial_tab, on_change=_on_tab_change)
-        
-        # Tab content area
-        with ui.tab_panels(tab_bar, value=initial_tab).classes("w-full flex-grow") as panels:
-            _tab_panels = panels
-            for tab_id in TAB_IDS:
-                with ui.tab_panel(tab_id):
-                    # Each page is responsible for its own content
-                    get_tab_content(tab_id)
+        # Primary Tab Bar (filtered by capabilities)
+        if TAB_IDS:
+            initial_tab = TAB_IDS[0]
+            tab_bar = render_tab_bar(value=initial_tab, on_change=_on_tab_change)
+            
+            # Tab content area
+            with ui.tab_panels(tab_bar, value=initial_tab).classes("w-full flex-grow") as panels:
+                _tab_panels = panels
+                for tab_id in TAB_IDS:
+                    with ui.tab_panel(tab_id):
+                        # Each page is responsible for its own content
+                        get_tab_content(tab_id)
+        else:
+            # No tabs enabled - show a message
+            with ui.column().classes("w-full h-full p-8 items-center justify-center"):
+                ui.icon("warning").classes("text-6xl text-warning mb-4")
+                ui.label("No UI tabs available").classes("text-xl font-bold mb-2")
+                ui.label("All UI capabilities are disabled. Check UI configuration.").classes("text-tertiary")
         
         # Footer (optional)
         with ui.row().classes("w-full py-2 px-4 text-center text-tertiary text-sm border-t border-panel-dark"):
@@ -125,4 +148,5 @@ def start_ui(host: str = "0.0.0.0", port: int = 8080, show: bool = True) -> None
         show=show,
         reload=False,
         reconnect_timeout=10.0,
+        dark=True,
     )

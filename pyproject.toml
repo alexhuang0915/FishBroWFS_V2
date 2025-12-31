@@ -20,7 +20,8 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "slow: research-grade tests",
-    "integration: integration tests requiring external services"
+    "integration: integration tests requiring external services",
+    "ui_contract: UI style contract tests requiring Playwright and UI server"
 ]
 addopts = "-m 'not slow'"
 

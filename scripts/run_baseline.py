@@ -137,10 +137,10 @@ def ensure_builtin_strategies_loaded() -> None:
 def ensure_feature_requirements(strategy: str, config: Dict[str, Any]) -> None:
     """
     Ensure feature requirements JSON exists for the strategy.
-    
+
     If the JSON file does not exist in outputs/strategies/{strategy}/features.json,
     create it using the baseline config's features list.
-    
+
     Args:
         strategy: Strategy ID
         config: Baseline config dictionary
@@ -149,34 +149,72 @@ def ensure_feature_requirements(strategy: str, config: Dict[str, Any]) -> None:
     outputs_json_path = Path("outputs") / "strategies" / strategy / "features.json"
     if outputs_json_path.exists():
         return
-    
+
     # Also check configs/strategies (if exists, we can skip)
     configs_json_path = Path("configs/strategies") / strategy / "features.json"
     if configs_json_path.exists():
         return
-    
+
     # Create outputs directory
     outputs_json_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    # Build feature requirements from config
+
+    # Build feature requirements from config with resolved concrete names
     required_features = config["features"]["required"]
     optional_features = config["features"].get("optional", [])
-    
-    # Convert to FeatureRef objects
+    params = config.get("params", {})
+
+    # Mapping of placeholder to param key
+    placeholder_map = {
+        "context_feature": "context_feature_name",
+        "value_feature": "value_feature_name",
+        "filter_feature": "filter_feature_name",
+    }
+
+    # Convert to FeatureRef objects with concrete names
     required_refs = []
     for feat in required_features:
-        required_refs.append(FeatureRef(
-            name=feat["name"],
-            timeframe_min=feat.get("timeframe_min", 60),
-        ))
-    
+        placeholder = feat["name"]
+        timeframe = feat.get("timeframe_min", 60)
+        
+        if placeholder in placeholder_map:
+            param_key = placeholder_map[placeholder]
+            concrete_name = params.get(param_key, "")
+            if concrete_name:
+                required_refs.append(FeatureRef(
+                    name=concrete_name,
+                    timeframe_min=timeframe,
+                ))
+            else:
+                # If param is empty, skip (should not happen for required features)
+                continue
+        else:
+            # Already concrete name (e.g., S1 features)
+            required_refs.append(FeatureRef(
+                name=placeholder,
+                timeframe_min=timeframe,
+            ))
+
     optional_refs = []
     for feat in optional_features:
-        optional_refs.append(FeatureRef(
-            name=feat["name"],
-            timeframe_min=feat.get("timeframe_min", 60),
-        ))
-    
+        placeholder = feat["name"]
+        timeframe = feat.get("timeframe_min", 60)
+        
+        if placeholder in placeholder_map:
+            param_key = placeholder_map[placeholder]
+            concrete_name = params.get(param_key, "")
+            if concrete_name:
+                optional_refs.append(FeatureRef(
+                    name=concrete_name,
+                    timeframe_min=timeframe,
+                ))
+            # If empty, skip (optional feature not used)
+        else:
+            # Already concrete name
+            optional_refs.append(FeatureRef(
+                name=placeholder,
+                timeframe_min=timeframe,
+            ))
+
     req = StrategyFeatureRequirements(
         strategy_id=strategy,
         required=required_refs,
@@ -184,7 +222,7 @@ def ensure_feature_requirements(strategy: str, config: Dict[str, Any]) -> None:
         min_schema_version="v1",
         notes=f"Auto-generated from baseline config for {strategy}",
     )
-    
+
     # Save JSON
     save_requirements_to_json(req, str(outputs_json_path))
     print(f"Created feature requirements JSON at {outputs_json_path}")

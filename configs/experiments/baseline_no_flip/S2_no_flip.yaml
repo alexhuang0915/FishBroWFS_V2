@@ -1,0 +1,65 @@
+# S2 No-Flip Configuration (Pullback Continuation)
+# Version: v1
+# Dataset: CME.MNQ
+# Timeframe: 60 minutes
+# Features: Non-directional context feature (volatility) + channel value feature
+# Design: Adapts S2 pullback continuation to use non-directional features
+
+version: "v1"
+strategy_id: "S2"
+dataset_id: "CME.MNQ"
+timeframe: 60
+features:
+  required:
+    - name: "context_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.context_feature_name
+    - name: "value_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.value_feature_name
+  optional:
+    - name: "filter_feature"
+      timeframe_min: 60
+      # Placeholder - actual feature name provided via params.filter_feature_name (optional)
+params:
+  filter_mode: "NONE"
+  trigger_mode: "NONE"
+  entry_mode: "MARKET_NEXT_OPEN"
+  context_threshold: 0.0
+  value_threshold: 0.2  # Near lower band for pullback continuation
+  filter_threshold: 0.0
+  context_feature_name: "atr_14"  # Volatility as non-directional context
+  value_feature_name: "bb_pb_20"  # Channel position as pullback indicator
+  filter_feature_name: ""  # No filter feature when filter_mode=NONE
+  order_qty: 1.0
+allow_build: false
+notes: |
+  S2 No-Flip adaptation for pullback continuation.
+  
+  Original S2 used:
+  - Context: ema_40 (trend indicator) - DIRECTIONAL
+  - Value: bb_pb_20 (pullback indicator) - NON-DIRECTIONAL
+  
+  No-Flip Adaptation:
+  - Context: atr_14 (volatility) - NON-DIRECTIONAL
+    Rationale: Volatility provides non-directional context for pullback significance
+    Threshold: 0.0 (no filtering by default, always active when volatility > 0)
+  - Value: bb_pb_20 (Bollinger %b) - NON-DIRECTIONAL (unchanged)
+    Rationale: Channel position is directionally neutral
+    Threshold: 0.2 (near lower band for pullback)
+  
+  Logic:
+  - Entry triggered when:
+    1. atr_14 > 0.0 (always true for non-zero volatility)
+    2. bb_pb_20 < 0.2 (price near lower Bollinger Band)
+  
+  This creates a volatility-conditioned channel-based entry signal.
+  
+  Feature Verification:
+  - atr_14: Available in registry (volatility family)
+  - bb_pb_20: Available in registry (bb family)
+  
+  Both features are non-directional and comply with No-Flip design principles.
+  
+  Configuration is research-ready with allow_build=False.
+  Features must be available in the feature cache.

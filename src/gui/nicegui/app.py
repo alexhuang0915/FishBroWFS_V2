@@ -10,6 +10,7 @@ import logging
 import os
 from typing import Optional
 
+from fastapi import FastAPI
 from nicegui import ui
 
 from .theme.nexus_theme import apply_nexus_theme
@@ -18,6 +19,7 @@ from .layout.tabs import render_tab_bar, TAB_IDS, get_tab_content
 from .layout.toasts import init_toast_system
 from .services.status_service import start_polling
 from .constitution.ui_constitution import apply_ui_constitution, UIConstitutionConfig
+from .asgi.ws_guard import WebSocketGuardMiddleware, default_ws_guard_config_from_env
 # Hidden forensic page (requires import to register the route)
 from .pages import forensics
 
@@ -139,14 +141,30 @@ def start_ui(host: str = "0.0.0.0", port: int = 8080, show: bool = True) -> None
     # Ensure deterministic single‑process mode
     os.environ['WATCHFILES_RELOAD'] = '0'
     
-    # Run NiceGUI
-    ui.run(
-        host=host,
-        port=port,
+    # Create FastAPI app
+    app = FastAPI(title="FishBro War Room")
+    
+    # Mount NiceGUI onto the FastAPI app
+    ui.run_with(
+        app,
         title="FishBro War Room",
         favicon="🚀",
-        show=show,
-        reload=False,
-        reconnect_timeout=10.0,
         dark=True,
+        reconnect_timeout=10.0,
+    )
+    
+    # Wrap with WebSocket guard middleware
+    guard_config = default_ws_guard_config_from_env()
+    guarded_app = WebSocketGuardMiddleware(app, guard_config)
+    
+    # Import uvicorn here to avoid extra dependency for CLI usage
+    import uvicorn
+    
+    # Run the guarded app
+    uvicorn.run(
+        guarded_app,
+        host=host,
+        port=port,
+        log_level="warning",
+        reload=False,
     )

@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Dict, Any, Mapping, List, Optional
 
-from engine.types import OrderIntent
+from engine.engine_types import OrderIntent
 from core.ast_identity import (
     StrategyIdentity,
     compute_strategy_id_from_function,

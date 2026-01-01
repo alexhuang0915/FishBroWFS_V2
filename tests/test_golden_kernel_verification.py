@@ -2,7 +2,7 @@
 import numpy as np
 
 from strategy.kernel import DonchianAtrParams, run_kernel, _max_drawdown
-from engine.types import BarArrays
+from engine.engine_types import BarArrays
 
 
 def _bars():

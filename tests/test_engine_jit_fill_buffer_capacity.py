@@ -10,7 +10,7 @@ import pytest
 
 from data.layout import normalize_bars
 from engine.engine_jit import STATUS_BUFFER_FULL, simulate as simulate_jit
-from engine.types import OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def test_fill_buffer_scales_with_intents():

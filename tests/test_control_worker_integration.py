@@ -11,7 +11,7 @@ import pytest
 
 from control.jobs_db import create_job, get_job, init_db
 from control.report_links import make_report_link
-from control.types import DBJobSpec, JobStatus
+from control.control_types import DBJobSpec, JobStatus
 from control.worker import run_one_job
 from pipeline.funnel_schema import (
     FunnelPlan,

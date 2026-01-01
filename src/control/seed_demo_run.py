@@ -16,7 +16,7 @@ from uuid import uuid4
 
 from control.jobs_db import init_db
 from control.report_links import build_report_link
-from control.types import JobStatus
+from control.control_types import JobStatus
 from core.paths import ensure_run_dir
 
 # Default DB path (same as api.py)

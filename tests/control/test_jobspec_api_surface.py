@@ -27,7 +27,7 @@ def test_control_no_ambiguous_jobspec() -> None:
     
     # Verify they are different classes
     from control.job_spec import WizardJobSpec
-    from control.types import DBJobSpec
+    from control.control_types import DBJobSpec
     
     assert control_module.WizardJobSpec is WizardJobSpec
     assert control_module.DBJobSpec is DBJobSpec
@@ -38,7 +38,7 @@ def test_jobspec_import_paths() -> None:
     """Verify that import statements work correctly after the rename."""
     # These imports should succeed
     from control.job_spec import WizardJobSpec
-    from control.types import DBJobSpec
+    from control.control_types import DBJobSpec
     
     # Verify class attributes
     assert WizardJobSpec.__name__ == "WizardJobSpec"
@@ -55,7 +55,7 @@ def test_jobspec_usage_scenarios() -> None:
     """Quick sanity check that the two specs are used as intended."""
     from datetime import date
     from control.job_spec import WizardJobSpec, DataSpec, WFSSpec
-    from control.types import DBJobSpec
+    from control.control_types import DBJobSpec
     
     # WizardJobSpec is Pydantic-based, should have model_config
     wizard = WizardJobSpec(

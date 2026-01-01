@@ -28,7 +28,7 @@ from engine.engine_jit import (
     _pack_intents,
     simulate_arrays,
 )
-from engine.types import BarArrays, OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import BarArrays, OrderIntent, OrderKind, OrderRole, Side
 
 
 class TestIndexDtypeSafety:

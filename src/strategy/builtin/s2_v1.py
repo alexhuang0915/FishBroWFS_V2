@@ -11,7 +11,7 @@ from typing import Dict, Any, Mapping
 
 import numpy as np
 
-from engine.types import OrderIntent, OrderRole, OrderKind, Side
+from engine.engine_types import OrderIntent, OrderRole, OrderKind, Side
 from engine.order_id import generate_order_id
 from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
 from strategy.spec import StrategySpec, StrategyFn

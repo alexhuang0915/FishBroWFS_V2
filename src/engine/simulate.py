@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from engine.types import BarArrays, OrderIntent, SimResult
+from engine.engine_types import BarArrays, OrderIntent, SimResult
 from engine.kernels.cursor_kernel import simulate_cursor_kernel
 from engine.kernels.reference_kernel import simulate_reference_matcher
 

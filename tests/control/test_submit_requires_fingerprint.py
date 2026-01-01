@@ -12,7 +12,7 @@ from control.batch_submit import (
     submit_batch,
 )
 from control.job_spec import WizardJobSpec, DataSpec, WFSSpec
-from control.types import DBJobSpec
+from control.control_types import DBJobSpec
 
 
 def test_wizard_to_db_jobspec_requires_fingerprint() -> None:

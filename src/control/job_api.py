@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, List
 from datetime import datetime
 
 from control.jobs_db import create_job, get_job, list_jobs
-from control.types import DBJobSpec, JobRecord, JobStatus
+from control.control_types import DBJobSpec, JobRecord, JobStatus
 from control.dataset_catalog import get_dataset_catalog
 from control.strategy_catalog import get_strategy_catalog
 from control.dataset_descriptor import get_descriptor

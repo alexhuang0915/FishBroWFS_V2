@@ -17,7 +17,7 @@ try:
 except Exception:  # pragma: no cover
     nb = None  # type: ignore
 
-from engine.types import (
+from engine.engine_types import (
     BarArrays,
     Fill,
     OrderIntent,

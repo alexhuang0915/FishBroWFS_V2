@@ -108,9 +108,10 @@ class TestBootstrapSingleton:
         assert kwargs.get("interval") == 0.1
         assert callable(kwargs.get("callback"))
 
-    @patch("gui.nicegui.app.ui.run")
+    @patch("uvicorn.run")
+    @patch("gui.nicegui.app.ui.run_with")
     @patch("gui.nicegui.app.bootstrap_app_shell_and_services")
-    def test_start_ui_gate(self, mock_bootstrap, mock_ui_run):
+    def test_start_ui_gate(self, mock_bootstrap, mock_ui_run_with, mock_uvicorn_run):
         """start_ui must set _UI_BOOTSTRAPPED flag before bootstrap and skip on second call."""
         import gui.nicegui.app as app_module
         from gui.nicegui.app import start_ui
@@ -130,14 +131,17 @@ class TestBootstrapSingleton:
         assert app_module._UI_BOOTSTRAPPED is True, f"Flag should be True after start_ui, got {app_module._UI_BOOTSTRAPPED}"
         # Verify bootstrap called once
         mock_bootstrap.assert_called_once()
-        # Verify ui.run called once with correct args
-        mock_ui_run.assert_called_once()
+        # Verify ui.run_with called once
+        mock_ui_run_with.assert_called_once()
+        # Verify uvicorn.run called once
+        mock_uvicorn_run.assert_called_once()
         # Second call (should skip due to flag)
         start_ui()
         # bootstrap should not be called again
         mock_bootstrap.assert_called_once()
-        # ui.run should not be called again (since start_ui returns early)
-        assert mock_ui_run.call_count == 1
+        # ui.run_with and uvicorn.run should not be called again (since start_ui returns early)
+        assert mock_ui_run_with.call_count == 1
+        assert mock_uvicorn_run.call_count == 1
 
     def test_no_import_time_bootstrap(self):
         """Ensure no module in the UI subsystem calls bootstrap functions at import time.

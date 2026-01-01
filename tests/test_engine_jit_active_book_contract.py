@@ -9,7 +9,7 @@ import pytest
 from data.layout import normalize_bars
 from engine.engine_jit import _simulate_with_ttl, simulate as simulate_jit
 from engine.matcher_core import simulate as simulate_py
-from engine.types import Fill, OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import Fill, OrderIntent, OrderKind, OrderRole, Side
 
 
 def _assert_fills_equal(a: list[Fill], b: list[Fill]) -> None:

@@ -17,8 +17,8 @@ from nicegui import ui
 
 logger = logging.getLogger(__name__)
 
-# Default API base (should be configurable)
-API_BASE = "http://localhost:8000"
+# Configurable API base via environment variable
+API_BASE = os.environ.get("FISHBRO_API_BASE", "http://localhost:8000").rstrip("/")
 
 # -----------------------------------------------------------------------------
 # Status snapshot
@@ -63,7 +63,8 @@ def get_summary() -> str:
     elif state == "DEGRADED":
         return f"Backend up, worker down: {snap.worker_error or 'unknown error'}"
     else:  # OFFLINE
-        return f"Backend unreachable: {snap.backend_error or 'connection failed'}"
+        hint = "Start backend via 'make war' (port 8000)"
+        return f"Backend unreachable: {snap.backend_error or 'connection failed'} | Hint: {hint}"
 # -----------------------------------------------------------------------------
 # Module‑global state
 # -----------------------------------------------------------------------------
@@ -142,13 +143,15 @@ def _log_status_transition(
         if new_up:
             logger.info(f"{probe.capitalize()} is UP")
         else:
-            logger.warning(f"{probe.capitalize()} is DOWN: {error}")
+            hint = "Start backend via 'make war' (port 8000)" if probe == "backend" else "Start worker via 'make worker'"
+            logger.warning(f"{probe.capitalize()} is DOWN: {error} | Hint: {hint}")
             _update_warning_ts(probe, now)
         return
 
     if old_up and not new_up:
         if _should_log_warning(probe, now):
-            logger.warning(f"{probe.capitalize()} DOWN: {error}")
+            hint = "Start backend via 'make war' (port 8000)" if probe == "backend" else "Start worker via 'make worker'"
+            logger.warning(f"{probe.capitalize()} DOWN: {error} | Hint: {hint}")
             _update_warning_ts(probe, now)
         else:
             logger.debug(f"{probe.capitalize()} still down: {error}")
@@ -211,14 +214,18 @@ def get_status() -> StatusSnapshot:
 def get_system_status() -> Dict[str, Any]:
     """Legacy adapter: return dict compatible with previous dashboard."""
     snap = get_status()
+    backend_hint = "Start backend via 'make war' (port 8000)" if not snap.backend_up else None
+    worker_hint = "Start worker via 'make worker'" if not snap.worker_up else None
     return {
         "backend": {
             "online": snap.backend_up,
             "error": snap.backend_error,
+            "hint": backend_hint,
         },
         "worker": {
             "alive": snap.worker_up,
             "error": snap.worker_error,
+            "hint": worker_hint,
         },
         "overall": snap.backend_up and snap.worker_up,
     }

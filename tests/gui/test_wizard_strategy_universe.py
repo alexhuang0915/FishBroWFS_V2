@@ -28,10 +28,16 @@ class TestWizardStrategyUniverse:
         assert ids == ["S1", "S2", "S3"]
     
     @patch("gui.nicegui.pages.wizard.list_real_strategy_ids")
-    def test_wizard_calls_real_strategy_ids(self, mock_list_ids):
+    @patch("gui.nicegui.pages.wizard.page_shell")
+    def test_wizard_calls_real_strategy_ids(self, mock_page_shell, mock_list_ids):
         """Wizard render calls list_real_strategy_ids to populate checkboxes."""
         # Mock the return value
         mock_list_ids.return_value = ["S1", "S2", "S3"]
+        # Mock page_shell to avoid NiceGUI context errors, but call the render function
+        def page_shell_side_effect(title, render_func):
+            render_func()
+            return MagicMock()
+        mock_page_shell.side_effect = page_shell_side_effect
         # Mock UI components to avoid AttributeError
         with patch("gui.nicegui.pages.wizard.ui") as mock_ui:
             # Create a mock that has a classes method returning itself
@@ -93,6 +99,8 @@ class TestWizardStrategyUniverse:
         
         # Verify list_real_strategy_ids was called
         mock_list_ids.assert_called()
+        # Verify page_shell was called
+        mock_page_shell.assert_called()
     
     def test_wizard_state_accepts_real_strategy_ids(self):
         """WizardState can store real strategy IDs."""

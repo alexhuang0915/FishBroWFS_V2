@@ -147,7 +147,7 @@ def mock_load_features_npz(monkeypatch, dummy_features_cache: Path):
     def mock_load(path: Path) -> Dict[str, np.ndarray]:
         # Load the actual dummy cache we created
         if path == dummy_features_cache:
-            return np.load(str(path), allow_pickle=True)
+            return np.load(str(path), allow_pickle=False)
         # For any other path, return empty dict
         return {}
     
@@ -392,7 +392,7 @@ def test_missing_features_failure(tmp_path: Path, monkeypatch):
         # If path matches the expected pattern, load our cache
         # Otherwise fallback
         if str(path).endswith(f"features_{tf}m.npz"):
-            return np.load(str(feat_path), allow_pickle=True)
+            return np.load(str(feat_path), allow_pickle=False)
         raise FileNotFoundError(f"File not found: {path}")
     
     monkeypatch.setattr("scripts.run_baseline.load_features_npz", mock_load)

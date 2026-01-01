@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
-from engine.types import BarArrays, Fill, OrderIntent, SimResult
+from engine.engine_types import BarArrays, Fill, OrderIntent, SimResult
 from engine.matcher_core import simulate as simulate_reference
 
 

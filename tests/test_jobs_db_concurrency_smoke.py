@@ -16,7 +16,7 @@ from control.jobs_db import (
     mark_done,
     mark_running,
 )
-from control.types import DBJobSpec
+from control.control_types import DBJobSpec
 
 
 def _proc(db_path: str, n: int) -> None:

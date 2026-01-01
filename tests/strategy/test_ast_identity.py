@@ -40,7 +40,7 @@ SAMPLE_STRATEGY_SOURCE = '''
 from typing import Dict, Any, Mapping
 import numpy as np
 
-from engine.types import OrderIntent
+from engine.engine_types import OrderIntent
 
 def sample_strategy(context: Mapping[str, Any], params: Mapping[str, float]) -> Dict[str, Any]:
     """Sample strategy implementation."""

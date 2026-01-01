@@ -11,7 +11,7 @@ import numpy as np
 
 from data.layout import normalize_bars
 from engine.simulate import simulate_run
-from engine.types import OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def _bars1(o, h, l, c):

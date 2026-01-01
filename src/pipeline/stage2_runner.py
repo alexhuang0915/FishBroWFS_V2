@@ -13,7 +13,7 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from data.layout import normalize_bars
-from engine.types import BarArrays, Fill
+from engine.engine_types import BarArrays, Fill
 from strategy.kernel import DonchianAtrParams, run_kernel
 
 

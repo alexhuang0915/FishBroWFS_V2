@@ -5,7 +5,7 @@ from typing import List, Tuple
 
 import numpy as np
 
-from engine.types import Fill, OrderRole, Side
+from engine.engine_types import Fill, OrderRole, Side
 
 
 def _max_drawdown(equity: np.ndarray) -> float:

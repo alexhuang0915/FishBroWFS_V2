@@ -12,7 +12,7 @@ from engine.constants import KIND_STOP, ROLE_ENTRY, ROLE_EXIT, SIDE_BUY, SIDE_SE
 from engine.engine_jit import simulate as simulate_matcher
 from engine.engine_jit import simulate_arrays as simulate_matcher_arrays
 from engine.metrics_from_fills import compute_metrics_from_fills
-from engine.types import BarArrays, Fill, OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import BarArrays, Fill, OrderIntent, OrderKind, OrderRole, Side
 from indicators.numba_indicators import rolling_max, rolling_min, atr_wilder
 
 

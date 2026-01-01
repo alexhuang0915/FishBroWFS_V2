@@ -8,7 +8,7 @@ import os
 import time
 
 from data.layout import normalize_bars
-from engine.types import BarArrays, Fill, OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import BarArrays, Fill, OrderIntent, OrderKind, OrderRole, Side
 from pipeline.metrics_schema import (
     METRICS_COL_MAX_DD,
     METRICS_COL_NET_PROFIT,

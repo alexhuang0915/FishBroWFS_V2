@@ -22,7 +22,7 @@ from control.jobs_db import (
     list_jobs,
     search_by_tag,
 )
-from control.types import DBJobSpec
+from control.control_types import DBJobSpec
 
 
 @pytest.fixture

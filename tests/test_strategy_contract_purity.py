@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from strategy.registry import get, load_builtin_strategies, clear
-from engine.types import OrderIntent
+from engine.engine_types import OrderIntent
 
 
 @pytest.fixture(autouse=True)

@@ -1,5 +1,5 @@
 import numpy as np
-from engine.types import BarArrays
+from engine.engine_types import BarArrays
 
 
 def ensure_float64_contiguous(x: np.ndarray) -> np.ndarray:

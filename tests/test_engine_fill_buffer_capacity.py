@@ -8,7 +8,7 @@ import pytest
 
 from data.layout import normalize_bars
 from engine.engine_jit import STATUS_BUFFER_FULL, STATUS_OK, simulate as simulate_jit
-from engine.types import OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def test_engine_fill_buffer_capacity_extreme_intents() -> None:

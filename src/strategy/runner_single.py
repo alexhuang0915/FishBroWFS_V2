@@ -6,7 +6,7 @@ from typing import Dict
 import numpy as np
 
 from data.layout import normalize_bars
-from engine.types import BarArrays
+from engine.engine_types import BarArrays
 from strategy.kernel import DonchianAtrParams, run_kernel
 
 

@@ -246,7 +246,7 @@ def test_trigger_rate_mask_integration_with_kernel() -> None:
     This test uses run_kernel_arrays directly (no subprocess) to verify the integration.
     """
     from strategy.kernel import run_kernel_arrays, DonchianAtrParams
-    from engine.types import BarArrays
+    from engine.engine_types import BarArrays
     
     n_bars = 200
     warmup = 20

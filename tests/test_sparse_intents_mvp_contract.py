@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from config.dtypes import INDEX_DTYPE
-from engine.types import BarArrays
+from engine.engine_types import BarArrays
 from strategy.kernel import (
     DonchianAtrParams,
     _build_entry_intents_from_trigger,

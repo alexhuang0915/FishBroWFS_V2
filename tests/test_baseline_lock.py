@@ -4,7 +4,7 @@ import numpy as np
 from data.layout import normalize_bars
 from engine.engine_jit import simulate as simulate_jit
 from engine.matcher_core import simulate as simulate_py
-from engine.types import OrderIntent, OrderKind, OrderRole, Side
+from engine.engine_types import OrderIntent, OrderKind, OrderRole, Side
 
 
 def _fills_to_matrix(fills):

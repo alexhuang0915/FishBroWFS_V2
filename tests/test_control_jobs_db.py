@@ -22,7 +22,7 @@ from control.jobs_db import (
     request_stop,
     update_running,
 )
-from control.types import DBJobSpec, JobStatus, StopMode
+from control.control_types import DBJobSpec, JobStatus, StopMode
 
 
 @pytest.fixture

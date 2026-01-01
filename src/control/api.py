@@ -27,7 +27,7 @@ from control.jobs_db import (
 )
 from control.paths import run_log_path
 from control.preflight import PreflightResult, run_preflight
-from control.types import DBJobSpec, JobRecord, StopMode
+from control.control_types import DBJobSpec, JobRecord, StopMode
 
 # Phase 13: Batch submit
 from control.batch_submit import (

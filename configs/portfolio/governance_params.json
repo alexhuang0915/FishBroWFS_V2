@@ -1,0 +1,26 @@
+{
+  "allowed_risk_models": [
+    "vol_target",
+    "risk_parity"
+  ],
+  "bucket_slots": {
+    "Carry/Income": 1,
+    "LongVol": 1,
+    "MeanRev": 2,
+    "Other": 1,
+    "Trend": 2
+  },
+  "corr_member_hard_limit": 0.8,
+  "corr_min_samples": 20,
+  "corr_portfolio_hard_limit": 0.7,
+  "corr_rolling_days": 30,
+  "dd_absolute_cap": 0.35,
+  "dd_k_multiplier": 1.0,
+  "exposure_reduction_on_breaker": 0.5,
+  "portfolio_dd_cap": 0.2,
+  "portfolio_vol_target": 0.1,
+  "risk_model": "vol_target",
+  "vol_floor": 0.02,
+  "w_max": 0.35,
+  "w_min": 0.0
+}

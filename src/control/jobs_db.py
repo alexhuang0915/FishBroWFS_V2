@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Optional, TypeVar
 from uuid import uuid4
 
-from control.types import DBJobSpec, JobRecord, JobStatus, StopMode
+from control.control_types import DBJobSpec, JobRecord, JobStatus, StopMode
 
 T = TypeVar("T")
 

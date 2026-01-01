@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Dict, Any, List
 
-from engine.types import OrderIntent
+from engine.engine_types import OrderIntent
 from strategy.registry import get
 from strategy.spec import StrategySpec
 

@@ -13,7 +13,7 @@ from dataclasses import asdict, is_dataclass
 import numpy as np
 import os
 
-from engine.types import Fill
+from engine.engine_types import Fill
 from pipeline.runner_grid import run_grid
 
 

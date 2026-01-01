@@ -26,7 +26,7 @@ from control.jobs_db import (
     mark_running,
 )
 from control.job_spec import WizardJobSpec
-from control.types import DBJobSpec
+from control.control_types import DBJobSpec
 from control.batch_submit import wizard_to_db_jobspec
 
 

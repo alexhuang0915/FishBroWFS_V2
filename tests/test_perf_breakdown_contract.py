@@ -14,7 +14,7 @@ import os
 import numpy as np
 
 from strategy.kernel import run_kernel_arrays, DonchianAtrParams
-from engine.types import BarArrays
+from engine.engine_types import BarArrays
 from pipeline.runner_grid import run_grid
 
 

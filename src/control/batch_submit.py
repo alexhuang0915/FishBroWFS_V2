@@ -14,7 +14,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from control.job_spec import WizardJobSpec
-from control.types import DBJobSpec
+from control.control_types import DBJobSpec
 
 # Import create_job for monkeypatching by tests
 from control.jobs_db import create_job

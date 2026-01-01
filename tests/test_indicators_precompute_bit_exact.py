@@ -11,7 +11,7 @@ from dataclasses import asdict, is_dataclass
 
 import numpy as np
 
-from engine.types import BarArrays, Fill
+from engine.engine_types import BarArrays, Fill
 from strategy.kernel import DonchianAtrParams, PrecomputedIndicators, run_kernel_arrays
 from indicators.numba_indicators import rolling_max, rolling_min, atr_wilder
 

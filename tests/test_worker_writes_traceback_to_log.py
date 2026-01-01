@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from control.jobs_db import create_job, get_job, get_job_logs, init_db
-from control.types import DBJobSpec, JobStatus
+from control.control_types import DBJobSpec, JobStatus
 from control.worker import run_one_job
 
 

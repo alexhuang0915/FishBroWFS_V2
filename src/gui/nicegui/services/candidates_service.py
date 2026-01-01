@@ -1,5 +1,6 @@
 """Candidates service - fetch top‑K candidates."""
 import logging
+import os
 from typing import List, Dict, Any, Optional
 import requests
 
@@ -7,7 +8,8 @@ from .status_service import get_status
 
 logger = logging.getLogger(__name__)
 
-API_BASE = "http://localhost:8000"
+# Configurable API base via environment variable
+API_BASE = os.environ.get("FISHBRO_API_BASE", "http://localhost:8000").rstrip("/")
 
 
 def _fallback_candidates(k: int) -> List[Dict[str, Any]]:

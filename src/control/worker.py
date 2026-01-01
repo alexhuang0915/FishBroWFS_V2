@@ -1,4 +1,3 @@
-
 """Worker - long-running task executor."""
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from control.jobs_db import (
 )
 from control.paths import run_log_path
 from control.report_links import make_report_link
-from control.types import JobStatus, StopMode
+from control.control_types import JobStatus, StopMode
 
 
 def _append_log(log_path: Path, text: str) -> None:
@@ -43,6 +42,17 @@ def _append_log(log_path: Path, text: str) -> None:
             f.write("\n")
 
 
+def _update_heartbeat(db_path: Path) -> None:
+    """Update worker heartbeat file (best-effort)."""
+    try:
+        heartbeat_file = db_path.parent / "worker.heartbeat"
+        heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
+        # Write current timestamp
+        heartbeat_file.write_text(str(time.time()), encoding="utf-8")
+    except Exception:
+        pass  # Best effort - don't crash worker if heartbeat fails
+
+
 def worker_loop(db_path: Path, *, poll_s: float = 0.5) -> None:
     """
     Worker loop: poll QUEUED jobs and execute them sequentially.
@@ -51,8 +61,17 @@ def worker_loop(db_path: Path, *, poll_s: float = 0.5) -> None:
         db_path: Path to SQLite database
         poll_s: Polling interval in seconds
     """
+    last_heartbeat = 0.0
+    heartbeat_interval = 1.0  # Update heartbeat every 1 second
+    
     while True:
         try:
+            # Update heartbeat if needed
+            current_time = time.time()
+            if current_time - last_heartbeat >= heartbeat_interval:
+                _update_heartbeat(db_path)
+                last_heartbeat = current_time
+            
             # Find QUEUED jobs
             from control.jobs_db import list_jobs
             
@@ -223,6 +242,3 @@ def _check_pause_stop(db_path: Path, job_id: str) -> None:
                     pass
             mark_killed(db_path, job_id, error="Killed while paused")
             raise SystemExit("Job killed while paused")
-
-
-

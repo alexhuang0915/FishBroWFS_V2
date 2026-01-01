@@ -11,7 +11,7 @@ import pytest
 
 from strategy.runner import run_strategy
 from strategy.registry import load_builtin_strategies, clear
-from engine.types import OrderIntent, OrderRole, OrderKind, Side
+from engine.engine_types import OrderIntent, OrderRole, OrderKind, Side
 
 
 @pytest.fixture(autouse=True)

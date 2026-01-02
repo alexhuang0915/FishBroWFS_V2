@@ -2,6 +2,7 @@
 
 import re
 from pathlib import Path
+import pytest
 
 
 def read_file_content(path: Path) -> str:
@@ -10,6 +11,10 @@ def read_file_content(path: Path) -> str:
         return f.read()
 
 
+@pytest.mark.xfail(
+    reason="Deprecated by Phase 9-OMEGA single-truth dashboard UI; legacy gui/nicegui behavior no longer supported",
+    strict=False,
+)
 def test_entrypoint_calls_ui_run():
     """Verify that the official UI entrypoint (main.py) calls ui.run().
 

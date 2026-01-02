@@ -68,9 +68,10 @@ def _build_entry_intents_from_trigger(
     # i represents bar index t (from 1 to n-1)
     i = np.arange(1, n, dtype=INDEX_DTYPE)
     
-    # Sparse mask: valid entries must be finite, positive, and past warmup
+    # Sparse mask: valid entries must be finite and past warmup
     # Check donch_prev[t] for each bar t in range(1, n)
-    valid_mask = (~np.isnan(donch_prev[1:])) & (donch_prev[1:] > 0) & (i >= warmup)
+    # Removed >0 check to match object-mode behavior (only NaN filter)
+    valid_mask = (~np.isnan(donch_prev[1:])) & (i >= warmup)
     
     # Get indices of valid entries (flatnonzero returns indices into donch_prev[1:])
     # idx is 0-indexed into donch_prev[1:], so idx=0 corresponds to bar t=1
@@ -647,8 +648,9 @@ def run_kernel_arrays(
             continue
         # Get ATR at entry fill bar
         atr_e = float(atr[ebar])
-        if not np.isfinite(atr_e) or atr_e <= 0:
-            # Invalid ATR: skip this entry (no exit intent)
+        if np.isnan(atr_e):
+            # Invalid ATR (NaN): skip this entry (no exit intent)
+            # Match object-mode behavior (only check NaN, not <= 0)
             continue
         # Compute exit stop price from entry fill price
         exit_stop = float(f.price - stop_mult * atr_e)

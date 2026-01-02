@@ -10,22 +10,32 @@ BACKEND_PORT ?= 8000
 UI_HOST ?= 0.0.0.0
 UI_PORT ?= 8080
 
-.PHONY: help check test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics ui-contract backend worker status war stop-war ports down gui-safe up doctor run logs
+# Test selection variables (override-friendly)
+PYTEST ?= $(PYTHON) -m pytest
+PYTEST_ARGS ?= -q
+PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
+PYTEST_MARK_EXPR_ALL ?= not legacy_ui
+
+.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile gui dashboard war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics ui-contract backend worker status war stop-war ports down gui-safe up doctor run logs
 
 help:
 	@echo ""
-	@echo "FishBroWFS Strategy Factory V3"
+	@echo "FishBroWFS Governance Console (Phase 10 - RELEASE HYGIENE)"
 	@echo ""
-	@echo "Canonical Ops (Supervisor):"
+	@echo "Product Commands (Supported):"
 	@echo "  make doctor           Run pre-flight checks (deps, ports, health)"
-	@echo "  make run              Safe start full stack (backend+worker+gui)"
+	@echo "  make run              Safe start full stack (backend+worker+dashboard)"
+	@echo "  make dashboard        Launch Governance Console UI (official entry point)"
 	@echo "  make down             Stop all fishbro processes"
-	@echo "  make status           Check backend/worker/gui health"
+	@echo "  make status           Check backend/worker/dashboard health"
 	@echo "  make logs             Show logs"
 	@echo "  make ports            Show port ownership"
 	@echo ""
-	@echo "UI:"
-	@echo "  make gui              Launch GUI only (safe)"
+	@echo "Testing:"
+	@echo "  make check            Run product tests (excludes legacy UI and slow)"
+	@echo "  make check-legacy     Run legacy UI tests only (historical reference)"
+	@echo "  make portfolio-gov-test   Run portfolio governance unit tests"
+	@echo "  make portfolio-gov-smoke  Smoke test governance modules"
 	@echo ""
 	@echo "Pipeline:"
 	@echo "  make run-research     [Phase 2]  Backtest"
@@ -33,11 +43,8 @@ help:
 	@echo "  make run-freeze       [Phase 3B] Freeze"
 	@echo "  make run-compile      [Phase 3C] Compile"
 	@echo ""
-	@echo "Governance:"
-	@echo "  make portfolio-gov-test   Run portfolio governance unit tests"
-	@echo "  make portfolio-gov-smoke  Smoke test governance modules"
-	@echo ""
-	@echo "Legacy Ops (for backward compatibility):"
+	@echo "Legacy Ops (Deprecated - for backward compatibility only):"
+	@echo "  make gui              Launch legacy GUI (deprecated)"
 	@echo "  make backend          Start Control API server only"
 	@echo "  make worker           Start Worker daemon only"
 	@echo "  make war              Start backend + worker (no GUI)"
@@ -57,25 +64,35 @@ run:
 	@echo "==> Safe start of full stack (backend+worker+gui)..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py run
 
-down:
+down-canonical:
 	@echo "==> Stopping all fishbro processes..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py down
 
-status:
+down: down-canonical
+
+status-canonical:
 	@echo "==> Checking stack health..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py status
+
+status: status-canonical
 
 logs:
 	@echo "==> Showing logs..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py logs
 
-ports:
+ports-canonical:
 	@echo "==> Showing port ownership..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py ports
 
+ports: ports-canonical
+
 gui:
-	@echo "==> Launching GUI only (safe)..."
+	@echo "==> Launching legacy GUI (deprecated)..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py run --no-backend --no-worker
+
+dashboard:
+	@echo "==> Launching Governance Console UI (official entry point)..."
+	$(ENV) $(PYTHON) -B scripts/start_dashboard.py
 
 war-room: gui
 
@@ -116,12 +133,16 @@ ui-contract:
 	FISHBRO_UI_CONTRACT=1 $(ENV) $(PYTHON) -B -m pytest -q -m ui_contract
 
 check:
-	@echo "==> Running fast CI-safe tests (excluding slow research-grade tests)..."
-	$(ENV) $(PYTHON) -B -m pytest
+	@echo "==> Running product CI tests (mark expr: $(PYTEST_MARK_EXPR_PRODUCT))..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "$(PYTEST_MARK_EXPR_PRODUCT)"
+
+check-legacy:
+	@echo "==> Running legacy UI tests only..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "legacy_ui"
 
 test:
-	@echo "==> Running all tests (including slow research-grade tests)..."
-	$(ENV) $(PYTHON) -B -m pytest -m "slow or not slow"
+	@echo "==> Running all tests (mark expr: $(PYTEST_MARK_EXPR_ALL))..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "$(PYTEST_MARK_EXPR_ALL)"
 
 portfolio-gov-test:
 	@echo "==> Running portfolio governance unit tests..."
@@ -144,13 +165,6 @@ worker:
 	@echo "==> Starting Worker daemon..."
 	@echo "    (Database: outputs/jobs.db)"
 	$(ENV) $(PYTHON) -m control.worker_main outputs/jobs.db
-
-status:
-	@echo "==> Checking backend/worker status..."
-	@echo "Backend:"
-	@curl -s http://$(BACKEND_HOST):$(BACKEND_PORT)/health 2>/dev/null || echo "  Backend not responding"
-	@echo "Worker:"
-	@curl -s http://$(BACKEND_HOST):$(BACKEND_PORT)/worker/status 2>/dev/null || echo "  Worker status endpoint not available"
 
 war:
 	@echo "==> Starting full stack (backend + worker)..."
@@ -183,16 +197,6 @@ stop-war:
 	@pkill -f "control.worker_main" 2>/dev/null || true
 	@echo "Stopped."
 
-ports:
-	@echo "==> Listening ports (backend/ui):"
-	@ss -ltnp 2>/dev/null | rg ":(8000|8080)\b" || echo "(no listeners on 8000/8080)"
-
-down:
-	@echo "==> Killing listeners on 8080/8000 (best effort)..."
-	@fuser -k $(UI_PORT)/tcp 2>/dev/null || true
-	@fuser -k $(BACKEND_PORT)/tcp 2>/dev/null || true
-	@echo "==> Done."
-	@$(MAKE) ports
 
 gui-safe:
 	@ss -ltnp 2>/dev/null | rg ":\b$(UI_PORT)\b" >/dev/null 2>&1 && { \

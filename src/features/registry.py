@@ -386,43 +386,42 @@ class FeatureRegistry(BaseModel):
 # Import numpy and warnings for the module
 import numpy as np
 import warnings
+import contextvars
 
 
-# Global registry instance
-_default_registry: Optional[FeatureRegistry] = None
-_default_registry_lock = threading.Lock()
+# ContextVar-based registry instance
+_registry_ctx: contextvars.ContextVar[Optional["FeatureRegistry"]] = contextvars.ContextVar(
+    "feature_registry",
+    default=None
+)
 
 
 def get_default_registry() -> FeatureRegistry:
     """
-    Get or create the default global feature registry.
-    
-    Returns:
-        Global FeatureRegistry instance
+    Return the registry bound to the current execution context.
+    Lazy Init Rule:
+    - If None: create new FeatureRegistry, bind it, then return.
     """
-    global _default_registry
-    
-    with _default_registry_lock:
-        if _default_registry is None:
-            _default_registry = FeatureRegistry()
-            from features.seed_default import seed_default_registry
-            seed_default_registry(_default_registry)
-
-            
-            # Optionally register default features with verification
-            # This would require compute functions for default features
-            
-        return _default_registry
+    registry = _registry_ctx.get()
+    if registry is None:
+        registry = FeatureRegistry()
+        from features.seed_default import seed_default_registry
+        seed_default_registry(registry)
+        _registry_ctx.set(registry)
+    return registry
 
 
 def set_default_registry(registry: FeatureRegistry) -> None:
     """
-    Set the default global feature registry.
-    
-    Args:
-        registry: FeatureRegistry to set as default
+    Explicitly bind a registry to the current execution context.
+    Used at async / worker entry points.
     """
-    global _default_registry
-    
-    with _default_registry_lock:
-        _default_registry = registry
+    _registry_ctx.set(registry)
+
+
+def reset_default_registry() -> None:
+    """
+    Clear registry from the current context.
+    REQUIRED for test isolation.
+    """
+    _registry_ctx.set(None)

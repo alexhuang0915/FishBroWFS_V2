@@ -83,6 +83,7 @@ def _sort_key(intent: OrderIntent) -> Tuple[int, int, int]:
 def simulate(
     bars: BarArrays,
     intents: Iterable[OrderIntent],
+    initial_pos: int = 0,
 ) -> List[Fill]:
     """
     Phase 1 slow reference matcher.
@@ -101,7 +102,7 @@ def simulate(
 
     intents_list = list(intents)
     fills: List[Fill] = []
-    state = PositionState(pos=0)
+    state = PositionState(pos=initial_pos)
 
     for t in range(n):
         ot = float(o[t])

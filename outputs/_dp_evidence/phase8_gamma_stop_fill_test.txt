@@ -1,0 +1,34 @@
+Testing BUY stop (side=1):
+  Case 1: Open gap through (o=102, stop=100, h=101, l=99)
+    Result: 102.0
+  Expected: 102 (fill at open)
+
+  Case 2: Intrabar touch (o=99, stop=100, h=101, l=98)
+    Result: 100.0
+  Expected: 100 (fill at stop)
+
+  Case 3: No touch (o=99, stop=100, h=99.5, l=98)
+    Result: nan
+  Expected: nan
+
+Testing SELL stop (side=255):
+  Case 1: Open gap through (o=98, stop=100, h=101, l=97)
+    Result: 98.0
+  Expected: 98 (fill at open)
+
+  Case 2: Intrabar touch (o=101, stop=100, h=102, l=99)
+    Result: 100.0
+  Expected: 100 (fill at stop)
+
+  Case 3: No touch (o=101, stop=100, h=101, l=100.5)
+    Result: nan
+  Expected: nan
+
+Edge case: Open equals stop (gap branch)
+  BUY: o=100, stop=100, h=101, l=99
+    Result: 100.0
+  Expected: 100 (fill at open)
+
+  SELL: o=100, stop=100, h=101, l=99
+    Result: 100.0
+  Expected: 100 (fill at open)

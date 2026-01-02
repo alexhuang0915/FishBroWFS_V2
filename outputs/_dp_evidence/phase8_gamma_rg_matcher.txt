@@ -1,0 +1,1296 @@
+src/engine/constitution.py:8:STOP fills (Open==price is treated as GAP branch):
+src/engine/constitution.py:10:- if Open >= S: fill = Open
+src/engine/constitution.py:11:- elif High >= S: fill = S
+src/engine/constitution.py:13:- if Open <= S: fill = Open
+src/engine/constitution.py:14:- elif Low <= S: fill = S
+src/engine/constitution.py:16:LIMIT fills (Open==price is treated as GAP branch):
+src/engine/constitution.py:18:- if Open <= L: fill = Open
+src/engine/constitution.py:19:- elif Low <= L: fill = L
+src/engine/constitution.py:21:- if Open >= L: fill = Open
+src/engine/constitution.py:22:- elif High >= L: fill = L
+src/engine/constitution.py:25:- STOP wins over LIMIT (risk-first pessimism).
+src/engine/constitution.py:28:- If entry and exit are both triggerable in the same bar, execute Entry then Exit.
+src/engine/constitution.py:31:- If multiple orders of the same role are triggerable in the same bar, execute EXIT-first.
+src/engine/constitution.py:32:- Within the same role+kind, use deterministic order: smaller order_id first.
+src/engine/constitution.py:36:PRIORITY_STOP_OVER_LIMIT = True
+src/utils/manifest_verify.py:78:            # Verify referenced files exist and match checksums
+src/utils/manifest_verify.py:120:        """Verify that all referenced files exist and match their checksums."""
+src/utils/manifest_verify.py:140:                            errors.append(f"Hash mismatch for {filename}: expected {expected_hash}, got {file_hash}")
+src/utils/manifest_verify.py:353:    1. Files listing matches exactly (no extra/missing files)
+src/utils/manifest_verify.py:354:    2. Each file's SHA256 matches
+src/utils/manifest_verify.py:393:    # 3. Verify SHA256 matches for common files
+src/utils/manifest_verify.py:397:            errors.append(f"SHA256 mismatch for {rel_path}: manifest={manifest_file_map[rel_path]}, actual={actual_file_map[rel_path]}")
+src/utils/manifest_verify.py:404:            errors.append(f"files_sha256 mismatch: expected {expected_files_sha256}, computed {computed_files_sha256}")
+src/utils/manifest_verify.py:417:            errors.append(f"manifest_sha256 mismatch: expected {manifest_dict['manifest_sha256']}, computed {computed_hash}")
+src/engine/simulate.py:14:from engine.kernels.reference_kernel import simulate_reference_matcher
+src/engine/simulate.py:32:        intents: Iterable of order intents
+src/engine/simulate.py:37:        SimResult containing the fills from simulation
+src/engine/simulate.py:45:        return simulate_reference_matcher(bars, intents)
+src/utils/fs_snapshot.py:47:        Paths are sorted in stable alphabetical order.
+src/engine/metrics_from_fills.py:24:def compute_metrics_from_fills(
+src/engine/metrics_from_fills.py:25:    fills: List[Fill],
+src/engine/metrics_from_fills.py:31:    Compute metrics from fills list.
+src/engine/metrics_from_fills.py:33:    This is the unified source of truth for metrics computation from fills.
+src/engine/metrics_from_fills.py:37:        fills: List of Fill objects (can be empty)
+src/engine/metrics_from_fills.py:45:            - trades: int - Number of trades (equals pnl.size, not entry fills count)
+src/engine/metrics_from_fills.py:52:        - Costs are applied per fill (entry + exit each incur cost)
+src/engine/metrics_from_fills.py:53:        - Metrics are derived from pnl/equity, not from fills count
+src/engine/metrics_from_fills.py:56:    # Pairing rule: take fills in chronological order, pair BUY(ENTRY) then SELL(EXIT)
+src/engine/metrics_from_fills.py:59:    for f in fills:
+src/engine/metrics_from_fills.py:74:    # Costs applied per fill (entry + exit)
+src/engine/constants.py:11:KIND_STOP = 0
+src/utils/write_scope.py:6:under a designated root directory and whose relative paths match a predefined
+src/utils/write_scope.py:7:allow‑list (exact matches or prefix‑based patterns).  Any attempt to write
+src/utils/write_scope.py:19:• Prefix matching is performed on the basename only, not on the whole relative
+src/utils/write_scope.py:100:        # 4. Check exact matches first.
+src/utils/write_scope.py:104:        # 5. Check prefix matches on the basename.
+src/utils/write_scope.py:224:    # Allow any file under export_root (empty allowed_rel_files means no exact matches required,
+src/utils/write_scope.py:229:        allowed_rel_files=frozenset(),  # No exact matches required
+src/engine/kernels/cursor_kernel.py:5:It uses array/struct inputs and deterministic cursor-based matching.
+src/engine/kernels/cursor_kernel.py:28:        intents: Iterable of order intents
+src/engine/kernels/cursor_kernel.py:31:        SimResult containing the fills from simulation
+src/engine/kernels/cursor_kernel.py:38:    fills: List[Fill] = simulate_jit(bars, intents)
+src/engine/kernels/cursor_kernel.py:39:    return SimResult(fills=fills)
+src/engine/order_id.py:5:Provides pure function for generating deterministic order IDs that do not depend
+src/engine/order_id.py:6:on generation order or counters. Used by both object-mode and array-mode kernels.
+src/engine/order_id.py:13:from engine.constants import KIND_STOP, ROLE_ENTRY, ROLE_EXIT, SIDE_BUY, SIDE_SELL
+src/engine/order_id.py:16:def generate_order_id(
+src/engine/order_id.py:20:    kind: int = KIND_STOP,
+src/engine/order_id.py:24:    Generate deterministic order ID from intent attributes.
+src/engine/order_id.py:27:    generation order or counters. This ensures parity between object-mode and
+src/engine/order_id.py:31:        order_id = created_bar * 1_000_000 + param_idx * 100 + role_code * 10 + kind_code * 2 + side_code_bit
+src/engine/order_id.py:37:        kind: Kind code (KIND_STOP or KIND_LIMIT)
+src/engine/order_id.py:41:        Deterministic order ID (int32)
+src/engine/order_id.py:51:    # Map kind to code: STOP=0, LIMIT=1 (assuming KIND_STOP=0, KIND_LIMIT=1)
+src/engine/order_id.py:52:    kind_code = 0 if kind == KIND_STOP else 1
+src/engine/order_id.py:58:    order_id = (
+src/engine/order_id.py:66:    return int(order_id)
+src/engine/order_id.py:69:def generate_order_ids_array(
+src/engine/order_id.py:77:    Generate deterministic order IDs for array of intents.
+src/engine/order_id.py:79:    Vectorized version of generate_order_id for array-mode kernels.
+src/engine/order_id.py:85:        kind: Array of kind codes (uint8, shape (n,)). If None, defaults to KIND_STOP.
+src/engine/order_id.py:89:        Array of deterministic order IDs (int32, shape (n,))
+src/engine/order_id.py:97:        kind = np.full(n, KIND_STOP, dtype=np.uint8)
+src/engine/order_id.py:103:    kind_code = np.where(kind == KIND_STOP, 0, 1).astype(np.int32)
+src/engine/order_id.py:107:    order_id = (
+src/engine/order_id.py:115:    return order_id.astype(INDEX_DTYPE)
+src/engine/kernels/reference_kernel.py:2:"""Reference kernel - adapter for matcher_core (testing/debugging only).
+src/engine/kernels/reference_kernel.py:4:This kernel wraps matcher_core.simulate() and should only be used for:
+src/engine/kernels/reference_kernel.py:17:from engine.matcher_core import simulate as simulate_reference
+src/engine/kernels/reference_kernel.py:20:def simulate_reference_matcher(
+src/engine/kernels/reference_kernel.py:25:    Reference matcher adapter - wraps matcher_core.simulate().
+src/engine/kernels/reference_kernel.py:27:    This is an adapter that wraps the reference implementation in matcher_core.
+src/engine/kernels/reference_kernel.py:32:        intents: Iterable of order intents
+src/engine/kernels/reference_kernel.py:35:        SimResult containing the fills from simulation
+src/engine/kernels/reference_kernel.py:38:        - This wraps matcher_core.simulate() which is the semantic truth source
+src/engine/kernels/reference_kernel.py:41:    fills: List[Fill] = simulate_reference(bars, intents)
+src/engine/kernels/reference_kernel.py:42:    return SimResult(fills=fills)
+src/engine/engine_types.py:25:    STOP = "STOP"
+src/engine/engine_types.py:38:    Deterministic ordering is controlled via `order_id` (smaller = earlier).
+src/engine/engine_types.py:40:    order_id: int
+src/engine/engine_types.py:57:    order_id: int
+src/engine/engine_types.py:67:    fills: List[Fill]
+src/research/plateau.py:62:    selected_backup: List[PlateauCandidate]  # ordered by preference
+src/research/plateau.py:120:        param_names: list of parameter names in order
+src/research/plateau.py:334:        "generated_at": "",  # caller can fill timestamp
+src/engine/matcher_core.py:32:def _stop_fill_price(side: Side, stop_price: float, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:35:        if o >= stop_price:
+src/engine/matcher_core.py:37:        if h >= stop_price:
+src/engine/matcher_core.py:38:            return stop_price
+src/engine/matcher_core.py:41:        if o <= stop_price:
+src/engine/matcher_core.py:43:        if l <= stop_price:
+src/engine/matcher_core.py:44:            return stop_price
+src/engine/matcher_core.py:48:def _limit_fill_price(side: Side, limit_price: float, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:64:def _intent_fill_price(intent: OrderIntent, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:65:    if intent.kind == OrderKind.STOP:
+src/engine/matcher_core.py:66:        return _stop_fill_price(intent.side, intent.price, o, h, l)
+src/engine/matcher_core.py:67:    return _limit_fill_price(intent.side, intent.price, o, h, l)
+src/engine/matcher_core.py:74:    2) Kind: STOP before LIMIT.
+src/engine/matcher_core.py:75:    3) order_id: ascending.
+src/engine/matcher_core.py:76:    Note: Entry-vs-Exit ordering is handled at a higher level (Entry then Exit).
+src/engine/matcher_core.py:79:    kind_rank = 0 if intent.kind == OrderKind.STOP else 1
+src/engine/matcher_core.py:80:    return (role_rank, kind_rank, intent.order_id)
+src/engine/matcher_core.py:88:    Phase 1 slow reference matcher.
+src/engine/matcher_core.py:92:    - STOP/LIMIT gap behavior at Open
+src/engine/matcher_core.py:93:    - STOP over LIMIT
+src/engine/matcher_core.py:95:    - Same-kind tie: EXIT-first, order_id ascending
+src/engine/matcher_core.py:103:    fills: List[Fill] = []
+src/engine/matcher_core.py:121:            # Among entries: STOP before LIMIT, then order_id.
+src/engine/matcher_core.py:122:            entry_sorted = sorted(entry_intents, key=lambda x: (0 if x.kind == OrderKind.STOP else 1, x.order_id))
+src/engine/matcher_core.py:126:                px = _intent_fill_price(it, ot, ht, lt)
+src/engine/matcher_core.py:129:                fills.append(
+src/engine/matcher_core.py:137:                        order_id=int(it.order_id),
+src/engine/matcher_core.py:145:                break  # at most one entry fill per bar in Phase 1 reference
+src/engine/matcher_core.py:149:            # Same-kind tie rule: EXIT-first already, and STOP before LIMIT, then order_id
+src/engine/matcher_core.py:159:                px = _intent_fill_price(it, ot, ht, lt)
+src/engine/matcher_core.py:162:                fills.append(
+src/engine/matcher_core.py:170:                        order_id=int(it.order_id),
+src/engine/matcher_core.py:174:                break  # at most one exit fill per bar in Phase 1 reference
+src/engine/matcher_core.py:176:    return fills
+src/engine/signal_exporter.py:28:    fills_df: pd.DataFrame,  # cols: ts, qty (contracts signed)
+src/engine/signal_exporter.py:39:    Build signal series V1 DataFrame from bars and fills.
+src/engine/signal_exporter.py:44:        fills_df: DataFrame with columns ['ts', 'qty']; qty is signed contracts (+ for buy, - for sell)
+src/engine/signal_exporter.py:66:    if "ts" not in fills_df.columns or "qty" not in fills_df.columns:
+src/engine/signal_exporter.py:67:        raise ValueError("fills_df must have columns ['ts', 'qty']")
+src/engine/signal_exporter.py:77:    # If no fills, position is zero for all bars
+src/engine/signal_exporter.py:78:    if fills_df.empty:
+src/engine/signal_exporter.py:81:        # Ensure fills are sorted by ts
+src/engine/signal_exporter.py:82:        fills_sorted = fills_df.sort_values("ts").reset_index(drop=True)
+src/engine/signal_exporter.py:84:        # Merge fills to bars using merge_asof to align fill ts to bar ts
+src/engine/signal_exporter.py:85:        # direction='backward' assigns fill to the nearest bar with ts <= fill_ts
+src/engine/signal_exporter.py:86:        # We need to merge on ts, but we want to get the bar ts for each fill
+src/engine/signal_exporter.py:88:            fills_sorted,
+src/engine/signal_exporter.py:96:        fills_per_bar = merged.groupby("bar_ts")["qty"].sum().reset_index()
+src/engine/signal_exporter.py:97:        fills_per_bar = fills_per_bar.rename(columns={"bar_ts": "ts", "qty": "fill_qty"})
+src/engine/signal_exporter.py:99:        # Merge fills back to bars
+src/engine/signal_exporter.py:100:        result = pd.merge(result, fills_per_bar, on="ts", how="left")
+src/engine/signal_exporter.py:101:        result["fill_qty"] = result["fill_qty"].fillna(0.0)
+src/engine/signal_exporter.py:103:        # Cumulative sum of fills to get position
+src/engine/signal_exporter.py:104:        result["position_contracts"] = result["fill_qty"].cumsum()
+src/engine/signal_exporter.py:132:    # Ensure all required columns are present and in correct order
+src/engine/signal_exporter.py:137:    # Reorder columns
+src/engine/signal_exporter.py:144:        result[numeric_cols] = result[numeric_cols].fillna(0.0)
+src/core/policy_engine.py:50:    "send_orders",
+src/data/cache.py:73:    # Write parquet (preserve order, no sort)
+src/data/dataset_registry.py:111:        # Sort datasets by id to ensure deterministic order
+src/engine/engine_jit.py:9:# Engine JIT matcher kernel contract:
+src/engine/engine_jit.py:28:from engine.matcher_core import simulate as simulate_py
+src/engine/engine_jit.py:31:    KIND_STOP,
+src/engine/engine_jit.py:73:        return 0 if x == OrderKind.STOP else 1
+src/engine/engine_jit.py:78:    return 0 if k == OrderKind.STOP else 1
+src/engine/engine_jit.py:106:    - 0 (KIND_STOP) -> OrderKind.STOP
+src/engine/engine_jit.py:111:    if v == KIND_STOP:  # 0
+src/engine/engine_jit.py:112:        return OrderKind.STOP
+src/engine/engine_jit.py:117:            f"Invalid kind enum value: {v}. Allowed values are {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)"
+src/engine/engine_jit.py:166:      order_id: int32 (INDEX_DTYPE)
+src/engine/engine_jit.py:169:      kind: uint8 (INTENT_ENUM_DTYPE, 0=STOP,1=LIMIT)
+src/engine/engine_jit.py:182:    order_id = np.empty(n, dtype=INDEX_DTYPE)
+src/engine/engine_jit.py:191:        order_id[i] = int(x.order_id)
+src/engine/engine_jit.py:199:    return order_id, created_bar, role, kind, side, price, qty
+src/engine/engine_jit.py:206:    Sort packed intent arrays by (created_bar, order_id).
+src/engine/engine_jit.py:209:      - Cursor + active-book kernel requires activate_bar=(created_bar+1) and order_id to be non-decreasing.
+src/engine/engine_jit.py:210:      - Determinism is preserved because selection is still based on (kind priority, order_id).
+src/engine/engine_jit.py:212:    order_id, created_bar, role, kind, side, price, qty = packed
+src/engine/engine_jit.py:213:    # lexsort uses last key as primary -> (created_bar primary, order_id secondary)
+src/engine/engine_jit.py:214:    idx = np.lexsort((order_id, created_bar))
+src/engine/engine_jit.py:216:        order_id[idx],
+src/engine/engine_jit.py:231:    Phase 2A: JIT accelerated matcher.
+src/engine/engine_jit.py:253:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:283:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:285:        row = fills_arr[i]
+src/engine/engine_jit.py:294:                order_id=int(row[6]),
+src/engine/engine_jit.py:303:    order_id: np.ndarray,
+src/engine/engine_jit.py:316:      order_id: int32 (INDEX_DTYPE)
+src/engine/engine_jit.py:340:    oid = np.asarray(order_id, dtype=INDEX_DTYPE)
+src/engine/engine_jit.py:364:            if kd_val == KIND_STOP:
+src/engine/engine_jit.py:365:                k = OrderKind.STOP
+src/engine/engine_jit.py:369:                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+src/engine/engine_jit.py:380:                    order_id=int(oid[i]),
+src/engine/engine_jit.py:409:            if kd_val == KIND_STOP:
+src/engine/engine_jit.py:410:                k = OrderKind.STOP
+src/engine/engine_jit.py:414:                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+src/engine/engine_jit.py:425:                    order_id=int(oid[i]),
+src/engine/engine_jit.py:437:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:465:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:467:        row = fills_arr[i]
+src/engine/engine_jit.py:476:                order_id=int(row[6]),
+src/engine/engine_jit.py:484:    Internal helper (tests/dev): run JIT matcher with a custom ttl_bars.
+src/engine/engine_jit.py:496:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:511:            f"engine_jit kernel buffer full: fills exceeded capacity. "
+src/engine/engine_jit.py:518:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:520:        row = fills_arr[i]
+src/engine/engine_jit.py:529:                order_id=int(row[6]),
+src/engine/engine_jit.py:542:    def _stop_fill(side: int, stop_price: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:543:        # returns nan if no fill
+src/engine/engine_jit.py:545:            if o >= stop_price:
+src/engine/engine_jit.py:547:            if h >= stop_price:
+src/engine/engine_jit.py:548:                return stop_price
+src/engine/engine_jit.py:551:            if o <= stop_price:
+src/engine/engine_jit.py:553:            if l <= stop_price:
+src/engine/engine_jit.py:554:                return stop_price
+src/engine/engine_jit.py:558:    def _limit_fill(side: int, limit_price: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:559:        # returns nan if no fill
+src/engine/engine_jit.py:574:    def _fill_price(kind: int, side: int, px: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:575:        # kind: 0=STOP, 1=LIMIT
+src/engine/engine_jit.py:577:            return _stop_fill(side, px, o, h, l)
+src/engine/engine_jit.py:578:        return _limit_fill(side, px, o, h, l)
+src/engine/engine_jit.py:585:        order_id: np.ndarray,
+src/engine/engine_jit.py:600:          2 kind_int (0=STOP,1=LIMIT)
+src/engine/engine_jit.py:602:          4 fill_price
+src/engine/engine_jit.py:604:          6 order_id
+src/engine/engine_jit.py:607:          - intents are sorted by (created_bar, order_id) before calling this kernel.
+src/engine/engine_jit.py:613:          - When t > activate_bar + ttl_bars - 1, intent is removed from active book (even if not filled)
+src/engine/engine_jit.py:617:        n_intents = order_id.shape[0]
+src/engine/engine_jit.py:619:        # Buffer size must accommodate at least n_intents (each intent can produce a fill)
+src/engine/engine_jit.py:620:        # Default heuristic: n_bars * 2 (allows 2 fills per bar on average)
+src/engine/engine_jit.py:621:        max_fills = n_bars * 2
+src/engine/engine_jit.py:622:        if n_intents > max_fills:
+src/engine/engine_jit.py:623:            max_fills = n_intents
+src/engine/engine_jit.py:625:        out = np.empty((max_fills, 7), dtype=np.float64)
+src/engine/engine_jit.py:629:        # Fail-fast monotonicity check (activate_bar, order_id)
+src/engine/engine_jit.py:632:        prev_order = np.int64(-1)
+src/engine/engine_jit.py:635:            o = np.int64(order_id[i])
+src/engine/engine_jit.py:636:            if a < prev_activate or (a == prev_activate and o < prev_order):
+src/engine/engine_jit.py:639:            prev_order = o
+src/engine/engine_jit.py:686:            # Deterministic selection: STOP(0) before LIMIT(1), then order_id asc.
+src/engine/engine_jit.py:701:                    oo = np.int64(order_id[idx])
+src/engine/engine_jit.py:703:                        fp = _fill_price(int(kk), int(side[idx]), float(price[idx]), o, h, l)
+src/engine/engine_jit.py:713:                    if out_n >= max_fills:
+src/engine/engine_jit.py:723:                    out[out_n, 6] = float(order_id[idx])
+src/engine/engine_jit.py:728:                    # swap-remove filled intent
+src/engine/engine_jit.py:733:            # Deterministic selection: STOP(0) before LIMIT(1), then order_id asc.
+src/engine/engine_jit.py:759:                    oo = np.int64(order_id[idx])
+src/engine/engine_jit.py:761:                        fp = _fill_price(int(kk), int(s), float(price[idx]), o, h, l)
+src/engine/engine_jit.py:771:                    if out_n >= max_fills:
+src/engine/engine_jit.py:781:                    out[out_n, 6] = float(order_id[idx])
+src/engine/engine_jit.py:786:                    # swap-remove filled intent
+src/core/resampler.py:279:    Deterministic output ordering by ts ascending.
+src/data/session/kbar.py:142:        # This ensures output matches the actual first bar time in local timezone
+src/data/session/kbar.py:169:    # Sort by ts_str to maintain chronological order
+src/data/session/kbar.py:224:        # Legacy: Use current session name to find matching session.start
+src/data/session/kbar.py:234:            # Legacy: Find session.start by matching session name
+src/data/session/kbar.py:294:    # Sort by ts_str to maintain chronological order
+src/core/slippage_policy.py:5:定義 per fill/per side 的滑價等級，並提供價格調整函數。
+src/core/slippage_policy.py:21:        definition: 滑價定義，固定為 "per_fill_per_side"
+src/core/slippage_policy.py:27:    definition: str = "per_fill_per_side"
+src/core/slippage_policy.py:35:        if self.definition != "per_fill_per_side":
+src/core/slippage_policy.py:36:            raise ValueError(f"definition 必須為 'per_fill_per_side'，收到: {self.definition}")
+src/data/raw_ingest.py:6:Binding: One line = one row, preserve TXT row order exactly.
+src/data/raw_ingest.py:82:    - One line = one row, preserve TXT row order exactly
+src/data/raw_ingest.py:105:    # Read TXT file (preserve order)
+src/data/raw_ingest.py:132:    # Build ts_str column (preserve row order)
+src/data/raw_ingest.py:148:    # Build result DataFrame (preserve order, no sort/dedup/dropna)
+src/data/raw_ingest.py:155:        "volume": pd.to_numeric(df_raw[volume_col], errors="coerce").fillna(0).astype("int64"),
+src/core/run_id.py:18:    - Timestamp ensures chronological ordering (UTC)
+src/core/config_snapshot.py:52:      stage_name, topk, commission, slip, order_qty, config knobs...
+src/core/ast_identity.py:4:canonical AST (ast-c14n-v1). This replaces filesystem iteration order, Python
+src/core/ast_identity.py:5:import order, list index/enumerate/incremental counters, filename or class name
+src/core/ast_identity.py:9:1. Deterministic: Same AST → same hash regardless of file location, import order
+src/governance/models.py:45:        # Ensure deterministic ordering of tags
+src/governance/models.py:51:        """Return JSON string with deterministic key order."""
+src/core/artifact_status.py:21:    DIRTY = "DIRTY"  # config_hash mismatch
+src/core/artifact_status.py:121:            matches = re.findall(r"Field required.*?['\"]([^'\"]+)['\"]", error_msg)
+src/core/artifact_status.py:122:            if matches:
+src/core/artifact_status.py:123:                missing_fields = matches
+src/core/artifact_status.py:307:            matches = re.findall(r"Field required.*?['\"]([^'\"]+)['\"]", error_msg)
+src/core/artifact_status.py:308:            if matches:
+src/core/artifact_status.py:309:                missing_fields = matches
+src/deployment/compiler.py:33:    match = re.match(r"^(\d+)([mDhH])$", timeframe_str)
+src/deployment/compiler.py:34:    if not match:
+src/deployment/compiler.py:37:    value = int(match.group(1))
+src/deployment/compiler.py:38:    unit = match.group(2).lower()
+src/strategy/identity_models.py:4:filesystem iteration order, Python import order, list index/enumerate/incremental
+src/strategy/identity_models.py:9:- StrategyManifest: Registry manifest with deterministic ordering
+src/strategy/identity_models.py:209:    Contains all information needed to register, identify, and execute
+src/strategy/identity_models.py:264:    """Strategy registry manifest with deterministic ordering.
+src/strategy/identity_models.py:266:    Contains all registered strategies in a deterministic order,
+src/strategy/identity_models.py:270:    - Deterministic ordering: Strategies sorted by strategy_id
+src/strategy/identity_models.py:318:        """Serialize manifest to JSON string with deterministic ordering."""
+src/contracts/dimensions.py:23:        if not time_pattern.match(self.open_taipei):
+src/contracts/dimensions.py:25:        if not time_pattern.match(self.close_taipei):
+src/contracts/dimensions.py:29:            if not time_pattern.match(start):
+src/contracts/dimensions.py:31:            if not time_pattern.match(end):
+src/perf/timers.py:17:    Supports multiple start/stop calls for the same timer name (accumulates).
+src/perf/timers.py:32:    def stop(self, name: str) -> None:
+src/strategy/runner_single.py:22:    order_qty: int = 1,
+src/strategy/runner_single.py:38:    return run_kernel(bars, params, commission=commission, slip=slip, order_qty=order_qty)
+src/core/processor.py:352:    async def stop(self) -> None:
+src/core/processor.py:407:        self.logger.info("StateProcessor stopped")
+src/core/processor.py:450:            async def execute_handler_with_timeout():
+src/core/processor.py:460:                    execute_handler_with_timeout(),
+src/core/processor.py:555:async def stop_processor() -> None:
+src/core/processor.py:565:            await asyncio.wait_for(_processor_instance.stop(), timeout=2.0)
+src/core/processor.py:570:            logger.warning("stop_processor timed out after 2 seconds, forcing cleanup")
+src/core/processor.py:574:            logger.error(f"Error stopping processor: {e}")
+src/core/processor.py:582:    This stops the processor if it's running and clears the singleton.
+src/core/processor.py:586:        # Try to stop synchronously (not ideal but works for tests)
+src/core/processor.py:593:                # If we're in a running loop, we can't call stop_processor synchronously
+src/core/processor.py:613:                # If loop is running, we can't call stop_processor synchronously
+src/core/processor.py:617:                # Run stop_processor in the event loop
+src/core/processor.py:618:                loop.run_until_complete(stop_processor())
+src/pipeline/stage2_runner.py:30:    - fills: list of fills (optional, for detailed analysis)
+src/pipeline/stage2_runner.py:38:    fills: Optional[List[Fill]] = None
+src/pipeline/stage2_runner.py:63:    order_qty: int = 1,
+src/pipeline/stage2_runner.py:73:            - col2: stop_mult
+src/pipeline/stage2_runner.py:77:        order_qty: order quantity (default: 1)
+src/pipeline/stage2_runner.py:81:        Results are in same order as param_ids.
+src/pipeline/stage2_runner.py:110:                    fills=None,
+src/pipeline/stage2_runner.py:121:        stop_mult = float(params_row[2])
+src/pipeline/stage2_runner.py:127:            stop_mult=stop_mult,
+src/pipeline/stage2_runner.py:136:            order_qty=order_qty,
+src/pipeline/stage2_runner.py:145:        fills = kernel_result.get("fills")
+src/pipeline/stage2_runner.py:154:                fills=fills,
+src/strategy/entry_builder_nb.py:6:Uses two-pass approach: count first, then allocate and fill.
+src/strategy/entry_builder_nb.py:28:        Note: For exact compatibility with apply_trigger_rate_mask, we need to match
+src/strategy/entry_builder_nb.py:33:        # This ensures deterministic selection matching numpy's default_rng(seed)
+src/strategy/entry_builder_nb.py:96:        order_qty: int,
+src/strategy/entry_builder_nb.py:100:        order_id: np.ndarray,
+src/strategy/entry_builder_nb.py:114:            order_qty: Order quantity
+src/strategy/entry_builder_nb.py:118:            order_id: Output array (int32, shape n_entry)
+src/strategy/entry_builder_nb.py:149:            order_id[idx] = idx + 1  # Sequential order ID (1, 2, 3, ...)
+src/strategy/entry_builder_nb.py:151:            kind[idx] = 0  # KIND_STOP
+src/strategy/entry_builder_nb.py:153:            qty[idx] = order_qty
+src/strategy/entry_builder_nb.py:199:        order_qty: int,
+src/strategy/entry_builder_nb.py:203:        order_id: np.ndarray,
+src/strategy/entry_builder_nb.py:230:            order_id[idx] = idx + 1
+src/strategy/entry_builder_nb.py:234:            qty[idx] = order_qty
+src/strategy/entry_builder_nb.py:242:    order_qty: int,
+src/strategy/entry_builder_nb.py:252:        order_qty: Order quantity
+src/strategy/entry_builder_nb.py:260:            - order_id: int32 array (n_entry,)
+src/strategy/entry_builder_nb.py:277:    # Pre-compute random values (matching apply_trigger_rate_mask logic)
+src/strategy/entry_builder_nb.py:303:            "order_id": np.empty(0, dtype=INDEX_DTYPE),
+src/strategy/entry_builder_nb.py:312:    # Pass 2: Allocate and fill arrays
+src/strategy/entry_builder_nb.py:315:    order_id = np.empty(n_entry, dtype=INDEX_DTYPE)
+src/strategy/entry_builder_nb.py:326:        order_qty=order_qty,
+src/strategy/entry_builder_nb.py:330:        order_id=order_id,
+src/strategy/entry_builder_nb.py:340:        "order_id": order_id,
+src/pipeline/funnel_runner.py:89:            - commission, slip, order_qty: Trading parameters
+src/strategy/runner.py:25:    """Run a strategy and return order intents.
+src/strategy/runner.py:30:    3. Returns intents (does NOT fill, does NOT compute indicators)
+src/strategy/runner.py:36:        context: Execution context (e.g., {"bar_index": 100, "order_qty": 1})
+src/pipeline/metrics_schema.py:7:Defines the column order for metrics arrays returned by run_grid().
+src/strategy/registry.py:50:                f"Content-addressed identity mismatch indicates different strategy logic."
+src/pipeline/funnel.py:51:    order_qty: int = 1,
+src/pipeline/funnel.py:69:            - For Stage2: uses col0 (channel_len), col1 (atr_len), col2 (stop_mult) for kernel
+src/pipeline/funnel.py:73:        order_qty: order quantity (default: 1)
+src/pipeline/funnel.py:115:        order_qty=order_qty,
+src/strategy/param_schema.py:25:        description="Parameter name (must match strategy implementation)",
+src/pipeline/stage0_runner.py:58:        Results are in same order as params_matrix rows.
+src/strategy/registry_builder.py:4:that replaces filesystem iteration order, Python import order, list
+src/strategy/registry_builder.py:8:1. Deterministic scanning: Strategies discovered in deterministic order
+src/pipeline/runner_adapter.py:62:            - commission, slip, order_qty: Trading parameters
+src/pipeline/runner_adapter.py:151:    order_qty = cfg.get("order_qty", 1)
+src/pipeline/runner_adapter.py:174:        order_qty=order_qty,
+src/pipeline/runner_adapter.py:233:    order_qty = cfg.get("order_qty", 1)
+src/pipeline/runner_adapter.py:254:        order_qty=order_qty,
+src/strategy/builder_sparse.py:18:from engine.constants import KIND_STOP, ROLE_ENTRY, SIDE_BUY
+src/strategy/builder_sparse.py:24:    order_qty: int,
+src/strategy/builder_sparse.py:38:        order_qty: order quantity
+src/strategy/builder_sparse.py:47:            - order_id: int32 array (n_entry,) - order IDs
+src/strategy/builder_sparse.py:49:            - kind: uint8 array (n_entry,) - kind (STOP)
+src/strategy/builder_sparse.py:111:            "order_id": np.empty(0, dtype=INDEX_DTYPE),
+src/strategy/builder_sparse.py:127:    # Order ID maintains deterministic ordering
+src/strategy/builder_sparse.py:128:    # Order ID is sequential (1, 2, 3, ...) based on created_bar order
+src/strategy/builder_sparse.py:129:    # Since created_bar is already sorted, this preserves deterministic ordering
+src/strategy/builder_sparse.py:130:    order_id = np.arange(1, n_entry + 1, dtype=INDEX_DTYPE)
+src/strategy/builder_sparse.py:132:    kind = np.full(n_entry, KIND_STOP, dtype=INTENT_ENUM_DTYPE)
+src/strategy/builder_sparse.py:134:    qty = np.full(n_entry, int(order_qty), dtype=INDEX_DTYPE)
+src/strategy/builder_sparse.py:139:        "order_id": order_id,
+src/strategy/builder_sparse.py:152:    order_qty: int,
+src/strategy/builder_sparse.py:163:        order_qty: order quantity
+src/strategy/builder_sparse.py:171:        order_qty=order_qty,
+src/control/strategy_rotation.py:169:                for match in re.finditer(r"(s1|s2|s3|sma_cross|breakout_channel|mean_revert)", content, re.IGNORECASE):
+src/control/strategy_rotation.py:170:                    strategy_id = match.group(0).lower()
+src/control/worker.py:18:    get_requested_stop,
+src/control/worker.py:58:    Worker loop: poll QUEUED jobs and execute them sequentially.
+src/control/worker.py:125:        stop_mode = get_requested_stop(db_path, job_id)
+src/control/worker.py:126:        if stop_mode == StopMode.KILL.value:
+src/control/worker.py:145:        # Check pause/stop before each stage
+src/control/worker.py:146:        _check_pause_stop(db_path, job_id)
+src/control/worker.py:208:def _check_pause_stop(db_path: Path, job_id: str) -> None:
+src/control/worker.py:210:    Check pause/stop flags and handle accordingly.
+src/control/worker.py:219:    stop_mode = get_requested_stop(db_path, job_id)
+src/control/worker.py:220:    if stop_mode == StopMode.KILL.value:
+src/control/worker.py:234:        # Re-check stop while paused
+src/control/worker.py:235:        stop_mode = get_requested_stop(db_path, job_id)
+src/control/worker.py:236:        if stop_mode == StopMode.KILL.value:
+src/strategy/kernel.py:11:from engine.constants import KIND_STOP, ROLE_ENTRY, ROLE_EXIT, SIDE_BUY, SIDE_SELL
+src/strategy/kernel.py:12:from engine.engine_jit import simulate as simulate_matcher
+src/strategy/kernel.py:13:from engine.engine_jit import simulate_arrays as simulate_matcher_arrays
+src/strategy/kernel.py:14:from engine.metrics_from_fills import compute_metrics_from_fills
+src/strategy/kernel.py:36:    order_qty: int,
+src/strategy/kernel.py:44:        order_qty: order quantity
+src/strategy/kernel.py:50:            - order_id: int32 array (n_entry,) - order IDs
+src/strategy/kernel.py:52:            - kind: uint8 array (n_entry,) - kind (STOP)
+src/strategy/kernel.py:73:    # Removed >0 check to match object-mode behavior (only NaN filter)
+src/strategy/kernel.py:95:            "order_id": np.empty(0, dtype=INDEX_DTYPE),
+src/strategy/kernel.py:112:    # Stage P2-3A: Order ID maintains deterministic ordering
+src/strategy/kernel.py:113:    # Order ID is sequential (1, 2, 3, ...) based on created_bar order
+src/strategy/kernel.py:114:    # Since created_bar is already sorted, this preserves deterministic ordering
+src/strategy/kernel.py:115:    order_id = np.arange(1, n_entry + 1, dtype=INDEX_DTYPE)
+src/strategy/kernel.py:117:    kind = np.full(n_entry, KIND_STOP, dtype=INTENT_ENUM_DTYPE)
+src/strategy/kernel.py:119:    qty = np.full(n_entry, int(order_qty), dtype=INDEX_DTYPE)
+src/strategy/kernel.py:124:        "order_id": order_id,
+src/strategy/kernel.py:138:    stop_mult: float
+src/strategy/kernel.py:160:    order_qty: int = 1,
+src/strategy/kernel.py:168:      - Exit: Sell Stop at (entry_fill_price - stop_mult * ATR_wilder) active from next bar after entry_fill.
+src/strategy/kernel.py:173:      Costs are applied on each round-trip fill (entry and exit each incur cost).
+src/strategy/kernel.py:177:        - fills: List[Fill]
+src/strategy/kernel.py:188:    stop_mult = float(params.stop_mult)
+src/strategy/kernel.py:197:            "fills": [],
+src/strategy/kernel.py:204:                "fills_total": 0,
+src/strategy/kernel.py:217:    # --- Build order intents (next-bar active) ---
+src/strategy/kernel.py:219:    # CURSOR TASK 5: Use deterministic order ID generation (pure function)
+src/strategy/kernel.py:220:    from engine.order_id import generate_order_id
+src/strategy/kernel.py:229:        # CURSOR TASK 5: Generate deterministic order_id
+src/strategy/kernel.py:230:        oid = generate_order_id(
+src/strategy/kernel.py:234:            kind=KIND_STOP,
+src/strategy/kernel.py:239:                order_id=oid,
+src/strategy/kernel.py:242:                kind=OrderKind.STOP,
+src/strategy/kernel.py:245:                qty=order_qty,
+src/strategy/kernel.py:250:    # Run matcher (JIT or python via kill-switch)
+src/strategy/kernel.py:251:    fills: List[Fill] = simulate_matcher(bars, intents)
+src/strategy/kernel.py:254:    # --- Convert fills -> round-trip pnl (vectorized style, no python trade loops as truth) ---
+src/strategy/kernel.py:257:    # Phase 3A GKV: We implement exits by post-processing: when entry fills, schedule a sell stop from next bar.
+src/strategy/kernel.py:258:    # To preserve Homology, we do a second matcher pass with generated exit intents.
+src/strategy/kernel.py:259:    # This keeps all fill semantics inside the matcher (constitution).
+src/strategy/kernel.py:261:    for f in fills:
+src/strategy/kernel.py:264:        # exit stop price = entry_price - stop_mult * atr at entry bar
+src/strategy/kernel.py:271:        stop_px = float(f.price - stop_mult * a)
+src/strategy/kernel.py:272:        # CURSOR TASK 5: Generate deterministic order_id for exit
+src/strategy/kernel.py:273:        exit_oid = generate_order_id(
+src/strategy/kernel.py:277:            kind=KIND_STOP,
+src/strategy/kernel.py:282:                order_id=exit_oid,
+src/strategy/kernel.py:285:                kind=OrderKind.STOP,
+src/strategy/kernel.py:287:                price=stop_px,
+src/strategy/kernel.py:288:                qty=order_qty,
+src/strategy/kernel.py:294:        fills2 = simulate_matcher(bars, exit_intents)
+src/strategy/kernel.py:296:        fills_all = fills + fills2
+src/strategy/kernel.py:297:        # deterministic order: sort by (bar_index, role(ENTRY first), kind, order_id)
+src/strategy/kernel.py:298:        fills_all.sort(key=lambda x: (x.bar_index, 0 if x.role == OrderRole.ENTRY else 1, 0 if x.kind == OrderKind.STOP else 1, x.order_id))
+src/strategy/kernel.py:300:        fills_all = fills
+src/strategy/kernel.py:303:    # CURSOR TASK 1: Compute metrics from fills (unified source of truth)
+src/strategy/kernel.py:304:    net_profit, trades, max_dd, equity = compute_metrics_from_fills(
+src/strategy/kernel.py:305:        fills=fills_all,
+src/strategy/kernel.py:308:        qty=order_qty,
+src/strategy/kernel.py:322:    out = {"fills": fills_all, "pnl": pnl, "equity": equity, "metrics": metrics}
+src/strategy/kernel.py:327:    fills_total = int(len(fills_all))  # fills_all is List[Fill], use len()
+src/strategy/kernel.py:333:        "fills_total": fills_total,
+src/strategy/kernel.py:359:    order_qty: int = 1,
+src/strategy/kernel.py:392:    stop_mult = float(params.stop_mult)
+src/strategy/kernel.py:395:        timers.stop("t_total_kernel")
+src/strategy/kernel.py:405:            "fills": [],
+src/strategy/kernel.py:412:                "fills_total": 0,
+src/strategy/kernel.py:414:                "entry_fills_total": 0,
+src/strategy/kernel.py:416:                "exit_fills_total": 0,
+src/strategy/kernel.py:431:        timers.stop("t_ind_donchian")
+src/strategy/kernel.py:433:        timers.stop("t_ind_atr")
+src/strategy/kernel.py:440:        timers.stop("t_ind_donchian")
+src/strategy/kernel.py:445:        timers.stop("t_ind_atr")
+src/strategy/kernel.py:452:    # Entry orders generated at bar t-1 close, active at bar t, stop price = donch_hi[t-1]
+src/strategy/kernel.py:494:            order_qty=order_qty,
+src/strategy/kernel.py:504:            order_qty=order_qty,
+src/strategy/kernel.py:513:            order_qty=order_qty,
+src/strategy/kernel.py:519:    timers.stop("t_build_entry_intents")
+src/strategy/kernel.py:523:    # CURSOR TASK 5: Use deterministic order ID generation (pure function)
+src/strategy/kernel.py:524:    # Override order_id from builder with deterministic version
+src/strategy/kernel.py:525:    from engine.order_id import generate_order_ids_array
+src/strategy/kernel.py:526:    order_id = generate_order_ids_array(
+src/strategy/kernel.py:546:        timers.stop("t_total_kernel")
+src/strategy/kernel.py:555:        fills_total = 0
+src/strategy/kernel.py:569:            "fills": [],
+src/strategy/kernel.py:577:                "fills_total": fills_total,
+src/strategy/kernel.py:580:                "entry_fills_total": 0,
+src/strategy/kernel.py:581:                "exit_fills_total": 0,
+src/strategy/kernel.py:615:    # This ensures exit intents are only generated after entry fills occur
+src/strategy/kernel.py:617:    entry_fills: List[Fill] = simulate_matcher_arrays(
+src/strategy/kernel.py:619:        order_id=order_id,
+src/strategy/kernel.py:628:    timers.stop("t_simulate_entry")
+src/strategy/kernel.py:631:    # CURSOR TASK 2: Build exit intents from entry fills (not from entry intents)
+src/strategy/kernel.py:632:    # This matches object-mode behavior: exit intents only generated after entry fills
+src/strategy/kernel.py:640:    # Build exit intents for each entry fill (parity with object-mode)
+src/strategy/kernel.py:643:    for f in entry_fills:
+src/strategy/kernel.py:649:        # Get ATR at entry fill bar
+src/strategy/kernel.py:655:        # Compute exit stop price from entry fill price
+src/strategy/kernel.py:656:        exit_stop = float(f.price - stop_mult * atr_e)
+src/strategy/kernel.py:658:            "created_bar": ebar,  # Same as entry fill bar (allows same-bar entry then exit)
+src/strategy/kernel.py:659:            "price": exit_stop,
+src/strategy/kernel.py:663:    timers.stop("t_calc_exits")
+src/strategy/kernel.py:666:    # CURSOR TASK 2 & 3: Simulate exit intents, then merge fills
+src/strategy/kernel.py:667:    # Sort intents properly (created_bar, order_id) before simulate
+src/strategy/kernel.py:673:        # CURSOR TASK 5: Use deterministic order ID generation for exit intents
+src/strategy/kernel.py:674:        from engine.order_id import generate_order_id
+src/strategy/kernel.py:675:        exit_order_id_list = []
+src/strategy/kernel.py:677:            exit_oid = generate_order_id(
+src/strategy/kernel.py:681:                kind=KIND_STOP,
+src/strategy/kernel.py:684:            exit_order_id_list.append(exit_oid)
+src/strategy/kernel.py:685:        exit_order_id = np.asarray(exit_order_id_list, dtype=INDEX_DTYPE)
+src/strategy/kernel.py:687:        exit_kind = np.full(exit_intents_count, KIND_STOP, dtype=INTENT_ENUM_DTYPE)
+src/strategy/kernel.py:689:        exit_qty = np.full(exit_intents_count, int(order_qty), dtype=INDEX_DTYPE)
+src/strategy/kernel.py:691:        # CURSOR TASK 3: Sort exit intents by created_bar, then order_id
+src/strategy/kernel.py:692:        exit_sort_idx = np.lexsort((exit_order_id, exit_created))
+src/strategy/kernel.py:693:        exit_order_id = exit_order_id[exit_sort_idx]
+src/strategy/kernel.py:702:        exit_fills: List[Fill] = simulate_matcher_arrays(
+src/strategy/kernel.py:704:            order_id=exit_order_id,
+src/strategy/kernel.py:714:        # Merge entry and exit fills, sort by (bar_index, role, kind, order_id)
+src/strategy/kernel.py:715:        fills_all = entry_fills + exit_fills
+src/strategy/kernel.py:716:        fills_all.sort(
+src/strategy/kernel.py:720:                0 if x.kind == OrderKind.STOP else 1,
+src/strategy/kernel.py:721:                x.order_id,
+src/strategy/kernel.py:725:        fills_all = entry_fills
+src/strategy/kernel.py:727:    timers.stop("t_simulate_exit")
+src/strategy/kernel.py:730:    # Count entry and exit fills
+src/strategy/kernel.py:731:    entry_fills_count = sum(1 for f in entry_fills if f.role == OrderRole.ENTRY and f.side == Side.BUY)
+src/strategy/kernel.py:733:        exit_fills_count = sum(1 for f in fills_all if f.role == OrderRole.EXIT and f.side == Side.SELL)
+src/strategy/kernel.py:735:        exit_fills_count = 0
+src/strategy/kernel.py:737:    # Capture first entry fill for debug
+src/strategy/kernel.py:738:    if return_debug and len(fills_all) > 0:
+src/strategy/kernel.py:740:        for f in fills_all:
+src/strategy/kernel.py:748:    # Capture first exit fill for debug
+src/strategy/kernel.py:749:    if return_debug and len(fills_all) > 0:
+src/strategy/kernel.py:751:        for f in fills_all:
+src/strategy/kernel.py:759:    # CURSOR TASK 1: Compute metrics from fills (unified source of truth)
+src/strategy/kernel.py:760:    net_profit, trades, max_dd, equity = compute_metrics_from_fills(
+src/strategy/kernel.py:761:        fills=fills_all,
+src/strategy/kernel.py:764:        qty=order_qty,
+src/strategy/kernel.py:778:    out = {"fills": fills_all, "pnl": pnl, "equity": equity, "metrics": metrics}
+src/strategy/kernel.py:782:    fills_total = int(len(fills_all))  # fills_all is List[Fill], use len()
+src/strategy/kernel.py:783:    timers.stop("t_total_kernel")
+src/strategy/kernel.py:813:        "fills_total": fills_total,
+src/strategy/kernel.py:822:        "entry_fills_total": int(entry_fills_count),
+src/strategy/kernel.py:823:        "exit_fills_total": int(exit_fills_count),
+src/strategy/kernel.py:868:    order_qty: int = 1,
+src/strategy/kernel.py:881:            order_qty=order_qty,
+src/strategy/kernel.py:888:        order_qty=order_qty,
+src/control/season_compare_batches.py:252:    # group, keep top per_group_i in deterministic order (already sorted)
+src/control/season_compare_batches.py:268:    # deterministic group ordering: key asc
+src/features/causality.py:328:    stop_on_first_failure: bool = True
+src/features/causality.py:335:        stop_on_first_failure: If True, stop verification on first failure
+src/features/causality.py:347:            if stop_on_first_failure and not report.passed:
+src/features/causality.py:357:            if stop_on_first_failure:
+src/pipeline/runner_grid.py:56:    order_qty: int = 1,
+src/pipeline/runner_grid.py:67:      col2 stop_mult (float)
+src/pipeline/runner_grid.py:71:            using close[-1] as exit price. This ensures trades > 0 when fills exist.
+src/pipeline/runner_grid.py:77:        - order: np.ndarray indices mapping output rows back to original params (or identity)
+src/pipeline/runner_grid.py:108:        pm_sorted, order = sort_params_cache_friendly(pm)
+src/pipeline/runner_grid.py:109:        # Convert order to INDEX_DTYPE (int32) for memory optimization
+src/pipeline/runner_grid.py:110:        order = order.astype(INDEX_DTYPE)
+src/pipeline/runner_grid.py:113:        order = np.arange(pm.shape[0], dtype=INDEX_DTYPE)
+src/pipeline/runner_grid.py:121:        debug_fills_first = np.full((n, 6), np.nan, dtype=np.float64)
+src/pipeline/runner_grid.py:124:        debug_fills_first = None
+src/pipeline/runner_grid.py:222:        selected_pos = np.sort(perm[:k]).astype(INDEX_DTYPE)  # Sort to maintain deterministic loop order
+src/pipeline/runner_grid.py:227:    selected_orig = order[selected_pos].astype(np.int64)  # Map sorted positions to original indices
+src/pipeline/runner_grid.py:254:        perf["entry_fills_total"] = 0
+src/pipeline/runner_grid.py:256:        perf["exit_fills_total"] = 0
+src/pipeline/runner_grid.py:257:    result: Dict[str, object] = {"metrics": metrics, "order": order, "perf": perf}
+src/pipeline/runner_grid.py:260:        # Debug mode: bypass strategy/orchestration and only benchmark matcher simulate.
+src/pipeline/runner_grid.py:272:                        order_id=oid,
+src/pipeline/runner_grid.py:275:                        kind=OrderKind.STOP,
+src/pipeline/runner_grid.py:284:                        order_id=oid,
+src/pipeline/runner_grid.py:287:                        kind=OrderKind.STOP,
+src/pipeline/runner_grid.py:296:        _fills = engine_jit.simulate(bars, intents)
+src/pipeline/runner_grid.py:312:            "fills_total": int(len(_fills)),
+src/pipeline/runner_grid.py:316:        if return_debug and debug_fills_first is not None:
+src/pipeline/runner_grid.py:317:            result["debug_fills_first"] = debug_fills_first
+src/pipeline/runner_grid.py:326:    fills_total = 0
+src/pipeline/runner_grid.py:339:    debug_fills_first_subset = None
+src/pipeline/runner_grid.py:341:        debug_fills_first_subset = np.full((len(selected_pos), 6), np.nan, dtype=np.float64)
+src/pipeline/runner_grid.py:365:            DonchianAtrParams(channel_len=ch, atr_len=atr, stop_mult=sm),
+src/pipeline/runner_grid.py:368:            order_qty=int(order_qty),
+src/pipeline/runner_grid.py:380:            fills_total += int(obs.get("fills_total", 0))
+src/pipeline/runner_grid.py:420:            if "entry_fills_total" in obs:
+src/pipeline/runner_grid.py:421:                perf["entry_fills_total"] = int(perf.get("entry_fills_total", 0)) + int(obs.get("entry_fills_total", 0))
+src/pipeline/runner_grid.py:424:            if "exit_fills_total" in obs:
+src/pipeline/runner_grid.py:425:                perf["exit_fills_total"] = int(perf.get("exit_fills_total", 0)) + int(obs.get("exit_fills_total", 0))
+src/pipeline/runner_grid.py:457:        # Get fills count for debug assert
+src/pipeline/runner_grid.py:458:        fills_this_param = out.get("fills", [])
+src/pipeline/runner_grid.py:459:        fills_count_this_param = len(fills_this_param) if isinstance(fills_this_param, list) else 0
+src/pipeline/runner_grid.py:471:            fills = out.get("fills", [])
+src/pipeline/runner_grid.py:472:            if isinstance(fills, list) and len(fills) > 0:
+src/pipeline/runner_grid.py:473:                # Count entry and exit fills
+src/pipeline/runner_grid.py:474:                entry_fills = [f for f in fills if f.role == OrderRole.ENTRY and f.side == Side.BUY]
+src/pipeline/runner_grid.py:475:                exit_fills = [f for f in fills if f.role == OrderRole.EXIT and f.side == Side.SELL]
+src/pipeline/runner_grid.py:478:                if len(entry_fills) > len(exit_fills):
+src/pipeline/runner_grid.py:479:                    n_unpaired = len(entry_fills) - len(exit_fills)
+src/pipeline/runner_grid.py:483:                    # Create forced exit fills for unpaired entries
+src/pipeline/runner_grid.py:485:                    unpaired_entry_prices = [float(f.price) for f in entry_fills[-n_unpaired:]]
+src/pipeline/runner_grid.py:492:                        trade_pnl = (last_close_price - entry_price) * float(order_qty) - costs_per_trade
+src/pipeline/runner_grid.py:532:                        debug_fills_first_subset[subset_idx, 0] = entry_bar
+src/pipeline/runner_grid.py:533:                        debug_fills_first_subset[subset_idx, 1] = entry_price
+src/pipeline/runner_grid.py:534:                        debug_fills_first_subset[subset_idx, 2] = exit_bar
+src/pipeline/runner_grid.py:535:                        debug_fills_first_subset[subset_idx, 3] = exit_price
+src/pipeline/runner_grid.py:536:                        debug_fills_first_subset[subset_idx, 4] = new_net_profit
+src/pipeline/runner_grid.py:537:                        debug_fills_first_subset[subset_idx, 5] = float(new_trades)
+src/pipeline/runner_grid.py:544:                        debug_fills_first_subset[subset_idx, 0] = entry_bar
+src/pipeline/runner_grid.py:545:                        debug_fills_first_subset[subset_idx, 1] = entry_price
+src/pipeline/runner_grid.py:546:                        debug_fills_first_subset[subset_idx, 2] = exit_bar
+src/pipeline/runner_grid.py:547:                        debug_fills_first_subset[subset_idx, 3] = exit_price
+src/pipeline/runner_grid.py:548:                        debug_fills_first_subset[subset_idx, 4] = m_net_profit
+src/pipeline/runner_grid.py:549:                        debug_fills_first_subset[subset_idx, 5] = float(m_trades)
+src/pipeline/runner_grid.py:551:                # No fills, use original metrics
+src/pipeline/runner_grid.py:554:                # Store debug data in subset (no fills case)
+src/pipeline/runner_grid.py:556:                    debug_fills_first_subset[subset_idx, 0] = entry_bar
+src/pipeline/runner_grid.py:557:                    debug_fills_first_subset[subset_idx, 1] = entry_price
+src/pipeline/runner_grid.py:558:                    debug_fills_first_subset[subset_idx, 2] = exit_bar
+src/pipeline/runner_grid.py:559:                    debug_fills_first_subset[subset_idx, 3] = exit_price
+src/pipeline/runner_grid.py:560:                    debug_fills_first_subset[subset_idx, 4] = m_net_profit
+src/pipeline/runner_grid.py:561:                    debug_fills_first_subset[subset_idx, 5] = float(m_trades)
+src/pipeline/runner_grid.py:568:                debug_fills_first_subset[subset_idx, 0] = entry_bar
+src/pipeline/runner_grid.py:569:                debug_fills_first_subset[subset_idx, 1] = entry_price
+src/pipeline/runner_grid.py:570:                debug_fills_first_subset[subset_idx, 2] = exit_bar
+src/pipeline/runner_grid.py:571:                debug_fills_first_subset[subset_idx, 3] = exit_price
+src/pipeline/runner_grid.py:572:                debug_fills_first_subset[subset_idx, 4] = m_net_profit
+src/pipeline/runner_grid.py:573:                debug_fills_first_subset[subset_idx, 5] = float(m_trades)
+src/pipeline/runner_grid.py:579:        # Note: entry fills without exits yield trades=0 and all-zero metrics, which is valid
+src/pipeline/runner_grid.py:603:    # CURSOR TASK 3: Assert that if fills_total > 0, metrics_subset should have non-zero values
+src/pipeline/runner_grid.py:608:        assert fills_total == 0 or metrics_subset_abs_sum > 0, (
+src/pipeline/runner_grid.py:609:            f"CURSOR TASK B violation: fills_total={fills_total} > 0 but metrics_subset_abs_sum={metrics_subset_abs_sum} == 0. "
+src/pipeline/runner_grid.py:619:    # Variables: selected_pos (sorted-space index), order (sorted_pos -> original_index), metrics_subset (computed metrics)
+src/pipeline/runner_grid.py:622:        orig_i = int(order[int(pos)])
+src/pipeline/runner_grid.py:625:        if return_debug and debug_fills_first is not None and debug_fills_first_subset is not None:
+src/pipeline/runner_grid.py:626:            debug_fills_first[orig_i, :] = debug_fills_first_subset[subset_i, :]
+src/pipeline/runner_grid.py:632:    perf["fills_total"] = int(fills_total)
+src/pipeline/runner_grid.py:636:    # This helps distinguish: entry_intents_total > 0 but fills_total == 0 → matcher/engine issue
+src/pipeline/runner_grid.py:652:        # fills_total already set in scatter-back section (line 592), but ensure it's here too for clarity
+src/pipeline/runner_grid.py:653:        if "fills_total" not in perf:
+src/pipeline/runner_grid.py:654:            perf["fills_total"] = int(fills_total)
+src/pipeline/runner_grid.py:676:        if "fills_total" not in perf:
+src/pipeline/runner_grid.py:677:            perf["fills_total"] = int(fills_total)
+src/pipeline/runner_grid.py:682:        if return_debug and debug_fills_first is not None:
+src/pipeline/runner_grid.py:683:            result["debug_fills_first"] = debug_fills_first
+src/pipeline/runner_grid.py:721:        "fills_total": int(fills_total),
+src/pipeline/runner_grid.py:745:    perf_summary["fills_total"] = int(fills_total)
+src/pipeline/runner_grid.py:748:    # Keep accumulated per-kernel timings already stored in `perf` (t_*_s, entry_fills_total, etc.)
+src/pipeline/runner_grid.py:752:    if return_debug and debug_fills_first is not None:
+src/pipeline/runner_grid.py:753:        result["debug_fills_first"] = debug_fills_first
+src/control/batch_execute.py:235:                # Create runner and execute
+src/features/registry.py:244:            reports = batch_verify_features(specs_to_verify, stop_on_first_failure=False)
+src/features/registry.py:356:        # Sort by name for deterministic ordering
+src/pipeline/funnel_schema.py:41:    Funnel plan containing ordered list of stages.
+src/pipeline/funnel_schema.py:43:    Stages are executed in order: Stage0 -> Stage1 -> Stage2
+src/config/constants.py:10:# Stage0 proxy name (must match the proxy implementation name)
+src/pipeline/param_sort.py:15:        col2 = stop_mult
+src/pipeline/param_sort.py:18:      sorted_params: params reordered (view/copy depending on numpy)
+src/pipeline/param_sort.py:19:      order: indices such that sorted_params = params[order]
+src/pipeline/param_sort.py:26:    # Tertiary: stop_mult
+src/pipeline/param_sort.py:31:    order = np.lexsort((sm, atr, ch))
+src/pipeline/param_sort.py:32:    return params[order], order
+src/control/action_queue.py:4:FIFO ordering and idempotency (duplicate intents are rejected). StateProcessor
+src/control/action_queue.py:25:    1. FIFO ordering (first in, first out)
+src/pipeline/governance_eval.py:155:    Find Stage2 candidate matching param_id.
+src/pipeline/governance_eval.py:239:    # For v2: use candidate_id for matching
+src/pipeline/governance_eval.py:245:        # Find matching candidate by candidate_id
+src/pipeline/governance_eval.py:265:    stage2_match = find_stage2_candidate(param_id, stage2_winners)
+src/pipeline/governance_eval.py:266:    if stage2_match is None:
+src/pipeline/governance_eval.py:454:        # Check if Stage2 is v2 (for candidate matching)
+src/control/season_api.py:8:- Rebuild index is deterministic: stable ordering by batch_id.
+src/control/research_slippage_stress.py:5:給定 bars、fills/intents、commission 配置，計算 S0–S3 等級的 KPI 矩陣。
+src/control/research_slippage_stress.py:43:    fills: List[Dict[str, Any]],
+src/control/research_slippage_stress.py:54:        fills: 成交列表，每個成交為字典，包含 "entry_price", "exit_price", "entry_side", "exit_side", "quantity" 等欄位
+src/control/research_slippage_stress.py:80:            fills, slip_ticks, tick_size, commission_per_side
+src/control/research_slippage_stress.py:108:    fills: List[Dict[str, Any]],
+src/control/research_slippage_stress.py:121:    for fill in fills:
+src/control/research_slippage_stress.py:122:        # 假設 fill 結構包含 entry_price, exit_price, entry_side, exit_side, quantity
+src/control/research_slippage_stress.py:123:        entry_price = fill.get("entry_price")
+src/control/research_slippage_stress.py:124:        exit_price = fill.get("exit_price")
+src/control/research_slippage_stress.py:125:        entry_side = fill.get("entry_side")  # "buy" 或 "sellshort"
+src/control/research_slippage_stress.py:126:        exit_side = fill.get("exit_side")    # "sell" 或 "buytocover"
+src/control/research_slippage_stress.py:127:        quantity = fill.get("quantity", 1.0)
+src/control/local_scan.py:18:from fnmatch import fnmatch
+src/control/local_scan.py:73:    """Check if any path segment matches a deny segment."""
+src/control/local_scan.py:88:        return any(fnmatch(rel_path.name, g) for g in policy.allowed_root_files_glob)
+src/control/artifacts_api.py:98:        match = all(
+src/control/artifacts_api.py:102:        if match:
+src/control/artifacts_api.py:104:    raise KeyError(f"No unit found matching {unit_key}")
+src/control/batch_api.py:10:- Deterministic outputs: stable ordering by job_id, attempt_n.
+src/control/batch_api.py:263:            m = _ATTEMPT_RE.match(a.name)
+src/control/research_runner.py:25:    ManifestMismatchError,
+src/control/research_runner.py:166:    except (ManifestMismatchError, FeatureResolutionError) as e:
+src/control/research_runner.py:203:        # 假設 wfs_result 包含 fills/intents 資料
+src/control/research_runner.py:204:        # 目前我們沒有實際的 fills 資料，因此跳過計算
+src/control/research_runner.py:205:        # 這裡僅建立一個框架，實際計算需根據 fills/intents 實作
+src/control/research_runner.py:207:            "滑價壓力測試已啟用，但 fills/intents 資料不可用，跳過計算。"
+src/control/research_runner.py:208:            "請確保 WFS 結果包含 fills 欄位。"
+src/control/research_runner.py:223:            "note": "fills/intents 資料不可用，計算被跳過",
+src/engine/constitution.py:8:STOP fills (Open==price is treated as GAP branch):
+src/engine/constitution.py:10:- if Open >= S: fill = Open
+src/engine/constitution.py:11:- elif High >= S: fill = S
+src/engine/constitution.py:13:- if Open <= S: fill = Open
+src/engine/constitution.py:14:- elif Low <= S: fill = S
+src/engine/constitution.py:16:LIMIT fills (Open==price is treated as GAP branch):
+src/engine/constitution.py:18:- if Open <= L: fill = Open
+src/engine/constitution.py:19:- elif Low <= L: fill = L
+src/engine/constitution.py:21:- if Open >= L: fill = Open
+src/engine/constitution.py:22:- elif High >= L: fill = L
+src/engine/constitution.py:25:- STOP wins over LIMIT (risk-first pessimism).
+src/engine/constitution.py:28:- If entry and exit are both triggerable in the same bar, execute Entry then Exit.
+src/engine/constitution.py:31:- If multiple orders of the same role are triggerable in the same bar, execute EXIT-first.
+src/engine/constitution.py:32:- Within the same role+kind, use deterministic order: smaller order_id first.
+src/engine/constitution.py:36:PRIORITY_STOP_OVER_LIMIT = True
+src/control/data_snapshot.py:107:        # Build canonical dict with fixed key order
+src/control/resolve_cli.py:34:    ManifestMismatchError,
+src/control/resolve_cli.py:171:    except ManifestMismatchError as e:
+src/engine/simulate.py:14:from engine.kernels.reference_kernel import simulate_reference_matcher
+src/engine/simulate.py:32:        intents: Iterable of order intents
+src/engine/simulate.py:37:        SimResult containing the fills from simulation
+src/engine/simulate.py:45:        return simulate_reference_matcher(bars, intents)
+src/control/deploy_package_mc.py:6:並確保 deterministic ordering 與 atomic write。
+src/control/dataset_registry_mutation.py:120:    # Sort by id to maintain deterministic order
+src/strategy/builtin/s3_v1.py:5:Supports multiple trigger modes (NONE, STOP, CROSS) and filter modes (NONE, THRESHOLD).
+src/strategy/builtin/s3_v1.py:15:from engine.order_id import generate_order_id
+src/strategy/builtin/s3_v1.py:16:from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
+src/strategy/builtin/s3_v1.py:44:       - NONE: Generate MARKET_NEXT_OPEN order
+src/strategy/builtin/s3_v1.py:45:       - STOP: Place stop order at threshold level
+src/strategy/builtin/s3_v1.py:128:            # MARKET_NEXT_OPEN entry (implemented as STOP at next bar's open)
+src/strategy/builtin/s3_v1.py:132:            order_id = generate_order_id(
+src/strategy/builtin/s3_v1.py:136:                kind=KIND_STOP,
+src/strategy/builtin/s3_v1.py:141:                order_id=order_id,
+src/strategy/builtin/s3_v1.py:144:                kind=OrderKind.STOP,
+src/strategy/builtin/s3_v1.py:147:                qty=context.get("order_qty", 1),
+src/strategy/builtin/s3_v1.py:151:        elif trigger_mode == "STOP":
+src/strategy/builtin/s3_v1.py:152:            # Place stop order at value_threshold level
+src/strategy/builtin/s3_v1.py:155:            order_id = generate_order_id(
+src/strategy/builtin/s3_v1.py:159:                kind=KIND_STOP,
+src/strategy/builtin/s3_v1.py:164:                order_id=order_id,
+src/strategy/builtin/s3_v1.py:167:                kind=OrderKind.STOP,
+src/strategy/builtin/s3_v1.py:170:                qty=context.get("order_qty", 1),
+src/strategy/builtin/s3_v1.py:187:                    order_id = generate_order_id(
+src/strategy/builtin/s3_v1.py:191:                        kind=KIND_STOP,
+src/strategy/builtin/s3_v1.py:196:                        order_id=order_id,
+src/strategy/builtin/s3_v1.py:199:                        kind=OrderKind.STOP,
+src/strategy/builtin/s3_v1.py:202:                        qty=context.get("order_qty", 1),
+src/strategy/builtin/s3_v1.py:253:                "enum": ["NONE", "STOP", "CROSS"],
+src/strategy/builtin/s3_v1.py:293:            "order_qty": {
+src/strategy/builtin/s3_v1.py:310:            "order_qty"
+src/strategy/builtin/s3_v1.py:324:        "order_qty": 1.0,
+src/control/features_store.py:72:    Write features NPZ via tmp + replace. Deterministic keys order.
+src/engine/metrics_from_fills.py:24:def compute_metrics_from_fills(
+src/engine/metrics_from_fills.py:25:    fills: List[Fill],
+src/engine/metrics_from_fills.py:31:    Compute metrics from fills list.
+src/engine/metrics_from_fills.py:33:    This is the unified source of truth for metrics computation from fills.
+src/engine/metrics_from_fills.py:37:        fills: List of Fill objects (can be empty)
+src/engine/metrics_from_fills.py:45:            - trades: int - Number of trades (equals pnl.size, not entry fills count)
+src/engine/metrics_from_fills.py:52:        - Costs are applied per fill (entry + exit each incur cost)
+src/engine/metrics_from_fills.py:53:        - Metrics are derived from pnl/equity, not from fills count
+src/engine/metrics_from_fills.py:56:    # Pairing rule: take fills in chronological order, pair BUY(ENTRY) then SELL(EXIT)
+src/engine/metrics_from_fills.py:59:    for f in fills:
+src/engine/metrics_from_fills.py:74:    # Costs applied per fill (entry + exit)
+src/control/bars_store.py:83:    Write npz via tmp + replace. Deterministic keys order.
+src/control/season_export.py:159:        "deterministic_order": {
+src/control/season_export.py:231:    - deterministic ordering
+src/control/season_export.py:276:        "deterministic_order": {
+src/control/batch_submit.py:51:        description="Job IDs in same order as input jobs"
+src/control/batch_submit.py:59:        jobs: List of JobSpec (order does not matter)
+src/control/batch_submit.py:74:    # Sort normalized list by its JSON representation to make order irrelevant
+src/control/batch_submit.py:109:    # Use season as outputs_root subdirectory (must match test expectation)
+src/gui/nicegui/pages/wizard.py:44:        ui.label("Define your explicit intent. Machine will derive and execute.").classes("text-secondary mb-8")
+src/control/feature_resolver.py:49:class ManifestMismatchError(FeatureResolutionError):
+src/control/feature_resolver.py:102:        ManifestMismatchError: manifest 合約不符
+src/control/feature_resolver.py:136:        raise ManifestMismatchError(f"無法載入 features manifest: {e}")
+src/control/feature_resolver.py:171:        ManifestMismatchError: 合約不符
+src/control/feature_resolver.py:176:        raise ManifestMismatchError(
+src/control/feature_resolver.py:183:        raise ManifestMismatchError(
+src/control/feature_resolver.py:189:        raise ManifestMismatchError("manifest 缺少 'files' 欄位")
+src/control/feature_resolver.py:193:        raise ManifestMismatchError("manifest 缺少 'features_specs' 欄位")
+src/strategy/builtin/breakout_channel_v1.py:15:from engine.order_id import generate_order_id
+src/strategy/builtin/breakout_channel_v1.py:16:from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
+src/strategy/builtin/breakout_channel_v1.py:78:        order_id = generate_order_id(
+src/strategy/builtin/breakout_channel_v1.py:82:            kind=KIND_STOP,
+src/strategy/builtin/breakout_channel_v1.py:87:            order_id=order_id,
+src/strategy/builtin/breakout_channel_v1.py:90:            kind=OrderKind.STOP,
+src/strategy/builtin/breakout_channel_v1.py:93:            qty=context.get("order_qty", 1),
+src/control/batch_aggregate.py:4:TopK selection, summary metrics, and deterministic ordering.
+src/control/job_expand.py:35:        description="Dataset identifier (must match registry)"
+src/control/job_expand.py:40:        description="Strategy identifier (must match registry)"
+src/control/job_expand.py:61:        List of WizardJobSpec in deterministic order.
+src/control/job_expand.py:76:    # Compute Cartesian product in deterministic order
+src/control/job_expand.py:77:    # Order: iterate params sorted by name, values in order from values_for_param
+src/engine/kernels/cursor_kernel.py:5:It uses array/struct inputs and deterministic cursor-based matching.
+src/engine/kernels/cursor_kernel.py:28:        intents: Iterable of order intents
+src/engine/kernels/cursor_kernel.py:31:        SimResult containing the fills from simulation
+src/engine/kernels/cursor_kernel.py:38:    fills: List[Fill] = simulate_jit(bars, intents)
+src/engine/kernels/cursor_kernel.py:39:    return SimResult(fills=fills)
+src/gui/nicegui/pages/candidates.py:26:        with ui.card().classes("w-full bg-warning/20 border-warning border-l-4 mb-6"):
+src/gui/nicegui/pages/candidates.py:58:                with ui.row().classes("w-full font-bold border-b border-panel-light pb-2 mb-2"):
+src/gui/nicegui/pages/candidates.py:63:                    with ui.row().classes("w-full py-2 border-b border-panel-light last:border-0"):
+src/control/param_grid.py:5:Deterministic ordering, no floating drift surprises.
+src/control/param_grid.py:111:    def validate_range_order(cls, v: float | int | None, info) -> float | int | None:
+src/control/param_grid.py:129:        Sorted unique list of values in deterministic order.
+src/control/param_grid.py:180:        # Ensure uniqueness and deterministic order
+src/engine/kernels/reference_kernel.py:2:"""Reference kernel - adapter for matcher_core (testing/debugging only).
+src/engine/kernels/reference_kernel.py:4:This kernel wraps matcher_core.simulate() and should only be used for:
+src/engine/kernels/reference_kernel.py:17:from engine.matcher_core import simulate as simulate_reference
+src/engine/kernels/reference_kernel.py:20:def simulate_reference_matcher(
+src/engine/kernels/reference_kernel.py:25:    Reference matcher adapter - wraps matcher_core.simulate().
+src/engine/kernels/reference_kernel.py:27:    This is an adapter that wraps the reference implementation in matcher_core.
+src/engine/kernels/reference_kernel.py:32:        intents: Iterable of order intents
+src/engine/kernels/reference_kernel.py:35:        SimResult containing the fills from simulation
+src/engine/kernels/reference_kernel.py:38:        - This wraps matcher_core.simulate() which is the semantic truth source
+src/engine/kernels/reference_kernel.py:41:    fills: List[Fill] = simulate_reference(bars, intents)
+src/engine/kernels/reference_kernel.py:42:    return SimResult(fills=fills)
+src/gui/nicegui/pages/settings.py:262:        with ui.card().classes("w-full mb-6 border-2 border-cyan"):
+src/gui/nicegui/pages/settings.py:347:        with ui.card().classes("w-full border-2 border-success"):
+src/strategy/builtin/s2_v1.py:5:Supports multiple trigger modes (NONE, STOP, CROSS) and filter modes (NONE, THRESHOLD).
+src/strategy/builtin/s2_v1.py:15:from engine.order_id import generate_order_id
+src/strategy/builtin/s2_v1.py:16:from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
+src/strategy/builtin/s2_v1.py:44:       - NONE: Generate MARKET_NEXT_OPEN order
+src/strategy/builtin/s2_v1.py:45:       - STOP: Place stop order at threshold level
+src/strategy/builtin/s2_v1.py:109:            # MARKET_NEXT_OPEN entry (implemented as STOP at next bar's open)
+src/strategy/builtin/s2_v1.py:113:            order_id = generate_order_id(
+src/strategy/builtin/s2_v1.py:117:                kind=KIND_STOP,
+src/strategy/builtin/s2_v1.py:122:                order_id=order_id,
+src/strategy/builtin/s2_v1.py:125:                kind=OrderKind.STOP,
+src/strategy/builtin/s2_v1.py:128:                qty=context.get("order_qty", 1),
+src/strategy/builtin/s2_v1.py:132:        elif trigger_mode == "STOP":
+src/strategy/builtin/s2_v1.py:133:            # Place stop order at value_threshold level
+src/strategy/builtin/s2_v1.py:136:            order_id = generate_order_id(
+src/strategy/builtin/s2_v1.py:140:                kind=KIND_STOP,
+src/strategy/builtin/s2_v1.py:145:                order_id=order_id,
+src/strategy/builtin/s2_v1.py:148:                kind=OrderKind.STOP,
+src/strategy/builtin/s2_v1.py:151:                qty=context.get("order_qty", 1),
+src/strategy/builtin/s2_v1.py:167:                    order_id = generate_order_id(
+src/strategy/builtin/s2_v1.py:171:                        kind=KIND_STOP,
+src/strategy/builtin/s2_v1.py:176:                        order_id=order_id,
+src/strategy/builtin/s2_v1.py:179:                        kind=OrderKind.STOP,
+src/strategy/builtin/s2_v1.py:182:                        qty=context.get("order_qty", 1),
+src/strategy/builtin/s2_v1.py:233:                "enum": ["NONE", "STOP", "CROSS"],
+src/strategy/builtin/s2_v1.py:273:            "order_qty": {
+src/strategy/builtin/s2_v1.py:290:            "order_qty"
+src/strategy/builtin/s2_v1.py:304:        "order_qty": 1.0,
+src/control/api.py:26:    request_stop,
+src/control/api.py:47:from control.batch_execute import (
+src/control/api.py:327:    - Deterministic ordering: datasets sorted by id
+src/control/api.py:351:    - Deterministic ordering: strategies sorted by strategy_id; params sorted by name
+src/control/api.py:364:    for s in reg.strategies:  # preserve original strategy order
+src/control/api.py:365:        # Preserve original param order to satisfy tests (no sorting here)
+src/control/api.py:429:@app.post("/jobs/{job_id}/stop")
+src/control/api.py:430:async def stop_job_endpoint(job_id: str, mode: StopMode = StopMode.SOFT) -> dict[str, Any]:
+src/control/api.py:432:    request_stop(db_path, job_id, mode)
+src/control/api.py:678:        # pidfile is stale or mismatched, remove it
+src/control/api.py:721:    3) For each JobSpec in order: call existing "submit_job" internal function used by POST /jobs
+src/control/api.py:918:        from control.batch_execute import retry_failed
+src/control/api.py:1462:    - Deterministic tie‑break ordering
+src/control/api.py:1607:    """Request for emergency worker stop."""
+src/control/api.py:1612:@app.post("/worker/stop")
+src/control/api.py:1613:async def worker_stop(req: WorkerStopRequest) -> dict[str, Any]:
+src/control/api.py:1615:    Emergency stop worker daemon (controlled mutation).
+src/control/api.py:1618:    - Must validate worker is alive before attempting stop
+src/control/api.py:1621:    - Must clean up pidfile and heartbeat file after successful stop
+src/control/api.py:1622:    - Returns detailed status of what was stopped
+src/control/api.py:1630:    6. Clean up pidfile and heartbeat file after stop
+src/control/api.py:1633:        - stopped: bool (whether worker was stopped)
+src/control/api.py:1636:        - active_jobs_count: int (number of active jobs at time of stop)
+src/control/api.py:1649:            "stopped": False,
+src/control/api.py:1662:            "stopped": False,
+src/control/api.py:1677:            "stopped": False,
+src/control/api.py:1699:                        "message": f"Cannot stop worker with {active_jobs_count} active jobs",
+src/control/api.py:1701:                        "action": "Use force=True to override, or stop jobs first"
+src/control/api.py:1716:    # 4. Attempt to stop worker
+src/control/api.py:1717:    stopped = False
+src/control/api.py:1733:                stopped = True
+src/control/api.py:1737:        if not stopped:
+src/control/api.py:1742:                stopped = True
+src/control/api.py:1744:                stopped = True
+src/control/api.py:1747:        stopped = True
+src/control/api.py:1752:                "error": "STOP_FAILED",
+src/control/api.py:1753:                "message": f"Failed to stop worker: {str(e)}",
+src/control/api.py:1759:    if stopped:
+src/control/api.py:1766:            # Cleanup failed, but worker is stopped
+src/control/api.py:1770:        "stopped": stopped,
+src/control/batch_index.py:64:    # Sort entries by job_id for deterministic ordering
+src/control/batch_index.py:106:        ValueError: If existing index_hash does not match computed hash.
+src/control/batch_index.py:120:            raise ValueError("existing index_hash does not match computed hash")
+src/control/batch_index.py:159:    Checks that index_hash matches the SHA256 of the rest of the index.
+src/control/batch_index.py:165:        True if hash matches, False otherwise.
+src/gui/nicegui/pages/portfolio.py:23:        with ui.card().classes("w-full bg-warning/20 border-warning border-l-4 mb-6"):
+src/gui/nicegui/pages/portfolio.py:55:                with ui.row().classes("w-full font-bold border-b border-panel-light pb-2 mb-2"):
+src/gui/nicegui/pages/portfolio.py:60:                    with ui.row().classes("w-full py-2 border-b border-panel-light last:border-0"):
+src/engine/matcher_core.py:32:def _stop_fill_price(side: Side, stop_price: float, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:35:        if o >= stop_price:
+src/engine/matcher_core.py:37:        if h >= stop_price:
+src/engine/matcher_core.py:38:            return stop_price
+src/engine/matcher_core.py:41:        if o <= stop_price:
+src/engine/matcher_core.py:43:        if l <= stop_price:
+src/engine/matcher_core.py:44:            return stop_price
+src/engine/matcher_core.py:48:def _limit_fill_price(side: Side, limit_price: float, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:64:def _intent_fill_price(intent: OrderIntent, o: float, h: float, l: float) -> Optional[float]:
+src/engine/matcher_core.py:65:    if intent.kind == OrderKind.STOP:
+src/engine/matcher_core.py:66:        return _stop_fill_price(intent.side, intent.price, o, h, l)
+src/engine/matcher_core.py:67:    return _limit_fill_price(intent.side, intent.price, o, h, l)
+src/engine/matcher_core.py:74:    2) Kind: STOP before LIMIT.
+src/engine/matcher_core.py:75:    3) order_id: ascending.
+src/engine/matcher_core.py:76:    Note: Entry-vs-Exit ordering is handled at a higher level (Entry then Exit).
+src/engine/matcher_core.py:79:    kind_rank = 0 if intent.kind == OrderKind.STOP else 1
+src/engine/matcher_core.py:80:    return (role_rank, kind_rank, intent.order_id)
+src/engine/matcher_core.py:88:    Phase 1 slow reference matcher.
+src/engine/matcher_core.py:92:    - STOP/LIMIT gap behavior at Open
+src/engine/matcher_core.py:93:    - STOP over LIMIT
+src/engine/matcher_core.py:95:    - Same-kind tie: EXIT-first, order_id ascending
+src/engine/matcher_core.py:103:    fills: List[Fill] = []
+src/engine/matcher_core.py:121:            # Among entries: STOP before LIMIT, then order_id.
+src/engine/matcher_core.py:122:            entry_sorted = sorted(entry_intents, key=lambda x: (0 if x.kind == OrderKind.STOP else 1, x.order_id))
+src/engine/matcher_core.py:126:                px = _intent_fill_price(it, ot, ht, lt)
+src/engine/matcher_core.py:129:                fills.append(
+src/engine/matcher_core.py:137:                        order_id=int(it.order_id),
+src/engine/matcher_core.py:145:                break  # at most one entry fill per bar in Phase 1 reference
+src/engine/matcher_core.py:149:            # Same-kind tie rule: EXIT-first already, and STOP before LIMIT, then order_id
+src/engine/matcher_core.py:159:                px = _intent_fill_price(it, ot, ht, lt)
+src/engine/matcher_core.py:162:                fills.append(
+src/engine/matcher_core.py:170:                        order_id=int(it.order_id),
+src/engine/matcher_core.py:174:                break  # at most one exit fill per bar in Phase 1 reference
+src/engine/matcher_core.py:176:    return fills
+src/engine/constants.py:11:KIND_STOP = 0
+src/control/jobs_db.py:37:    conn.execute("PRAGMA journal_mode=WAL;")
+src/control/jobs_db.py:38:    conn.execute("PRAGMA synchronous=NORMAL;")
+src/control/jobs_db.py:39:    conn.execute("PRAGMA foreign_keys=ON;")
+src/control/jobs_db.py:40:    conn.execute("PRAGMA busy_timeout=30000;")  # ms
+src/control/jobs_db.py:84:    conn.execute("""
+src/control/jobs_db.py:100:            requested_stop TEXT NULL,
+src/control/jobs_db.py:105:    conn.execute("CREATE INDEX IF NOT EXISTS idx_status ON jobs(status)")
+src/control/jobs_db.py:106:    conn.execute("CREATE INDEX IF NOT EXISTS idx_created_at ON jobs(created_at DESC)")
+src/control/jobs_db.py:109:    cursor = conn.execute("PRAGMA table_info(jobs)")
+src/control/jobs_db.py:114:        conn.execute("ALTER TABLE jobs ADD COLUMN run_id TEXT")
+src/control/jobs_db.py:118:        conn.execute("ALTER TABLE jobs ADD COLUMN report_link TEXT")
+src/control/jobs_db.py:122:        conn.execute("ALTER TABLE jobs ADD COLUMN tags_json TEXT DEFAULT '[]'")
+src/control/jobs_db.py:126:        conn.execute("ALTER TABLE jobs ADD COLUMN data_fingerprint_sha256_40 TEXT DEFAULT ''")
+src/control/jobs_db.py:129:    conn.execute("""
+src/control/jobs_db.py:138:    conn.execute("CREATE INDEX IF NOT EXISTS idx_job_logs_job_id ON job_logs(job_id, created_at DESC)")
+src/control/jobs_db.py:218:            conn.execute("""
+src/control/jobs_db.py:412:            cursor = conn.execute("""
+src/control/jobs_db.py:442:        List of JobRecord, ordered by created_at DESC
+src/control/jobs_db.py:447:            cursor = conn.execute("""
+src/control/jobs_db.py:481:            cur = conn.execute("""
+src/control/jobs_db.py:495:def request_stop(db_path: Path, job_id: str, mode: StopMode) -> None:
+src/control/jobs_db.py:497:    Request stop for a job (atomic update).
+src/control/jobs_db.py:500:    Otherwise, set requested_stop flag (worker will handle).
+src/control/jobs_db.py:514:            cur = conn.execute("""
+src/control/jobs_db.py:516:                SET status = ?, requested_stop = ?, updated_at = ?
+src/control/jobs_db.py:524:            # Otherwise, set requested_stop flag (atomic)
+src/control/jobs_db.py:525:            cur = conn.execute("""
+src/control/jobs_db.py:527:                SET requested_stop = ?, updated_at = ?
+src/control/jobs_db.py:555:            cur = conn.execute("""
+src/control/jobs_db.py:566:            row = conn.execute("SELECT status FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+src/control/jobs_db.py:576:            # Terminal status => ValueError (match existing tests/contract)
+src/control/jobs_db.py:614:            conn.execute("""
+src/control/jobs_db.py:636:            conn.execute("""
+src/control/jobs_db.py:671:            cur = conn.execute("""
+src/control/jobs_db.py:690:            row = conn.execute("SELECT status FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+src/control/jobs_db.py:723:            cur = conn.execute("""
+src/control/jobs_db.py:741:            row = conn.execute("SELECT status FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
+src/control/jobs_db.py:773:            cur = conn.execute("""
+src/control/jobs_db.py:787:def get_requested_stop(db_path: Path, job_id: str) -> Optional[str]:
+src/control/jobs_db.py:789:    Get requested_stop value for a job.
+src/control/jobs_db.py:801:            cursor = conn.execute("SELECT requested_stop FROM jobs WHERE job_id = ?", (job_id,))
+src/control/jobs_db.py:822:            cursor = conn.execute("SELECT requested_pause FROM jobs WHERE job_id = ?", (job_id,))
+src/control/jobs_db.py:834:    For exact matching, use application-layer filtering.
+src/control/jobs_db.py:842:        List of JobRecord matching the tag, ordered by created_at DESC
+src/control/jobs_db.py:850:            cursor = conn.execute("""
+src/control/jobs_db.py:868:            # Application-layer filtering for exact match (more reliable than LIKE)
+src/control/jobs_db.py:869:            # Filter to ensure tag is actually in the list, not just substring match
+src/control/jobs_db.py:892:            conn.execute("""
+src/control/jobs_db.py:911:        List of log text entries, ordered by created_at DESC
+src/control/jobs_db.py:916:            cursor = conn.execute("""
+src/strategy/builtin/mean_revert_zscore_v1.py:15:from engine.order_id import generate_order_id
+src/strategy/builtin/mean_revert_zscore_v1.py:73:        order_id = generate_order_id(
+src/strategy/builtin/mean_revert_zscore_v1.py:82:            order_id=order_id,
+src/strategy/builtin/mean_revert_zscore_v1.py:88:            qty=context.get("order_qty", 1),
+src/gui/nicegui/pages/deploy.py:26:        with ui.card().classes("w-full bg-danger/20 border-danger border-l-4 mb-6"):
+src/gui/nicegui/pages/deploy.py:37:                ui.label("$ python -m scripts.deploy_execute --confirm --dry-run")
+src/gui/nicegui/pages/deploy.py:53:                ui.label("Execution Mode: LIMIT orders only")
+src/gui/nicegui/pages/deploy.py:63:            ui.label("All checks are pre‑filled as example only.").classes("text-xs text-tertiary")
+src/gui/nicegui/pages/deploy.py:66:        with ui.card().classes("w-full mb-6 border-2 border-warning"):
+src/gui/nicegui/pages/deploy.py:100:[INFO]   $ python -m scripts.deploy_execute --confirm
+src/gui/nicegui/pages/deploy.py:110:        with ui.card().classes("w-full border-2 border-danger"):
+src/wfs/runner.py:48:            - fills_count
+src/wfs/runner.py:71:    if "order_qty" not in context:
+src/wfs/runner.py:72:        context["order_qty"] = 1
+src/wfs/runner.py:122:            "fills_count": 0,
+src/wfs/runner.py:129:    # 簡化：假設每個 intent 產生一個 fill，且每個 fill 的 profit 為 0
+src/wfs/runner.py:131:    fills_count = len(intents) // 2  # 假設每個 entry 對應一個 exit
+src/wfs/runner.py:133:    trades = fills_count
+src/wfs/runner.py:137:        "fills_count": fills_count,
+src/portfolio/spec.py:25:        strategy_version: Strategy version (must match registry)
+src/engine/signal_exporter.py:28:    fills_df: pd.DataFrame,  # cols: ts, qty (contracts signed)
+src/engine/signal_exporter.py:39:    Build signal series V1 DataFrame from bars and fills.
+src/engine/signal_exporter.py:44:        fills_df: DataFrame with columns ['ts', 'qty']; qty is signed contracts (+ for buy, - for sell)
+src/engine/signal_exporter.py:66:    if "ts" not in fills_df.columns or "qty" not in fills_df.columns:
+src/engine/signal_exporter.py:67:        raise ValueError("fills_df must have columns ['ts', 'qty']")
+src/engine/signal_exporter.py:77:    # If no fills, position is zero for all bars
+src/engine/signal_exporter.py:78:    if fills_df.empty:
+src/engine/signal_exporter.py:81:        # Ensure fills are sorted by ts
+src/engine/signal_exporter.py:82:        fills_sorted = fills_df.sort_values("ts").reset_index(drop=True)
+src/engine/signal_exporter.py:84:        # Merge fills to bars using merge_asof to align fill ts to bar ts
+src/engine/signal_exporter.py:85:        # direction='backward' assigns fill to the nearest bar with ts <= fill_ts
+src/engine/signal_exporter.py:86:        # We need to merge on ts, but we want to get the bar ts for each fill
+src/engine/signal_exporter.py:88:            fills_sorted,
+src/engine/signal_exporter.py:96:        fills_per_bar = merged.groupby("bar_ts")["qty"].sum().reset_index()
+src/engine/signal_exporter.py:97:        fills_per_bar = fills_per_bar.rename(columns={"bar_ts": "ts", "qty": "fill_qty"})
+src/engine/signal_exporter.py:99:        # Merge fills back to bars
+src/engine/signal_exporter.py:100:        result = pd.merge(result, fills_per_bar, on="ts", how="left")
+src/engine/signal_exporter.py:101:        result["fill_qty"] = result["fill_qty"].fillna(0.0)
+src/engine/signal_exporter.py:103:        # Cumulative sum of fills to get position
+src/engine/signal_exporter.py:104:        result["position_contracts"] = result["fill_qty"].cumsum()
+src/engine/signal_exporter.py:132:    # Ensure all required columns are present and in correct order
+src/engine/signal_exporter.py:137:    # Reorder columns
+src/engine/signal_exporter.py:144:        result[numeric_cols] = result[numeric_cols].fillna(0.0)
+src/portfolio/runner_v1.py:69:    matches = list(outputs_root.glob(pattern))
+src/portfolio/runner_v1.py:71:    if not matches:
+src/portfolio/runner_v1.py:75:    # Use first match
+src/portfolio/runner_v1.py:76:    parquet_path = matches[0]
+src/portfolio/runner_v1.py:223:    # Process bars in chronological order
+src/strategy/builtin/s1_v1.py:17:from engine.order_id import generate_order_id
+src/strategy/builtin/s1_v1.py:18:from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
+src/strategy/builtin/s1_v1.py:78:        order_id = generate_order_id(
+src/strategy/builtin/s1_v1.py:82:            kind=KIND_STOP,
+src/strategy/builtin/s1_v1.py:87:            order_id=order_id,
+src/strategy/builtin/s1_v1.py:90:            kind=OrderKind.STOP,
+src/strategy/builtin/s1_v1.py:93:            qty=context.get("order_qty", 1),
+src/engine/engine_types.py:25:    STOP = "STOP"
+src/engine/engine_types.py:38:    Deterministic ordering is controlled via `order_id` (smaller = earlier).
+src/engine/engine_types.py:40:    order_id: int
+src/engine/engine_types.py:57:    order_id: int
+src/engine/engine_types.py:67:    fills: List[Fill]
+src/control/season_export_replay.py:10:- Deterministic: same ordering as original compare endpoints
+src/control/season_export_replay.py:98:    # Sort by (-score, batch_id, job_id) for deterministic ordering
+src/control/season_export_replay.py:134:    Deterministic ordering: batches sorted by batch_id ascending.
+src/control/season_export_replay.py:215:    # Sort items within each group by (-score, batch_id, job_id) for deterministic ordering
+src/strategy/builtin/sma_cross_v1.py:15:from engine.order_id import generate_order_id
+src/strategy/builtin/sma_cross_v1.py:16:from engine.constants import ROLE_ENTRY, KIND_STOP, SIDE_BUY
+src/strategy/builtin/sma_cross_v1.py:75:        order_id = generate_order_id(
+src/strategy/builtin/sma_cross_v1.py:79:            kind=KIND_STOP,
+src/strategy/builtin/sma_cross_v1.py:84:            order_id=order_id,
+src/strategy/builtin/sma_cross_v1.py:87:            kind=OrderKind.STOP,
+src/strategy/builtin/sma_cross_v1.py:90:            qty=context.get("order_qty", 1),
+src/gui/nicegui/theme/nexus_tokens.py:32:# Borders & glows
+src/gui/nicegui/theme/nexus_tokens.py:51:# Border radii
+src/gui/nicegui/app.py:38:    Solution: This middleware explicitly ensures the scope['path'] matches
+src/gui/nicegui/app.py:209:        with ui.row().classes("w-full py-2 px-4 text-center text-tertiary text-sm border-t border-panel-dark"):
+src/gui/nicegui/theme/nexus_theme.py:3:Applies global CSS, fonts, and Tailwind utilities to match the visual contract.
+src/gui/nicegui/theme/nexus_theme.py:130:        border-radius: 3px;
+src/gui/nicegui/theme/nexus_theme.py:134:        border-radius: 3px;
+src/gui/nicegui/theme/nexus_theme.py:143:        border: 1px solid {TOKENS['accents']['purple']}20;
+src/gui/nicegui/theme/nexus_theme.py:144:        border-radius: var(--radius-lg);
+src/gui/nicegui/theme/nexus_theme.py:151:        border-color: {TOKENS['accents']['purple']}80;
+src/gui/nicegui/theme/nexus_theme.py:156:        border-left: 4px solid {TOKENS['accents']['success']};
+src/gui/nicegui/theme/nexus_theme.py:159:        border-left-color: {TOKENS['accents']['danger']};
+src/gui/nicegui/theme/nexus_theme.py:171:        border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+src/gui/nicegui/theme/nexus_theme.py:213:    .border-purple {{ border-color: var(--accent-purple); }}
+src/gui/nicegui/theme/nexus_theme.py:214:    .border-cyan {{ border-color: var(--accent-cyan); }}
+src/gui/nicegui/theme/nexus_theme.py:228:    .nexus-page-fill {{
+src/gui/nicegui/theme/nexus_theme.py:251:        border-bottom: 2px solid var(--accent-purple);
+src/gui/nicegui/theme/nexus_theme.py:282:        border-radius: var(--radius-md);
+src/portfolio/governance/allocation.py:28:    # Ensure deterministic ordering
+src/gui/nicegui/contract/ui_contract.py:5:and the expected tab order. It must NOT contain any runtime UI creation,
+src/gui/nicegui/services/status_service.py:278:def stop_polling() -> None:
+src/gui/nicegui/services/status_service.py:285:    logger.debug("Polling stopped")
+src/gui/nicegui/layout/tabs.py:53:    with ui.tabs(value=value).classes("w-full bg-panel-dark border-b border-panel-light") as tabs:
+src/gui/nicegui/services/strategy_catalog_service.py:27:        # Ensure ordering S1, S2, S3
+src/portfolio/governance/admission.py:33:        raise ValueError("Series lengths must match")
+src/portfolio/governance/admission.py:63:    # Determine candidate's bucket (first matching tag)
+src/gui/nicegui/layout/cards.py:44:    border_color = color_map.get(color, TOKENS['accents']['blue'])
+src/gui/nicegui/layout/cards.py:46:    card_classes = f"fish-card {width} p-4 rounded-lg border"
+src/gui/nicegui/layout/cards.py:61:                icon_elem = ui.icon(icon, color=border_color)
+src/gui/nicegui/layout/cards.py:71:    # Inline style for border color (optional)
+src/gui/nicegui/layout/cards.py:73:        card.style(f"border-color: {border_color}20;")
+src/gui/nicegui/layout/cards.py:82:    card._border_color = border_color
+src/gui/nicegui/layout/cards.py:95:        """Update the card's accent color (border and icon)."""
+src/gui/nicegui/layout/cards.py:98:        border_color_hex = card._color_map.get(new_color, TOKENS['accents']['blue'])
+src/gui/nicegui/layout/cards.py:99:        # Update border color if not selected
+src/gui/nicegui/layout/cards.py:101:            card.style(f"border-color: {border_color_hex}20;")
+src/gui/nicegui/layout/cards.py:104:            card._icon_element.props(f"color={border_color_hex}")
+src/gui/nicegui/layout/cards.py:106:        card._border_color = border_color_hex
+src/portfolio/governance/state_machine.py:81:        """Return all records in insertion order (Python 3.7+ preserves insertion order)."""
+src/gui/nicegui/services/run_launcher_service.py:212:    Create canonical run record JSON matching existing format.
+src/engine/engine_jit.py:9:# Engine JIT matcher kernel contract:
+src/engine/engine_jit.py:28:from engine.matcher_core import simulate as simulate_py
+src/engine/engine_jit.py:31:    KIND_STOP,
+src/engine/engine_jit.py:73:        return 0 if x == OrderKind.STOP else 1
+src/engine/engine_jit.py:78:    return 0 if k == OrderKind.STOP else 1
+src/engine/engine_jit.py:106:    - 0 (KIND_STOP) -> OrderKind.STOP
+src/engine/engine_jit.py:111:    if v == KIND_STOP:  # 0
+src/engine/engine_jit.py:112:        return OrderKind.STOP
+src/engine/engine_jit.py:117:            f"Invalid kind enum value: {v}. Allowed values are {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)"
+src/engine/engine_jit.py:166:      order_id: int32 (INDEX_DTYPE)
+src/engine/engine_jit.py:169:      kind: uint8 (INTENT_ENUM_DTYPE, 0=STOP,1=LIMIT)
+src/engine/engine_jit.py:182:    order_id = np.empty(n, dtype=INDEX_DTYPE)
+src/engine/engine_jit.py:191:        order_id[i] = int(x.order_id)
+src/engine/engine_jit.py:199:    return order_id, created_bar, role, kind, side, price, qty
+src/engine/engine_jit.py:206:    Sort packed intent arrays by (created_bar, order_id).
+src/engine/engine_jit.py:209:      - Cursor + active-book kernel requires activate_bar=(created_bar+1) and order_id to be non-decreasing.
+src/engine/engine_jit.py:210:      - Determinism is preserved because selection is still based on (kind priority, order_id).
+src/engine/engine_jit.py:212:    order_id, created_bar, role, kind, side, price, qty = packed
+src/engine/engine_jit.py:213:    # lexsort uses last key as primary -> (created_bar primary, order_id secondary)
+src/engine/engine_jit.py:214:    idx = np.lexsort((order_id, created_bar))
+src/engine/engine_jit.py:216:        order_id[idx],
+src/engine/engine_jit.py:231:    Phase 2A: JIT accelerated matcher.
+src/engine/engine_jit.py:253:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:283:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:285:        row = fills_arr[i]
+src/engine/engine_jit.py:294:                order_id=int(row[6]),
+src/engine/engine_jit.py:303:    order_id: np.ndarray,
+src/engine/engine_jit.py:316:      order_id: int32 (INDEX_DTYPE)
+src/engine/engine_jit.py:340:    oid = np.asarray(order_id, dtype=INDEX_DTYPE)
+src/engine/engine_jit.py:364:            if kd_val == KIND_STOP:
+src/engine/engine_jit.py:365:                k = OrderKind.STOP
+src/engine/engine_jit.py:369:                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+src/engine/engine_jit.py:380:                    order_id=int(oid[i]),
+src/engine/engine_jit.py:409:            if kd_val == KIND_STOP:
+src/engine/engine_jit.py:410:                k = OrderKind.STOP
+src/engine/engine_jit.py:414:                raise ValueError(f"Invalid kind enum value: {kd_val}. Allowed: {KIND_STOP} (STOP) or {KIND_LIMIT} (LIMIT)")
+src/engine/engine_jit.py:425:                    order_id=int(oid[i]),
+src/engine/engine_jit.py:437:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:465:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:467:        row = fills_arr[i]
+src/engine/engine_jit.py:476:                order_id=int(row[6]),
+src/engine/engine_jit.py:484:    Internal helper (tests/dev): run JIT matcher with a custom ttl_bars.
+src/engine/engine_jit.py:496:    status, fills_arr = _simulate_kernel(
+src/engine/engine_jit.py:511:            f"engine_jit kernel buffer full: fills exceeded capacity. "
+src/engine/engine_jit.py:518:    m = fills_arr.shape[0]
+src/engine/engine_jit.py:520:        row = fills_arr[i]
+src/engine/engine_jit.py:529:                order_id=int(row[6]),
+src/engine/engine_jit.py:542:    def _stop_fill(side: int, stop_price: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:543:        # returns nan if no fill
+src/engine/engine_jit.py:545:            if o >= stop_price:
+src/engine/engine_jit.py:547:            if h >= stop_price:
+src/engine/engine_jit.py:548:                return stop_price
+src/engine/engine_jit.py:551:            if o <= stop_price:
+src/engine/engine_jit.py:553:            if l <= stop_price:
+src/engine/engine_jit.py:554:                return stop_price
+src/engine/engine_jit.py:558:    def _limit_fill(side: int, limit_price: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:559:        # returns nan if no fill
+src/engine/engine_jit.py:574:    def _fill_price(kind: int, side: int, px: float, o: float, h: float, l: float) -> float:
+src/engine/engine_jit.py:575:        # kind: 0=STOP, 1=LIMIT
+src/engine/engine_jit.py:577:            return _stop_fill(side, px, o, h, l)
+src/engine/engine_jit.py:578:        return _limit_fill(side, px, o, h, l)
+src/engine/engine_jit.py:585:        order_id: np.ndarray,
+src/engine/engine_jit.py:600:          2 kind_int (0=STOP,1=LIMIT)
+src/engine/engine_jit.py:602:          4 fill_price
+src/engine/engine_jit.py:604:          6 order_id
+src/engine/engine_jit.py:607:          - intents are sorted by (created_bar, order_id) before calling this kernel.
+src/engine/engine_jit.py:613:          - When t > activate_bar + ttl_bars - 1, intent is removed from active book (even if not filled)
+src/engine/engine_jit.py:617:        n_intents = order_id.shape[0]
+src/engine/engine_jit.py:619:        # Buffer size must accommodate at least n_intents (each intent can produce a fill)
+src/engine/engine_jit.py:620:        # Default heuristic: n_bars * 2 (allows 2 fills per bar on average)
+src/engine/engine_jit.py:621:        max_fills = n_bars * 2
+src/engine/engine_jit.py:622:        if n_intents > max_fills:
+src/engine/engine_jit.py:623:            max_fills = n_intents
+src/engine/engine_jit.py:625:        out = np.empty((max_fills, 7), dtype=np.float64)
+src/engine/engine_jit.py:629:        # Fail-fast monotonicity check (activate_bar, order_id)
+src/engine/engine_jit.py:632:        prev_order = np.int64(-1)
+src/engine/engine_jit.py:635:            o = np.int64(order_id[i])
+src/engine/engine_jit.py:636:            if a < prev_activate or (a == prev_activate and o < prev_order):
+src/engine/engine_jit.py:639:            prev_order = o
+src/engine/engine_jit.py:686:            # Deterministic selection: STOP(0) before LIMIT(1), then order_id asc.
+src/engine/engine_jit.py:701:                    oo = np.int64(order_id[idx])
+src/engine/engine_jit.py:703:                        fp = _fill_price(int(kk), int(side[idx]), float(price[idx]), o, h, l)
+src/engine/engine_jit.py:713:                    if out_n >= max_fills:
+src/engine/engine_jit.py:723:                    out[out_n, 6] = float(order_id[idx])
+src/engine/engine_jit.py:728:                    # swap-remove filled intent
+src/engine/engine_jit.py:733:            # Deterministic selection: STOP(0) before LIMIT(1), then order_id asc.
+src/engine/engine_jit.py:759:                    oo = np.int64(order_id[idx])
+src/engine/engine_jit.py:761:                        fp = _fill_price(int(kk), int(s), float(price[idx]), o, h, l)
+src/engine/engine_jit.py:771:                    if out_n >= max_fills:
+src/engine/engine_jit.py:781:                    out[out_n, 6] = float(order_id[idx])
+src/engine/engine_jit.py:786:                    # swap-remove filled intent
+src/portfolio/governance/params.py:20:    Search order:
+src/portfolio/audit.py:51:            List of event dicts in chronological order.
+src/portfolio/candidate_spec.py:89:        deterministic_order: Ordering guarantee
+src/portfolio/candidate_spec.py:95:    deterministic_order: str = "candidate_id asc"
+src/control/snapshot_compiler.py:8:- MUST preserve raw line order and content exactly as read.
+src/control/snapshot_compiler.py:51:    # Required order as per spec (matches test expectations)
+src/control/snapshot_compiler.py:52:    file_order = [
+src/control/snapshot_compiler.py:94:    for i, filename in enumerate(file_order, 1):
+src/control/snapshot_compiler.py:125:        # Section header (match test expectations: ## FILENAME_WITH_EXTENSION)
+src/gui/services/runtime_context.py:110:    # stable ordering for tests
+src/portfolio/cli.py:242:                print("✓ Replay matches original results")
+src/gui/nicegui/asgi/ws_guard.py:36:    - If path matches any prefix → pass through
+src/gui/nicegui/asgi/ws_guard.py:68:        # Send close frame and stop processing
+src/control/data_build.py:186:                # Reorder columns
+src/control/data_build.py:254:                    notes.append(f"Warning: Schema mismatch. Expected {expected_cols}, got {list(validate_df.columns)}")
+src/control/data_build.py:300:        - if not force and signatures match => no-op but ok=True
+src/portfolio/signal_series_writer.py:18:    fills_df: pd.DataFrame,
+src/portfolio/signal_series_writer.py:32:        fills_df: DataFrame with columns ['ts', 'qty']; qty is signed contracts
+src/portfolio/signal_series_writer.py:57:        fills_df=fills_df,
+src/gui/nicegui/autopass/report.py:396:            # intent_written will be filled later
+src/control/lifecycle.py:228:    - repo_root matches current repo
+src/control/lifecycle.py:249:            # Not a strict match, but should contain our repo path
+src/control/lifecycle.py:250:            return False, data, f"repo_root mismatch: {actual_repo_root}"
+src/control/lifecycle.py:286:    return False, f"Cmdline doesn't match FishBro UI patterns: {occupant.cmdline[:100]}..."
+src/control/lifecycle.py:305:    - PID found + cmdline matches FishBro → OCCUPIED_FISHBRO
+src/control/governance.py:187:        """List batches matching filters.
+src/control/governance.py:191:        Deterministic ordering:
+src/control/season_compare.py:114:    # deterministic traversal order: batch_id asc
+src/control/artifacts.py:19:    Uses sort_keys=True, ensure_ascii=False, separators=(',', ':') for deterministic ordering.
+src/portfolio/allocator.py:42:        # Pre-fill outputs with zeros (explicitness for reporting)
+src/control/input_manifest.py:408:        results["errors"].append(f"Manifest hash mismatch: expected {original_hash}, got {computed_hash}")
+src/control/seed_demo_run.py:158:        conn.execute("""
+src/gui/nicegui/constitution/truth_providers.py:24:# Note: We use list_runs directly instead of list_local_runs to avoid parameter mismatch
+src/stage0/ma_proxy.py:8:  - engine/* (matcher, fills, intents)
+src/stage0/ma_proxy.py:20:  - This is NOT a backtest. No orders, no fills, no costs.
+src/control/worker_spawn_policy.py:1:"""Worker spawn policy - enforce governance to stop uncontrolled worker spawning.
+src/control/worker_spawn_policy.py:8:- pidfile must be validated: process exists AND cmdline matches worker_main and db_path
+src/control/worker_spawn_policy.py:38:    """Validate pidfile points to a live worker process with matching db_path.
+src/control/worker_spawn_policy.py:42:    If invalid (stale or mismatched), caller should remove pidfile and spawn.
+src/control/worker_spawn_policy.py:78:        return False, "process db_path mismatch"
+src/control/worker_spawn_policy.py:80:    return True, "worker alive and matching"
+src/gui/nicegui/constitution/page_shell.py:54:    with ui.element('div').classes('nexus-page-fill'):
+src/gui/nicegui/constitution/page_shell.py:61:                        "border-b-2 border-purple pb-2"
+src/stage0/__init__.py:7:  - No matcher, no orders, no fills, no state machine.
+src/portfolio/candidate_export.py:52:        deterministic_order="candidate_id asc",
+src/portfolio/candidate_export.py:60:        "deterministic_order": "candidate_id asc",
+src/portfolio/candidate_export.py:88:        "deterministic_order": "candidate_id asc",
+src/portfolio/candidate_export.py:113:        "deterministic_order": export.deterministic_order,
+src/portfolio/candidate_export.py:183:        deterministic_order=data.get("deterministic_order", "candidate_id asc"),
+src/portfolio/engine_v1.py:50:        Sort order (ascending):
+src/portfolio/engine_v1.py:59:        # Negative candidate_score for descending order (higher score first)
+src/portfolio/engine_v1.py:234:            policy_sha256="",  # To be filled by caller
+src/portfolio/engine_v1.py:235:            spec_sha256="",  # To be filled by caller
+src/portfolio/validate.py:25:    - strategy_version matches registry (strict match)
+src/portfolio/validate.py:81:        # Validate strategy_version matches (strict match)
+src/portfolio/validate.py:84:                f"Leg '{leg.leg_id}': strategy_version mismatch. "
+src/portfolio/plan_builder.py:7:- Deterministic tie‑break ordering.
+src/portfolio/plan_builder.py:227:    order = sorted(range(len(rounded)), key=lambda i: rounded[i][0])  # cid asc
+src/portfolio/plan_builder.py:235:            i = order[idx % len(order)]
+src/portfolio/plan_builder.py:294:    for k in sorted(buckets.keys()):  # deterministic bucket ordering
+src/portfolio/plan_builder.py:505:    # weight_items order matches construction; but we also want stable mapping by candidate_id
+src/portfolio/plan_builder.py:511:    # Deterministic universe order: use selected order (already deterministic)
+src/portfolio/plan_view_loader.py:100:        True if all checksums match, False otherwise.
+src/stage0/proxies.py:178:    Volatility proxy: effective stop distance = ATR(atr_len) * stop_mult.
+src/stage0/proxies.py:180:    Score prefers moderate stop distance (avoids extremely tiny or huge stops).
+src/stage0/proxies.py:186:            - col1: stop_mult
+src/stage0/proxies.py:196:        raise ValueError("params_matrix must have at least 2 columns: atr_len, stop_mult")
+src/stage0/proxies.py:202:        stop_mult = float(pm[i, 1])
+src/stage0/proxies.py:205:        if atr_len <= 0 or atr_len >= n or stop_mult <= 0.0:
+src/stage0/proxies.py:218:        # Compute stop distance: ATR * stop_mult
+src/stage0/proxies.py:219:        stop_dist_sum = 0.0
+src/stage0/proxies.py:220:        stop_dist_count = 0
+src/stage0/proxies.py:223:                stop_dist = atr[t] * stop_mult
+src/stage0/proxies.py:224:                stop_dist_sum += stop_dist
+src/stage0/proxies.py:225:                stop_dist_count += 1
+src/stage0/proxies.py:227:        if stop_dist_count == 0:
+src/stage0/proxies.py:230:            stop_dist_mean = stop_dist_sum / float(stop_dist_count)
+src/stage0/proxies.py:231:            # Score: -log1p(stop_mean) - penalize larger stops; deterministic; no target/median
+src/stage0/proxies.py:232:            scores[i] = -np.log1p(stop_dist_mean)
+src/stage0/proxies.py:521:        """Numba kernel for vol proxy with stop_mult."""
+src/stage0/proxies.py:528:            stop_mult = float(params_matrix[i, 1])
+src/stage0/proxies.py:530:            if atr_len <= 0 or atr_len >= n or stop_mult <= 0.0:
+src/stage0/proxies.py:541:            # Compute stop distance: ATR * stop_mult
+src/stage0/proxies.py:542:            stop_dist_sum = 0.0
+src/stage0/proxies.py:543:            stop_dist_count = 0
+src/stage0/proxies.py:546:                    stop_dist = atr[t] * stop_mult
+src/stage0/proxies.py:547:                    stop_dist_sum += stop_dist
+src/stage0/proxies.py:548:                    stop_dist_count += 1
+src/stage0/proxies.py:550:            if stop_dist_count == 0:
+src/stage0/proxies.py:553:                stop_dist_mean = stop_dist_sum / float(stop_dist_count)
+src/stage0/proxies.py:554:                # Score: -log1p(stop_mean) - penalize larger stops; deterministic; no target/median
+src/stage0/proxies.py:555:                scores[i] = -np.log1p(stop_dist_mean)
+src/portfolio/plan_quality.py:86:    # Inputs will be filled by caller if needed
+src/portfolio/plan_quality.py:334:    """Return (grade, reasons) with deterministic ordering.
+src/gui/nicegui/layout/tables.py:41:        border-collapse: collapse;
+src/engine/order_id.py:5:Provides pure function for generating deterministic order IDs that do not depend
+src/engine/order_id.py:6:on generation order or counters. Used by both object-mode and array-mode kernels.
+src/engine/order_id.py:13:from engine.constants import KIND_STOP, ROLE_ENTRY, ROLE_EXIT, SIDE_BUY, SIDE_SELL
+src/engine/order_id.py:16:def generate_order_id(
+src/engine/order_id.py:20:    kind: int = KIND_STOP,
+src/engine/order_id.py:24:    Generate deterministic order ID from intent attributes.
+src/engine/order_id.py:27:    generation order or counters. This ensures parity between object-mode and
+src/engine/order_id.py:31:        order_id = created_bar * 1_000_000 + param_idx * 100 + role_code * 10 + kind_code * 2 + side_code_bit
+src/engine/order_id.py:37:        kind: Kind code (KIND_STOP or KIND_LIMIT)
+src/engine/order_id.py:41:        Deterministic order ID (int32)
+src/engine/order_id.py:51:    # Map kind to code: STOP=0, LIMIT=1 (assuming KIND_STOP=0, KIND_LIMIT=1)
+src/engine/order_id.py:52:    kind_code = 0 if kind == KIND_STOP else 1
+src/engine/order_id.py:58:    order_id = (
+src/engine/order_id.py:66:    return int(order_id)
+src/engine/order_id.py:69:def generate_order_ids_array(
+src/engine/order_id.py:77:    Generate deterministic order IDs for array of intents.
+src/engine/order_id.py:79:    Vectorized version of generate_order_id for array-mode kernels.
+src/engine/order_id.py:85:        kind: Array of kind codes (uint8, shape (n,)). If None, defaults to KIND_STOP.
+src/engine/order_id.py:89:        Array of deterministic order IDs (int32, shape (n,))
+src/engine/order_id.py:97:        kind = np.full(n, KIND_STOP, dtype=np.uint8)
+src/engine/order_id.py:103:    kind_code = np.where(kind == KIND_STOP, 0, 1).astype(np.int32)
+src/engine/order_id.py:107:    order_id = (
+src/engine/order_id.py:115:    return order_id.astype(INDEX_DTYPE)
+src/portfolio/writer.py:49:    Required sections (order matters for readability):
+src/portfolio/writer.py:127:    lines.append("To reproduce this portfolio exactly, you must use the same inputs and ordering rules:")
+src/portfolio/writer.py:131:    lines.append("- the input digests above (sha1) must match.")
+src/gui/nicegui/layout/header.py:43:    with ui.header().classes("w-full bg-panel-dark border-b border-panel-light px-6 py-3"):

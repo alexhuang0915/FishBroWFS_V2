@@ -245,7 +245,6 @@ def _stage2_truth_score(result) -> float:
     return result.net_profit
 
 @pytest.mark.research
-@pytest.mark.xfail(reason="Known Phase 8-GAMMA Stage2 kernel exit/heartbeat incomplete; tracked separately", strict=False)
 def test_stage0_vs_stage2_ranking_preservation(monkeypatch):
     """
     P2-THETA MODE-SPLIT GOVERNANCE:

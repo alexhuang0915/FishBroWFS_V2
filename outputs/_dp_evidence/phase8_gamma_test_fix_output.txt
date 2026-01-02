@@ -1,0 +1,14 @@
+Test: Simulate entry and exit intents together
+Total fills: 2
+  Bar 2: OrderRole.ENTRY Side.BUY OrderKind.STOP at 1000000000.0
+  Bar 3: OrderRole.EXIT Side.SELL OrderKind.STOP at 0.01
+
+Entry fills: 1, Exit fills: 1
+
+
+Test: Two-pass simulation (current buggy approach)
+First pass (entry only): 1 fills
+  Fill(bar_index=2, role=<OrderRole.ENTRY: 'ENTRY'>, kind=<OrderKind.STOP: 'STOP'>, side=<Side.BUY: 1>, price=1000000000.0, qty=1, order_id=1)
+Second pass (exit only): 0 fills
+
+Conclusion: Exit intents don't fill when simulated alone because pos=0.

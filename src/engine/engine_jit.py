@@ -226,6 +226,7 @@ def _sort_packed_by_created_bar(
 def simulate(
     bars: BarArrays,
     intents: Iterable[OrderIntent],
+    initial_pos: int = 0,
 ) -> List[Fill]:
     """
     Phase 2A: JIT accelerated matcher.
@@ -238,7 +239,7 @@ def simulate(
     if nb is None:
         JIT_PATH_USED_LAST = False
         JIT_KERNEL_SIGNATURES_LAST = None
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos)
 
     # If numba is disabled, keep behavior stable.
     # Numba respects NUMBA_DISABLE_JIT; but we short-circuit to be safe.
@@ -247,7 +248,7 @@ def simulate(
     if os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
         JIT_PATH_USED_LAST = False
         JIT_KERNEL_SIGNATURES_LAST = None
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos)
 
     packed = _sort_packed_by_created_bar(_pack_intents(intents))
     status, fills_arr = _simulate_kernel(
@@ -262,6 +263,7 @@ def simulate(
         packed[5],
         packed[6],
         np.int64(INTENT_TTL_BARS_DEFAULT),  # Use Constitution constant
+        np.int64(initial_pos),  # initial_pos passed by caller
     )
     if int(status) != STATUS_OK:
         JIT_PATH_USED_LAST = True
@@ -308,6 +310,7 @@ def simulate_arrays(
     price: np.ndarray,
     qty: np.ndarray,
     ttl_bars: int = 1,
+    initial_pos: int = 0,
 ) -> List[Fill]:
     """
     Array/SoA entry point: bypass OrderIntent objects and _pack_intents hot-path.
@@ -386,7 +389,7 @@ def simulate_arrays(
                     qty=int(qy[i]),
                 )
             )
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos)
 
     import os
 
@@ -431,7 +434,7 @@ def simulate_arrays(
                     qty=int(qy[i]),
                 )
             )
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos)
 
     packed = _sort_packed_by_created_bar((oid, cb, rl, kd, sd, px, qy))
     status, fills_arr = _simulate_kernel(
@@ -446,6 +449,7 @@ def simulate_arrays(
         packed[5],
         packed[6],
         np.int64(ttl_bars),
+        np.int64(initial_pos),  # initial_pos passed by caller
     )
     if int(status) != STATUS_OK:
         JIT_PATH_USED_LAST = True
@@ -485,12 +489,12 @@ def _simulate_with_ttl(bars: BarArrays, intents: Iterable[OrderIntent], ttl_bars
     ttl_bars=0 => GTC, ttl_bars=1 => one-shot next-bar-only (default).
     """
     if nb is None:
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos=0)
 
     import os
 
     if os.environ.get("NUMBA_DISABLE_JIT", "").strip() == "1":
-        return simulate_py(bars, intents)
+        return simulate_py(bars, intents, initial_pos=0)
 
     packed = _sort_packed_by_created_bar(_pack_intents(intents))
     status, fills_arr = _simulate_kernel(
@@ -505,6 +509,7 @@ def _simulate_with_ttl(bars: BarArrays, intents: Iterable[OrderIntent], ttl_bars
         packed[5],
         packed[6],
         np.int64(ttl_bars),
+        np.int64(0),  # initial_pos = 0 (flat)
     )
     if int(status) == STATUS_BUFFER_FULL:
         raise RuntimeError(
@@ -590,6 +595,7 @@ if nb is not None:
         price: np.ndarray,
         qty: np.ndarray,
         ttl_bars: np.int64,
+        initial_pos: np.int64 = np.int64(0),
     ):
         """
         Cursor + Active Book kernel (O(B + I + A)).
@@ -643,7 +649,7 @@ if nb is not None:
         active_count = np.int64(0)
         global_cursor = np.int64(0)
 
-        pos = np.int64(0)  # 0 flat, 1 long, -1 short
+        pos = initial_pos  # 0 flat, 1 long, -1 short
 
         for t in range(n_bars):
             o = float(open_[t])

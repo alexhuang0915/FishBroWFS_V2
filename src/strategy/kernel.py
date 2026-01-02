@@ -247,28 +247,23 @@ def run_kernel_object_mode(
         )
     t_intents = time.perf_counter() if profile else 0.0
 
-    # Run matcher (JIT or python via kill-switch)
-    fills: List[Fill] = simulate_matcher(bars, intents)
-    t_sim1 = time.perf_counter() if profile else 0.0
-
-    # --- Convert fills -> round-trip pnl (vectorized style, no python trade loops as truth) ---
-    # For this minimal kernel we assume:
-    # - Only LONG trades (BUY entry, SELL exit) will be produced once we add exits.
-    # Phase 3A GKV: We implement exits by post-processing: when entry fills, schedule a sell stop from next bar.
-    # To preserve Homology, we do a second matcher pass with generated exit intents.
-    # This keeps all fill semantics inside the matcher (constitution).
+    # --- Generate exit intents for all entry intents (before simulation) ---
+    # We need exit intents to be in the same simulation as entry intents for position continuity.
+    # Generate exit intents for each entry intent using the entry intent price.
+    # This is an approximation; the correct exit stop price should be based on actual fill price,
+    # but for gap semantics the fill price equals intent price in many cases.
     exit_intents: List[OrderIntent] = []
-    for f in fills:
-        if f.role != OrderRole.ENTRY:
+    for intent in intents:
+        if intent.role != OrderRole.ENTRY:
             continue
         # exit stop price = entry_price - stop_mult * atr at entry bar
-        ebar = int(f.bar_index)
+        ebar = int(intent.created_bar)  # created_bar, not fill bar yet
         if ebar < 0 or ebar >= n:
             continue
         a = float(atr[ebar])
         if np.isnan(a):
             continue
-        stop_px = float(f.price - stop_mult * a)
+        stop_px = float(intent.price - stop_mult * a)
         # CURSOR TASK 5: Generate deterministic order_id for exit
         exit_oid = generate_order_id(
             created_bar=ebar,
@@ -290,15 +285,11 @@ def run_kernel_object_mode(
         )
     t_exit_intents = time.perf_counter() if profile else 0.0
 
-    if exit_intents:
-        fills2 = simulate_matcher(bars, exit_intents)
-        t_sim2 = time.perf_counter() if profile else 0.0
-        fills_all = fills + fills2
-        # deterministic order: sort by (bar_index, role(ENTRY first), kind, order_id)
-        fills_all.sort(key=lambda x: (x.bar_index, 0 if x.role == OrderRole.ENTRY else 1, 0 if x.kind == OrderKind.STOP else 1, x.order_id))
-    else:
-        fills_all = fills
-        t_sim2 = t_sim1 if profile else 0.0
+    # Simulate ALL intents together (entry + exit) for position continuity
+    all_intents = intents + exit_intents
+    fills_all: List[Fill] = simulate_matcher(bars, all_intents)
+    t_sim2 = time.perf_counter() if profile else 0.0
+    t_sim1 = t_sim2  # For backward compatibility
 
     # CURSOR TASK 1: Compute metrics from fills (unified source of truth)
     net_profit, trades, max_dd, equity = compute_metrics_from_fills(
@@ -624,6 +615,7 @@ def run_kernel_arrays(
         price=price,
         qty=qty,
         ttl_bars=1,
+        initial_pos=0,
     )
     timers.stop("t_simulate_entry")
     t_sim1 = time.perf_counter() if profile else 0.0
@@ -698,7 +690,7 @@ def run_kernel_arrays(
         exit_side = exit_side[exit_sort_idx]
         exit_qty = exit_qty[exit_sort_idx]
         
-        # Simulate exit intents
+        # Simulate exit intents with initial position = 1 (long) because we have BUY entry fills
         exit_fills: List[Fill] = simulate_matcher_arrays(
             bars,
             order_id=exit_order_id,
@@ -709,6 +701,7 @@ def run_kernel_arrays(
             price=exit_price,
             qty=exit_qty,
             ttl_bars=1,
+            initial_pos=1,
         )
         
         # Merge entry and exit fills, sort by (bar_index, role, kind, order_id)

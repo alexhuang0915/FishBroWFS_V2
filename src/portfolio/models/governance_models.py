@@ -17,6 +17,7 @@ class StrategyState(str, Enum):
     PAPER_TRADING = "PAPER_TRADING"
     LIVE = "LIVE"
     PROBATION = "PROBATION"
+    FREEZE = "FREEZE"
     RETIRED = "RETIRED"
 
 

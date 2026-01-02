@@ -72,11 +72,16 @@ A strategy MUST exist in exactly one of the following states:
    - Allocated real capital
    - Subject to all kill-switches
 
-5. PROBATION  
+5. PROBATION
    - Triggered when Drawdown > 0.5 × Historical MaxDD
    - Exposure reduced
 
-6. RETIRED  
+6. FREEZE
+   - Halted by governance intervention
+   - No new positions, existing positions held
+   - Awaiting manual review or automated demotion
+
+7. RETIRED
    - Triggered when Drawdown > MaxDD
      OR structural failure detected
    - Permanent death

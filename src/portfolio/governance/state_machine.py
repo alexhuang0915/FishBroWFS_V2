@@ -96,6 +96,11 @@ _ALLOWED_TRANSITIONS = {
     (StrategyState.PROBATION, StrategyState.LIVE),
     (StrategyState.PROBATION, StrategyState.RETIRED),
     (StrategyState.LIVE, StrategyState.RETIRED),
+    (StrategyState.PROBATION, StrategyState.FREEZE),
+    (StrategyState.LIVE, StrategyState.FREEZE),
+    (StrategyState.FREEZE, StrategyState.RETIRED),
+    (StrategyState.FREEZE, StrategyState.PROBATION),
+    (StrategyState.FREEZE, StrategyState.LIVE),
 }
 
 

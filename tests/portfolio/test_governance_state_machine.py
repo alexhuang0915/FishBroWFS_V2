@@ -55,6 +55,11 @@ class TestStateMachineTransitions:
             (StrategyState.PROBATION, StrategyState.LIVE),
             (StrategyState.PROBATION, StrategyState.RETIRED),
             (StrategyState.LIVE, StrategyState.RETIRED),
+            (StrategyState.PROBATION, StrategyState.FREEZE),
+            (StrategyState.LIVE, StrategyState.FREEZE),
+            (StrategyState.FREEZE, StrategyState.RETIRED),
+            (StrategyState.FREEZE, StrategyState.PROBATION),
+            (StrategyState.FREEZE, StrategyState.LIVE),
         }
         # Ensure no extra transitions
         for from_state in StrategyState:

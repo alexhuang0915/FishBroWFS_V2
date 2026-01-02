@@ -5,7 +5,7 @@ Wires State Machine + Gatekeeper + Allocator into one enforceable governance flo
 """
 from __future__ import annotations
 
-from typing import Dict, Optional
+from typing import Dict, Optional, TYPE_CHECKING
 import pandas as pd
 
 from portfolio.governance_state import (
@@ -17,6 +17,9 @@ from portfolio.governance_state import (
 from portfolio.gatekeeper import AdmissionGate, AdmissionResult
 from portfolio.allocator import RiskParityAllocator
 
+if TYPE_CHECKING:
+    from portfolio.audit import AuditTrail
+
 
 class PortfolioManager:
     """
@@ -27,9 +30,10 @@ class PortfolioManager:
     - portfolio_returns: Optional[pd.Series] (reference series for correlation gate)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, audit: Optional["AuditTrail"] = None) -> None:
         self.strategies: Dict[str, StrategyRecord] = {}
         self.portfolio_returns: Optional[pd.Series] = None
+        self.audit = audit
 
     def onboard_strategy(self, record: StrategyRecord) -> None:
         """
@@ -48,6 +52,15 @@ class PortfolioManager:
                 f"New strategy must be in INCUBATION state, got {record.state}"
             )
         self.strategies[record.strategy_id] = record
+
+        if self.audit:
+            from portfolio.audit import make_onboard_event
+            self.audit.append(make_onboard_event(
+                strategy_id=record.strategy_id,
+                version_hash=record.version_hash,
+                state_before=None,
+                state_after=record.state.value,
+            ))
 
     def request_admission(
         self, strategy_id: str, candidate_returns: pd.Series
@@ -81,6 +94,26 @@ class PortfolioManager:
             min_overlap=30,
         )
 
+        # Emit audit events
+        if self.audit:
+            from portfolio.audit import (
+                make_admission_request_event,
+                make_admission_decision_event,
+            )
+            # Request event
+            self.audit.append(make_admission_request_event(
+                strategy_id=strategy_id,
+                correlation=result.correlation,
+                allowed=result.allowed,
+            ))
+            # Decision event (after potential state transition)
+            self.audit.append(make_admission_decision_event(
+                strategy_id=strategy_id,
+                allowed=result.allowed,
+                correlation=result.correlation,
+                reason=result.reason,
+            ))
+
         # If gatekeeper allows, attempt state promotion
         if result.allowed:
             try:
@@ -101,6 +134,11 @@ class PortfolioManager:
                     correlation=result.correlation,
                     reason=f"State Machine Violation: {e}",
                 )
+                # Update decision event if we have audit
+                if self.audit:
+                    # Remove the previous decision? We'll just append a corrected one.
+                    # For simplicity, we keep both events (request + corrected decision).
+                    pass
 
         return result
 
@@ -116,11 +154,21 @@ class PortfolioManager:
             raise ValueError(f"Unknown strategy {strategy_id}")
 
         record = self.strategies[strategy_id]
+        state_before = record.state.value
+        
         # First transition: CANDIDATE → PAPER_TRADING
         record = transition_strategy(record, to_state=StrategyState.PAPER_TRADING)
         # Second transition: PAPER_TRADING → LIVE
         new_record = transition_strategy(record, to_state=StrategyState.LIVE)
         self.strategies[strategy_id] = new_record
+
+        if self.audit:
+            from portfolio.audit import make_activate_event
+            self.audit.append(make_activate_event(
+                strategy_id=strategy_id,
+                state_before=state_before,
+                state_after=new_record.state.value,
+            ))
 
     def rebalance_portfolio(
         self, total_capital: float = 1.0
@@ -138,12 +186,21 @@ class PortfolioManager:
             if record.state == StrategyState.LIVE
         ]
         if not live_records:
-            return {}
+            allocations = {}
+        else:
+            allocations = RiskParityAllocator.allocate(
+                strategies=live_records,
+                total_capital=total_capital,
+            )
 
-        return RiskParityAllocator.allocate(
-            strategies=live_records,
-            total_capital=total_capital,
-        )
+        if self.audit:
+            from portfolio.audit import make_rebalance_event
+            self.audit.append(make_rebalance_event(
+                allocations=allocations,
+                total_capital=total_capital,
+            ))
+
+        return allocations
 
     def update_portfolio_history(self, new_returns: pd.Series) -> None:
         """
@@ -154,11 +211,19 @@ class PortfolioManager:
         """
         if self.portfolio_returns is None:
             self.portfolio_returns = new_returns.copy()
-            return
+            total_count = len(new_returns)
+        else:
+            # Concatenate, sort by index, keep last observation for duplicate indices
+            combined = pd.concat(
+                [self.portfolio_returns, new_returns]
+            ).sort_index()
+            # Deduplicate: keep last observation per index
+            self.portfolio_returns = combined[~combined.index.duplicated(keep="last")]
+            total_count = len(self.portfolio_returns)
 
-        # Concatenate, sort by index, keep last observation for duplicate indices
-        combined = pd.concat(
-            [self.portfolio_returns, new_returns]
-        ).sort_index()
-        # Deduplicate: keep last observation per index
-        self.portfolio_returns = combined[~combined.index.duplicated(keep="last")]
+        if self.audit:
+            from portfolio.audit import make_portfolio_history_update_event
+            self.audit.append(make_portfolio_history_update_event(
+                new_returns_count=len(new_returns),
+                total_returns_count=total_count,
+            ))

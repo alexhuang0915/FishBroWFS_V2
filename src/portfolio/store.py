@@ -19,6 +19,7 @@ from portfolio.governance_state import StrategyRecord
 
 if TYPE_CHECKING:
     from portfolio.manager import PortfolioManager
+    from portfolio.audit import AuditTrail
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +27,13 @@ logger = logging.getLogger(__name__)
 class PortfolioStore:
     """Atomic persistence + snapshot store for PortfolioManager state."""
 
-    def __init__(self, root_dir: str = "outputs/portfolio_store") -> None:
+    def __init__(self, root_dir: str = "outputs/portfolio_store", audit: Optional["AuditTrail"] = None) -> None:
         self.root = Path(root_dir)
         self.root.mkdir(parents=True, exist_ok=True)
         self.snapshots_dir = self.root / "snapshots"
         self.snapshots_dir.mkdir(parents=True, exist_ok=True)
         self.current_state_path = self.root / "current_state.json"
+        self.audit = audit
 
     def _dump_record(self, record: StrategyRecord) -> Dict[str, Any]:
         """Serialize a StrategyRecord to a JSON‑compatible dict."""
@@ -102,6 +104,13 @@ class PortfolioStore:
             json.dump(payload, f, indent=2, ensure_ascii=False)
         os.replace(tmp, self.current_state_path)
 
+        if self.audit:
+            from portfolio.audit import make_save_state_event
+            self.audit.append(make_save_state_event(
+                strategy_count=len(manager.strategies),
+                has_returns=manager.portfolio_returns is not None,
+            ))
+
     def load_state(self) -> Dict[str, object]:
         """
         Load the persisted state from disk.
@@ -154,5 +163,13 @@ class PortfolioStore:
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
+
+        if self.audit:
+            from portfolio.audit import make_snapshot_event
+            self.audit.append(make_snapshot_event(
+                tag=tag,
+                strategy_count=len(manager.strategies),
+                has_returns=manager.portfolio_returns is not None,
+            ))
 
         return path

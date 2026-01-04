@@ -18,7 +18,8 @@ from nicegui import ui
 logger = logging.getLogger(__name__)
 
 # Configurable API base via environment variable
-API_BASE = os.environ.get("FISHBRO_API_BASE", "http://localhost:8000").rstrip("/")
+# Default to empty string (relative path) for same-origin requests
+API_BASE = os.environ.get("FISHBRO_API_BASE", "").rstrip("/")
 
 # -----------------------------------------------------------------------------
 # Status snapshot

@@ -18,20 +18,23 @@ class UICapabilities:
     should be rendered. False means the section is disabled and should not
     appear in the UI at all (or should show a "not implemented" message).
     
-    Default values reflect the "Minimum Honest UI" scope:
-    - Dashboard, Wizard, History, Settings: fully truthful, enabled
-    - Candidates, Portfolio, Deploy: read‑only/minimal, disabled by default
+    Default values reflect the Phase 11-12 Constitution:
+    - OP, Registry, Allocation, Audit: constitution-mandated tabs
     """
-    # Core truthful sections (always enabled in Minimum Honest UI)
-    enable_dashboard: bool = True
-    enable_wizard: bool = True
-    enable_history: bool = True
-    enable_settings: bool = True
+    # Constitution-mandated tabs (Phase 11-12)
+    enable_op: bool = True  # OP tab (Operator Console)
+    enable_registry: bool = True  # Registry tab (Strategy Inventory)
+    enable_allocation: bool = True  # Allocation tab (Read-only)
+    enable_audit: bool = True  # Audit tab (Historian)
     
-    # Non‑core sections (disabled by default; can be shown as read‑only)
+    # Legacy tabs (disabled in Phase 11-12)
+    enable_dashboard: bool = False
+    enable_wizard: bool = False
+    enable_history: bool = False
     enable_candidates: bool = False
     enable_portfolio: bool = False
     enable_deploy: bool = False
+    enable_settings: bool = False
     
     # Hidden forensic page (always accessible via direct URL)
     enable_forensics: bool = True
@@ -39,6 +42,10 @@ class UICapabilities:
     def to_dict(self) -> Dict[str, Any]:
         """Convert capabilities to a dictionary for serialization."""
         return {
+            "enable_op": self.enable_op,
+            "enable_registry": self.enable_registry,
+            "enable_allocation": self.enable_allocation,
+            "enable_audit": self.enable_audit,
             "enable_dashboard": self.enable_dashboard,
             "enable_wizard": self.enable_wizard,
             "enable_history": self.enable_history,
@@ -56,21 +63,25 @@ class UICapabilities:
 
 
 def get_ui_capabilities() -> UICapabilities:
-    """Return the default UI capabilities for Minimum Honest UI.
+    """Return the default UI capabilities for Phase 11-12 Constitution.
     
     This function is the primary API for obtaining the current UI capabilities.
     It returns a UICapabilities instance with the default values that implement
-    the "Minimum Honest UI" scope.
+    the Phase 11-12 Constitution requirements.
     
     Returns:
-        UICapabilities: Default capabilities with truthful sections enabled,
-        non‑core sections disabled.
+        UICapabilities: Default capabilities with constitution-mandated tabs enabled,
+        legacy tabs disabled.
     """
     return UICapabilities(
-        enable_dashboard=True,
-        enable_wizard=True,
-        enable_history=True,
-        enable_settings=True,
+        enable_op=True,
+        enable_registry=True,
+        enable_allocation=True,
+        enable_audit=True,
+        enable_dashboard=False,
+        enable_wizard=False,
+        enable_history=False,
+        enable_settings=False,
         enable_candidates=False,
         enable_portfolio=False,
         enable_deploy=False,

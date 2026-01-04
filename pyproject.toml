@@ -3,7 +3,7 @@ name = "FishBroWFS_V2"
 version = "0.1.0"
 description = "Speed-first backtesting engine"
 requires-python = ">=3.10"
-dependencies = ["numpy"]
+dependencies = ["numpy", "PySide6"]
 
 [build-system]
 requires = ["setuptools"]
@@ -21,7 +21,9 @@ pythonpath = ["src"]
 markers = [
     "slow: research-grade tests",
     "integration: integration tests requiring external services",
-    "ui_contract: UI style contract tests requiring Playwright and UI server"
+    "ui_contract: UI style contract tests requiring Playwright and UI server",
+    "legacy_ui: legacy UI tests (gui.nicegui based) - excluded from product CI",
+    "research: research-grade / slow / exploratory tests (not part of product CI)"
 ]
-addopts = "-m 'not slow'"
+addopts = "-m 'not slow and not legacy_ui'"
 

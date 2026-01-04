@@ -36,12 +36,12 @@ def test_makefile_contains_correct_mark_expressions():
     assert check_legacy_section is not None, "check-legacy target should run only legacy_ui tests"
     
     # Verify help text mentions legacy UI as deprecated
-    help_section = re.search(r'Legacy Ops.*deprecated', content, re.DOTALL)
-    assert help_section is not None, "Help should mention Legacy Ops (Deprecated)"
+    help_section = re.search(r'LEGACY / DEPRECATED.*deprecated', content, re.DOTALL)
+    assert help_section is not None, "Help should mention LEGACY / DEPRECATED"
     
-    # Verify gui target mentions deprecated (could be in echo line after target)
-    gui_section = re.search(r'^gui:.*?(?:\n\t.*?)*?deprecated', content, re.MULTILINE | re.DOTALL)
-    assert gui_section is not None, "gui target should be labeled deprecated"
+    # Verify legacy-gui target mentions deprecated (could be in echo line after target)
+    gui_section = re.search(r'^legacy-gui:.*?(?:\n\t.*?)*?deprecated', content, re.MULTILINE | re.DOTALL)
+    assert gui_section is not None, "legacy-gui target should be labeled deprecated"
 
 
 def test_makefile_targets_exist():
@@ -50,8 +50,8 @@ def test_makefile_targets_exist():
     content = makefile_path.read_text()
     
     required_targets = [
-        "dashboard",
-        "gui",
+        "legacy-dashboard",
+        "legacy-gui",
         "check",
         "check-legacy",
         "desktop",

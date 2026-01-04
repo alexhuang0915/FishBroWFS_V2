@@ -1,57 +1,92 @@
 """
-Desktop Control Station - Main window for running backtests.
+Desktop Control Station - Main window with 4-tab architecture.
+Matching historical NiceGUI product design with 1:1 functional parity.
 """
 
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QComboBox, QPushButton, QTextEdit, QProgressBar,
-    QGroupBox, QFrame, QSplitter, QSizePolicy
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
+    QLabel, QPushButton, QStatusBar
 )
 from PySide6.QtGui import QFont, QFontDatabase
 
-from .worker import BacktestWorker, BuildWorker, ArtifactWorker
-from .artifact_validation import (
-    is_artifact_dir_name,
-    validate_artifact_dir,
-    find_latest_valid_artifact,
-)
+from .tabs.op_tab import OpTab
+from .tabs.report_tab import ReportTab
+from .tabs.registry_tab import RegistryTab
+from .tabs.allocation_tab import AllocationTab
+from .tabs.audit_tab import AuditTab
 
 logger = logging.getLogger(__name__)
 
 
+def _is_wayland() -> bool:
+    """Detect if running under Wayland compositor."""
+    wayland_display = os.environ.get("WAYLAND_DISPLAY")
+    qt_platform = os.environ.get("QT_QPA_PLATFORM", "").lower()
+    
+    # If WAYLAND_DISPLAY is set and we're not explicitly forcing XCB
+    # Check if platform contains "xcb" (case-insensitive)
+    # This handles variations like "xcb", "xcb_egl", "XCB", etc.
+    is_xcb = "xcb" in qt_platform
+    return bool(wayland_display) and not is_xcb
+
+
+def _apply_initial_geometry(window, target_w: int = 1920, target_h: int = 1080):
+    """
+    Apply initial window geometry in a Wayland-safe manner.
+    
+    On Wayland:
+    - Use resize() only (no setGeometry)
+    - Never maximize
+    - Clamp to available screen geometry
+    
+    On X11/Windows:
+    - Use setGeometry with default position
+    """
+    if _is_wayland():
+        # Wayland: use resize only, clamp to available geometry
+        from PySide6.QtWidgets import QApplication
+        screen = QApplication.primaryScreen()
+        if screen:
+            available = screen.availableGeometry()
+            # Clamp to 90% of available size
+            clamped_w = min(target_w, int(available.width() * 0.9))
+            clamped_h = min(target_h, int(available.height() * 0.9))
+            window.resize(clamped_w, clamped_h)
+            logger.info(f"Wayland: resized to {clamped_w}x{clamped_h} (clamped from {target_w}x{target_h})")
+        else:
+            window.resize(target_w, target_h)
+            logger.info(f"Wayland: resized to {target_w}x{target_h}")
+    else:
+        # X11/Windows: use setGeometry with default position
+        window.setGeometry(100, 100, target_w, target_h)
+        logger.info(f"X11/Windows: setGeometry to 100,100,{target_w},{target_h}")
+
+
 class ControlStation(QMainWindow):
-    """Main control station window."""
+    """Main control station window with 4-tab architecture."""
     
     def __init__(self):
         super().__init__()
-        self.worker: Optional[BacktestWorker] = None
-        self.worker_thread: Optional[QThread] = None
-        self.current_result: Optional[dict] = None
-        
-        # State machine for artifact tracking
-        self.artifact_state = "NONE"  # NONE, BUILDING, READY, FAILED
-        self.artifact_run_id: Optional[str] = None
-        self.artifact_run_dir: Optional[str] = None
-        
         self.setup_ui()
-        self.load_datasets()
         self.setup_connections()
         
-        # Timer for periodic updates (e.g., progress)
+        # Timer for periodic updates
         self.update_timer = QTimer()
-        self.update_timer.timeout.connect(self.update_progress)
-        self.update_timer.start(100)  # 100ms
+        self.update_timer.timeout.connect(self.update_status)
+        self.update_timer.start(1000)  # 1 second
     
     def setup_ui(self):
         """Initialize the UI components."""
-        self.setWindowTitle("FishBroWFS Control Station")
-        self.setGeometry(100, 100, 1200, 800)
+        self.setWindowTitle("FishBro Quant Pro Station")
+        
+        # Apply Wayland-safe geometry
+        _apply_initial_geometry(self, 1920, 1080)
         
         # Central widget
         central_widget = QWidget()
@@ -59,719 +94,127 @@ class ControlStation(QMainWindow):
         
         # Main layout
         main_layout = QVBoxLayout(central_widget)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
-        # Create splitter for left/right panels
-        splitter = QSplitter(Qt.Horizontal)
+        # Header - compact, terminal-like
+        header_widget = QWidget()
+        header_widget.setStyleSheet("background-color: #1E1E1E;")
+        header_layout = QHBoxLayout(header_widget)
+        header_layout.setContentsMargins(10, 5, 10, 5)
         
-        # Left panel (Inputs)
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(5, 5, 5, 5)
+        title_label = QLabel("Quant Pro Station")
+        title_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #E6E6E6;")
+        header_layout.addWidget(title_label)
         
-        # Inputs group
-        inputs_group = QGroupBox("Inputs")
-        inputs_layout = QGridLayout()
+        header_layout.addStretch()
         
-        # Strategy selection
-        inputs_layout.addWidget(QLabel("Strategy:"), 0, 0)
-        self.strategy_cb = QComboBox()
-        self.strategy_cb.addItems(["S1", "S2", "S3"])
-        inputs_layout.addWidget(self.strategy_cb, 0, 1)
+        # Status indicator
+        self.status_indicator = QLabel("🟢 Ready")
+        self.status_indicator.setStyleSheet("font-size: 11px; color: #9A9A9A;")
+        header_layout.addWidget(self.status_indicator)
         
-        # Dataset selection
-        inputs_layout.addWidget(QLabel("Dataset:"), 1, 0)
-        self.data_cb = QComboBox()
-        inputs_layout.addWidget(self.data_cb, 1, 1)
+        main_layout.addWidget(header_widget)
         
-        # Timeframe selection
-        inputs_layout.addWidget(QLabel("Timeframe (minutes):"), 2, 0)
-        self.tf_cb = QComboBox()
-        self.tf_cb.addItems(["15", "30", "60", "120", "240"])
-        self.tf_cb.setCurrentText("60")
-        inputs_layout.addWidget(self.tf_cb, 2, 1)
+        # Tab widget - compact, dense
+        self.tab_widget = QTabWidget()
+        self.tab_widget.setTabPosition(QTabWidget.North)
+        self.tab_widget.setMovable(False)
         
-        inputs_group.setLayout(inputs_layout)
-        left_layout.addWidget(inputs_group)
+        # Create tabs
+        self.op_tab = OpTab()
+        self.report_tab = ReportTab()
+        self.registry_tab = RegistryTab()
+        self.allocation_tab = AllocationTab()
+        self.audit_tab = AuditTab()
         
-        # Build buttons
-        build_buttons_layout = QHBoxLayout()
+        # Add tabs
+        self.tab_widget.addTab(self.op_tab, "Operation")
+        self.tab_widget.addTab(self.report_tab, "Report")
+        self.tab_widget.addTab(self.registry_tab, "Strategy Library")
+        self.tab_widget.addTab(self.allocation_tab, "Allocation")
+        self.tab_widget.addTab(self.audit_tab, "Audit")
         
-        self.build_bars_btn = QPushButton("🧱 Build Bars Cache")
-        self.build_bars_btn.setMinimumHeight(40)
-        self.build_bars_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #1976d2;
-                color: white;
-                border-radius: 6px;
-                padding: 8px;
-            }
-            QPushButton:disabled {
-                background-color: #666;
-            }
-        """)
-        build_buttons_layout.addWidget(self.build_bars_btn)
+        main_layout.addWidget(self.tab_widget)
         
-        self.build_features_btn = QPushButton("🔮 Build Features Cache")
-        self.build_features_btn.setMinimumHeight(40)
-        self.build_features_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #7b1fa2;
-                color: white;
-                border-radius: 6px;
-                padding: 8px;
-            }
-            QPushButton:disabled {
-                background-color: #666;
-            }
-        """)
-        build_buttons_layout.addWidget(self.build_features_btn)
+        # Status bar - minimal
+        self.status_bar = QStatusBar()
+        self.setStatusBar(self.status_bar)
         
-        left_layout.addLayout(build_buttons_layout)
+        # Status bar widgets
+        self.status_bar.showMessage("Ready")
         
-        # Run button
-        self.run_btn = QPushButton("🚀 Run Backtest")
-        self.run_btn.setMinimumHeight(60)
-        font = self.run_btn.font()
-        font.setPointSize(14)
-        font.setBold(True)
-        self.run_btn.setFont(font)
-        self.run_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #2e7d32;
-                color: white;
-                border-radius: 8px;
-                padding: 10px;
-            }
-            QPushButton:disabled {
-                background-color: #666;
-            }
-        """)
-        left_layout.addWidget(self.run_btn)
-        
-        # Results group
-        results_group = QGroupBox("Results")
-        results_layout = QVBoxLayout()
-        
-        # PnL label
-        self.pnl_label = QLabel("PnL: -")
-        self.pnl_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        results_layout.addWidget(self.pnl_label)
-        
-        # MaxDD label
-        self.dd_label = QLabel("MaxDD: -")
-        self.dd_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        results_layout.addWidget(self.dd_label)
-        
-        # Artifact status label
-        self.artifact_status_label = QLabel("Artifact: NONE")
-        self.artifact_status_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #666;")
-        results_layout.addWidget(self.artifact_status_label)
-        
-        # Build Artifact button
-        self.build_artifact_btn = QPushButton("🔨 Build Artifact (Admission/Compile)")
-        self.build_artifact_btn.setEnabled(False)
-        self.build_artifact_btn.setMinimumHeight(40)
-        self.build_artifact_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #ff9800;
-                color: white;
-                border-radius: 6px;
-                padding: 8px;
-            }
-            QPushButton:disabled {
-                background-color: #666;
-            }
-        """)
-        results_layout.addWidget(self.build_artifact_btn)
-        
-        # Promote button
-        self.promote_btn = QPushButton("💾 Promote to Registry")
-        self.promote_btn.setEnabled(False)
-        self.promote_btn.setMinimumHeight(40)
-        results_layout.addWidget(self.promote_btn)
-
-        results_group.setLayout(results_layout)
-        left_layout.addWidget(results_group)
-        
-        left_layout.addStretch()
-        
-        # Right panel (Monitoring)
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        
-        # Log view
-        log_group = QGroupBox("Execution Log")
-        log_layout = QVBoxLayout()
-        self.log_view = QTextEdit()
-        self.log_view.setReadOnly(True)
-        self.log_view.setFont(QFont("Monospace", 10))
-        self.log_view.setStyleSheet("""
-            QTextEdit {
-                background-color: #1e1e1e;
-                color: #d4d4d4;
-                border: 1px solid #555;
-            }
-        """)
-        log_layout.addWidget(self.log_view)
-        log_group.setLayout(log_layout)
-        right_layout.addWidget(log_group)
-        
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setRange(0, 0)  # Indeterminate
-        self.progress_bar.setTextVisible(False)
-        right_layout.addWidget(self.progress_bar)
-        
-        # Add widgets to splitter
-        splitter.addWidget(left_widget)
-        splitter.addWidget(right_widget)
-        splitter.setSizes([400, 800])
-        
-        main_layout.addWidget(splitter)
-    
-    def load_datasets(self):
-        """Load dataset options from raw data directory."""
-        raw_dir = Path("/home/fishbro/FishBroWFS_V2/FishBroData/raw")
-        if not raw_dir.exists():
-            self.log(f"ERROR: Raw data directory not found: {raw_dir}")
-            return
-        
-        identifiers = set()
-        for item in raw_dir.iterdir():
-            if not item.is_file():
-                continue
-            
-            # Extract identifier from filename
-            # Expected pattern: "{IDENTIFIER} HOT-Minute-Trade.txt" or "{IDENTIFIER}_SUBSET.txt"
-            name = item.name
-            # Remove known suffixes
-            if name.endswith(" HOT-Minute-Trade.txt"):
-                identifier = name[:-len(" HOT-Minute-Trade.txt")]
-            elif name.endswith("_SUBSET.txt"):
-                identifier = name[:-len("_SUBSET.txt")]
-            else:
-                # Try to extract before first space or underscore
-                identifier = name.split()[0] if ' ' in name else name.split('_')[0]
-                # Remove file extension
-                identifier = identifier.rsplit('.', 1)[0] if '.' in identifier else identifier
-            
-            # Clean up identifier (should be like "CME.MNQ")
-            if identifier and '.' in identifier:
-                identifiers.add(identifier)
-        
-        datasets = sorted(identifiers)  # Lexicographic sort
-        self.data_cb.clear()
-        self.data_cb.addItems(datasets)
-        
-        if datasets:
-            self.log(f"Loaded {len(datasets)} datasets from {raw_dir}")
-        else:
-            self.log("WARNING: No datasets found in raw directory")
-    
-    def get_txt_path_for_dataset(self, dataset_id: str) -> Optional[Path]:
-        """Get the TXT file path for a given dataset identifier."""
-        raw_dir = Path("/home/fishbro/FishBroWFS_V2/FishBroData/raw")
-        if not raw_dir.exists():
-            return None
-        
-        # Try to find matching file
-        for item in raw_dir.iterdir():
-            if not item.is_file():
-                continue
-            
-            name = item.name
-            # Check if this file matches the dataset identifier
-            if name.startswith(dataset_id):
-                # It could be exact match or with suffix
-                return item
-        
-        # If not found, try with common suffixes
-        suffixes = [" HOT-Minute-Trade.txt", "_SUBSET.txt", ".txt"]
-        for suffix in suffixes:
-            candidate = raw_dir / f"{dataset_id}{suffix}"
-            if candidate.exists():
-                return candidate
-        
-        return None
+        # Add version info
+        version_label = QLabel("Phase 18.1 - Quant Pro Station")
+        version_label.setStyleSheet("color: #9A9A9A; font-size: 10px;")
+        self.status_bar.addPermanentWidget(version_label)
     
     def setup_connections(self):
         """Connect signals and slots."""
-        self.run_btn.clicked.connect(self.start_run)
-        self.build_bars_btn.clicked.connect(self.start_build_bars)
-        self.build_features_btn.clicked.connect(self.start_build_features)
-        self.build_artifact_btn.clicked.connect(self.start_build_artifact)
-        self.promote_btn.clicked.connect(self.promote_artifact)
-    
-    def log(self, message: str):
-        """Append message to log view."""
-        self.log_view.append(message)
-        # Auto-scroll to bottom
-        scrollbar = self.log_view.verticalScrollBar()
-        scrollbar.setValue(scrollbar.maximum())
-    
-    def scan_and_update_artifact_status(self):
-        """Scan for latest valid artifact and update UI status accordingly."""
-        if not self.current_result:
-            # No research result, cannot determine season/dataset
-            self.update_artifact_status("NONE")
-            return
+        # Connect tab signals to main window
+        self.op_tab.log_signal.connect(self.handle_log)
+        self.op_tab.progress_signal.connect(self.handle_progress)
+        self.op_tab.artifact_state_changed.connect(self.handle_artifact_state)
         
-        season = self.current_result.get("season", "2026Q1")
-        # Build runs directory path
-        runs_dir = Path("outputs") / "seasons" / season / "runs"
+        self.report_tab.log_signal.connect(self.handle_log)
+        self.registry_tab.log_signal.connect(self.handle_log)
+        self.allocation_tab.log_signal.connect(self.handle_log)
+        self.allocation_tab.allocation_changed.connect(self.handle_allocation_change)
+        self.audit_tab.log_signal.connect(self.handle_log)
         
-        result = self.find_latest_valid_artifact(runs_dir)
-        if result.get("ok"):
-            artifact_dir = result["artifact_dir"]
-            artifact_path = Path(artifact_dir)
-            self.update_artifact_status("READY", artifact_path.name, str(artifact_path))
-            self.log(f"Found valid artifact: {artifact_path.name}")
-        else:
-            self.update_artifact_status("NONE")
-            # Log only if directory exists but no artifact found
-            if result.get("reason") == "no_valid_artifact_found":
-                self.log(f"No valid artifact found in {runs_dir}")
-    
-    def update_artifact_status(self, state: str, run_id: Optional[str] = None, run_dir: Optional[str] = None):
-        """Update artifact status and UI."""
-        self.artifact_state = state
-        if run_id:
-            self.artifact_run_id = run_id
-        if run_dir:
-            self.artifact_run_dir = run_dir
-        
-        # Update label with more detailed info
-        color_map = {
-            "NONE": "#666",
-            "BUILDING": "#ff9800",
-            "READY": "#4caf50",
-            "FAILED": "#f44336"
-        }
-        color = color_map.get(state, "#666")
-        
-        if state == "READY" and run_id:
-            display_text = f"Artifact: READY ({run_id})"
-        else:
-            display_text = f"Artifact: {state}"
-        
-        self.artifact_status_label.setText(display_text)
-        self.artifact_status_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {color};")
-        
-        # Update button states
-        self.set_ui_locked(self.worker_thread is not None and self.worker_thread.isRunning())
-    
-    def start_run(self):
-        """Start a backtest run."""
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.log("WARNING: A run is already in progress")
-            return
-        
-        # Get inputs
-        strategy = self.strategy_cb.currentText()
-        dataset = self.data_cb.currentText()
-        try:
-            timeframe = int(self.tf_cb.currentText())
-        except ValueError:
-            self.log("ERROR: Invalid timeframe")
-            return
-        
-        self.log(f"Starting backtest: {strategy}, {dataset}, {timeframe}m")
-        
-        # Create worker
-        self.worker = BacktestWorker(strategy, dataset, timeframe)
-        self.worker_thread = QThread()
-        
-        # Move worker to thread
-        self.worker.moveToThread(self.worker_thread)
-        
-        # Connect signals
-        self.worker.log_signal.connect(self.log)
-        self.worker.progress_signal.connect(self.update_progress_value)
-        self.worker.finished_signal.connect(self.on_finished)
-        self.worker.failed_signal.connect(self.on_failed)
-        
-        # Connect thread start to worker run
-        self.worker_thread.started.connect(self.worker.run)
-        
-        # Connect thread finished to cleanup
-        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-        
-        # Lock UI
-        self.set_ui_locked(True)
-        
-        # Start thread
-        self.worker_thread.start()
-        
-        # Show progress as indeterminate
-        self.progress_bar.setRange(0, 0)
-    
-    def start_build_bars(self):
-        """Start building bars cache for selected dataset."""
-        self._start_build(build_bars=True, build_features=False)
-    
-    def start_build_artifact(self):
-        """Start building artifact (Admission/Compile)."""
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.log("WARNING: An operation is already in progress")
-            return
-        
-        if not self.current_result:
-            self.log("ERROR: No research result available. Run research first.")
-            return
-        
-        # Get research result details
-        strategy = self.current_result.get("strategy_id", "")
-        dataset = self.current_result.get("dataset_id", "")
-        season = self.current_result.get("season", "2026Q1")
-        
-        self.log(f"Starting artifact build: {strategy}, {dataset}, {season}")
-        self.update_artifact_status("BUILDING")
-        
-        # Create worker
-        self.worker = ArtifactWorker(
-            strategy=strategy,
-            dataset=dataset,
-            season=season,
-            research_result=self.current_result
-        )
-        self.worker_thread = QThread()
-        
-        # Move worker to thread
-        self.worker.moveToThread(self.worker_thread)
-        
-        # Connect signals
-        self.worker.log_signal.connect(self.log)
-        self.worker.progress_signal.connect(self.update_progress_value)
-        self.worker.finished_signal.connect(self.on_artifact_finished)
-        self.worker.failed_signal.connect(self.on_artifact_failed)
-        
-        # Connect thread start to worker run
-        self.worker_thread.started.connect(self.worker.run)
-        
-        # Connect thread finished to cleanup
-        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-        
-        # Lock UI
-        self.set_ui_locked(True)
-        
-        # Start thread
-        self.worker_thread.start()
-        
-        # Show progress as indeterminate
-        self.progress_bar.setRange(0, 0)
-    
-    def start_build_features(self):
-        """Start building features cache for selected dataset."""
-        self._start_build(build_bars=False, build_features=True)
-    
-    def _start_build(self, build_bars: bool, build_features: bool):
-        """Common build worker setup."""
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.log("WARNING: An operation is already in progress")
-            return
-        
-        dataset = self.data_cb.currentText()
-        if not dataset:
-            self.log("ERROR: No dataset selected")
-            return
-        
-        txt_path = self.get_txt_path_for_dataset(dataset)
-        if not txt_path:
-            self.log(f"ERROR: Could not find TXT file for dataset {dataset}")
-            return
-        
-        # Determine mode (FULL for now, could be configurable later)
-        mode = "FULL"
-        
-        if build_bars:
-            self.log(f"Starting bars cache build for {dataset} (mode={mode})")
-        if build_features:
-            self.log(f"Starting features cache build for {dataset} (mode={mode})")
-        self.log(f"TXT path: {txt_path}")
-        
-        # Create worker
-        self.worker = BuildWorker(
-            dataset=dataset,
-            txt_path=txt_path,
-            build_bars=build_bars,
-            build_features=build_features,
-            mode=mode
-        )
-        self.worker_thread = QThread()
-        
-        # Move worker to thread
-        self.worker.moveToThread(self.worker_thread)
-        
-        # Connect signals
-        self.worker.log_signal.connect(self.log)
-        self.worker.progress_signal.connect(self.update_progress_value)
-        self.worker.finished_signal.connect(self.on_build_finished)
-        self.worker.failed_signal.connect(self.on_build_failed)
-        
-        # Connect thread start to worker run
-        self.worker_thread.started.connect(self.worker.run)
-        
-        # Connect thread finished to cleanup
-        self.worker_thread.finished.connect(self.worker_thread.deleteLater)
-        
-        # Lock UI
-        self.set_ui_locked(True)
-        
-        # Start thread
-        self.worker_thread.start()
-        
-        # Show progress as indeterminate
-        self.progress_bar.setRange(0, 0)
-    
-    @Slot(dict)
-    def on_build_finished(self, payload: dict):
-        """Handle successful completion of build."""
-        self.log(f"Build completed successfully!")
-        self.log(f"Report: {payload.get('report', {})}")
-        
-        # Unlock UI
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(100)
+        # Tab change events
+        self.tab_widget.currentChanged.connect(self.on_tab_changed)
     
     @Slot(str)
-    def on_build_failed(self, error_msg: str):
-        """Handle build failure."""
-        self.log(f"Build failed: {error_msg}")
-        
-        # Unlock UI
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-    
-    @Slot(dict)
-    def on_artifact_finished(self, payload: dict):
-        """Handle successful completion of artifact build."""
-        run_id = payload.get("run_id", "")
-        run_dir = payload.get("run_dir", "")
-        
-        self.log(f"Artifact build completed successfully!")
-        self.log(f"Run ID: {run_id}")
-        self.log(f"Run directory: {run_dir}")
-        
-        # Update artifact status
-        self.update_artifact_status("READY", run_id, run_dir)
-        
-        # Unlock UI
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(100)
-    
-    @Slot(str)
-    def on_artifact_failed(self, error_msg: str):
-        """Handle artifact build failure."""
-        self.log(f"Artifact build failed: {error_msg}")
-        
-        # Update artifact status
-        self.update_artifact_status("FAILED")
-        
-        # Unlock UI
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-    
-    def set_ui_locked(self, locked: bool):
-        """Lock or unlock UI controls."""
-        self.strategy_cb.setEnabled(not locked)
-        self.data_cb.setEnabled(not locked)
-        self.tf_cb.setEnabled(not locked)
-        self.run_btn.setEnabled(not locked)
-        self.build_bars_btn.setEnabled(not locked)
-        self.build_features_btn.setEnabled(not locked)
-        self.build_artifact_btn.setEnabled(not locked and self.current_result is not None and self.artifact_state == "NONE")
-        self.promote_btn.setEnabled(not locked and self.current_result is not None and self.artifact_state == "READY")
+    def handle_log(self, message: str):
+        """Handle log messages from tabs."""
+        logger.info(message)
+        # Update status bar with last message
+        self.status_bar.showMessage(message, 3000)  # Show for 3 seconds
     
     @Slot(int)
-    def update_progress_value(self, value: int):
-        """Update progress bar with specific value."""
-        if value >= 0 and value <= 100:
-            self.progress_bar.setRange(0, 100)
-            self.progress_bar.setValue(value)
-    
-    def update_progress(self):
-        """Periodic progress update (placeholder)."""
-        # Could be used to poll job status in the future
+    def handle_progress(self, value: int):
+        """Handle progress updates from tabs."""
+        # Could update a progress bar in status bar if needed
         pass
     
+    @Slot(str, str, str)
+    def handle_artifact_state(self, state: str, run_id: str, run_dir: str):
+        """Handle artifact state changes from OP tab."""
+        logger.info(f"Artifact state changed: {state} ({run_id})")
+        # Could update other tabs or UI elements
+        if state == "READY":
+            # Refresh registry tab to show new artifact
+            self.registry_tab.refresh_registry()
+    
     @Slot(dict)
-    def on_finished(self, payload: dict):
-        """Handle successful completion of backtest."""
-        self.current_result = payload
-        self.log(f"Backtest completed successfully!")
-        self.log(f"Run ID: {payload.get('run_id', 'unknown')}")
-        
-        # Update result labels
-        pnl = payload.get('pnl', 0)
-        maxdd = payload.get('maxdd', 0)
-        self.pnl_label.setText(f"PnL: {pnl:,.2f}")
-        self.dd_label.setText(f"MaxDD: {maxdd:,.2f}")
-        
-        # Scan for existing artifacts (may find previous artifact_* runs)
-        self.scan_and_update_artifact_status()
-        
-        # Enable build artifact button (research succeeded)
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(100)
+    def handle_allocation_change(self, audit_event: dict):
+        """Handle allocation change events."""
+        logger.info(f"Allocation change: {audit_event}")
+        # Emit audit event to audit tab
+        # TODO: Actually add event to audit trail
+        self.handle_log(f"Allocation change audited: {audit_event.get('event_type', 'unknown')}")
     
-    @Slot(str)
-    def on_failed(self, error_msg: str):
-        """Handle backtest failure."""
-        self.log(f"Backtest failed: {error_msg}")
-        self.current_result = None
-        
-        # Update result labels
-        self.pnl_label.setText("PnL: -")
-        self.dd_label.setText("MaxDD: -")
-        
-        # Scan for existing artifacts (may find previous artifact_* runs)
-        self.scan_and_update_artifact_status()
-        
-        # Unlock UI
-        self.set_ui_locked(False)
-        
-        # Stop worker thread
-        if self.worker_thread:
-            self.worker_thread.quit()
-            self.worker_thread.wait()
-            self.worker_thread = None
-            self.worker = None
-        
-        # Reset progress bar
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
+    @Slot(int)
+    def on_tab_changed(self, index: int):
+        """Handle tab change events."""
+        tab_names = ["OP", "Report", "Registry", "Allocation", "Audit"]
+        if 0 <= index < len(tab_names):
+            self.handle_log(f"Switched to {tab_names[index]} tab")
     
-    # Artifact validation methods delegate to the shared module
-    def is_artifact_dir_name(self, name: str) -> bool:
-        """Canonical predicate: return True iff name starts with 'artifact_'."""
-        return is_artifact_dir_name(name)
-    
-    def validate_artifact_dir(self, run_dir: Path) -> dict:
-        """HARD CONTRACT: Validate artifact directory."""
-        return validate_artifact_dir(run_dir)
-    
-    def find_latest_valid_artifact(self, runs_dir: Path) -> dict:
-        """Find the latest valid artifact directory in runs_dir."""
-        return find_latest_valid_artifact(runs_dir)
-    
-    def validate_artifact(self, artifact_path: str) -> dict:
-        """
-        Validate artifact directory according to Phase 15 requirements.
-        
-        Returns dict with:
-            valid: bool
-            run_dir: str
-            found_files: list[str]
-        """
-        if not artifact_path:
-            return {"valid": False, "run_dir": "", "found_files": []}
-        
-        path = Path(artifact_path)
-        if not path.exists():
-            return {"valid": False, "run_dir": str(path), "found_files": []}
-        
-        # Use new strict validation
-        v = validate_artifact_dir(path)
-        if not v.get("ok"):
-            return {"valid": False, "run_dir": str(path), "found_files": []}
-        
-        # Check which files exist for backward compatibility
-        required_patterns = ["metrics.json", "manifest.json", "trades.parquet"]
-        found_files = []
-        
-        for pattern in required_patterns:
-            if (path / pattern).exists():
-                found_files.append(pattern)
-        
-        return {
-            "valid": True,
-            "run_dir": str(path),
-            "found_files": found_files
-        }
-    
-    def promote_artifact(self):
-        """Promote artifact to registry."""
-        if not self.current_result:
-            self.log("ERROR: No result to promote")
-            return
-        
-        if self.artifact_state != "READY":
-            self.log(f"ERROR: Artifact not ready (state: {self.artifact_state})")
-            return
-        
-        if not self.artifact_run_id:
-            self.log("ERROR: No artifact run_id")
-            return
-        
-        self.log(f"Promoting artifact: {self.artifact_run_id}")
-        self.log(f"Run directory: {self.artifact_run_dir}")
-        
-        # TODO: Call actual promote function from portfolio module
-        # For now, just log
-        self.log("Promotion would call portfolio.manager.onboard_strategy()")
-        self.log("Promotion successful (placeholder)")
-        
-        # Disable promote button after promotion
-        self.promote_btn.setEnabled(False)
+    @Slot()
+    def update_status(self):
+        """Periodic status update."""
+        # Update status indicator
+        # Could check for backend connectivity, disk space, etc.
+        pass
     
     def closeEvent(self, event):
         """Handle window close event."""
-        # Clean up worker thread
-        if self.worker_thread and self.worker_thread.isRunning():
-            self.worker_thread.quit()
-            self.worker_thread.wait()
+        # Clean up any resources
+        self.update_timer.stop()
+        
+        # Log closure
+        logger.info("Desktop Control Station closed")
         
         event.accept()

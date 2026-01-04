@@ -26,6 +26,7 @@ import argparse
 from pathlib import Path
 from typing import Optional
 
+from control.research_service import run_research_job
 from control.research_runner import (
     run_research,
     ResearchRunError,
@@ -157,15 +158,30 @@ def run_research_cli(args) -> int:
     
     # 3. 執行研究
     try:
-        report = run_research(
-            season=args.season,
-            dataset_id=args.dataset_id,
-            strategy_id=args.strategy_id,
-            outputs_root=args.outputs_root,
-            allow_build=args.allow_build,
-            build_ctx=build_ctx,
-            wfs_config=wfs_config,
-        )
+        if args.allow_build:
+            # Use the old path with build support
+            report = run_research(
+                season=args.season,
+                dataset_id=args.dataset_id,
+                strategy_id=args.strategy_id,
+                outputs_root=args.outputs_root,
+                allow_build=args.allow_build,
+                build_ctx=build_ctx,
+                wfs_config=wfs_config,
+            )
+        else:
+            # Use the canonical research job function (no build)
+            result = run_research_job(
+                season=args.season,
+                dataset_id=args.dataset_id,
+                strategy_id=args.strategy_id,
+                outputs_root=str(args.outputs_root),
+                mode=args.mode,
+                verbose=args.verbose,
+                log_cb=lambda text: print(text, file=sys.stderr) if args.verbose else None,
+            )
+            # Convert result to report format for backward compatibility
+            report = result["report"]
         
         # 4. 輸出結果
         output_result(report, args)
@@ -186,6 +202,10 @@ def run_research_cli(args) -> int:
         else:
             print(f"研究執行失敗: {e}", file=sys.stderr)
             return 1
+    except Exception as e:
+        # Handle errors from run_research_job
+        print(f"研究執行失敗: {e}", file=sys.stderr)
+        return 1
 
 
 def prepare_build_context(args) -> Optional[BuildContext]:

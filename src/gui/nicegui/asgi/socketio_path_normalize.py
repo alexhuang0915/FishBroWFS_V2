@@ -31,7 +31,28 @@ class SocketIOPathNormalizeMiddleware:
         t = scope.get("type")
         if t in ("http", "websocket"):
             path = scope.get("path", "")
+            raw = scope.get("raw_path", None)
+            # Debug print
+            print(f"[SocketIOPathNormalize] type={t}, path={path}, raw_path={raw}", flush=True)
             if path == "/_nicegui_ws/socket.io":
-                logger.debug("Normalizing path %s to include trailing slash", path)
+                print(f"[SocketIOPathNormalize] Normalizing path {path} to include trailing slash", flush=True)
                 scope["path"] = "/_nicegui_ws/socket.io/"
+                if isinstance(raw, (bytes, bytearray)):
+                    # raw_path may include query string, e.g., b"/_nicegui_ws/socket.io?transport=websocket"
+                    # We need to add slash before query if path part matches.
+                    # Split on b'?' to isolate path part.
+                    if raw.startswith(b"/_nicegui_ws/socket.io"):
+                        # Check if the path part is exactly b"/_nicegui_ws/socket.io" (no slash)
+                        # There may be a query separator '?' or end of bytes.
+                        if raw == b"/_nicegui_ws/socket.io":
+                            scope["raw_path"] = b"/_nicegui_ws/socket.io/"
+                        elif raw.startswith(b"/_nicegui_ws/socket.io?"):
+                            # Insert slash before '?'
+                            scope["raw_path"] = b"/_nicegui_ws/socket.io/?" + raw.split(b'?', 1)[1]
+                        elif raw.startswith(b"/_nicegui_ws/socket.io/"):
+                            # Already has slash, do nothing
+                            pass
+                        else:
+                            # Some other variation, ignore
+                            pass
         await self.app(scope, receive, send)

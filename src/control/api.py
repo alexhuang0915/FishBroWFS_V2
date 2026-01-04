@@ -57,6 +57,9 @@ from control.governance import (
     BatchMetadata,
 )
 
+# Phase 14: Governance Observability via HTTP Pull (Heartbeat Pattern)
+from control.run_status import read_status
+
 # Phase 14.1: Read-only batch API helpers
 from control.batch_api import (
     read_execution,
@@ -305,6 +308,35 @@ app = FastAPI(title="B5-C Mission Control API", lifespan=lifespan)
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/run_status")
+async def get_run_status() -> dict[str, Any]:
+    """
+    Read-only endpoint for run status observability via HTTP pull (Heartbeat Pattern).
+    
+    Contract:
+    - GET only, no mutation
+    - If run_status.json exists → return JSON
+    - If missing → return default IDLE state
+    - No partial JSON ever observed (atomic writes guarantee)
+    - No Socket.IO / WebSocket / SSE
+    """
+    try:
+        return read_status()
+    except Exception:
+        # If file missing or unreadable, return default IDLE state
+        return {
+            "state": "IDLE",
+            "progress": 0,
+            "step": "init",
+            "message": "",
+            "started_at": None,
+            "updated_at": None,
+            "eta_seconds": 0,
+            "artifacts": {},
+            "error": None
+        }
 
 
 @app.get("/__identity")

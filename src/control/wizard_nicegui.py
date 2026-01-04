@@ -22,8 +22,8 @@ from data.dataset_registry import DatasetRecord
 from strategy.param_schema import ParamSpec
 from strategy.registry import StrategySpecForGUI
 
-# API base URL
-API_BASE = "http://localhost:8000"
+# API base URL - use relative path (same origin as NiceGUI app)
+API_BASE = ""
 
 
 class WizardState:

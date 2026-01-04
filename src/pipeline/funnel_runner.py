@@ -24,6 +24,19 @@ from pipeline.funnel_plan import build_default_funnel_plan
 from pipeline.funnel_schema import FunnelResultIndex, FunnelStageIndex
 from pipeline.runner_adapter import run_stage_job
 
+# Phase 14: Governance observability via HTTP pull
+try:
+    from control.run_status import (
+        set_running,
+        update_status,
+        set_done,
+        set_failed,
+        set_canceled,
+    )
+    RUN_STATUS_AVAILABLE = True
+except ImportError:
+    RUN_STATUS_AVAILABLE = False
+
 
 def _get_git_info(repo_root: Path | None = None) -> tuple[str, bool]:
     """
@@ -94,6 +107,20 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
     Returns:
         FunnelResultIndex with plan and stage execution indices
     """
+    # Phase 14: Set initial run status
+    if RUN_STATUS_AVAILABLE:
+        try:
+            # Create a composite run_id for the entire funnel
+            from core.run_id import make_run_id as make_composite_id
+            funnel_run_id = make_composite_id(prefix="funnel")
+            set_running(
+                run_id=funnel_run_id,
+                message=f"Starting funnel: {cfg.get('season', 'unknown')} / {cfg.get('dataset_id', 'unknown')}"
+            )
+        except Exception:
+            # If status update fails, continue without it (best-effort)
+            pass
+    
     # Build funnel plan
     plan = build_default_funnel_plan(cfg)
     
@@ -118,7 +145,29 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
     stage_indices: list[FunnelStageIndex] = []
     prev_winners: list[dict[str, Any]] = []
     
-    for spec in plan.stages:
+    # Define stage names for status updates
+    stage_names = {
+        "stage0_coarse": "Stage 0: Coarse exploration",
+        "stage1_topk": "Stage 1: Top-K refinement",
+        "stage2_confirm": "Stage 2: Full confirmation"
+    }
+    
+    for i, spec in enumerate(plan.stages):
+        stage_num = i + 1
+        total_stages = len(plan.stages)
+        
+        # Phase 14: Update status for stage start
+        if RUN_STATUS_AVAILABLE:
+            try:
+                stage_display = stage_names.get(str(spec.name.value), f"Stage {stage_num}")
+                progress = int((stage_num - 1) / total_stages * 80)  # 0-80% for stages
+                update_status(
+                    progress=progress,
+                    step="load_data" if stage_num == 1 else "backtest_kernel",
+                    message=f"{stage_display}: {spec.param_subsample_rate:.1%} subsample"
+                )
+            except Exception:
+                pass
         # Generate run_id for this stage
         run_id = make_run_id(prefix=str(spec.name.value))
         
@@ -151,6 +200,12 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         
         # Handle gate actions
         if gate_result["action"] == "BLOCK":
+            # Phase 14: Update status for failure
+            if RUN_STATUS_AVAILABLE:
+                try:
+                    set_failed(f"OOM Gate BLOCKED stage {spec.name.value}: {gate_result['reason']}")
+                except Exception:
+                    pass
             raise RuntimeError(
                 f"OOM Gate BLOCKED stage {spec.name.value}: {gate_result['reason']}"
             )
@@ -190,6 +245,18 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
             params_effective=params_effective,
             artifact_version="v1",
         )
+        
+        # Phase 14: Update status for kernel execution
+        if RUN_STATUS_AVAILABLE:
+            try:
+                progress = int((stage_num - 0.5) / total_stages * 80)  # Mid-stage progress
+                update_status(
+                    progress=progress,
+                    step="backtest_kernel",
+                    message=f"Running {spec.name.value} kernel"
+                )
+            except Exception:
+                pass
         
         # Run stage job (adapter returns data only, no file I/O)
         # Use stage_cfg which has final subsample (after auto-downsample if any)
@@ -272,6 +339,13 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         
         # Save winners for next stage
         prev_winners = stage_winners.get("topk", [])
+    
+    # Phase 14: Update status for successful completion
+    if RUN_STATUS_AVAILABLE:
+        try:
+            set_done("Funnel completed successfully")
+        except Exception:
+            pass
     
     return FunnelResultIndex(plan=plan, stages=stage_indices)
 

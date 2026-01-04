@@ -4,28 +4,23 @@ from typing import Callable, Optional, List
 from nicegui import ui
 
 from ..pages import (
-    dashboard,
-    wizard,
-    history,
-    candidates,
-    portfolio,
-    deploy,
-    settings,
+    op,
+    registry,
+    allocation,
+    audit,
 )
 from ..services.ui_capabilities import get_ui_capabilities
 
 # Get current UI capabilities
 _CAPS = get_ui_capabilities()
 
-# Tab definitions with their capability flags
+# Tab definitions with their capability flags (kept for backward compatibility)
+# Constitution-mandated tabs: [ OP ] [ Registry ] [ Allocation ] [ Audit ]
 _TAB_DEFINITIONS = [
-    ("dashboard", "Dashboard", "dashboard", _CAPS.enable_dashboard),
-    ("wizard", "Wizard", "auto_fix_high", _CAPS.enable_wizard),
-    ("history", "History", "history", _CAPS.enable_history),
-    ("candidates", "Candidates", "emoji_events", _CAPS.enable_candidates),
-    ("portfolio", "Portfolio", "account_balance", _CAPS.enable_portfolio),
-    ("deploy", "Deploy", "rocket_launch", _CAPS.enable_deploy),
-    ("settings", "Settings", "settings", _CAPS.enable_settings),
+    ("op", "OP", "terminal", _CAPS.enable_op),  # OP is default landing tab
+    ("registry", "Registry", "inventory", _CAPS.enable_registry),
+    ("allocation", "Allocation", "pie_chart", _CAPS.enable_allocation),
+    ("audit", "Audit", "history", _CAPS.enable_audit),
 ]
 
 # Filter tabs based on capabilities
@@ -70,14 +65,12 @@ def get_tab_content(tab_id: str) -> None:
     For tabs that are disabled by capabilities, shows a "not implemented" message.
     """
     # Map tab IDs to page rendering functions
+    # Constitution-mandated tabs: OP, Registry, Allocation, Audit
     page_map = {
-        "dashboard": dashboard.render,
-        "wizard": wizard.render,
-        "history": history.render,
-        "candidates": candidates.render,
-        "portfolio": portfolio.render,
-        "deploy": deploy.render,
-        "settings": settings.render,
+        "op": op,
+        "registry": registry,
+        "allocation": allocation,
+        "audit": audit,
     }
     
     render_func = page_map.get(tab_id)

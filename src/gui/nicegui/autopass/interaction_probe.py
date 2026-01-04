@@ -135,7 +135,7 @@ def generate_interaction_report() -> Dict[str, Any]:
     return {
         "meta": {
             "probe_version": "1.0",
-            "timestamp": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+            "timestamp": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
         },
         "overall": {
             "status": overall_status,

@@ -17,7 +17,7 @@ PRICE_DTYPE_STAGE2 = np.float64
 INTENT_PRICE_DTYPE = np.float64
 INTENT_ENUM_DTYPE = np.uint8  # For role, kind, side
 
-# Index arrays: Use int32 instead of int64 where possible
-INDEX_DTYPE = np.int32  # For bar_index, param_id (if within int32 range)
+# Index arrays: Use int64 to avoid overflow for large order_id values
+INDEX_DTYPE = np.int64  # For bar_index, param_id, order_id (supports >2.1B values)
 
 

@@ -26,6 +26,19 @@ from control.paths import run_log_path
 from control.report_links import make_report_link
 from control.control_types import JobStatus, StopMode
 
+# Phase 14: Run status for governance observability
+try:
+    from control.run_status import (
+        set_running as set_run_status_running,
+        set_done as set_run_status_done,
+        set_failed as set_run_status_failed,
+        set_canceled as set_run_status_canceled,
+        update_status as update_run_status,
+    )
+    RUN_STATUS_AVAILABLE = True
+except ImportError:
+    RUN_STATUS_AVAILABLE = False
+
 
 def _append_log(log_path: Path, text: str) -> None:
     """
@@ -142,6 +155,16 @@ def run_one_job(db_path: Path, job_id: str) -> None:
             f"{timestamp} [job_id={job_id}] [status=RUNNING] Starting funnel execution"
         )
         
+        # Phase 14: Update run status
+        if RUN_STATUS_AVAILABLE:
+            try:
+                set_run_status_running(
+                    run_id=job_id,
+                    message=f"Job {job_id}: {job.spec.season} / {job.spec.dataset_id}"
+                )
+            except Exception:
+                pass
+        
         # Check pause/stop before each stage
         _check_pause_stop(db_path, job_id)
         
@@ -173,6 +196,13 @@ def run_one_job(db_path: Path, job_id: str) -> None:
         # Mark as done with run_id and report_link (both can be None if no stages)
         mark_done(db_path, job_id, run_id=run_id, report_link=report_link)
         
+        # Phase 14: Update run status for successful completion
+        if RUN_STATUS_AVAILABLE:
+            try:
+                set_run_status_done("Job completed successfully")
+            except Exception:
+                pass
+        
         # Log final status
         timestamp = datetime.now(timezone.utc).isoformat()
         if log_path:
@@ -183,6 +213,14 @@ def run_one_job(db_path: Path, job_id: str) -> None:
             timestamp = datetime.now(timezone.utc).isoformat()
             _append_log(log_path, f"{timestamp} [job_id={job_id}] [status=KILLED] Interrupted by user")
         mark_killed(db_path, job_id, error="Interrupted by user")
+        
+        # Phase 14: Update run status for canceled job
+        if RUN_STATUS_AVAILABLE:
+            try:
+                set_run_status_canceled("Job interrupted by user")
+            except Exception:
+                pass
+        
         raise
     except Exception as e:
         import traceback
@@ -190,6 +228,13 @@ def run_one_job(db_path: Path, job_id: str) -> None:
         # Short for DB column (500 chars)
         error_msg = str(e)[:500]
         mark_failed(db_path, job_id, error=error_msg)
+        
+        # Phase 14: Update run status for failure
+        if RUN_STATUS_AVAILABLE:
+            try:
+                set_run_status_failed(f"Job failed: {error_msg}")
+            except Exception:
+                pass
         
         # Full traceback for audit log (MUST)
         tb = traceback.format_exc()

@@ -25,16 +25,17 @@ class WebSocketGuardConfig:
     allowed_path_prefixes: tuple[str, ...]
     close_code: int = 1008  # Policy violation default
     log_denies: bool = False
+    debug_env: str = "FISHBRO_DEBUG_WS_GUARD"
 
 
 class WebSocketGuardMiddleware:
-    """ASGI middleware that rejects WebSocket connections on non‑allowed paths.
+    """ASGI middleware that blackholes non‑allowed WebSocket connections.
 
     Behaviour:
     - If scope.get("type") != "websocket" → pass through
-    - Else check path against allowed_path_prefixes
-    - If path matches any prefix → pass through
-    - Else send {"type": "websocket.close", "code": config.close_code} and return
+    - If path matches allowed_prefixes → pass through to downstream app
+    - Else send {"type": "websocket.accept"} then {"type": "websocket.close", "code": close_code}
+      and return immediately, never calling downstream app.
     """
 
     def __init__(self, app: ASGIApp, config: WebSocketGuardConfig) -> None:
@@ -47,25 +48,58 @@ class WebSocketGuardMiddleware:
         receive: Callable[[], Awaitable[dict]],
         send: Callable[[dict], Awaitable[None]],
     ) -> None:
+        # Debug all scopes when enabled
+        if os.getenv(self.config.debug_env) == "1":
+            print(f"[WS_GUARD] ENTER scope type={scope.get('type')} path={scope.get('path')}", flush=True)
+        
         if scope.get("type") != "websocket":
             # Not a websocket scope, pass through
             await self.app(scope, receive, send)
             return
 
-        path = scope.get("path", "")
-        if any(path.startswith(prefix) for prefix in self.config.allowed_path_prefixes):
-            # Allowed WebSocket path, pass through
+        root_path = scope.get("root_path") or ""
+        path = scope.get("path") or ""
+        effective_path = f"{root_path}{path}"
+        
+        # Normalize path for comparison (strip trailing slash except for root)
+        def _normalize(p: str) -> str:
+            if p != "/" and p.endswith("/"):
+                return p[:-1]
+            return p
+        
+        normalized_effective = _normalize(effective_path)
+        allowed = any(
+            normalized_effective == _normalize(prefix) or
+            normalized_effective.startswith(_normalize(prefix) + "/")
+            for prefix in self.config.allowed_path_prefixes
+        )
+
+        # Optional debug logging
+        if os.getenv(self.config.debug_env) == "1":
+            print(f"[WS_GUARD] WS root_path={root_path} path={path} effective_path={effective_path} normalized={normalized_effective} allowed={allowed} prefixes={self.config.allowed_path_prefixes}", flush=True)
+            logger.debug(
+                "[WS_GUARD] root_path=%s path=%s effective_path=%s normalized=%s allowed=%s prefixes=%s",
+                root_path,
+                path,
+                effective_path,
+                normalized_effective,
+                allowed,
+                self.config.allowed_path_prefixes,
+            )
+
+        if allowed:
+            # Pass through to downstream app (NiceGUI's socket.io handler)
             await self.app(scope, receive, send)
             return
 
-        # Deny this WebSocket connection
+        # Blackhole non-allowed websocket paths
         if self.config.log_denies:
             logger.warning(
-                "WebSocketGuard: rejecting WebSocket on path %s (allowed prefixes: %s)",
-                path,
-                self.config.allowed_path_prefixes,
+                "WebSocketGuard: blackholing WebSocket on effective path %s (not in allowed prefixes)",
+                effective_path,
             )
-        # Send close frame and stop processing
+        # Accept then immediately close (ASGI spec requires accept before close)
+        await send({"type": "websocket.accept"})
         await send({"type": "websocket.close", "code": self.config.close_code})
         # Do NOT call self.app
 
@@ -73,15 +107,13 @@ class WebSocketGuardMiddleware:
 def default_ws_guard_config_from_env() -> WebSocketGuardConfig:
     """Create a WebSocketGuardConfig with defaults and environment overrides.
 
-    Default allowed prefixes:
-    - "/_nicegui_ws"
-    - "/socket.io"
-    - "/_nicegui"
+    Default allowed prefixes (Phase 14.7: precise socket.io path only):
+    - "/_nicegui_ws/socket.io"
 
     Environment variable FISHBRO_ALLOWED_WS_PREFIXES can extend the list
     (comma‑separated, no spaces).
     """
-    default_prefixes = ("/_nicegui_ws", "/socket.io", "/_nicegui")
+    default_prefixes = ("/_nicegui_ws/socket.io",)
     env_prefixes = os.environ.get("FISHBRO_ALLOWED_WS_PREFIXES", "")
     if env_prefixes:
         extra = tuple(p.strip() for p in env_prefixes.split(",") if p.strip())
@@ -95,4 +127,5 @@ def default_ws_guard_config_from_env() -> WebSocketGuardConfig:
         allowed_path_prefixes=allowed,
         close_code=int(os.environ.get("FISHBRO_WS_GUARD_CLOSE_CODE", "1008")),
         log_denies=log_denies,
+        debug_env="FISHBRO_DEBUG_WS_GUARD",
     )

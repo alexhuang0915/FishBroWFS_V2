@@ -86,7 +86,7 @@ def get_system_info() -> Dict[str, Any]:
         pass
     
     return {
-        "ts": datetime.datetime.utcnow().isoformat() + "Z",
+        "ts": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
         "git_sha": git_sha,
         "python": python_version,
         "nicegui": nicegui_version,
@@ -340,7 +340,7 @@ def attempt_portfolio(artifacts_dir: Path) -> Tuple[Optional[Path], Optional[str
         # Build a trivial portfolio
         portfolio = {
             "version": "1.0",
-            "created_at": datetime.datetime.utcnow().isoformat(),
+            "created_at": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f"),
             "candidates": [],
             "weights": {},
             "total_weight": 0.0,

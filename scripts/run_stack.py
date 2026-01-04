@@ -100,6 +100,8 @@ def is_fishbro_process(cmdline: str) -> bool:
         "main.py",
         "uvicorn control.api:app",
         "control.worker_main",
+        "start_dashboard.py",
+        "scripts/start_dashboard.py",
     ]
     return any(indicator in cmdline for indicator in repo_indicators)
 

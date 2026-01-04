@@ -9,7 +9,7 @@ import logging
 import os
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from ..services.status_service import get_state, get_summary, get_status, get_forensics_snapshot
@@ -51,7 +51,7 @@ def generate_ui_forensics(outputs_dir: str = "outputs/forensics") -> Dict[str, A
     
     # 1. Meta
     meta = {
-        "timestamp_iso": datetime.utcfromtimestamp(now).isoformat() + "Z",
+        "timestamp_iso": datetime.fromtimestamp(now, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f") + "Z",
         "pid": os.getpid(),
         "cwd": os.getcwd(),
         "python_version": sys.version,

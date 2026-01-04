@@ -1,3 +1,48 @@
+# FishBroWFS_V2 — GOVERNANCE READY
+
+FishBro Governance Console = Control Tower for Live Kernel + Governance + Audit
+
+**Status**: Phase 10 (RELEASE HYGIENE) — Product Ready
+
+## Quick Start
+
+```bash
+make dashboard
+# or
+python scripts/start_dashboard.py
+```
+
+The Governance Console provides:
+- Portfolio strategy registration & admission
+- Live kernel activation
+- Audit trail visualization
+- Rebalancing controls
+
+## Architecture
+
+```
+[NiceGUI UI]
+       ↓
+[PortfolioService]
+       ↓
+[PortfolioManager]
+   ↓         ↓
+[Store]   [Audit]
+       ↓
+   [Stage2 Kernel]
+```
+
+## Legacy Note
+
+The legacy `gui/nicegui` UI is deprecated and exists only for historical reference.
+The product path uses `src/dashboard/ui.py` via `scripts/start_dashboard.py`.
+
+For full documentation, see [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
+---
+*Original documentation continues below*
+---
+
 # FishBroWFS_V2
 
 Speed-first quantitative backtesting engine.

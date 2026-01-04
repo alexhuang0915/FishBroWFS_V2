@@ -6,18 +6,25 @@ hard contract: only artifact_* directories with both manifest.json AND
 metrics.json are considered promotable artifacts.
 """
 
+import re
 from pathlib import Path
 from typing import Dict, Any, List
 
+# Regex for valid run directory names matching ^(run|artifact)_[0-9a-f]{6,64}$
+_DIR_RE = re.compile(r"^(run|artifact)_[0-9a-f]{6,64}$")
+
 
 def is_artifact_dir_name(name: str) -> bool:
-    """Canonical predicate: return True iff name starts with 'artifact_'."""
-    return name.startswith("artifact_")
+    """Canonical predicate: return True iff name matches ^(run|artifact)_[0-9a-f]{6,64}$."""
+    return bool(_DIR_RE.match(name))
 
 
 def validate_artifact_dir(run_dir: Path) -> Dict[str, Any]:
     """
     HARD CONTRACT: Validate artifact directory.
+    
+    Phase 18: Requires ALL of manifest.json, metrics.json, trades.parquet,
+    equity.parquet, and report.json for a valid promotable artifact.
     
     Returns dict with:
         ok: bool
@@ -29,13 +36,27 @@ def validate_artifact_dir(run_dir: Path) -> Dict[str, Any]:
     if not is_artifact_dir_name(run_dir.name):
         return {"ok": False, "reason": "not_artifact_prefix", "path": str(run_dir)}
     
-    manifest = run_dir / "manifest.json"
-    metrics = run_dir / "metrics.json"
-    if not manifest.exists() or not metrics.exists():
-        missing = []
-        if not manifest.exists(): missing.append("manifest.json")
-        if not metrics.exists(): missing.append("metrics.json")
-        return {"ok": False, "reason": "missing_required_files", "missing": missing, "path": str(run_dir)}
+    # Phase 18: Full artifact contract
+    required_files = [
+        ("manifest.json", run_dir / "manifest.json"),
+        ("metrics.json", run_dir / "metrics.json"),
+        ("trades.parquet", run_dir / "trades.parquet"),
+        ("equity.parquet", run_dir / "equity.parquet"),
+        ("report.json", run_dir / "report.json"),
+    ]
+    
+    missing = []
+    for name, path in required_files:
+        if not path.exists():
+            missing.append(name)
+    
+    if missing:
+        return {
+            "ok": False,
+            "reason": "missing_required_files",
+            "missing": missing,
+            "path": str(run_dir)
+        }
     
     return {"ok": True, "reason": "ok", "path": str(run_dir)}
 
@@ -73,18 +94,31 @@ def validate_artifact_backward_compatible(artifact_path: str) -> Dict[str, Any]:
     if not path.exists():
         return {"valid": False, "run_dir": str(path), "found_files": []}
     
-    # Use strict validation
-    v = validate_artifact_dir(path)
-    if not v.get("ok"):
+    # HARD CONTRACT: MUST be artifact_*
+    if not is_artifact_dir_name(path.name):
         return {"valid": False, "run_dir": str(path), "found_files": []}
     
-    # Check which files exist for backward compatibility
-    required_patterns = ["metrics.json", "manifest.json", "trades.parquet"]
-    found_files = []
+    # Backward compatibility: only require manifest.json and metrics.json
+    # (Phase 15.1 contract)
+    required_files = [
+        ("manifest.json", path / "manifest.json"),
+        ("metrics.json", path / "metrics.json"),
+    ]
     
-    for pattern in required_patterns:
-        if (path / pattern).exists():
-            found_files.append(pattern)
+    found_files = []
+    for name, filepath in required_files:
+        if filepath.exists():
+            found_files.append(name)
+    
+    # Check if we have at least manifest and metrics
+    if len(found_files) < 2:
+        return {"valid": False, "run_dir": str(path), "found_files": found_files}
+    
+    # Also check for Phase 18 files for completeness
+    phase18_files = ["trades.parquet", "equity.parquet", "report.json"]
+    for name in phase18_files:
+        if (path / name).exists():
+            found_files.append(name)
     
     return {
         "valid": True,

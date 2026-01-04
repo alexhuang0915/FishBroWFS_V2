@@ -70,6 +70,13 @@ def build_global_css() -> str:
         
         /* Shadows */
         --shadow-elevated: {SHADOW_ELEVATED};
+        
+        /* Phase 14.1: Color scheme for dark theme */
+        color-scheme: dark;
+        
+        /* Phase 14.3: Compact mode variables */
+        --fb-gap: 8px;
+        --fb-pad: 10px;
     }}
     
     /* Base styles - ensure full coverage */
@@ -224,6 +231,39 @@ def build_global_css() -> str:
         color: var(--text-primary) !important;
     }}
 
+    /* Phase 14.1: Readability/Contrast Fixes */
+    /* Improve text contrast for form labels and inputs */
+    .q-field__label {{
+        color: var(--text-secondary) !important;
+        opacity: 0.9 !important;
+    }}
+    
+    .q-field__native, .q-field__input {{
+        color: var(--text-primary) !important;
+    }}
+    
+    /* Improve card backgrounds for better readability */
+    .q-card {{
+        background-color: rgba(17, 24, 39, 0.72) !important;
+        backdrop-filter: blur(8px);
+    }}
+    
+    /* Ensure all headers and labels have good contrast */
+    h1, h2, h3, h4, h5, h6, label {{
+        color: var(--text-primary) !important;
+        font-weight: 600;
+    }}
+    
+    /* Improve button text contrast */
+    .q-btn {{
+        color: var(--text-primary) !important;
+    }}
+    
+    .q-btn--primary {{
+        background-color: var(--accent-purple) !important;
+        color: white !important;
+    }}
+
     /* Layout constitution classes */
     .nexus-page-fill {{
         width: 100%;
@@ -251,6 +291,20 @@ def build_global_css() -> str:
         border-bottom: 2px solid var(--accent-purple);
         padding-bottom: 12px;
     }}
+
+    /* Phase 14.3: Compact mode CSS */
+    .fb-page {{ padding-top: 8px !important; }}
+    .fb-h1 {{ margin: 0 0 6px 0 !important; font-size: 34px !important; }}
+    .fb-h2 {{ margin: 6px 0 6px 0 !important; font-size: 22px !important; }}
+    .fb-sub {{ margin: 0 0 8px 0 !important; font-size: 13px !important; opacity: .9; }}
+    .fb-card {{ padding: 10px !important; }}
+    .fb-divider {{ margin: 6px 0 !important; }}
+    .fb-actions {{ padding: 8px 0 !important; }}
+    .fb-table-dense .q-table__container {{ padding: 0 !important; }}
+    .fb-table-dense .q-table__top {{ padding: 8px !important; }}
+    .fb-table-dense .q-table__bottom {{ padding: 8px !important; }}
+    .fb-table-dense .q-table th, .fb-table-dense .q-table td {{ padding: 8px 12px !important; }}
+    .fb-legend-row {{ gap: 16px !important; padding: 8px 12px !important; }}
 
     /* Nexus islands grid CSS with responsive breakpoints */
     .nexus-islands {{
@@ -289,7 +343,7 @@ def build_global_css() -> str:
 def inject_global_css() -> None:
     """Inject Nexus global CSS as a style tag."""
     css = build_global_css()
-    ui.add_head_html(f"<style>{css}</style>")
+    ui.add_head_html(f"<style>{css}</style>", shared=True)
 
 
 def inject_fonts() -> None:
@@ -299,7 +353,7 @@ def inject_fonts() -> None:
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     """
-    ui.add_head_html(font_html)
+    ui.add_head_html(font_html, shared=True)
 
 
 def inject_tailwind() -> None:
@@ -335,7 +389,7 @@ def inject_tailwind() -> None:
         }
     </script>
     """
-    ui.add_head_html(tailwind_cdn)
+    ui.add_head_html(tailwind_cdn, shared=True)
 
 
 def inject_nexus_theme(use_tailwind: bool = False) -> None:

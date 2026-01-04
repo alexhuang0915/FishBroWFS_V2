@@ -62,6 +62,15 @@ help:
 	@echo "  make run-freeze       [Phase 3B] Freeze"
 	@echo "  make run-compile      [Phase 3C] Compile"
 	@echo ""
+	@echo "Phase 2 Migration (Supervisor):"
+	@echo "  make clean-cache      Clean cache via Supervisor"
+	@echo "  make clean-cache-legacy  Legacy cache cleaning (if available)"
+	@echo "  make clean-caches     Alias for clean-cache"
+	@echo "  make clean-caches-dry Dry-run cache cleaning"
+	@echo "  make generate-reports Generate reports via Supervisor"
+	@echo "  make generate-reports-legacy Legacy report generation"
+	@echo "  Note: build-data requires parameters, use Supervisor CLI directly"
+	@echo ""
 	@echo "LEGACY / DEPRECATED (NiceGUI/web UI decommissioned):"
 	@echo "  make legacy-gui       Launch legacy NiceGUI (deprecated)"
 	@echo "  make legacy-dashboard Launch legacy dashboard (deprecated)"
@@ -106,20 +115,12 @@ ports-canonical:
 ports: ports-canonical
 
 legacy-gui:
-	@echo "==> [LEGACY] Launching NiceGUI (deprecated) on port $(GUI_PORT)..."
-	@echo "    WARNING: NiceGUI/web UI is decommissioned. Use 'make desktop' instead."
-	@echo "    Use GUI_PORT=... to override."
-	UI_PORT=$(GUI_PORT) $(ENV) $(PYTHON) -B scripts/run_stack.py run --no-backend --no-worker
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 legacy-dashboard:
-	@echo "==> [LEGACY] Launching Dashboard (deprecated)..."
-	@echo "    WARNING: Web UI is decommissioned. Use 'make desktop' instead."
-	@echo "    Host: $(DASH_HOST), Port: $(DASH_PORT), Reload: $(DASH_RELOAD), Show: $(DASH_SHOW)"
-	$(ENV) $(PYTHON) -B scripts/start_dashboard.py \
-		--host $(DASH_HOST) \
-		--port $(DASH_PORT) \
-		$(if $(filter 1,$(DASH_RELOAD)),--reload) \
-		$(if $(filter 1,$(DASH_SHOW)),--show)
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 # -----------------------------------------------------------------------------
 # Desktop UI (Product Standard: Phase 18.5 Wayland Fixed)
@@ -212,73 +213,29 @@ portfolio-gov-smoke:
 # -----------------------------------------------------------------------------
 
 legacy-backend:
-	@echo "==> [LEGACY] Starting Control API server on $(BACKEND_HOST):$(BACKEND_PORT)..."
-	@echo "    WARNING: Web backend is legacy-only. Desktop UI uses direct backend access."
-	@echo "    (Use BACKEND_HOST=... BACKEND_PORT=... to override)"
-	$(ENV) $(PYTHON) -m uvicorn control.api:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 legacy-worker:
-	@echo "==> [LEGACY] Starting Worker daemon..."
-	@echo "    WARNING: Worker is legacy-only for web UI."
-	@echo "    (Database: outputs/jobs.db)"
-	$(ENV) $(PYTHON) -m control.worker_main outputs/jobs.db
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 legacy-war:
-	@echo "==> [LEGACY] Starting full stack (backend + worker)..."
-	@echo "    WARNING: Web stack is legacy-only. Desktop UI requires no ports."
-	@echo "    Backend: http://$(BACKEND_HOST):$(BACKEND_PORT)"
-	@echo "    Worker:  outputs/jobs.db"
-	@echo "    Press Ctrl+C to stop both."
-	@echo ""
-	@echo "Starting backend in background..."
-	@$(ENV) $(PYTHON) -m uvicorn control.api:app --host $(BACKEND_HOST) --port $(BACKEND_PORT) --reload > /tmp/fishbro_backend.log 2>&1 &
-	@BACKEND_PID=$$!; \
-	echo "Backend PID: $$BACKEND_PID"; \
-	echo "Waiting for backend to start..."; \
-	sleep 2; \
-	echo "Starting worker in background..."; \
-	$(ENV) $(PYTHON) -m control.worker_main outputs/jobs.db > /tmp/fishbro_worker.log 2>&1 & \
-	WORKER_PID=$$!; \
-	echo "Worker PID: $$WORKER_PID"; \
-	echo ""; \
-	echo "Backend and worker started. Logs:"; \
-	echo "  Backend: /tmp/fishbro_backend.log"; \
-	echo "  Worker:  /tmp/fishbro_worker.log"; \
-	echo ""; \
-	echo "Press Ctrl+C to stop both processes."; \
-	trap 'echo ""; echo "Stopping processes..."; kill $$BACKEND_PID $$WORKER_PID 2>/dev/null || true; echo "Stopped."; exit 0' INT TERM; \
-	wait
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 legacy-stop-war:
-	@echo "==> [LEGACY] Stopping backend and worker..."
-	@pkill -f "uvicorn control.api:app" 2>/dev/null || true
-	@pkill -f "control.worker_main" 2>/dev/null || true
-	@echo "Stopped."
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 
 gui-safe:
-	@ss -ltnp 2>/dev/null | rg ":\b$(UI_PORT)\b" >/dev/null 2>&1 && { \
-	  echo "ERROR: Port $(UI_PORT) is already in use."; \
-	  echo "Fix: run 'make ports' then 'make down' (or 'fuser -k $(UI_PORT)/tcp')."; \
-	  exit 2; \
-	} || true
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 legacy-up:
-	@echo "==> [LEGACY] Starting full stack (backend+worker+ui)..."
-	@echo "    WARNING: Web stack is legacy-only. Use 'make desktop' for product UI."
-	@if command -v tmux >/dev/null 2>&1; then \
-	  echo "Using tmux to start backend+worker+ui in separate panes..."; \
-	  tmux new-session -d -s fishbro "make legacy-war" \; \
-	    split-window -h "make legacy-gui" \; \
-	    attach-session -t fishbro; \
-	else \
-	  echo "tmux not found. Please run in two terminals:"; \
-	  echo "  Terminal 1: make legacy-war"; \
-	  echo "  Terminal 2: make legacy-gui"; \
-	  echo ""; \
-	  echo "Or install tmux and run again."; \
-	  exit 0; \
-	fi
+	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
+	@exit 1
 
 # -----------------------------------------------------------------------------
 # Clean targets
@@ -290,3 +247,51 @@ clean-all:
 
 clean-snapshot:
 	rm -rf SNAPSHOT/*
+
+# -----------------------------------------------------------------------------
+# Phase 2: Supervisor Migration Targets (Strangler Pattern)
+# -----------------------------------------------------------------------------
+
+clean-cache:
+	@echo "==> Cleaning cache via Supervisor (CLEAN_CACHE job)..."
+	$(ENV) $(PYTHON) -B -m src.control.supervisor.cli submit \
+		--job-type CLEAN_CACHE \
+		--params-json '{"scope": "all", "dry_run": false}'
+
+clean-cache-legacy:
+	@echo "==> [LEGACY] Cleaning cache using legacy implementation..."
+	@echo "ERROR: Legacy clean-cache implementation not found. Use 'make clean-cache' instead."
+	@exit 1
+
+clean-caches:
+	@echo "==> Cleaning caches via Supervisor (CLEAN_CACHE job with scope=all)..."
+	$(ENV) $(PYTHON) -B -m src.control.supervisor.cli submit \
+		--job-type CLEAN_CACHE \
+		--params-json '{"scope": "all", "dry_run": false}'
+
+clean-caches-dry:
+	@echo "==> Dry-run cleaning caches via Supervisor..."
+	$(ENV) $(PYTHON) -B -m src.control.supervisor.cli submit \
+		--job-type CLEAN_CACHE \
+		--params-json '{"scope": "all", "dry_run": true}'
+
+build-data:
+	@echo "==> Building data via Supervisor (BUILD_DATA job)..."
+	@echo "ERROR: BUILD_DATA requires parameters. Use CLI directly:"
+	@echo "  python -B -m src.control.supervisor.cli submit --job-type BUILD_DATA --params-json '{\"dataset_id\": \"...\", \"timeframe_min\": 60}'"
+	@exit 1
+
+build-data-legacy:
+	@echo "==> [LEGACY] Building data using legacy implementation..."
+	@echo "ERROR: Legacy build-data implementation not found. Use Qt Desktop UI 'Prepare Data' button or Supervisor CLI."
+	@exit 1
+
+generate-reports:
+	@echo "==> Generating reports via Supervisor (GENERATE_REPORTS job)..."
+	$(ENV) $(PYTHON) -B -m src.control.supervisor.cli submit \
+		--job-type GENERATE_REPORTS \
+		--params-json '{"outputs_root": "outputs", "strict": true}'
+
+generate-reports-legacy:
+	@echo "==> [LEGACY] Generating reports using legacy implementation..."
+	$(ENV) $(PYTHON) -B scripts/generate_research.py --outputs-root outputs

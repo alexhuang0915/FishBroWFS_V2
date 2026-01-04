@@ -1,1 +1,0 @@
-"""Nexus UI system built on NiceGUI."""

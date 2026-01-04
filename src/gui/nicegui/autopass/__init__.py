@@ -1,1 +1,0 @@
-"""Autopass module for UI self‑test."""

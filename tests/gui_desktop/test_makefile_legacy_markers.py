@@ -39,9 +39,9 @@ def test_makefile_contains_correct_mark_expressions():
     help_section = re.search(r'LEGACY / DEPRECATED.*deprecated', content, re.DOTALL)
     assert help_section is not None, "Help should mention LEGACY / DEPRECATED"
     
-    # Verify legacy-gui target mentions deprecated (could be in echo line after target)
-    gui_section = re.search(r'^legacy-gui:.*?(?:\n\t.*?)*?deprecated', content, re.MULTILINE | re.DOTALL)
-    assert gui_section is not None, "legacy-gui target should be labeled deprecated"
+    # Verify legacy-gui target mentions NiceGUI removal error (could be in echo line after target)
+    gui_section = re.search(r'^legacy-gui:.*?(?:\n\t.*?)*?ERROR: NiceGUI has been fully removed', content, re.MULTILINE | re.DOTALL)
+    assert gui_section is not None, "legacy-gui target should error about NiceGUI removal"
 
 
 def test_makefile_targets_exist():

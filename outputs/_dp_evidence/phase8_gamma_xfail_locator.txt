@@ -1,1 +1,0 @@
-248:@pytest.mark.xfail(reason="Known Phase 8-GAMMA Stage2 kernel exit/heartbeat incomplete; tracked separately", strict=False)

@@ -23,10 +23,11 @@ numba_cache/
 scratch/
 tmp/
 
-# --- Generated artifacts (never commit) ---
-outputs/
-outputs/**
+# Generated artifacts (never commit)
+outputs/*
+!outputs/_dp_evidence/
+!outputs/_dp_evidence/**
 
-# Raw.txt
+# Raw data
 FishBroData/
 *.txt

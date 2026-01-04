@@ -1,6 +1,0 @@
- D src/gui.zip
- M src/gui/nicegui/app.py
-?? scripts/start_dashboard.py
-?? src/dashboard/ui.py
-?? tests/dashboard/test_ui_policy.py
-?? tests/dashboard/test_ui_smoke.py

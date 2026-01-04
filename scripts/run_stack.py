@@ -38,7 +38,6 @@ REQUIRED_MODULES = {
     "requests": "HTTP health checks",
     "uvicorn": "Backend server",
     "fastapi": "Backend API",
-    "nicegui": "UI runtime",
 }
 
 # Default configuration
@@ -231,27 +230,9 @@ def spawn_worker() -> subprocess.Popen:
 
 
 def spawn_gui() -> subprocess.Popen:
-    """Start GUI."""
-    cmd = [
-        sys.executable, "-B", str(REPO_ROOT / "main.py")
-    ]
-    env = os.environ.copy()
-    env.update({
-        "PYTHONPATH": str(REPO_ROOT / "src"),
-        "PYTHONDONTWRITEBYTECODE": "1",
-    })
-    
-    with open(GUI_LOG, "a") as f:
-        proc = subprocess.Popen(
-            cmd,
-            env=env,
-            stdout=f,
-            stderr=subprocess.STDOUT,
-            start_new_session=True
-        )
-    
-    print(f"GUI started (PID: {proc.pid}, log: {GUI_LOG})")
-    return proc
+    """Start GUI (deprecated)."""
+    print("ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI).")
+    sys.exit(1)
 
 
 def save_pids(pids: Dict[str, int]) -> None:

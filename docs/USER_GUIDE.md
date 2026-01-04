@@ -9,7 +9,7 @@ This is the official product interface for managing quantitative trading strateg
 ## Architecture
 
 ```
-[NiceGUI UI]
+[Qt Desktop UI]
        ↓
 [PortfolioService]
        ↓
@@ -21,7 +21,7 @@ This is the official product interface for managing quantitative trading strateg
 ```
 
 **Components:**
-- **NiceGUI UI**: Modern web interface built with NiceGUI framework
+- **Qt Desktop UI**: Modern desktop interface built with PySide6 (Qt)
 - **PortfolioService**: Service layer that enforces governance policies
 - **PortfolioManager**: Core portfolio management logic
 - **Store**: Persistent storage for strategy state and artifacts
@@ -33,16 +33,10 @@ This is the official product interface for managing quantitative trading strateg
 ### Launch the Governance Console
 
 ```bash
-make dashboard
+make desktop
 ```
 
-Or directly:
-
-```bash
-python scripts/start_dashboard.py
-```
-
-The console will start on `http://localhost:8080`.
+The Qt Desktop UI will launch as a native window (no web browser required).
 
 ### First-Time Setup
 
@@ -56,7 +50,7 @@ The console will start on `http://localhost:8080`.
    make doctor
    ```
 
-3. Start the full stack (backend + worker + dashboard):
+3. Start the Qt Desktop UI:
    ```bash
    make run
    ```
@@ -65,7 +59,7 @@ The console will start on `http://localhost:8080`.
 
 ### 1. Register Strategy
 
-From the dashboard, click "New Strategy" to register a new strategy. Provide:
+From the Qt Desktop UI, click "New Strategy" to register a new strategy. Provide:
 - Strategy ID (unique identifier)
 - Configuration JSON (strategy parameters)
 
@@ -89,7 +83,7 @@ Click "Rebalance" to run portfolio rebalancing. This recalculates capital alloca
 
 ### 5. Monitor Audit Trail
 
-The dashboard shows recent audit events at the bottom. All governance decisions are recorded in an immutable audit trail.
+The Qt Desktop UI shows recent audit events at the bottom. All governance decisions are recorded in an immutable audit trail.
 
 ## Where Data Lives
 
@@ -135,24 +129,23 @@ make portfolio-gov-test
 
 ## Legacy System Note
 
-### `gui/nicegui` is Deprecated
-The legacy `gui/nicegui` UI subsystem is deprecated and not part of the product path. It exists only for historical reference and backward compatibility.
+### Qt Desktop UI is the Sole Product Interface
+The Qt Desktop UI (`src/gui/desktop/`) is the only supported user interface. All legacy web UI components have been removed.
 
 ### Policy Enforcement
-The product UI (`src/dashboard/ui.py`) is strictly isolated from legacy code:
+The product UI is strictly isolated from legacy code:
 - Does not import `portfolio.*` modules directly
 - Does not import `engine.*` modules
-- Does not import `gui.nicegui.*` (except for NiceGUI framework itself)
 - Uses only the `dashboard.service.PortfolioService` API
 
 Policy tests enforce these isolation rules.
 
 ## Troubleshooting
 
-### Dashboard Won't Start
-- Check if port 8080 is already in use: `make ports`
-- Stop conflicting processes: `make down`
+### Qt Desktop UI Won't Start
+- Ensure Qt dependencies are installed (PySide6).
 - Verify Python dependencies: `make doctor`
+- If Wayland issues occur, try `make desktop-xcb` (X11 fallback).
 
 ### Tests Failing
 - Ensure test database is clean: `rm -rf outputs/jobs.db outputs/portfolio_store`

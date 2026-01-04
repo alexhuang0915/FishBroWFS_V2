@@ -66,7 +66,7 @@ This document defines the operational contract for the FishBroWFS_V2 supervisor 
 
 ### `make doctor` Exit Codes
 - **0**: All checks passed, system ready to start
-- **10**: Dependency missing (e.g., psutil, requests, uvicorn, fastapi, nicegui)
+- **10**: Dependency missing (e.g., psutil, requests, uvicorn, fastapi)
 - **11**: Port conflict (8000 or 8080 occupied by non-fishbro process)
 - **12**: Environment misconfiguration (missing env vars, invalid paths)
 - **13**: Health check failure (backend/GUI already running but unhealthy)

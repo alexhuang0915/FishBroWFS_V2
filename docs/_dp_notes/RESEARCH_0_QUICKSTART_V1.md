@@ -27,31 +27,34 @@ Research-0 includes three baseline No-Flip experiments:
 - **Exclusions**: No moving averages, momentum indicators, trend indicators, or regime features
 - **Build Policy**: `allow_build: false` (requires pre-built feature cache)
 
-## Running via UI (Wizard Page)
+## Running via Qt Desktop UI
 
-The Wizard page is the **only UI-accessible method** for launching Research-0 experiments. The UI is now frozen per the [UI Freeze Policy](UI_FREEZE_POLICY_V1.md), ensuring consistent workflow.
+The Qt Desktop UI includes a Wizard tab for launching Research-0 experiments. The UI is now frozen per the [UI Freeze Policy](UI_FREEZE_POLICY_V1.md), ensuring consistent workflow.
 
 ### Step-by-Step Workflow
 
-1. **Access the Wizard**
-   - Navigate to the Wizard page in the FishBroWFS application
-   - URL: `/wizard` (if running locally)
+1. **Launch Qt Desktop UI**
+   - Run `make desktop` to start the Qt Desktop application
+   - The main window will open with several tabs
 
-2. **Quick Launch Section**
+2. **Navigate to Wizard Tab**
+   - Click the "Wizard" tab in the top navigation
+
+3. **Quick Launch Section**
    - Locate the "Quick Launch from Experiment YAML" section
    - This section provides direct access to Research-0 experiments
 
-3. **Select Experiment**
+4. **Select Experiment**
    - From the "Experiment YAML" dropdown, select one of:
      - `S1_no_flip.yaml`
-     - `S2_no_flip.yaml` 
+     - `S2_no_flip.yaml`
      - `S3_no_flip.yaml`
 
-4. **Configure Season**
+5. **Configure Season**
    - Verify/update the "Season" field (default: 2026Q1)
    - This determines the output directory structure
 
-5. **Launch Run**
+6. **Launch Run**
    - Click the "Launch Run from YAML" button
    - The system will:
      - Validate the YAML configuration
@@ -59,7 +62,7 @@ The Wizard page is the **only UI-accessible method** for launching Research-0 ex
      - Create a run directory with artifacts
      - Return success/failure status
 
-6. **Monitor Execution**
+7. **Monitor Execution**
    - Success message includes run ID and directory path
    - Use the "Open run folder" button to inspect artifacts
    - Check the launch log for execution details
@@ -260,7 +263,7 @@ Research-0 outputs feed into a structured decision framework for strategy evalua
 | **Missing Feature Cache** | `RuntimeError: Missing required features in cache` | Ensure features are built: `python scripts/build_features_subset.py` |
 | **Invalid YAML** | `yaml.YAMLError` in launch | Validate YAML syntax: `python -m yamllint config.yaml` |
 | **Permission Denied** | `PermissionError` when writing outputs | Check directory permissions: `chmod 755 outputs/seasons` |
-| **UI Wizard Not Loading** | Blank page or errors | Verify NiceGUI server is running: `python main.py` |
+| **UI Wizard Not Loading** | Blank page or errors | Verify Qt Desktop UI is running: `make desktop` |
 | **Run Directory Not Created** | Launch succeeds but no directory | Check `outputs/seasons/{season}/runs/` for new run_* folder |
 
 ### Verification Commands
@@ -272,8 +275,8 @@ ls -la outputs/shared/2026Q1/CME.MNQ/features/features_60m.npz
 # List recent runs
 ls -la outputs/seasons/2026Q1/runs/ | tail -10
 
-# Check run status
-python -m src.gui.nicegui.services.run_launcher_service test
+# Check run status (via Qt Desktop UI)
+# Use the "Run Status" tab in the Qt Desktop UI
 ```
 
 ### Getting Help
@@ -288,7 +291,7 @@ python -m src.gui.nicegui.services.run_launcher_service test
 - **No-Flip Blueprint**: [`WFS_BLUEPRINT_NO_FLIP_V1.md`](WFS_BLUEPRINT_NO_FLIP_V1.md)
 - **UI Freeze Policy**: [`UI_FREEZE_POLICY_V1.md`](UI_FREEZE_POLICY_V1.md)
 - **Strategy Pruning**: [`STRATEGY_PRUNING_POLICY_V1.md`](STRATEGY_PRUNING_POLICY_V1.md)
-- **Run Launcher Service**: [`src/gui/nicegui/services/run_launcher_service.py`](../../src/gui/nicegui/services/run_launcher_service.py)
+- **Run Launcher Service**: (Deprecated, use Qt Desktop UI)
 - **Baseline Runner**: [`scripts/run_baseline.py`](../../scripts/run_baseline.py)
 
 ---

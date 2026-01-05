@@ -85,6 +85,14 @@ class GovernanceParams(BaseModel):
         default=0.8,
         description="Maximum allowed correlation vs. any existing member"
     )
+    max_pairwise_correlation: float = Field(
+        default=0.60,
+        description="Maximum allowed pairwise correlation between candidate strategies (0 < value < 1)"
+    )
+    portfolio_risk_budget_max: float = Field(
+        default=1.00,
+        description="Maximum total risk budget for portfolio (0 < value ≤ 1)"
+    )
 
     # Diversity gate
     bucket_slots: Dict[str, int] = Field(
@@ -142,11 +150,18 @@ class GovernanceParams(BaseModel):
         description="Fraction of exposure retained during circuit breaker"
     )
 
-    @field_validator("corr_portfolio_hard_limit", "corr_member_hard_limit")
+    @field_validator("corr_portfolio_hard_limit", "corr_member_hard_limit", "max_pairwise_correlation")
     @classmethod
     def validate_corr_limits(cls, v: float) -> float:
         if not 0 < v < 1:
             raise ValueError("Correlation limits must be in (0, 1)")
+        return v
+
+    @field_validator("portfolio_risk_budget_max")
+    @classmethod
+    def validate_risk_budget_max(cls, v: float) -> float:
+        if not 0 < v <= 1:
+            raise ValueError("portfolio_risk_budget_max must be in (0, 1]")
         return v
 
     @field_validator("w_max")

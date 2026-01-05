@@ -5,12 +5,18 @@ import subprocess
 import sys
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Set
 import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
 from src.contracts.supervisor.build_portfolio import BuildPortfolioPayload
 from src.control.paths import get_outputs_root
+from src.portfolio.governance.params import load_governance_params
+from src.control.portfolio.evidence_reader import RunEvidenceReader
+from src.control.portfolio.admission import PortfolioAdmissionController
+from src.portfolio.research_bridge import load_research_index, read_decisions_log, build_portfolio_from_research
+from src.portfolio.writer import write_portfolio_artifacts
+from src.contracts.portfolio.admission_schemas import AdmissionDecision
 
 logger = logging.getLogger(__name__)
 
@@ -85,72 +91,145 @@ class BuildPortfolioHandler(BaseJobHandler):
             
             raise  # Re-raise to mark job as FAILED
     
+    def _get_candidate_run_ids(self, season: str, outputs_root: Path) -> Set[str]:
+        """Get candidate run IDs from research decisions (KEEP decisions)."""
+        research_root = outputs_root / "seasons" / season / "research"
+        decisions_log_path = research_root / "decisions.log"
+        if not decisions_log_path.exists():
+            raise RuntimeError(f"Decisions log not found at {decisions_log_path}")
+        
+        decisions = read_decisions_log(decisions_log_path)
+        # Get final decision for each run_id (last entry wins)
+        final_decisions = {}
+        for entry in decisions:
+            run_id = entry.get('run_id', '')
+            if not run_id:
+                continue
+            final_decisions[run_id] = entry.get('decision', '').upper()
+        
+        # Keep only KEEP decisions
+        keep_run_ids = {run_id for run_id, decision in final_decisions.items() if decision == 'KEEP'}
+        return keep_run_ids
+    
+    def _run_admission_gate(self, payload: BuildPortfolioPayload, outputs_root: Path, portfolio_dir: Path) -> AdmissionDecision:
+        """Run portfolio admission gate; raise RuntimeError if admission fails.
+        
+        Returns:
+            AdmissionDecision if admitted.
+        """
+        # Load governance params
+        params = load_governance_params()
+        
+        # Initialize evidence reader
+        evidence_reader = RunEvidenceReader()
+        
+        # Get candidate run IDs
+        candidate_run_ids = list(self._get_candidate_run_ids(payload.season, outputs_root))
+        if not candidate_run_ids:
+            raise RuntimeError("No candidate run IDs (KEEP decisions) found for admission.")
+        
+        # Generate provisional portfolio ID (deterministic hash of candidate run IDs)
+        import hashlib
+        sorted_ids = sorted(candidate_run_ids)
+        id_string = ",".join(sorted_ids)
+        hash_digest = hashlib.sha256(id_string.encode()).hexdigest()[:12]
+        provisional_portfolio_id = f"portfolio_{payload.season}_{hash_digest}"
+        
+        # Create admission controller
+        controller = PortfolioAdmissionController(
+            governance_params=params,
+            evidence_reader=evidence_reader
+        )
+        
+        # Determine evidence directory: outputs/seasons/{season}/portfolios/{portfolio_id}/admission
+        portfolios_root = outputs_root / "seasons" / payload.season / "portfolios"
+        portfolios_root.mkdir(parents=True, exist_ok=True)
+        
+        # Evaluate admission and write evidence
+        decision = controller.evaluate_and_write_evidence(
+            candidate_run_ids=candidate_run_ids,
+            portfolio_id=provisional_portfolio_id,
+            evidence_dir=portfolios_root
+        )
+        
+        if not decision.admitted:
+            # Summarize top reasons
+            reasons = []
+            for rejected in decision.rejected_run_ids:
+                reason = decision.reasons.get(rejected, "unknown")
+                reasons.append(f"{rejected}: {reason}")
+            summary = "; ".join(reasons[:5])  # top 5
+            raise RuntimeError(f"Portfolio admission failed: {summary}")
+        
+        # Admission passed; we could optionally filter candidate run IDs, but the portfolio builder
+        # will use the same KEEP decisions (which are already filtered by admission).
+        # The admission evidence is already written to evidence_dir/admission.
+        logger.info(f"Portfolio admission passed with {len(decision.admitted_run_ids)} admitted runs.")
+        return decision
+    
     def _execute_portfolio(self, payload: BuildPortfolioPayload, context: JobContext, outputs_root: Path, portfolio_dir: Path) -> Dict[str, Any]:
         """Execute the actual portfolio build logic."""
         # Update heartbeat
         context.heartbeat(progress=0.3, phase="preparing_portfolio")
         
-        # Build command for portfolio execution
-        cmd = [
-            sys.executable, "-B", "-m", "scripts.build_portfolio_from_research",
-            "--season", payload.season,
-            "--outputs-root", str(outputs_root)
-        ]
-        
-        # Add optional parameters
-        if payload.allowlist:
-            cmd.extend(["--allowlist", payload.allowlist])
-        
-        # Set up stdout/stderr capture
-        stdout_path = Path(context.artifacts_dir) / "portfolio_stdout.txt"
-        stderr_path = Path(context.artifacts_dir) / "portfolio_stderr.txt"
-        
-        logger.info(f"Executing portfolio build via CLI: {' '.join(cmd)}")
+        # Run admission gate before building portfolio
+        decision = self._run_admission_gate(payload, outputs_root, portfolio_dir)
         
         # Update heartbeat
-        context.heartbeat(progress=0.5, phase="executing_portfolio")
+        context.heartbeat(progress=0.5, phase="building_portfolio")
         
-        try:
-            with open(stdout_path, "w") as stdout_file, open(stderr_path, "w") as stderr_file:
-                # Run subprocess
-                process = subprocess.run(
-                    cmd,
-                    stdout=stdout_file,
-                    stderr=stderr_file,
-                    text=True,
-                    cwd=Path.cwd(),
-                    env={**os.environ, "PYTHONPATH": "src"}
-                )
-            
-            # Check result
-            if process.returncode == 0:
-                context.heartbeat(progress=0.9, phase="finalizing")
-                
-                # Parse output to extract results
-                result = self._parse_portfolio_output(stdout_path, portfolio_dir)
-                
-                return {
-                    "ok": True,
-                    "returncode": process.returncode,
-                    "stdout_path": str(stdout_path),
-                    "stderr_path": str(stderr_path),
-                    "result": result
-                }
-            else:
-                error_msg = f"Portfolio CLI failed with return code {process.returncode}"
-                logger.error(error_msg)
-                
-                # Read stderr for more details
-                stderr_content = ""
-                if stderr_path.exists():
-                    stderr_content = stderr_path.read_text()[:1000]
-                
-                raise RuntimeError(f"{error_msg}\nStderr: {stderr_content}")
-                
-        except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Portfolio subprocess failed: {e}")
-        except Exception as e:
-            raise RuntimeError(f"Failed to execute portfolio build: {e}")
+        # Prepare symbols allowlist
+        symbols_allowlist = set()
+        if payload.allowlist:
+            symbols_allowlist = {s.strip() for s in payload.allowlist.split(",") if s.strip()}
+        else:
+            # Default allowlist (maybe from config)
+            symbols_allowlist = {"CME.MNQ", "TWF.MXF"}
+        
+        # Build portfolio using admitted run IDs
+        portfolio_id, portfolio_spec, manifest = build_portfolio_from_research(
+            season=payload.season,
+            outputs_root=outputs_root,
+            symbols_allowlist=symbols_allowlist,
+            run_ids_allowlist=set(decision.admitted_run_ids)
+        )
+        
+        # Write portfolio artifacts
+        out_dir = write_portfolio_artifacts(
+            outputs_root=outputs_root,
+            season=payload.season,
+            spec=portfolio_spec,
+            manifest=manifest
+        )
+        
+        # Update heartbeat
+        context.heartbeat(progress=0.9, phase="finalizing")
+        
+        # Capture stdout/stderr for compatibility (empty)
+        stdout_path = Path(context.artifacts_dir) / "portfolio_stdout.txt"
+        stderr_path = Path(context.artifacts_dir) / "portfolio_stderr.txt"
+        stdout_path.write_text(f"Portfolio built via direct call. Portfolio ID: {portfolio_id}\n")
+        stderr_path.write_text("")
+        
+        # Parse output to extract results
+        result = self._parse_portfolio_output(stdout_path, portfolio_dir)
+        # Admission evidence directory
+        admission_evidence_dir = outputs_root / "seasons" / payload.season / "portfolios" / decision.portfolio_id / "admission"
+        result.update({
+            "portfolio_id": portfolio_id,
+            "portfolio_spec_path": str(out_dir / "portfolio_spec.json"),
+            "portfolio_manifest_path": str(out_dir / "portfolio_manifest.json"),
+            "admitted_run_ids": decision.admitted_run_ids,
+            "admission_evidence_dir": str(admission_evidence_dir)
+        })
+        
+        return {
+            "ok": True,
+            "returncode": 0,
+            "stdout_path": str(stdout_path),
+            "stderr_path": str(stderr_path),
+            "result": result
+        }
     
     def _parse_portfolio_output(self, stdout_path: Path, portfolio_dir: Path) -> Dict[str, Any]:
         """Parse portfolio output to extract results."""

@@ -11,7 +11,7 @@ import json
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, List, Set, Tuple
+from typing import Dict, List, Set, Tuple, Optional
 
 from .decisions_reader import read_decisions_log
 from .hash_utils import stable_json_dumps, sha1_text
@@ -40,6 +40,7 @@ def build_portfolio_from_research(
     season: str,
     outputs_root: Path,
     symbols_allowlist: Set[str],
+    run_ids_allowlist: Optional[Set[str]] = None,
 ) -> Tuple[str, PortfolioSpec, dict]:
     """Build portfolio from research decisions.
     
@@ -47,6 +48,8 @@ def build_portfolio_from_research(
         season: Season identifier (e.g., "2026Q1")
         outputs_root: Root outputs directory
         symbols_allowlist: Set of allowed symbols (e.g., {"CME.MNQ", "TWF.MXF"})
+        run_ids_allowlist: Optional set of run IDs to restrict to (intersection with KEEP decisions).
+            If None, all KEEP decisions are used.
         
     Returns:
         Tuple of (portfolio_id, portfolio_spec, manifest_dict)
@@ -67,6 +70,10 @@ def build_portfolio_from_research(
         run_id for run_id, decision_info in final_decisions.items()
         if decision_info.get('decision', '').upper() == 'KEEP'
     }
+    
+    # Apply run_ids_allowlist if provided
+    if run_ids_allowlist is not None:
+        keep_run_ids = keep_run_ids.intersection(run_ids_allowlist)
     
     # Extract research entries and filter by allowlist
     research_entries = research_index.get('entries', [])

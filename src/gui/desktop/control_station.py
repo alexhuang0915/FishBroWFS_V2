@@ -5,13 +5,14 @@ Matching historical NiceGUI product design with 1:1 functional parity.
 
 import logging
 import os
+import time
 from pathlib import Path
 from typing import Optional
 
 from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QLabel, QPushButton, QStatusBar
+    QLabel, QPushButton, QStatusBar, QMessageBox
 )
 from PySide6.QtGui import QFont, QFontDatabase
 
@@ -20,6 +21,12 @@ from .tabs.report_tab import ReportTab
 from .tabs.registry_tab import RegistryTab
 from .tabs.allocation_tab import AllocationTab
 from .tabs.audit_tab import AuditTab
+from .supervisor_lifecycle import (
+    ensure_supervisor_running,
+    SupervisorStatus,
+    detect_port_occupant_8000,
+)
+from .config import SUPERVISOR_BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +80,16 @@ class ControlStation(QMainWindow):
     
     def __init__(self):
         super().__init__()
+        
+        # Supervisor state
+        self.supervisor_status = SupervisorStatus.NOT_RUNNING
+        self.supervisor_details = {}
+        
         self.setup_ui()
         self.setup_connections()
+        
+        # Start supervisor on initialization
+        self.start_supervisor()
         
         # Timer for periodic updates
         self.update_timer = QTimer()
@@ -202,12 +217,97 @@ class ControlStation(QMainWindow):
         if 0 <= index < len(tab_names):
             self.handle_log(f"Switched to {tab_names[index]} tab")
     
+    def start_supervisor(self):
+        """Ensure supervisor is running at desktop startup."""
+        logger.info("Checking supervisor status...")
+        self.supervisor_status, self.supervisor_details = ensure_supervisor_running()
+        
+        # Handle different statuses
+        if self.supervisor_status == SupervisorStatus.PORT_OCCUPIED:
+            # Show blocking error for port occupied by non-fishbro process
+            pid = self.supervisor_details.get("pid")
+            process_name = self.supervisor_details.get("process_name", "unknown")
+            cmdline = self.supervisor_details.get("cmdline", [])
+            
+            error_msg = (
+                f"Port 8000 is occupied by another process.\n\n"
+                f"PID: {pid}\n"
+                f"Process: {process_name}\n"
+                f"Command: {' '.join(cmdline[:5]) if cmdline else 'unknown'}\n\n"
+                f"Please stop the service using port 8000 and restart the Desktop."
+            )
+            
+            QMessageBox.critical(
+                self,
+                "Port Conflict",
+                error_msg,
+                QMessageBox.Ok
+            )
+            logger.error(f"Port 8000 occupied by non-fishbro process: {self.supervisor_details}")
+        
+        elif self.supervisor_status == SupervisorStatus.ERROR:
+            error_msg = (
+                f"Failed to start supervisor.\n\n"
+                f"Error: {self.supervisor_details.get('message', 'Unknown error')}\n\n"
+                f"Check logs at outputs/_dp_evidence/desktop_supervisor_runtime.log"
+            )
+            
+            QMessageBox.warning(
+                self,
+                "Supervisor Error",
+                error_msg,
+                QMessageBox.Ok
+            )
+            logger.error(f"Supervisor startup error: {self.supervisor_details}")
+        
+        elif self.supervisor_status == SupervisorStatus.RUNNING:
+            logger.info(f"Supervisor is running: {self.supervisor_details}")
+        
+        elif self.supervisor_status == SupervisorStatus.STARTING:
+            logger.info("Supervisor is starting...")
+        
+        # Update status indicator immediately
+        self.update_supervisor_status_indicator()
+
+    def update_supervisor_status_indicator(self):
+        """Update the status indicator based on supervisor state."""
+        if self.supervisor_status == SupervisorStatus.RUNNING:
+            self.status_indicator.setText(f"🟢 Connected to {SUPERVISOR_BASE_URL}")
+            self.status_indicator.setStyleSheet("font-size: 11px; color: #4CAF50;")
+        
+        elif self.supervisor_status == SupervisorStatus.STARTING:
+            self.status_indicator.setText("🟡 Starting Supervisor...")
+            self.status_indicator.setStyleSheet("font-size: 11px; color: #FFC107;")
+        
+        elif self.supervisor_status == SupervisorStatus.PORT_OCCUPIED:
+            self.status_indicator.setText("🔴 Port 8000 occupied")
+            self.status_indicator.setStyleSheet("font-size: 11px; color: #F44336;")
+        
+        elif self.supervisor_status == SupervisorStatus.ERROR:
+            self.status_indicator.setText("🔴 Supervisor error")
+            self.status_indicator.setStyleSheet("font-size: 11px; color: #F44336;")
+        
+        else:  # NOT_RUNNING
+            self.status_indicator.setText("⚪ Supervisor not running")
+            self.status_indicator.setStyleSheet("font-size: 11px; color: #9A9A9A;")
+
     @Slot()
     def update_status(self):
         """Periodic status update."""
-        # Update status indicator
-        # Could check for backend connectivity, disk space, etc.
-        pass
+        # Update supervisor status indicator
+        self.update_supervisor_status_indicator()
+        
+        # If supervisor is not running, try to restart periodically
+        if self.supervisor_status in [SupervisorStatus.NOT_RUNNING, SupervisorStatus.ERROR]:
+            # Only retry every 30 seconds to avoid spam
+            if hasattr(self, '_last_supervisor_retry'):
+                elapsed = time.time() - self._last_supervisor_retry
+                if elapsed < 30:
+                    return
+            
+            logger.info("Attempting to restart supervisor...")
+            self.supervisor_status, self.supervisor_details = ensure_supervisor_running()
+            self._last_supervisor_retry = time.time()
     
     def closeEvent(self, event):
         """Handle window close event."""

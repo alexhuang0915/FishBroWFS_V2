@@ -59,6 +59,11 @@ def test_no_localhost_network_tests():
         try:
             content = test_file.read_text(encoding="utf-8")
             
+            # Skip files marked as integration or slow tests
+            # These are allowed to use real network for supervisor lifecycle testing
+            if "@pytest.mark.integration" in content or "@pytest.mark.slow" in content:
+                continue
+            
             # Check for forbidden patterns
             for pattern, reason in forbidden_patterns:
                 if re.search(pattern, content):

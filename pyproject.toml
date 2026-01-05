@@ -3,7 +3,7 @@ name = "FishBroWFS_V2"
 version = "0.1.0"
 description = "Speed-first backtesting engine"
 requires-python = ">=3.10"
-dependencies = ["numpy", "PySide6"]
+dependencies = ["numpy", "PySide6", "requests"]
 
 [build-system]
 requires = ["setuptools"]

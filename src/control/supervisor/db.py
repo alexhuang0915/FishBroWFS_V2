@@ -52,9 +52,17 @@ class SupervisorDB:
                         last_heartbeat TEXT NULL,
                         abort_requested INTEGER DEFAULT 0,
                         progress REAL NULL,
-                        phase TEXT NULL
+                        phase TEXT NULL,
+                        params_hash TEXT DEFAULT ''
                     )
                 """)
+                
+                # Add params_hash column if it doesn't exist (schema migration)
+                cursor = conn.execute("PRAGMA table_info(jobs)")
+                columns = [row[1] for row in cursor.fetchall()]
+                if "params_hash" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN params_hash TEXT DEFAULT ''")
+                
                 # workers table
                 conn.execute("""
                     CREATE TABLE IF NOT EXISTS workers (
@@ -72,12 +80,14 @@ class SupervisorDB:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_worker ON jobs(worker_id)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_heartbeat ON jobs(last_heartbeat)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status)")
+                # Index for duplicate fingerprint checks
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_type_params_hash ON jobs(job_type, params_hash)")
                 conn.commit()
             except Exception:
                 conn.rollback()
                 raise
     
-    def submit_job(self, spec: JobSpec) -> str:
+    def submit_job(self, spec: JobSpec, params_hash: str = "", state: str = "QUEUED") -> str:
         """Submit a new job and return job_id."""
         job_id = new_job_id()
         now = now_iso()
@@ -91,9 +101,33 @@ class SupervisorDB:
                         job_id, job_type, spec_json, state, state_reason,
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
-                        abort_requested, progress, phase
-                    ) VALUES (?, ?, ?, 'QUEUED', '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL)
-                """, (job_id, spec.job_type, spec_json, now, now))
+                        abort_requested, progress, phase, params_hash
+                    ) VALUES (?, ?, ?, ?, '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
+                """, (job_id, spec.job_type, spec_json, state, now, now, params_hash))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+        
+        return job_id
+    
+    def submit_rejected_job(self, spec: JobSpec, params_hash: str, rejection_reason: str) -> str:
+        """Submit a job with REJECTED state."""
+        job_id = new_job_id()
+        now = now_iso()
+        spec_json = spec.model_dump_json()
+        
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("""
+                    INSERT INTO jobs (
+                        job_id, job_type, spec_json, state, state_reason,
+                        result_json, created_at, updated_at,
+                        worker_id, worker_pid, last_heartbeat,
+                        abort_requested, progress, phase, params_hash
+                    ) VALUES (?, ?, ?, 'REJECTED', ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
+                """, (job_id, spec.job_type, spec_json, rejection_reason, now, now, params_hash))
                 conn.commit()
             except Exception:
                 conn.rollback()

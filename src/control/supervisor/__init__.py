@@ -15,11 +15,21 @@ from .handlers.ping import ping_handler
 from .handlers.clean_cache import clean_cache_handler
 from .handlers.build_data import build_data_handler
 from .handlers.generate_reports import generate_reports_handler
+from .handlers.run_research import run_research_handler
+from .handlers.run_plateau import run_plateau_handler
+from .handlers.run_freeze import run_freeze_handler
+from .handlers.run_compile import run_compile_handler
+from .handlers.build_portfolio import build_portfolio_handler
 
 register_handler("PING", ping_handler)
 register_handler("CLEAN_CACHE", clean_cache_handler)
 register_handler("BUILD_DATA", build_data_handler)
 register_handler("GENERATE_REPORTS", generate_reports_handler)
+register_handler("RUN_RESEARCH_V2", run_research_handler)
+register_handler("RUN_PLATEAU_V2", run_plateau_handler)
+register_handler("RUN_FREEZE_V2", run_freeze_handler)
+register_handler("RUN_COMPILE_V2", run_compile_handler)
+register_handler("BUILD_PORTFOLIO_V2", build_portfolio_handler)
 
 
 def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:

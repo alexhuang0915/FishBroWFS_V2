@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional, Literal
 import uuid
 from datetime import datetime, timezone
 
-JobState = Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "ABORTED", "ORPHANED"]
+JobState = Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "ABORTED", "ORPHANED", "REJECTED"]
 
 HEARTBEAT_INTERVAL_SEC: float = 2.0
 HEARTBEAT_TIMEOUT_SEC: float = 10.0

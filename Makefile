@@ -61,6 +61,7 @@ help:
 	@echo "  make run-plateau      [Phase 3A] Plateau"
 	@echo "  make run-freeze       [Phase 3B] Freeze"
 	@echo "  make run-compile      [Phase 3C] Compile"
+	@echo "  make run-portfolio    [Phase 3D] Portfolio Build"
 	@echo ""
 	@echo "Phase 2 Migration (Supervisor):"
 	@echo "  make clean-cache      Clean cache via Supervisor"
@@ -152,17 +153,65 @@ war-room: legacy-gui
 	@echo "==> [LEGACY] Starting war room (NiceGUI web UI)"
 	@echo "    WARNING: Web UI is decommissioned. Use 'make desktop' instead."
 
+# -----------------------------------------------------------------------------
+# Pipeline Targets (Supervisor Wrappers)
+# These targets submit jobs to Supervisor v2 and do NOT execute core logic directly.
+# -----------------------------------------------------------------------------
+
 run-research:
+	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
+	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
+	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
+	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
+		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
+		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
+		exit 2; \
+	fi
 	$(ENV) $(PYTHON) -B scripts/run_research_v3.py
 
 run-plateau:
+	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
+	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
+	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
+	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
+		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
+		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
+		exit 2; \
+	fi
 	$(ENV) $(PYTHON) -B scripts/run_phase3a_plateau.py
 
 run-freeze:
+	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
+	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
+	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
+	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
+		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
+		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
+		exit 2; \
+	fi
 	$(ENV) $(PYTHON) -B scripts/run_phase3b_freeze.py
 
 run-compile:
+	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
+	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
+	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
+	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
+		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
+		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
+		exit 2; \
+	fi
 	$(ENV) $(PYTHON) -B scripts/run_phase3c_compile.py
+
+run-portfolio:
+	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
+	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
+	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
+	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
+		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
+		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
+		exit 2; \
+	fi
+	$(ENV) $(PYTHON) -B scripts/build_portfolio_from_research.py
 
 run-season: run-research run-plateau run-freeze run-compile
 

@@ -107,7 +107,7 @@ def main() -> int:
     
     # list command
     list_parser = subparsers.add_parser("list", help="List jobs")
-    list_parser.add_argument("--state", type=str, choices=["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "ABORTED", "ORPHANED"],
+    list_parser.add_argument("--state", type=str, choices=["QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "ABORTED", "ORPHANED", "REJECTED"],
                             help="Filter by state")
     
     # abort command

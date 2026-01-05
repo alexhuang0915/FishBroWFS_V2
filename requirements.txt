@@ -44,11 +44,8 @@ pytest-playwright>=0.4,<1.0
 # GUI (Phase 0–4)
 # ===============================
 
-# GUI now uses NiceGUI only; streamlit removed per policy.
-# [NEW] Added NiceGUI as it was missing from the list
-nicegui>=1.4,<2.0
-
-# [NEW] Often needed for NiceGUI sessions
+# GUI now uses Qt Desktop UI only; NiceGUI removed per policy.
+# [NEW] itsdangerous kept for compatibility with other dependencies
 itsdangerous>=2.0,<3.0
 
 # ===============================

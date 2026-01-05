@@ -56,7 +56,6 @@ def test_port_occupied_detection_includes_pid_and_cmdline():
 
 
 @pytest.mark.skipif(not QT_AVAILABLE, reason="PySide6 not available")
-@pytest.mark.legacy_ui
 def test_control_station_shows_port_occupied_dialog():
     """Test that ControlStation shows QMessageBox for PORT_OCCUPIED."""
     # Import here to avoid Qt import errors when skipped
@@ -87,9 +86,6 @@ def test_control_station_shows_port_occupied_dialog():
             station.status_indicator = Mock()
             station.status_indicator.setText = Mock()
             station.status_indicator.setStyleSheet = Mock()
-            
-            # Mock the parent class initialization
-            super(ControlStation, station).__init__ = Mock()
             
             # Call start_supervisor directly
             station.start_supervisor()

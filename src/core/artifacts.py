@@ -11,8 +11,7 @@ import json
 from pathlib import Path
 from typing import Any, Dict
 
-from core.winners_builder import build_winners_v2
-from core.winners_schema import is_winners_legacy, is_winners_v2
+from core.winners_schema import build_winners_v2_dict, is_winners_v2
 
 
 def _write_json(path: Path, obj: Any) -> None:
@@ -45,7 +44,7 @@ def write_run_artifacts(
     - manifest.json: Full AuditSchema data
     - config_snapshot.json: Original/normalized config
     - metrics.json: Performance metrics
-    - winners.json: Top-K results (fixed schema)
+    - winners.json: Top-K results (v2 schema only)
     - README.md: Human-readable summary
     - logs.txt: Execution logs (empty initially)
     
@@ -54,8 +53,9 @@ def write_run_artifacts(
         manifest: Manifest data (AuditSchema as dict)
         config_snapshot: Configuration snapshot
         metrics: Performance metrics (must include param_subsample_rate visibility)
-        winners: Optional winners dict. If None, uses empty schema.
-            Must follow schema: {"topk": [...], "notes": {"schema": "v1", ...}}
+        winners: Optional winners dict. If None, uses empty v2 schema.
+            Must follow v2 schema (see core.winners_schema).
+            Legacy winners are no longer supported.
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -68,46 +68,21 @@ def write_run_artifacts(
     # Write metrics.json (must include param_subsample_rate visibility)
     _write_json(run_dir / "metrics.json", metrics)
     
-    # Write winners.json (always output v2 schema)
+    # Write winners.json (v2 schema only)
     if winners is None:
-        winners = {"topk": [], "notes": {"schema": "v1"}}
-    
-    # Auto-upgrade legacy winners to v2
-    if is_winners_legacy(winners):
-        # Convert legacy to v2
-        legacy_topk = winners.get("topk", [])
-        run_id = manifest.get("run_id", "unknown")
-        stage_name = metrics.get("stage_name", "unknown")
-        
-        winners = build_winners_v2(
-            stage_name=stage_name,
-            run_id=run_id,
-            manifest=manifest,
-            config_snapshot=config_snapshot,
-            legacy_topk=legacy_topk,
+        winners = build_winners_v2_dict(
+            stage_name=metrics.get("stage_name", "unknown"),
+            run_id=manifest.get("run_id", "unknown"),
+            topk=[],
         )
-    elif not is_winners_v2(winners):
-        # Unknown format - try to upgrade anyway (defensive)
-        legacy_topk = winners.get("topk", [])
-        if legacy_topk:
-            run_id = manifest.get("run_id", "unknown")
-            stage_name = metrics.get("stage_name", "unknown")
-            
-            winners = build_winners_v2(
-                stage_name=stage_name,
-                run_id=run_id,
-                manifest=manifest,
-                config_snapshot=config_snapshot,
-                legacy_topk=legacy_topk,
-            )
-        else:
-            # Empty topk - create minimal v2 structure
-            from core.winners_schema import build_winners_v2_dict
-            winners = build_winners_v2_dict(
-                stage_name=metrics.get("stage_name", "unknown"),
-                run_id=manifest.get("run_id", "unknown"),
-                topk=[],
-            )
+    
+    # Ensure winners are v2 schema; legacy winners are not allowed.
+    if not is_winners_v2(winners):
+        raise ValueError(
+            f"Winners dict does not conform to v2 schema. "
+            f"Legacy winners conversion removed. "
+            f"Got keys: {list(winners.keys())}"
+        )
     
     _write_json(run_dir / "winners.json", winners)
     

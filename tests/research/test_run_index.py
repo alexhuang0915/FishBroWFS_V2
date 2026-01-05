@@ -19,7 +19,7 @@ from research.run_index import (
 
 
 def test_run_index_list_runs_handles_mixed_dirs():
-    """Test that list_runs() handles mixed run_* and artifact_* directories."""
+    """Test that list_runs() ignores artifact_* directories (run_* only)."""
     with tempfile.TemporaryDirectory() as tmpdir:
         outputs_root = Path(tmpdir)
         season = "2026Q1"
@@ -58,7 +58,7 @@ def test_run_index_list_runs_handles_mixed_dirs():
             "stage_name": "research",
         }))
         
-        # Create a legacy artifact_* directory
+        # Create a legacy artifact_* directory (should be ignored)
         artifact_dir = runs_dir / "artifact_S1-20260103T101142Z-3ed66323"
         artifact_dir.mkdir()
         (artifact_dir / "manifest.json").write_text(json.dumps({
@@ -92,8 +92,8 @@ def test_run_index_list_runs_handles_mixed_dirs():
         # List runs
         runs = list_runs(outputs_root, season)
         
-        # Should find all 3 directories
-        assert len(runs) == 3
+        # Should find only the two run_* directories (artifact ignored)
+        assert len(runs) == 2
         
         # Should be sorted newest first (run_dir2 is newest)
         assert runs[0].run_id == "run_def456"
@@ -106,10 +106,9 @@ def test_run_index_list_runs_handles_mixed_dirs():
         assert run_abc.strategy_id == "S1"
         assert run_abc.timeframe == "60"
         
-        # Check legacy artifact
-        artifact = next(r for r in runs if "artifact_" in r.run_id)
-        assert artifact.status == "COMPLETED"  # Should be inferred from manifest
-        assert artifact.dataset_id == "CBOT.ZN"
+        # Ensure no artifact appears in results
+        artifact_runs = [r for r in runs if "artifact_" in r.run_id]
+        assert len(artifact_runs) == 0
 
 
 def test_find_best_run_prefers_completed_and_matches_intent():

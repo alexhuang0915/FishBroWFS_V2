@@ -8,6 +8,8 @@ Each stage gets its own run_id and run directory.
 from __future__ import annotations
 
 import subprocess
+# Subprocess usage: git info collection for audit trail.
+# NOT UI ENTRYPOINT – only used by research pipeline via Supervisor jobs.
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
@@ -19,6 +21,7 @@ from core.config_snapshot import make_config_snapshot
 from core.oom_gate import decide_oom_action
 from core.paths import ensure_run_dir
 from core.run_id import make_run_id
+from core.winners_schema import WinnerItemV2, build_winners_v2_dict, is_winners_v2
 from data.session.tzdb_info import get_tzdb_info
 from pipeline.funnel_plan import build_default_funnel_plan
 from pipeline.funnel_schema import FunnelResultIndex, FunnelStageIndex
@@ -36,6 +39,61 @@ try:
     RUN_STATUS_AVAILABLE = True
 except ImportError:
     RUN_STATUS_AVAILABLE = False
+
+
+def _convert_legacy_winners_to_v2(
+    legacy_winners: dict,
+    stage_name: str,
+    run_id: str,
+) -> dict:
+    """
+    Convert legacy winners (v1 schema) to v2 schema.
+    
+    Legacy format:
+        {"topk": [{"param_id": ..., "proxy_value": ...}], "notes": {"schema": "v1", ...}}
+        or {"topk": [{"param_id": ..., "net_profit": ..., "trades": ..., "max_dd": ...}], ...}
+    
+    Returns:
+        Winners dict with v2 schema.
+    """
+    topk = legacy_winners.get("topk", [])
+    notes = legacy_winners.get("notes", {})
+    
+    v2_items = []
+    for item in topk:
+        param_id = item.get("param_id")
+        # Determine score: proxy_value or net_profit
+        score = item.get("proxy_value", item.get("net_profit", 0.0))
+        # Build metrics dict with all fields from item
+        metrics = {k: v for k, v in item.items() if k != "param_id"}
+        # Build source dict
+        source = {
+            "param_id": param_id,
+            "run_id": run_id,
+            "stage_name": stage_name,
+        }
+        v2_items.append(
+            WinnerItemV2(
+                candidate_id=f"unknown:{param_id}" if param_id is not None else "unknown:unknown",
+                strategy_id="unknown",
+                symbol="UNKNOWN",
+                timeframe="UNKNOWN",
+                params={},
+                score=float(score),
+                metrics=metrics,
+                source=source,
+            )
+        )
+    
+    # Preserve any extra notes (excluding schema)
+    extra_notes = {k: v for k, v in notes.items() if k != "schema"}
+    
+    return build_winners_v2_dict(
+        stage_name=stage_name,
+        run_id=run_id,
+        topk=v2_items,
+        notes=extra_notes,
+    )
 
 
 def _get_git_info(repo_root: Path | None = None) -> tuple[str, bool]:
@@ -265,59 +323,70 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         # Extract metrics and winners
         stage_metrics = dict(stage_out.get("metrics", {}))
         stage_winners = stage_out.get("winners", {"topk": [], "notes": {"schema": "v1"}})
-        
+
         # Ensure metrics include required fields
         stage_metrics["param_subsample_rate"] = effective_subsample  # Use final subsample
         stage_metrics["params_effective"] = params_effective
         stage_metrics["params_total"] = params_total
         stage_metrics["bars"] = bars
         stage_metrics["stage_name"] = str(spec.name.value)
-        
+
         # Add OOM gate fields (mandatory for audit)
         stage_metrics["oom_gate_action"] = gate_result["action"]
         stage_metrics["oom_gate_reason"] = gate_result["reason"]
         stage_metrics["mem_est_mb"] = gate_result["estimates"]["mem_est_mb"]
         stage_metrics["mem_limit_mb"] = mem_limit_mb
         stage_metrics["ops_est"] = gate_result["estimates"]["ops_est"]
-        
+
         # Record planned subsample (before gate adjustment)
         stage_metrics["stage_planned_subsample"] = planned_subsample
-        
+
         # If auto-downsample occurred, record original and final subsample
         if gate_result["action"] == "AUTO_DOWNSAMPLE":
             stage_metrics["oom_gate_original_subsample"] = planned_subsample
             stage_metrics["oom_gate_final_subsample"] = final_subsample
-        
+
+        # Save winners for next stage (must be legacy format)
+        prev_winners = stage_winners.get("topk", [])
+
+        # Convert stage_winners to v2 if needed
+        if not is_winners_v2(stage_winners):
+            stage_winners = _convert_legacy_winners_to_v2(
+                stage_winners,
+                stage_name=str(spec.name.value),
+                run_id=run_id,
+            )
+
         # Phase 6.6: Add tzdb metadata to manifest
         manifest_dict = audit.to_dict()
         tzdb_provider, tzdb_version = get_tzdb_info()
         manifest_dict["tzdb_provider"] = tzdb_provider
         manifest_dict["tzdb_version"] = tzdb_version
-        
+
         # Add data_tz and exchange_tz if available in config
         # These come from session profile if session processing is used
         if "data_tz" in stage_cfg:
             manifest_dict["data_tz"] = stage_cfg["data_tz"]
         if "exchange_tz" in stage_cfg:
             manifest_dict["exchange_tz"] = stage_cfg["exchange_tz"]
-        
+
         # Phase 7: Add strategy metadata if available
         if "strategy_id" in stage_cfg:
             import json
             import hashlib
-            
+
             manifest_dict["strategy_id"] = stage_cfg["strategy_id"]
-            
+
             if "strategy_version" in stage_cfg:
                 manifest_dict["strategy_version"] = stage_cfg["strategy_version"]
-            
+
             if "param_schema" in stage_cfg:
                 param_schema = stage_cfg["param_schema"]
                 # Compute hash of param_schema
                 schema_json = json.dumps(param_schema, sort_keys=True)
                 schema_hash = hashlib.sha1(schema_json.encode("utf-8")).hexdigest()
                 manifest_dict["param_schema_hash"] = schema_hash
-        
+
         # Write artifacts (unified artifact system)
         # Use sanitized snapshot (not runtime cfg with ndarrays)
         write_run_artifacts(
@@ -327,7 +396,7 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
             metrics=stage_metrics,
             winners=stage_winners,
         )
-        
+
         # Record stage index
         stage_indices.append(
             FunnelStageIndex(
@@ -336,9 +405,6 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
                 run_dir=str(run_dir.relative_to(outputs_root)),
             )
         )
-        
-        # Save winners for next stage
-        prev_winners = stage_winners.get("topk", [])
     
     # Phase 14: Update status for successful completion
     if RUN_STATUS_AVAILABLE:

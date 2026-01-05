@@ -2,7 +2,7 @@
 """
 FishBroWFS Supervisor - Safe stack management with pre-flight checks.
 
-Provides deterministic startup/shutdown of backend+worker+GUI with comprehensive
+Provides deterministic startup/shutdown of backend+worker with comprehensive
 dependency and port conflict detection.
 
 Usage:
@@ -43,15 +43,16 @@ REQUIRED_MODULES = {
 # Default configuration
 BACKEND_HOST = os.environ.get("FISHBRO_BACKEND_HOST", "127.0.0.1")
 BACKEND_PORT = int(os.environ.get("FISHBRO_BACKEND_PORT", "8000"))
-GUI_HOST = os.environ.get("FISHBRO_GUI_HOST", "0.0.0.0")
-GUI_PORT = int(os.environ.get("FISHBRO_GUI_PORT", "8080"))
+# GUI removed (FND-009)
+GUI_HOST = "0.0.0.0"
+GUI_PORT = 8080
 
 # Paths
 REPO_ROOT = Path(__file__).parent.parent
 PID_FILE = REPO_ROOT / "outputs" / "_dp_evidence" / "ops_pids.json"
 BACKEND_LOG = Path("/tmp/fishbro_backend.log")
 WORKER_LOG = Path("/tmp/fishbro_worker.log")
-GUI_LOG = Path("/tmp/fishbro_gui.log")
+# GUI_LOG removed (FND-009)
 
 # Global state
 children = []  # List of Popen objects for cleanup
@@ -106,9 +107,8 @@ def is_fishbro_process(cmdline: str) -> bool:
 
 
 def check_ports() -> None:
-    """Check backend and GUI ports, fail if occupied by non-fishbro."""
+    """Check backend port, fail if occupied by non-fishbro."""
     backend_owner = get_port_owner(BACKEND_PORT)
-    gui_owner = get_port_owner(GUI_PORT)
     
     errors = []
     
@@ -116,11 +116,6 @@ def check_ports() -> None:
         pid, cmdline = backend_owner
         if not is_fishbro_process(cmdline):
             errors.append(f"Port {BACKEND_PORT} is used by PID={pid} cmd={cmdline[:100]}")
-    
-    if gui_owner:
-        pid, cmdline = gui_owner
-        if not is_fishbro_process(cmdline):
-            errors.append(f"Port {GUI_PORT} is used by PID={pid} cmd={cmdline[:100]}")
     
     if errors:
         print("PORT_CONFLICT: " + "; ".join(errors))
@@ -144,17 +139,7 @@ def check_health() -> None:
     except requests.RequestException:
         pass  # Backend not running, that's OK
     
-    # Check GUI if port is occupied by fishbro
-    gui_owner = get_port_owner(GUI_PORT)
-    if gui_owner and is_fishbro_process(gui_owner[1]):
-        try:
-            resp = requests.get(f"http://{BACKEND_HOST}:{GUI_PORT}/health", timeout=2)
-            if resp.status_code != 200:
-                print(f"HEALTH_FAILURE: GUI unhealthy (HTTP {resp.status_code})")
-                sys.exit(13)
-        except requests.RequestException:
-            print("HEALTH_FAILURE: GUI running but health endpoint unreachable")
-            sys.exit(13)
+    # GUI removed (FND-009)
 
 
 def doctor() -> None:
@@ -229,10 +214,7 @@ def spawn_worker() -> subprocess.Popen:
     return proc
 
 
-def spawn_gui() -> subprocess.Popen:
-    """Start GUI (deprecated)."""
-    print("ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI).")
-    sys.exit(1)
+# GUI spawning removed (FND-009)
 
 
 def save_pids(pids: Dict[str, int]) -> None:
@@ -313,17 +295,13 @@ def run_command(args) -> None:
         pids["worker"] = worker_proc.pid
         time.sleep(1)
     
-    if not args.no_gui:
-        gui_proc = spawn_gui()
-        children.append(gui_proc)
-        pids["gui"] = gui_proc.pid
+    # GUI removed (FND-009)
     
     # Save PIDs
     save_pids(pids)
     
     print(f"\n==> Stack started. PIDs saved to {PID_FILE}")
     print(f"    Backend: http://{BACKEND_HOST}:{BACKEND_PORT}")
-    print(f"    GUI:     http://{GUI_HOST}:{GUI_PORT}")
     print(f"    Logs:    /tmp/fishbro_*.log")
     print("\nPress Ctrl+C to stop all components.")
     
@@ -361,7 +339,7 @@ def down_command() -> None:
     # Fallback to port-based cleanup
     import psutil
     
-    for port in [BACKEND_PORT, GUI_PORT]:
+    for port in [BACKEND_PORT]:
         owner = get_port_owner(port)
         if owner and is_fishbro_process(owner[1]):
             try:
@@ -411,49 +389,25 @@ def status_command() -> None:
     except requests.RequestException:
         print("✗ Worker: status endpoint not available")
     
-    # GUI health
-    try:
-        resp = requests.get(f"http://{BACKEND_HOST}:{GUI_PORT}/health", timeout=2)
-        if resp.status_code == 200:
-            print(f"✓ GUI: healthy (HTTP 200)")
-        else:
-            print(f"✗ GUI: unhealthy (HTTP {resp.status_code})")
-    except requests.RequestException:
-        print("✗ GUI: not responding or not running")
+    # GUI removed (FND-009)
     
     # Port status
     backend_owner = get_port_owner(BACKEND_PORT)
-    gui_owner = get_port_owner(GUI_PORT)
     
     print(f"\nPort {BACKEND_PORT}: {'occupied' if backend_owner else 'free'}")
     if backend_owner:
         print(f"  PID: {backend_owner[0]}, Cmd: {backend_owner[1][:80]}...")
-    
-    print(f"Port {GUI_PORT}: {'occupied' if gui_owner else 'free'}")
-    if gui_owner:
-        print(f"  PID: {gui_owner[0]}, Cmd: {gui_owner[1][:80]}...")
 
 
 def ports_command() -> None:
     """Show port ownership."""
-    print(f"==> Port ownership (backend: {BACKEND_PORT}, GUI: {GUI_PORT})")
+    print(f"==> Port ownership (backend: {BACKEND_PORT})")
     
     backend_owner = get_port_owner(BACKEND_PORT)
-    gui_owner = get_port_owner(GUI_PORT)
     
     print(f"\nPort {BACKEND_PORT}:")
     if backend_owner:
         pid, cmdline = backend_owner
-        owner_type = "fishbro" if is_fishbro_process(cmdline) else "external"
-        print(f"  PID: {pid}")
-        print(f"  Type: {owner_type}")
-        print(f"  Cmd: {cmdline}")
-    else:
-        print("  Free")
-    
-    print(f"\nPort {GUI_PORT}:")
-    if gui_owner:
-        pid, cmdline = gui_owner
         owner_type = "fishbro" if is_fishbro_process(cmdline) else "external"
         print(f"  PID: {pid}")
         print(f"  Type: {owner_type}")
@@ -469,7 +423,6 @@ def logs_command() -> None:
     for log_path, name in [
         (BACKEND_LOG, "Backend"),
         (WORKER_LOG, "Worker"),
-        (GUI_LOG, "GUI"),
     ]:
         print(f"\n--- {name} log ({log_path}) ---")
         if log_path.exists():
@@ -495,7 +448,7 @@ def main() -> None:
     run_parser = subparsers.add_parser("run", help="Start full stack")
     run_parser.add_argument("--no-backend", action="store_true", help="Skip backend")
     run_parser.add_argument("--no-worker", action="store_true", help="Skip worker")
-    run_parser.add_argument("--no-gui", action="store_true", help="Skip GUI")
+    # GUI flag removed (FND-009)
     
     # other commands
     subparsers.add_parser("down", help="Stop all fishbro processes")

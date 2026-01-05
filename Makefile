@@ -31,7 +31,7 @@ PYTEST_ARGS ?= -q
 PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
 PYTEST_MARK_EXPR_ALL ?= not legacy_ui
 
-.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile legacy-gui legacy-dashboard desktop desktop-wayland desktop-offscreen war-room run-research run-plateau run-freeze run-compile run-season snapshot forensics ui-forensics ui-contract legacy-backend legacy-worker status legacy-war legacy-stop-war ports down gui-safe legacy-up doctor run logs
+.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile desktop desktop-wayland desktop-offscreen snapshot forensics ui-forensics ui-contract status ports down doctor run logs
 
 help:
 	@echo ""
@@ -56,30 +56,13 @@ help:
 	@echo "  make portfolio-gov-test   Run portfolio governance unit tests"
 	@echo "  make portfolio-gov-smoke  Smoke test governance modules"
 	@echo ""
-	@echo "Pipeline:"
-	@echo "  make run-research     [Phase 2]  Backtest"
-	@echo "  make run-plateau      [Phase 3A] Plateau"
-	@echo "  make run-freeze       [Phase 3B] Freeze"
-	@echo "  make run-compile      [Phase 3C] Compile"
-	@echo "  make run-portfolio    [Phase 3D] Portfolio Build"
 	@echo ""
 	@echo "Phase 2 Migration (Supervisor):"
 	@echo "  make clean-cache      Clean cache via Supervisor"
-	@echo "  make clean-cache-legacy  Legacy cache cleaning (if available)"
 	@echo "  make clean-caches     Alias for clean-cache"
 	@echo "  make clean-caches-dry Dry-run cache cleaning"
 	@echo "  make generate-reports Generate reports via Supervisor"
-	@echo "  make generate-reports-legacy Legacy report generation"
 	@echo "  Note: build-data requires parameters, use Supervisor CLI directly"
-	@echo ""
-	@echo "LEGACY / DEPRECATED (NiceGUI/web UI decommissioned):"
-	@echo "  make legacy-gui       Launch legacy NiceGUI (deprecated)"
-	@echo "  make legacy-dashboard Launch legacy dashboard (deprecated)"
-	@echo "  make legacy-backend   Start Control API server only"
-	@echo "  make legacy-worker    Start Worker daemon only"
-	@echo "  make legacy-war       Start backend + worker (no GUI)"
-	@echo "  make legacy-stop-war  Stop backend + worker"
-	@echo "  make legacy-up        Start full stack with tmux"
 	@echo ""
 
 # -----------------------------------------------------------------------------
@@ -115,13 +98,6 @@ ports-canonical:
 
 ports: ports-canonical
 
-legacy-gui:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-legacy-dashboard:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
 
 # -----------------------------------------------------------------------------
 # Desktop UI (Product Standard: Phase 18.5 Wayland Fixed)
@@ -149,71 +125,7 @@ desktop-offscreen:
 	@echo "==> Launching Desktop in Offscreen mode (CI/Dev)..."
 	QT_QPA_PLATFORM=offscreen $(ENV) $(PYTHON) -B scripts/desktop_launcher.py
 
-war-room: legacy-gui
-	@echo "==> [LEGACY] Starting war room (NiceGUI web UI)"
-	@echo "    WARNING: Web UI is decommissioned. Use 'make desktop' instead."
 
-# -----------------------------------------------------------------------------
-# Pipeline Targets (Supervisor Wrappers)
-# These targets submit jobs to Supervisor v2 and do NOT execute core logic directly.
-# -----------------------------------------------------------------------------
-
-run-research:
-	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
-	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
-	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
-	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
-		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
-		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
-		exit 2; \
-	fi
-	$(ENV) $(PYTHON) -B scripts/run_research_v3.py
-
-run-plateau:
-	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
-	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
-	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
-	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
-		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
-		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
-		exit 2; \
-	fi
-	$(ENV) $(PYTHON) -B scripts/run_phase3a_plateau.py
-
-run-freeze:
-	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
-	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
-	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
-	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
-		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
-		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
-		exit 2; \
-	fi
-	$(ENV) $(PYTHON) -B scripts/run_phase3b_freeze.py
-
-run-compile:
-	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
-	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
-	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
-	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
-		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
-		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
-		exit 2; \
-	fi
-	$(ENV) $(PYTHON) -B scripts/run_phase3c_compile.py
-
-run-portfolio:
-	@echo "==> [PHASE B HARDENING] Legacy wrapper execution is DISABLED by default."
-	@echo "    To enable legacy compatibility, set: export FISHBRO_ALLOW_LEGACY_WRAPPERS=1"
-	@echo "    PREFERRED: Use Qt Desktop UI (src/gui/desktop/) or Supervisor API directly."
-	@if [ "$(FISHBRO_ALLOW_LEGACY_WRAPPERS)" != "1" ]; then \
-		echo "ERROR: FISHBRO_ALLOW_LEGACY_WRAPPERS is not set to '1'."; \
-		echo "       Legacy wrapper execution is disabled as part of Phase B 'root-cut' hardening."; \
-		exit 2; \
-	fi
-	$(ENV) $(PYTHON) -B scripts/build_portfolio_from_research.py
-
-run-season: run-research run-plateau run-freeze run-compile
 
 snapshot:
 	@echo "==> Generating Context Snapshot..."
@@ -257,34 +169,6 @@ portfolio-gov-smoke:
 	@echo "==> Smoke testing portfolio governance modules..."
 	$(ENV) $(PYTHON) -B scripts/_dev/portfolio_governance_log_smoke.py | tee outputs/_dp_evidence/portfolio_gov_smoke.txt
 
-# -----------------------------------------------------------------------------
-# Ops targets
-# -----------------------------------------------------------------------------
-
-legacy-backend:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-legacy-worker:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-legacy-war:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-legacy-stop-war:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-
-gui-safe:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
-
-legacy-up:
-	@echo "ERROR: NiceGUI has been fully removed. Use 'make desktop' (Qt UI)."
-	@exit 1
 
 # -----------------------------------------------------------------------------
 # Clean targets
@@ -307,10 +191,6 @@ clean-cache:
 		--job-type CLEAN_CACHE \
 		--params-json '{"scope": "all", "dry_run": false}'
 
-clean-cache-legacy:
-	@echo "==> [LEGACY] Cleaning cache using legacy implementation..."
-	@echo "ERROR: Legacy clean-cache implementation not found. Use 'make clean-cache' instead."
-	@exit 1
 
 clean-caches:
 	@echo "==> Cleaning caches via Supervisor (CLEAN_CACHE job with scope=all)..."
@@ -330,17 +210,8 @@ build-data:
 	@echo "  python -B -m src.control.supervisor.cli submit --job-type BUILD_DATA --params-json '{\"dataset_id\": \"...\", \"timeframe_min\": 60}'"
 	@exit 1
 
-build-data-legacy:
-	@echo "==> [LEGACY] Building data using legacy implementation..."
-	@echo "ERROR: Legacy build-data implementation not found. Use Qt Desktop UI 'Prepare Data' button or Supervisor CLI."
-	@exit 1
-
 generate-reports:
 	@echo "==> Generating reports via Supervisor (GENERATE_REPORTS job)..."
 	$(ENV) $(PYTHON) -B -m src.control.supervisor.cli submit \
 		--job-type GENERATE_REPORTS \
 		--params-json '{"outputs_root": "outputs", "strict": true}'
-
-generate-reports-legacy:
-	@echo "==> [LEGACY] Generating reports using legacy implementation..."
-	$(ENV) $(PYTHON) -B scripts/generate_research.py --outputs-root outputs

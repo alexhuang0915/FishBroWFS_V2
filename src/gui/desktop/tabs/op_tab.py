@@ -1,8 +1,8 @@
 """
-OP (Operator Console) Tab - Desktop replacement for NiceGUI OP tab.
+OP (Operator Console) Tab - Desktop replacement for Qt Desktop UI OP tab.
 Phase 17B: Card-based, Task-oriented UI with 4 fixed cards.
 
-Provides 1:1 semantic parity with historical NiceGUI OP flow.
+Provides 1:1 semantic parity with historical Desktop UI OP flow.
 """
 
 import logging

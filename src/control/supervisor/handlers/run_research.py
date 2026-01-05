@@ -172,7 +172,7 @@ class RunResearchHandler(BaseJobHandler):
     def _generate_manifest(self, job_id: str, payload: RunResearchPayload, run_dir: Path) -> None:
         """Generate manifest.json for the research run."""
         import git
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         # Get git commit hash
         git_commit = "unknown"
@@ -188,7 +188,7 @@ class RunResearchHandler(BaseJobHandler):
         manifest = {
             "job_id": job_id,
             "job_type": "run_research_v2",
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
             "input_fingerprint": {
                 "strategy_id": payload.strategy_id,
                 "profile_name": payload.profile_name,

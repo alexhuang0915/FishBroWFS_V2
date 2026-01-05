@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, UTC
 
 from control.shared_build import build_shared, load_shared_manifest
 from control.fingerprint_store import fingerprint_index_path, load_fingerprint_index_if_exists
@@ -80,7 +80,7 @@ def prepare_with_data2_enforcement(
             outputs_root=outputs_root,
             mode=mode,
             save_fingerprint=True,
-            generated_at_utc=datetime.utcnow().isoformat() + "Z",
+            generated_at_utc=datetime.now(UTC).isoformat(),
             build_bars=build_bars,
             build_features=build_features,
             tfs=tfs,
@@ -125,7 +125,7 @@ def prepare_with_data2_enforcement(
                     outputs_root=outputs_root,
                     mode=mode,
                     save_fingerprint=True,
-                    generated_at_utc=datetime.utcnow().isoformat() + "Z",
+                    generated_at_utc=datetime.now(UTC).isoformat(),
                     build_bars=build_bars,
                     build_features=build_features,
                     tfs=tfs,

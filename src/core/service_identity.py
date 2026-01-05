@@ -2,7 +2,7 @@
 
 Provides a single canonical identity payload that any running service can return.
 This payload uniquely proves:
-- Who is serving the request (NiceGUI vs FastAPI)
+- Who is serving the request (Desktop UI vs FastAPI)
 - Which git commit / version it is
 - Which DB path it uses (and why)
 - Which PID / process commandline is serving
@@ -104,7 +104,7 @@ def get_service_identity(
     """Return JSON-safe identity dict.
 
     Fields:
-      - service_name: str (caller-defined, e.g. "nicegui", "control_api")
+      - service_name: str (caller-defined, e.g. "desktop_ui", "control_api")
       - pid: int
       - ppid: int
       - cmdline: str (best-effort; if unavailable return "")

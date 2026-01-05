@@ -44,7 +44,6 @@
     "__pycache__"
   ],
   "actual_items": [
-    ".continue",
     ".gitattributes",
     ".github",
     ".gitignore",
@@ -52,7 +51,6 @@
     ".vscode",
     "Makefile",
     "README.md",
-    "SNAPSHOT_CLEAN.jsonl",
     "configs",
     "docs",
     "outputs",
@@ -65,5 +63,5 @@
     "tests"
   ],
   "violations": [],
-  "timestamp": "2026-01-05T23:02:06.267683"
+  "timestamp": "2026-01-06T00:46:52.967355"
 }

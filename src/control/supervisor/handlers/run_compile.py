@@ -270,7 +270,7 @@ class RunCompileHandler(BaseJobHandler):
     def _generate_manifest(self, job_id: str, payload: RunCompilePayload, compile_dir: Path, manifest_path: Path) -> None:
         """Generate manifest.json for the compile run."""
         import git
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         # Get git commit hash
         git_commit = "unknown"
@@ -286,7 +286,7 @@ class RunCompileHandler(BaseJobHandler):
         manifest = {
             "job_id": job_id,
             "job_type": "run_compile_v2",
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
             "input_fingerprint": {
                 "season": payload.season,
                 "manifest_path": str(manifest_path),

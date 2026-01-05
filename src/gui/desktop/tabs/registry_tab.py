@@ -1,6 +1,6 @@
 """
 Registry Tab - Desktop-only governance view.
-Replaces NiceGUI "Registry" tab with direct backend access (no HTTP/localhost).
+Replaces legacy web UI "Registry" tab with direct backend access (no HTTP/localhost).
 """
 
 import logging

@@ -16,6 +16,8 @@ from __future__ import annotations
 
 import json
 import subprocess
+# Subprocess usage: system diagnostics (ss, lsof, git) for runtime context.
+# NOT UI ENTRYPOINT – only used by diagnostic scripts and Supervisor bootstrap.
 import hashlib
 import time
 import os

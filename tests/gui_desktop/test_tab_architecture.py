@@ -87,29 +87,46 @@ class TestMakefileDesktopTargets:
         assert "desktop-offscreen:" in content
     
     def test_makefile_legacy_targets_renamed(self):
-        """Test that legacy web UI targets are renamed with legacy- prefix."""
+        """Test that legacy web UI targets have been removed (Phase 1 cleanup)."""
         makefile_path = Path(__file__).parent.parent.parent / "Makefile"
         with open(makefile_path, 'r') as f:
             content = f.read()
         
-        # Check that legacy targets exist
-        assert "legacy-gui:" in content
-        assert "legacy-dashboard:" in content
-        assert "legacy-backend:" in content
-        assert "legacy-worker:" in content
-        assert "legacy-war:" in content
+        # Legacy targets should NOT exist after Phase 1 cleanup
+        assert "legacy-gui:" not in content
+        assert "legacy-dashboard:" not in content
+        assert "legacy-backend:" not in content
+        assert "legacy-worker:" not in content
+        assert "legacy-war:" not in content
+        
+        # Ensure no legacy-* targets remain
+        import re
+        legacy_targets = re.findall(r'^legacy-\w+:', content, re.MULTILINE)
+        assert len(legacy_targets) == 0, f"Unexpected legacy targets found: {legacy_targets}"
     
     def test_makefile_help_mentions_desktop_only(self):
-        """Test that help mentions Desktop as ONLY product UI."""
+        """Test that help mentions Desktop as ONLY product UI (legacy section removed)."""
         makefile_path = Path(__file__).parent.parent.parent / "Makefile"
         with open(makefile_path, 'r') as f:
             content = f.read()
         
-        # Check help section
-        help_section = content[content.find("help:"):content.find("\n\n", content.find("help:"))]
+        # Check help section (find from help: to next blank line or end of help)
+        help_start = content.find("help:")
+        if help_start == -1:
+            raise AssertionError("Makefile missing help target")
+        # Find the next target after help: (line that starts with a letter and colon)
+        import re
+        help_end_match = re.search(r'\n\n[a-zA-Z]+:', content[help_start:])
+        if help_end_match:
+            help_section = content[help_start:help_start + help_end_match.start()]
+        else:
+            help_section = content[help_start:]
+        
+        # Must contain these strings
         assert "Desktop is the ONLY product UI" in help_section
         assert "PRODUCT COMMANDS" in help_section
-        assert "LEGACY / DEPRECATED" in help_section
+        # LEGACY / DEPRECATED section should be removed after Phase 1 cleanup
+        assert "LEGACY / DEPRECATED" not in help_section
 
 
 class TestArtifactContract:

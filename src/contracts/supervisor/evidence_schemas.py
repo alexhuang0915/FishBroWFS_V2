@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, UTC
 import json
 
 
@@ -58,4 +58,7 @@ def stable_params_hash(payload: dict) -> str:
 
 def now_iso() -> str:
     """Return current UTC time in ISO format."""
-    return datetime.utcnow().isoformat() + "Z"
+    # Use timezone-aware datetime (UTC)
+    dt = datetime.now(UTC)
+    # Convert +00:00 offset to Z for backward compatibility
+    return dt.isoformat().replace('+00:00', 'Z')

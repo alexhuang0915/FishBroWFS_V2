@@ -1,6 +1,6 @@
 """
 Desktop Control Station - Main window with 4-tab architecture.
-Matching historical NiceGUI product design with 1:1 functional parity.
+Matching historical product design with 1:1 functional parity.
 """
 
 import logging

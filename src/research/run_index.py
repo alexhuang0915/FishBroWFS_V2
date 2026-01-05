@@ -1,8 +1,8 @@
 """
 Robust Run Index Resolver - Canonical run indexing for UI discovery.
 
-Provides deterministic run discovery and matching for Desktop and NiceGUI.
-Tolerates mixed legacy folders (run_*, artifact_*) and selects best matches.
+Provides deterministic run discovery and matching for Desktop UI.
+Enforces run_* naming convention only.
 """
 
 import json
@@ -39,11 +39,11 @@ def _read_json(p: Path) -> Optional[Dict[str, Any]]:
 
 
 def _iter_run_dirs(runs_root: Path):
-    """Iterate over run directories, tolerating legacy folders."""
+    """Iterate over run directories (run_* only)."""
     if not runs_root.exists():
         return []
     for d in runs_root.iterdir():
-        if d.is_dir() and (d.name.startswith("run_") or d.name.startswith("artifact_")):
+        if d.is_dir() and d.name.startswith("run_"):
             yield d
 
 
@@ -147,7 +147,7 @@ def _extract_run_metadata(run_dir: Path) -> Optional[Dict[str, Any]]:
 
 
 def list_runs(outputs_root: Path, season: str) -> List[RunSummary]:
-    """Return runs newest-first. Must tolerate mixed legacy folders."""
+    """Return runs newest-first. Only run_* directories are considered."""
     runs_dir = outputs_root / "seasons" / season / "runs"
     
     runs = []

@@ -284,7 +284,7 @@ class RunPlateauHandler(BaseJobHandler):
     def _generate_manifest(self, job_id: str, payload: RunPlateauPayload, plateau_dir: Path, winners_path: Path) -> None:
         """Generate manifest.json for the plateau run."""
         import git
-        from datetime import datetime
+        from datetime import datetime, UTC
         
         # Get git commit hash
         git_commit = "unknown"
@@ -300,7 +300,7 @@ class RunPlateauHandler(BaseJobHandler):
         manifest = {
             "job_id": job_id,
             "job_type": "run_plateau_v2",
-            "created_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
             "input_fingerprint": {
                 "research_run_id": payload.research_run_id,
                 "k_neighbors": payload.k_neighbors,

@@ -274,9 +274,9 @@ def verify_fishbro_ui_identity(occupant: PortOccupant) -> Tuple[bool, Optional[s
     
     # Look for FishBro UI module patterns
     ui_patterns = [
-        "fishbrowfs_v2.gui.nicegui.app",
-        "fishbrowfs_v2/gui/nicegui/app.py",
-        "nicegui.app",
+        "fishbrowfs_v2.gui.desktop.control_station",
+        "desktop_launcher.py",
+        "control_station",
     ]
     
     for pattern in ui_patterns:

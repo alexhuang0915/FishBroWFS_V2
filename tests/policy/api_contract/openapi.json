@@ -2266,10 +2266,276 @@
           }
         }
       }
+    },
+    "/api/v1/portfolios/build": {
+      "post": {
+        "tags": [
+          "portfolios"
+        ],
+        "summary": "Post Portfolio Build",
+        "description": "Submit a portfolio build request.\n\nCreates a BUILD_PORTFOLIO_V2 job and returns job_id immediately.\nThe portfolio_id may be null initially and will be discoverable from job evidence.",
+        "operationId": "post_portfolio_build_api_v1_portfolios_build_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioBuildRequestV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioBuildResponseV1"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}": {
+      "get": {
+        "tags": [
+          "portfolios"
+        ],
+        "summary": "Get Portfolio",
+        "description": "Get basic portfolio metadata.\n\nReturns portfolio ID, creation timestamp (if available), and URLs to\nreport and artifacts.",
+        "operationId": "get_portfolio_api_v1_portfolios__portfolio_id__get",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Portfolio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioResponseV1"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/artifacts": {
+      "get": {
+        "tags": [
+          "portfolios"
+        ],
+        "summary": "Get Portfolio Artifacts",
+        "description": "Get artifact index for a portfolio admission.\n\nLists all files under outputs/portfolios/<portfolio_id>/admission/\nwith metadata and download URLs.",
+        "operationId": "get_portfolio_artifacts_api_v1_portfolios__portfolio_id__artifacts_get",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Portfolio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioArtifactsResponseV1"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/artifacts/{filename}": {
+      "get": {
+        "tags": [
+          "portfolios"
+        ],
+        "summary": "Get Portfolio Artifact File",
+        "description": "Serve a single artifact file from the portfolio admission directory.\n\nSecurity:\n- filename must be a simple basename (no slashes, no path traversal)\n- Must enforce containment within outputs/portfolios/<portfolio_id>/admission/\n- Returns 404 if file not found, 403 if path traversal detected.",
+        "operationId": "get_portfolio_artifact_file_api_v1_portfolios__portfolio_id__artifacts__filename__get",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Portfolio Id"
+            }
+          },
+          {
+            "name": "filename",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Filename"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/reveal_admission_path": {
+      "get": {
+        "tags": [
+          "portfolios"
+        ],
+        "summary": "Reveal Portfolio Admission Path",
+        "description": "Return the absolute path to the portfolio admission directory after containment check.\n\nSecurity:\n- Must ensure portfolio_id does not contain path traversal.\n- Must ensure the resolved path is within the locked evidence root (outputs/portfolios/).\n- Returns 404 if admission directory does not exist.",
+        "operationId": "reveal_portfolio_admission_path_api_v1_portfolios__portfolio_id__reveal_admission_path_get",
+        "parameters": [
+          {
+            "name": "portfolio_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Portfolio Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealAdmissionPathResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArtifactFile": {
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "description": "Filename (relative path)"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "title": "Size Bytes",
+            "description": "File size in bytes"
+          },
+          "content_type": {
+            "type": "string",
+            "title": "Content Type",
+            "description": "MIME type"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sha256",
+            "description": "SHA256 hash (null if not computed)"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "URL to download the file"
+          }
+        },
+        "type": "object",
+        "required": [
+          "filename",
+          "size_bytes",
+          "content_type",
+          "url"
+        ],
+        "title": "ArtifactFile",
+        "description": "File entry in artifacts index."
+      },
       "ArtifactIndexResponse": {
         "properties": {
           "job_id": {
@@ -2742,6 +3008,38 @@
         ],
         "title": "DatasetRecord",
         "description": "Metadata for a single derived dataset."
+      },
+      "GovernanceParamsOverrides": {
+        "properties": {
+          "max_pairwise_correlation": {
+            "anyOf": [
+              {
+                "type": "number",
+                "maximum": 1.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Pairwise Correlation"
+          },
+          "portfolio_risk_budget_max": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Risk Budget Max"
+          }
+        },
+        "type": "object",
+        "title": "GovernanceParamsOverrides",
+        "description": "Optional governance parameter overrides."
       },
       "HTTPValidationError": {
         "properties": {
@@ -3359,6 +3657,120 @@
         "title": "PortfolioAdmissionSummaryV1",
         "description": "Summary of portfolio admission decisions."
       },
+      "PortfolioArtifactsResponseV1": {
+        "properties": {
+          "portfolio_id": {
+            "type": "string",
+            "title": "Portfolio Id",
+            "description": "Portfolio ID"
+          },
+          "links": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Links",
+            "description": "Named links to key artifacts"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/ArtifactFile"
+            },
+            "type": "array",
+            "title": "Files",
+            "description": "List of all files"
+          }
+        },
+        "type": "object",
+        "required": [
+          "portfolio_id",
+          "links",
+          "files"
+        ],
+        "title": "PortfolioArtifactsResponseV1",
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}/artifacts."
+      },
+      "PortfolioBuildRequestV1": {
+        "properties": {
+          "season": {
+            "type": "string",
+            "title": "Season",
+            "description": "Season identifier (e.g., '2026Q1')"
+          },
+          "timeframe": {
+            "type": "string",
+            "title": "Timeframe",
+            "description": "Timeframe (e.g., '60m')"
+          },
+          "candidate_run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Candidate Run Ids",
+            "description": "List of candidate run IDs to include"
+          },
+          "governance_params_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GovernanceParamsOverrides"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional governance parameter overrides"
+          }
+        },
+        "type": "object",
+        "required": [
+          "season",
+          "timeframe",
+          "candidate_run_ids"
+        ],
+        "title": "PortfolioBuildRequestV1",
+        "description": "Request for POST /api/v1/portfolios/build."
+      },
+      "PortfolioBuildResponseV1": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job Id",
+            "description": "Job ID for the portfolio build"
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Id",
+            "description": "Portfolio ID (may be null initially)"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "Job status (PENDING, RUNNING, etc.)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "PortfolioBuildResponseV1",
+        "description": "Response for POST /api/v1/portfolios/build."
+      },
       "PortfolioCorrelationV1": {
         "properties": {
           "labels": {
@@ -3629,6 +4041,45 @@
         ],
         "title": "PortfolioReportV1",
         "description": "Portfolio report v1 payload."
+      },
+      "PortfolioResponseV1": {
+        "properties": {
+          "portfolio_id": {
+            "type": "string",
+            "title": "Portfolio Id",
+            "description": "Portfolio ID"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At",
+            "description": "Creation timestamp"
+          },
+          "admission_report_v1_url": {
+            "type": "string",
+            "title": "Admission Report V1 Url",
+            "description": "URL to portfolio report v1"
+          },
+          "admission_artifacts_index_url": {
+            "type": "string",
+            "title": "Admission Artifacts Index Url",
+            "description": "URL to portfolio artifacts index"
+          }
+        },
+        "type": "object",
+        "required": [
+          "portfolio_id",
+          "admission_report_v1_url",
+          "admission_artifacts_index_url"
+        ],
+        "title": "PortfolioResponseV1",
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}."
       },
       "PreflightResult": {
         "properties": {
@@ -3962,6 +4413,27 @@
         ],
         "title": "ReadinessResponse",
         "description": "Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}."
+      },
+      "RevealAdmissionPathResponse": {
+        "properties": {
+          "approved": {
+            "type": "boolean",
+            "title": "Approved",
+            "description": "Whether path access is approved"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Absolute path to admission directory"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approved",
+          "path"
+        ],
+        "title": "RevealAdmissionPathResponse",
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}/reveal_admission_path."
       },
       "RevealEvidencePathResponse": {
         "properties": {

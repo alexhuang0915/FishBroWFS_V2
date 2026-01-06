@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "/home/fishbro/FishBroWFS_V2/src/control/__init__.py", line 4, in <module>
+    from control.job_spec import WizardJobSpec
+ModuleNotFoundError: No module named 'control'

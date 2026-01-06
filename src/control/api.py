@@ -139,6 +139,9 @@ from control.reporting.io import (
     read_portfolio_report,
 )
 
+# Phase D: Portfolio Build API
+from control.portfolio.api_v1 import router as portfolio_router
+
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
 
@@ -2459,5 +2462,8 @@ async def get_portfolio_report_v1(portfolio_id: str) -> PortfolioReportV1:
 
 # Register API v1 router
 app.include_router(api_v1)
+
+# Register portfolio API router (Phase D)
+app.include_router(portfolio_router)
 
 

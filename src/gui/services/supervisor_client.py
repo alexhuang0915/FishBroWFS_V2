@@ -158,6 +158,23 @@ class SupervisorClient:
         """Return list of dataset IDs (alias for get_datasets)."""
         return self.get_datasets()
 
+    # Phase D: Portfolio Build API methods
+    def post_portfolio_build(self, request_dict: dict) -> dict:
+        """Submit a portfolio build request."""
+        return self._post("/api/v1/portfolios/build", request_dict)
+
+    def get_portfolio_artifacts(self, portfolio_id: str) -> dict:
+        """Return portfolio artifacts index."""
+        return self._get(f"/api/v1/portfolios/{portfolio_id}/artifacts")
+
+    def reveal_portfolio_admission_path(self, portfolio_id: str) -> dict:
+        """Return approved admission path for portfolio."""
+        return self._get(f"/api/v1/portfolios/{portfolio_id}/reveal_admission_path")
+
+    def get_portfolio(self, portfolio_id: str) -> dict:
+        """Get portfolio metadata."""
+        return self._get(f"/api/v1/portfolios/{portfolio_id}")
+
 
 # Singleton client instance
 _client = SupervisorClient()
@@ -259,6 +276,24 @@ def get_registry_datasets() -> List[str]:
     return _client.get_registry_datasets()
 
 
+# Phase D: Portfolio Build API public functions
+def post_portfolio_build(request_dict: dict) -> dict:
+    """Submit a portfolio build request."""
+    return _client.post_portfolio_build(request_dict)
+
+def get_portfolio_artifacts(portfolio_id: str) -> dict:
+    """Return portfolio artifacts index."""
+    return _client.get_portfolio_artifacts(portfolio_id)
+
+def reveal_portfolio_admission_path(portfolio_id: str) -> dict:
+    """Return approved admission path for portfolio."""
+    return _client.reveal_portfolio_admission_path(portfolio_id)
+
+def get_portfolio(portfolio_id: str) -> dict:
+    """Get portfolio metadata."""
+    return _client.get_portfolio(portfolio_id)
+
+
 __all__ = [
     "SupervisorClient",
     "SupervisorClientError",
@@ -281,4 +316,9 @@ __all__ = [
     "get_registry_strategies",
     "get_registry_instruments",
     "get_registry_datasets",
+    # Phase D additions
+    "post_portfolio_build",
+    "get_portfolio_artifacts",
+    "reveal_portfolio_admission_path",
+    "get_portfolio",
 ]

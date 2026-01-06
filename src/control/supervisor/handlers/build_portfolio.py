@@ -91,9 +91,14 @@ class BuildPortfolioHandler(BaseJobHandler):
             
             raise  # Re-raise to mark job as FAILED
     
-    def _get_candidate_run_ids(self, season: str, outputs_root: Path) -> Set[str]:
-        """Get candidate run IDs from research decisions (KEEP decisions)."""
-        research_root = outputs_root / "seasons" / season / "research"
+    def _get_candidate_run_ids(self, payload: BuildPortfolioPayload, outputs_root: Path) -> Set[str]:
+        """Get candidate run IDs from either explicit list or research decisions (KEEP decisions)."""
+        # If candidate_run_ids is provided in payload, use it
+        if payload.candidate_run_ids is not None:
+            return set(payload.candidate_run_ids)
+        
+        # Otherwise, read from research decisions log
+        research_root = outputs_root / "seasons" / payload.season / "research"
         decisions_log_path = research_root / "decisions.log"
         if not decisions_log_path.exists():
             raise RuntimeError(f"Decisions log not found at {decisions_log_path}")
@@ -120,20 +125,31 @@ class BuildPortfolioHandler(BaseJobHandler):
         # Load governance params
         params = load_governance_params()
         
+        # Apply overrides if provided
+        if payload.governance_params_overrides:
+            from src.portfolio.models.governance_models import GovernanceParams
+            # Create a copy of params with overrides applied
+            params_dict = params.model_dump()
+            params_dict.update(payload.governance_params_overrides)
+            params = GovernanceParams(**params_dict)
+        
         # Initialize evidence reader
         evidence_reader = RunEvidenceReader()
         
         # Get candidate run IDs
-        candidate_run_ids = list(self._get_candidate_run_ids(payload.season, outputs_root))
+        candidate_run_ids = list(self._get_candidate_run_ids(payload, outputs_root))
         if not candidate_run_ids:
-            raise RuntimeError("No candidate run IDs (KEEP decisions) found for admission.")
+            raise RuntimeError("No candidate run IDs found for admission.")
         
-        # Generate provisional portfolio ID (deterministic hash of candidate run IDs)
+        # Use provided portfolio_id or generate provisional portfolio ID
         import hashlib
-        sorted_ids = sorted(candidate_run_ids)
-        id_string = ",".join(sorted_ids)
-        hash_digest = hashlib.sha256(id_string.encode()).hexdigest()[:12]
-        provisional_portfolio_id = f"portfolio_{payload.season}_{hash_digest}"
+        if payload.portfolio_id:
+            provisional_portfolio_id = payload.portfolio_id
+        else:
+            sorted_ids = sorted(candidate_run_ids)
+            id_string = ",".join(sorted_ids)
+            hash_digest = hashlib.sha256(id_string.encode()).hexdigest()[:12]
+            provisional_portfolio_id = f"portfolio_{payload.season}_{hash_digest}"
         
         # Create admission controller
         controller = PortfolioAdmissionController(

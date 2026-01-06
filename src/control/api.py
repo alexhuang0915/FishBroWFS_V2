@@ -393,6 +393,34 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="B5-C Mission Control API", lifespan=lifespan)
 
+# Middleware to reject path traversal attempts before Starlette normalizes them
+from fastapi import Request, Response
+from urllib.parse import unquote
+import sys
+
+@app.middleware("http")
+async def reject_path_traversal_middleware(request: Request, call_next):
+    """
+    Reject any request whose raw path contains '..' (path traversal) for portfolio and job artifact endpoints.
+    This ensures that path normalization does not hide traversal attempts.
+    """
+    raw_path_bytes = request.scope.get("raw_path", b"")
+    raw_path = raw_path_bytes.decode("utf-8") if isinstance(raw_path_bytes, bytes) else raw_path_bytes
+    # Decode percent-encoded characters to catch %2e%2e
+    decoded_path = unquote(raw_path)
+    # Check for '..' in the decoded path
+    if ".." in decoded_path:
+        # Determine if this is a portfolio or job artifact endpoint
+        if "/api/v1/portfolios/" in raw_path or "/api/v1/jobs/" in raw_path:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Invalid artifact filename."}
+            )
+    # Continue processing
+    response = await call_next(request)
+    return response
+
 # API v1 router for versioned endpoints
 api_v1 = APIRouter(prefix="/api/v1")
 
@@ -786,6 +814,26 @@ def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
     return artifacts
 
 
+def _validate_artifact_filename_or_403(filename: str) -> str:
+    """
+    Validate artifact filename; raise HTTP 403 if invalid (path traversal, slashes, etc.).
+    Returns the original filename if valid.
+    """
+    if filename is None or filename.strip() == "":
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    if filename in (".", ".."):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    if "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    if ".." in filename:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    # Ensure it's a basename (no directory components)
+    from pathlib import Path
+    if filename != Path(filename).name:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    return filename
+
+
 def _get_policy_check_link(job_id: str) -> Optional[str]:
     """Return URL to policy_check.json if it exists."""
     job_dir = _get_job_evidence_dir(job_id)
@@ -971,8 +1019,7 @@ async def get_artifact_file(job_id: str, filename: str):
     - Returns 404 if file not found, 403 if path traversal detected.
     """
     # Validate filename does not contain slashes or path traversal attempts
-    if "/" in filename or "\\" in filename or filename in (".", ".."):
-        raise HTTPException(status_code=400, detail="Invalid filename")
+    filename = _validate_artifact_filename_or_403(filename)
     
     job_dir = _get_job_evidence_dir(job_id)
     file_path = job_dir / filename

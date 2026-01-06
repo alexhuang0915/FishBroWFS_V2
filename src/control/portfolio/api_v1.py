@@ -115,6 +115,38 @@ def _get_portfolios_root() -> Path:
     return Path("outputs/portfolios")
 
 
+def _validate_artifact_filename_or_403(filename: str) -> str:
+    """Validate artifact filename, raising HTTPException(403) if invalid.
+    
+    Rules:
+    - filename must not be None or empty
+    - filename must not be "." or ".."
+    - filename must not contain "/" or "\\"
+    - filename must not contain ".."
+    - filename must be a basename (no directory components)
+    
+    Returns the original filename if valid.
+    """
+    if filename is None or filename.strip() == "":
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    if filename in (".", ".."):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    if "/" in filename or "\\" in filename:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    if ".." in filename:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Ensure it's a basename (no path components)
+    from pathlib import Path
+    if filename != Path(filename).name:
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    return filename
+
+
 def _get_portfolio_admission_dir(portfolio_id: str) -> Path:
     """Return the admission directory for a portfolio, ensuring containment."""
     root = _get_portfolios_root()
@@ -323,41 +355,51 @@ async def get_portfolio_artifacts(portfolio_id: str) -> PortfolioArtifactsRespon
     )
 
 
-@router.get("/{portfolio_id}/artifacts/{filename}")
+@router.get("/{portfolio_id}/artifacts/{filename:path}")
 async def get_portfolio_artifact_file(portfolio_id: str, filename: str):
     """
     Serve a single artifact file from the portfolio admission directory.
     
     Security:
-    - filename must be a simple basename (no slashes, no path traversal)
-    - Must enforce containment within outputs/portfolios/<portfolio_id>/admission/
-    - Returns 404 if file not found, 403 if path traversal detected.
+    - filename must be a simple basename (no slashes, no path traversal) -> 403
+    - Must enforce containment within outputs/portfolios/<portfolio_id>/admission/ -> 403
+    - Returns 404 if file not found (valid basename but missing)
+    - Returns 404 if admission directory does not exist (portfolio unknown)
     """
-    # Validate filename does not contain slashes or path traversal attempts
-    if "/" in filename or "\\" in filename or filename in (".", ".."):
-        raise HTTPException(status_code=400, detail="Invalid filename")
+    # Validate filename (raises 403 for traversal/invalid)
+    filename = _validate_artifact_filename_or_403(filename)
     
+    # Get admission directory (validates portfolio_id containment)
     admission_dir = _get_portfolio_admission_dir(portfolio_id)
-    file_path = admission_dir / filename
     
-    # Ensure file_path is within admission_dir (double-check containment)
-    try:
-        file_path.resolve().relative_to(admission_dir.resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Path traversal detected")
+    # Check if admission directory exists (portfolio not found)
+    if not admission_dir.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Admission directory not found."
+        )
     
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
+    # Build target path and resolve for containment check
+    admission_root = admission_dir.resolve()
+    target = (admission_dir / filename).resolve()
+    
+    # Defense-in-depth: ensure target is within admission_root
+    if not target.is_relative_to(admission_root):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Check if file exists
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found.")
     
     # Determine content type
-    content_type, _ = mimetypes.guess_type(str(file_path))
+    content_type, _ = mimetypes.guess_type(str(target))
     if content_type is None:
         content_type = "application/octet-stream"
     
-    # For text/plain or JSON, we can return as plain text; for binary, use FileResponse
+    # Serve file
     from fastapi.responses import FileResponse
     return FileResponse(
-        path=file_path,
+        path=target,
         media_type=content_type,
         filename=filename,
     )

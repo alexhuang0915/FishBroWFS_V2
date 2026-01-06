@@ -2401,7 +2401,7 @@
           "portfolios"
         ],
         "summary": "Get Portfolio Artifact File",
-        "description": "Serve a single artifact file from the portfolio admission directory.\n\nSecurity:\n- filename must be a simple basename (no slashes, no path traversal)\n- Must enforce containment within outputs/portfolios/<portfolio_id>/admission/\n- Returns 404 if file not found, 403 if path traversal detected.",
+        "description": "Serve a single artifact file from the portfolio admission directory.\n\nSecurity:\n- filename must be a simple basename (no slashes, no path traversal) -> 403\n- Must enforce containment within outputs/portfolios/<portfolio_id>/admission/ -> 403\n- Returns 404 if file not found (valid basename but missing)\n- Returns 404 if admission directory does not exist (portfolio unknown)",
         "operationId": "get_portfolio_artifact_file_api_v1_portfolios__portfolio_id__artifacts__filename__get",
         "parameters": [
           {

@@ -1,31 +1,151 @@
 """
-Registry Tab - Desktop-only governance view.
-Replaces legacy web UI "Registry" tab with direct backend access (no HTTP/localhost).
+Registry Tab - Phase C Professional CTA Desktop UI.
+
+Searchable table of registry strategies from Supervisor API.
 """
 
 import logging
-from typing import List, Dict, Any
+from typing import Optional, List, Dict, Any
 
-from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractTableModel, QSortFilterProxyModel
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QPushButton, QTableWidget, QTableWidgetItem,
-    QGroupBox, QHeaderView, QMessageBox
+    QLabel, QPushButton, QTableView, QLineEdit,
+    QGroupBox, QHeaderView, QMessageBox, QComboBox,
+    QApplication
 )
+from PySide6.QtGui import QFont, QColor, QAction
 
-from ..widgets.cleanup_dialog import CleanupDialog
+from ...services.supervisor_client import (
+    get_registry_strategies, SupervisorClientError
+)
 
 logger = logging.getLogger(__name__)
 
 
+class RegistryTableModel(QAbstractTableModel):
+    """Table model for displaying registry strategies."""
+    
+    def __init__(self):
+        super().__init__()
+        self.strategies: List[Dict[str, Any]] = []
+        self.headers = [
+            "Strategy ID", "Name", "Verification", "File Path", "Type"
+        ]
+    
+    def refresh(self):
+        """Refresh registry data from supervisor."""
+        try:
+            strategies = get_registry_strategies()
+            self.set_strategies(strategies)
+            
+        except SupervisorClientError as e:
+            logger.error(f"Failed to refresh registry: {e}")
+            raise
+    
+    def set_strategies(self, strategies: List[Dict[str, Any]]):
+        """Set strategies data and update table."""
+        self.beginResetModel()
+        
+        # Normalize strategies data
+        self.strategies = []
+        for strategy in strategies:
+            if isinstance(strategy, dict):
+                self.strategies.append({
+                    'id': strategy.get('id', ''),
+                    'name': strategy.get('name', ''),
+                    'verification': strategy.get('verification_status', 'unknown'),
+                    'file_path': strategy.get('file_path', ''),
+                    'type': strategy.get('type', 'unknown')
+                })
+            else:
+                # If API returns simple strings
+                self.strategies.append({
+                    'id': str(strategy),
+                    'name': str(strategy),
+                    'verification': 'unknown',
+                    'file_path': '',
+                    'type': 'unknown'
+                })
+        
+        self.endResetModel()
+    
+    def rowCount(self, parent=QModelIndex()):
+        return len(self.strategies)
+    
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.headers)
+    
+    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+        if not index.isValid():
+            return None
+        
+        row = index.row()
+        col = index.column()
+        
+        if row >= len(self.strategies):
+            return None
+        
+        strategy = self.strategies[row]
+        
+        if role == Qt.DisplayRole:
+            if col == 0:  # Strategy ID
+                return strategy.get('id', '')
+            elif col == 1:  # Name
+                return strategy.get('name', '')
+            elif col == 2:  # Verification
+                return strategy.get('verification', 'unknown')
+            elif col == 3:  # File Path
+                return strategy.get('file_path', '')
+            elif col == 4:  # Type
+                return strategy.get('type', 'unknown')
+        
+        elif role == Qt.ForegroundRole:
+            if col == 2:  # Verification column
+                verification = strategy.get('verification', '').lower()
+                if verification == 'verified':
+                    return QColor("#4CAF50")
+                elif verification == 'pending':
+                    return QColor("#FF9800")
+                elif verification == 'failed':
+                    return QColor("#F44336")
+                else:
+                    return QColor("#9A9A9A")
+        
+        elif role == Qt.FontRole:
+            if col == 0:  # Strategy ID column
+                font = QFont()
+                font.setBold(True)
+                return font
+        
+        elif role == Qt.ToolTipRole:
+            if col == 3:  # File Path
+                file_path = strategy.get('file_path', '')
+                if file_path:
+                    return f"File: {file_path}"
+        
+        return None
+    
+    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
+        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+            if section < len(self.headers):
+                return self.headers[section]
+        return None
+
+
 class RegistryTab(QWidget):
-    """Registry tab - strategy governance and artifact management."""
+    """Registry Tab - Phase C Professional CTA UI."""
     
     # Signals for communication with main window
     log_signal = Signal(str)
     
     def __init__(self):
         super().__init__()
+        self.registry_model = RegistryTableModel()
+        self.filter_proxy = QSortFilterProxyModel()
+        self.filter_proxy.setSourceModel(self.registry_model)
+        self.filter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        
         self.setup_ui()
         self.setup_connections()
         self.refresh_registry()
@@ -33,82 +153,182 @@ class RegistryTab(QWidget):
     def setup_ui(self):
         """Initialize the UI components."""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(10)
+        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setSpacing(8)
         
         # Header
-        header_label = QLabel("Strategy Registry - Desktop Governance View")
-        header_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        header_label = QLabel("Strategy Registry")
+        header_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #E6E6E6;")
         main_layout.addWidget(header_label)
         
         # Description
-        desc_label = QLabel("Direct backend access to registry/portfolio store (no HTTP/localhost)")
-        desc_label.setStyleSheet("font-size: 12px; color: #666;")
+        desc_label = QLabel("Searchable table of registered strategies from Supervisor API")
+        desc_label.setStyleSheet("font-size: 12px; color: #9e9e9e;")
         main_layout.addWidget(desc_label)
         
-        # Control buttons
+        # Control panel
+        control_group = QGroupBox("Controls")
+        control_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #7B1FA2;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        
         control_layout = QHBoxLayout()
         
+        # Search bar
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Search:"))
+        
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Search strategies...")
+        self.search_input.setClearButtonEnabled(True)
+        self.search_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #2a2a2a;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 12px;
+            }
+            QLineEdit:focus {
+                border: 1px solid #3A8DFF;
+            }
+        """)
+        search_layout.addWidget(self.search_input)
+        
+        # Filter by verification
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("Verification:"))
+        
+        self.verification_filter = QComboBox()
+        self.verification_filter.addItems(["All", "Verified", "Pending", "Failed", "Unknown"])
+        self.verification_filter.setStyleSheet("""
+            QComboBox {
+                background-color: #2a2a2a;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 6px;
+                font-size: 12px;
+                min-width: 120px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+            QComboBox::down-arrow {
+                image: none;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 5px solid #E6E6E6;
+            }
+        """)
+        filter_layout.addWidget(self.verification_filter)
+        
+        # Refresh button
         self.refresh_btn = QPushButton("🔄 Refresh")
-        self.refresh_btn.setMinimumHeight(40)
+        self.refresh_btn.setToolTip("Refresh registry data")
+        self.refresh_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2a2a2a;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #333333;
+                border: 1px solid #3A8DFF;
+            }
+            QPushButton:pressed {
+                background-color: #1a1a1a;
+            }
+        """)
+        
+        control_layout.addLayout(search_layout)
+        control_layout.addSpacing(20)
+        control_layout.addLayout(filter_layout)
+        control_layout.addStretch()
         control_layout.addWidget(self.refresh_btn)
         
-        self.promote_btn = QPushButton("💾 Promote Selected")
-        self.promote_btn.setMinimumHeight(40)
-        self.promote_btn.setEnabled(False)
-        control_layout.addWidget(self.promote_btn)
-        
-        self.freeze_btn = QPushButton("❄️ Freeze Selected")
-        self.freeze_btn.setMinimumHeight(40)
-        self.freeze_btn.setEnabled(False)
-        control_layout.addWidget(self.freeze_btn)
-        
-        self.remove_btn = QPushButton("🗑️ Remove Selected")
-        self.remove_btn.setMinimumHeight(40)
-        self.remove_btn.setEnabled(False)
-        control_layout.addWidget(self.remove_btn)
-        
-        # Clean Up button
-        self.cleanup_btn = QPushButton("🧹 Clean Up...")
-        self.cleanup_btn.setMinimumHeight(40)
-        self.cleanup_btn.setToolTip("Safe deletion tools for runs, artifacts, and cache")
-        control_layout.addWidget(self.cleanup_btn)
-        
-        control_layout.addStretch()
-        main_layout.addLayout(control_layout)
+        control_group.setLayout(control_layout)
+        main_layout.addWidget(control_group)
         
         # Registry table
         table_group = QGroupBox("Registered Strategies")
+        table_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #0288D1;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        
         table_layout = QVBoxLayout()
         
-        self.registry_table = QTableWidget()
-        self.registry_table.setColumnCount(6)
-        self.registry_table.setHorizontalHeaderLabels([
-            "Strategy ID", "Latest Artifact", "Net PnL", "Max DD", "Trades", "State"
-        ])
+        self.registry_table = QTableView()
+        self.registry_table.setModel(self.filter_proxy)
+        self.registry_table.setSelectionBehavior(QTableView.SelectRows)
+        self.registry_table.setSelectionMode(QTableView.SingleSelection)
+        self.registry_table.setAlternatingRowColors(True)
+        self.registry_table.setSortingEnabled(True)
+        self.registry_table.setStyleSheet("""
+            QTableView {
+                background-color: #1E1E1E;
+                alternate-background-color: #252525;
+                gridline-color: #333333;
+                color: #E6E6E6;
+                font-size: 11px;
+            }
+            QTableView::item {
+                padding: 4px;
+            }
+            QTableView::item:selected {
+                background-color: #2a2a2a;
+                color: #FFFFFF;
+            }
+            QHeaderView::section {
+                background-color: #2a2a2a;
+                color: #E6E6E6;
+                padding: 6px;
+                border: 1px solid #333333;
+                font-weight: bold;
+            }
+            QHeaderView::section:checked {
+                background-color: #3A8DFF;
+            }
+        """)
         
-        # Configure table with balanced column widths
+        # Configure column widths
         header = self.registry_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.Interactive)  # Strategy ID: 25-35%
-        header.setSectionResizeMode(1, QHeaderView.Interactive)  # Latest Artifact: 25-30%
-        header.setSectionResizeMode(2, QHeaderView.Interactive)  # Net PnL: 10-15%
-        header.setSectionResizeMode(3, QHeaderView.Interactive)  # Max DD: 10-15%
-        header.setSectionResizeMode(4, QHeaderView.Interactive)  # Trades: 8-10%
-        header.setSectionResizeMode(5, QHeaderView.Interactive)  # State: 8-10%
-        
-        # Set minimum sizes
-        header.setMinimumSectionSize(60)
-        
-        # Set default sizes (will be adjusted on resize)
-        self.registry_table.setColumnWidth(0, 250)  # Strategy ID
-        self.registry_table.setColumnWidth(1, 200)  # Latest Artifact
-        self.registry_table.setColumnWidth(2, 100)  # Net PnL
-        self.registry_table.setColumnWidth(3, 100)  # Max DD
-        self.registry_table.setColumnWidth(4, 80)   # Trades
-        self.registry_table.setColumnWidth(5, 80)   # State
-        
-        self.registry_table.setSelectionBehavior(QTableWidget.SelectRows)
-        self.registry_table.setSelectionMode(QTableWidget.SingleSelection)
+        header.setStretchLastSection(True)
+        self.registry_table.setColumnWidth(0, 200)  # Strategy ID
+        self.registry_table.setColumnWidth(1, 150)  # Name
+        self.registry_table.setColumnWidth(2, 100)  # Verification
+        self.registry_table.setColumnWidth(3, 300)  # File Path
+        self.registry_table.setColumnWidth(4, 80)   # Type
         
         table_layout.addWidget(self.registry_table)
         table_group.setLayout(table_layout)
@@ -116,199 +336,82 @@ class RegistryTab(QWidget):
         
         # Status bar
         self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("font-size: 11px; color: #666;")
+        self.status_label.setStyleSheet("color: #9e9e9e; font-size: 10px;")
         main_layout.addWidget(self.status_label)
     
     def setup_connections(self):
         """Connect signals and slots."""
         self.refresh_btn.clicked.connect(self.refresh_registry)
-        self.promote_btn.clicked.connect(self.promote_selected)
-        self.freeze_btn.clicked.connect(self.freeze_selected)
-        self.remove_btn.clicked.connect(self.remove_selected)
-        self.cleanup_btn.clicked.connect(self.open_cleanup_dialog)
-        self.registry_table.itemSelectionChanged.connect(self.update_button_states)
+        self.search_input.textChanged.connect(self.on_search_changed)
+        self.verification_filter.currentTextChanged.connect(self.on_filter_changed)
+    
+    def refresh_registry(self):
+        """Refresh registry data from supervisor."""
+        try:
+            self.status_label.setText("Refreshing registry...")
+            QApplication.processEvents()
+            
+            self.registry_model.refresh()
+            
+            count = self.registry_model.rowCount()
+            self.status_label.setText(f"Loaded {count} strategies")
+            self.log_signal.emit(f"Registry refreshed: {count} strategies")
+            
+        except SupervisorClientError as e:
+            error_msg = f"Failed to refresh registry: {e}"
+            self.status_label.setText(f"Error: {e}")
+            QMessageBox.critical(self, "Registry Error", error_msg)
+            logger.error(error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error: {e}"
+            self.status_label.setText(f"Error: {e}")
+            QMessageBox.critical(self, "Registry Error", error_msg)
+            logger.error(error_msg)
+    
+    def on_search_changed(self, text: str):
+        """Handle search text change."""
+        self.filter_proxy.setFilterFixedString(text)
+        
+        # Update status
+        visible_count = self.filter_proxy.rowCount()
+        total_count = self.registry_model.rowCount()
+        if text:
+            self.status_label.setText(f"Showing {visible_count} of {total_count} strategies (filtered)")
+        else:
+            self.status_label.setText(f"Showing all {total_count} strategies")
+    
+    def on_filter_changed(self, filter_text: str):
+        """Handle verification filter change."""
+        if filter_text == "All":
+            self.filter_proxy.setFilterRegExp("")
+        else:
+            # Filter by verification status (case-insensitive)
+            self.filter_proxy.setFilterFixedString(filter_text)
+        
+        # Update status
+        visible_count = self.filter_proxy.rowCount()
+        total_count = self.registry_model.rowCount()
+        if filter_text != "All":
+            self.status_label.setText(f"Showing {visible_count} strategies ({filter_text.lower()})")
+        else:
+            self.status_label.setText(f"Showing all {total_count} strategies")
     
     def log(self, message: str):
         """Append message to log."""
         self.log_signal.emit(message)
         self.status_label.setText(message)
     
-    def refresh_registry(self):
-        """Refresh registry data from backend."""
-        self.log("Refreshing registry from backend...")
+    def get_selected_strategy(self) -> Optional[Dict[str, Any]]:
+        """Get the selected strategy data."""
+        selected = self.registry_table.selectionModel().selectedRows()
+        if not selected:
+            return None
         
-        # Clear table
-        self.registry_table.setRowCount(0)
+        proxy_index = selected[0]
+        source_index = self.filter_proxy.mapToSource(proxy_index)
+        row = source_index.row()
         
-        try:
-            # TODO: Replace with actual backend call
-            # For now, use mock data
-            strategies = self._get_mock_strategies()
-            
-            self.registry_table.setRowCount(len(strategies))
-            
-            for row, strategy in enumerate(strategies):
-                # Strategy ID
-                self.registry_table.setItem(row, 0, QTableWidgetItem(strategy["strategy_id"]))
-                
-                # Latest artifact
-                self.registry_table.setItem(row, 1, QTableWidgetItem(strategy["latest_artifact"]))
-                
-                # Net PnL
-                pnl_item = QTableWidgetItem(f"{strategy['net_pnl']:,.2f}")
-                if strategy["net_pnl"] >= 0:
-                    pnl_item.setForeground(Qt.darkGreen)
-                else:
-                    pnl_item.setForeground(Qt.darkRed)
-                self.registry_table.setItem(row, 2, pnl_item)
-                
-                # Max DD
-                dd_item = QTableWidgetItem(f"{strategy['max_dd']:,.2f}")
-                dd_item.setForeground(Qt.darkRed)
-                self.registry_table.setItem(row, 3, dd_item)
-                
-                # Trades
-                self.registry_table.setItem(row, 4, QTableWidgetItem(str(strategy["trades"])))
-                
-                # State
-                state_item = QTableWidgetItem(strategy["state"])
-                if strategy["state"] == "ACTIVE":
-                    state_item.setForeground(Qt.darkGreen)
-                elif strategy["state"] == "INCUBATION":
-                    state_item.setForeground(Qt.darkBlue)
-                elif strategy["state"] == "FROZEN":
-                    state_item.setForeground(Qt.darkGray)
-                self.registry_table.setItem(row, 5, state_item)
-            
-            self.log(f"Loaded {len(strategies)} strategies")
-            
-        except Exception as e:
-            self.log(f"ERROR: Failed to refresh registry: {e}")
-            QMessageBox.critical(self, "Registry Error", f"Failed to load registry: {e}")
-    
-    def _get_mock_strategies(self) -> List[Dict[str, Any]]:
-        """Get mock strategy data for development."""
-        return [
-            {
-                "strategy_id": "S1_baseline",
-                "latest_artifact": "artifact_20260103_123456",
-                "net_pnl": 12500.50,
-                "max_dd": -2500.75,
-                "trades": 342,
-                "state": "ACTIVE"
-            },
-            {
-                "strategy_id": "S2_momentum",
-                "latest_artifact": "artifact_20260102_234567",
-                "net_pnl": 8500.25,
-                "max_dd": -1800.30,
-                "trades": 215,
-                "state": "INCUBATION"
-            },
-            {
-                "strategy_id": "S3_reversal",
-                "latest_artifact": "artifact_20260101_345678",
-                "net_pnl": -1200.75,
-                "max_dd": -3500.50,
-                "trades": 128,
-                "state": "FROZEN"
-            },
-            {
-                "strategy_id": "SMA_cross",
-                "latest_artifact": "artifact_20251231_456789",
-                "net_pnl": 3200.00,
-                "max_dd": -950.25,
-                "trades": 187,
-                "state": "ACTIVE"
-            }
-        ]
-    
-    def update_button_states(self):
-        """Update button states based on selection."""
-        selected_rows = self.registry_table.selectionModel().selectedRows()
-        has_selection = len(selected_rows) > 0
+        if 0 <= row < self.registry_model.rowCount():
+            return self.registry_model.strategies[row]
         
-        self.promote_btn.setEnabled(has_selection)
-        self.freeze_btn.setEnabled(has_selection)
-        self.remove_btn.setEnabled(has_selection)
-    
-    def get_selected_strategy_id(self) -> str:
-        """Get the strategy ID of the selected row."""
-        selected_rows = self.registry_table.selectionModel().selectedRows()
-        if not selected_rows:
-            return ""
-        
-        row = selected_rows[0].row()
-        item = self.registry_table.item(row, 0)  # Strategy ID column
-        return item.text() if item else ""
-    
-    def promote_selected(self):
-        """Promote selected strategy artifact."""
-        strategy_id = self.get_selected_strategy_id()
-        if not strategy_id:
-            return
-        
-        reply = QMessageBox.question(
-            self, "Confirm Promotion",
-            f"Promote latest artifact for strategy '{strategy_id}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            self.log(f"Promoting strategy: {strategy_id}")
-            # TODO: Call actual promote function
-            self.log("Promotion would call portfolio.manager.promote_strategy()")
-            QMessageBox.information(self, "Promotion", f"Strategy '{strategy_id}' promoted (placeholder)")
-    
-    def freeze_selected(self):
-        """Freeze selected strategy."""
-        strategy_id = self.get_selected_strategy_id()
-        if not strategy_id:
-            return
-        
-        reply = QMessageBox.question(
-            self, "Confirm Freeze",
-            f"Freeze strategy '{strategy_id}'?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            self.log(f"Freezing strategy: {strategy_id}")
-            # TODO: Call actual freeze function
-            self.log("Freeze would call portfolio.manager.freeze_strategy()")
-            QMessageBox.information(self, "Freeze", f"Strategy '{strategy_id}' frozen (placeholder)")
-            self.refresh_registry()
-    
-    def remove_selected(self):
-        """Remove selected strategy from registry."""
-        strategy_id = self.get_selected_strategy_id()
-        if not strategy_id:
-            return
-        
-        reply = QMessageBox.warning(
-            self, "Confirm Removal",
-            f"Remove strategy '{strategy_id}' from registry?\n\nThis action cannot be undone.",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if reply == QMessageBox.Yes:
-            self.log(f"Removing strategy: {strategy_id}")
-            # TODO: Call actual remove function
-            self.log("Remove would call portfolio.manager.remove_strategy()")
-            QMessageBox.information(self, "Removal", f"Strategy '{strategy_id}' removed (placeholder)")
-            self.refresh_registry()
-    
-    def open_cleanup_dialog(self):
-        """Open the cleanup dialog."""
-        dialog = CleanupDialog(self)
-        dialog.cleanup_performed.connect(self.on_cleanup_performed)
-        dialog.exec()
-    
-    def on_cleanup_performed(self, audit_event: dict):
-        """Handle cleanup completion."""
-        scope = audit_event.get("scope", "unknown")
-        item_count = audit_event.get("item_count", 0)
-        self.log(f"Cleanup performed: {scope}, {item_count} items moved to trash")
-        
-        # Refresh registry since cleanup might have affected artifacts
-        self.refresh_registry()
+        return None

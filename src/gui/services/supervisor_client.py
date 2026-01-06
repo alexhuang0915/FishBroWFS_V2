@@ -16,6 +16,14 @@ from src.gui.desktop.config import SUPERVISOR_BASE_URL
 logger = logging.getLogger(__name__)
 
 
+class SupervisorClientError(Exception):
+    """Custom exception for supervisor client errors."""
+    def __init__(self, status_code: Optional[int] = None, message: str = ""):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(f"SupervisorClientError: {status_code} - {message}")
+
+
 class SupervisorClient:
     """HTTP client for supervisor API v1."""
 
@@ -31,9 +39,13 @@ class SupervisorClient:
             response = self.session.get(url)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else None
+            logger.error(f"GET {url} failed with status {status_code}: {e}")
+            raise SupervisorClientError(status_code, str(e))
         except requests.RequestException as e:
             logger.error(f"GET {url} failed: {e}")
-            raise
+            raise SupervisorClientError(message=str(e))
 
     def _post(self, path: str, payload: dict) -> Any:
         """POST request with JSON payload."""
@@ -42,9 +54,13 @@ class SupervisorClient:
             response = self.session.post(url, json=payload)
             response.raise_for_status()
             return response.json()
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else None
+            logger.error(f"POST {url} failed with status {status_code}: {e}")
+            raise SupervisorClientError(status_code, str(e))
         except requests.RequestException as e:
             logger.error(f"POST {url} failed: {e}")
-            raise
+            raise SupervisorClientError(message=str(e))
 
     def health(self) -> dict:
         """Check supervisor health."""
@@ -85,13 +101,24 @@ class SupervisorClient:
             response = self.session.get(url)
             response.raise_for_status()
             return response.content
+        except requests.exceptions.HTTPError as e:
+            status_code = e.response.status_code if e.response else None
+            logger.error(f"GET {url} failed with status {status_code}: {e}")
+            raise SupervisorClientError(status_code, str(e))
         except requests.RequestException as e:
             logger.error(f"GET {url} failed: {e}")
-            raise
+            raise SupervisorClientError(message=str(e))
 
-    def get_stdout_tail(self, job_id: str, n: int = 200) -> dict:
-        """Return stdout tail lines."""
-        return self._get(f"/api/v1/jobs/{job_id}/logs/stdout_tail?n={n}")
+    def get_stdout_tail(self, job_id: str, n: int = 200) -> str:
+        """Return stdout tail lines as string."""
+        result = self._get(f"/api/v1/jobs/{job_id}/logs/stdout_tail?n={n}")
+        # API returns dict with 'lines' key
+        if isinstance(result, dict) and 'lines' in result:
+            return '\n'.join(result['lines'])
+        elif isinstance(result, list):
+            return '\n'.join(result)
+        else:
+            return str(result)
 
     def get_reveal_evidence_path(self, job_id: str) -> dict:
         """Return approved evidence path."""
@@ -100,6 +127,36 @@ class SupervisorClient:
     def check_readiness(self, season: str, dataset_id: str, timeframe: str) -> dict:
         """Check bars and features readiness."""
         return self._get(f"/api/v1/readiness/{season}/{dataset_id}/{timeframe}")
+
+    def get_job_artifacts(self, job_id: str) -> dict:
+        """Return artifact index for a job (alias for get_artifacts)."""
+        return self.get_artifacts(job_id)
+
+    def get_strategy_report_v1(self, job_id: str) -> dict:
+        """Get StrategyReportV1 for a job."""
+        return self._get(f"/api/v1/reports/strategy/{job_id}")
+
+    def get_portfolio_report_v1(self, portfolio_id: str) -> dict:
+        """Get PortfolioReportV1 for a portfolio."""
+        return self._get(f"/api/v1/reports/portfolio/{portfolio_id}")
+
+    def get_registry_strategies(self) -> List[dict]:
+        """Return list of registry strategies with details."""
+        # API returns list of strings or dicts; we'll handle both
+        result = self._get("/api/v1/registry/strategies")
+        if result and isinstance(result[0], dict):
+            return result
+        else:
+            # Convert list of strings to list of dicts with id field
+            return [{"id": s, "name": s} for s in result]
+
+    def get_registry_instruments(self) -> List[str]:
+        """Return list of instrument symbols (alias for get_instruments)."""
+        return self.get_instruments()
+
+    def get_registry_datasets(self) -> List[str]:
+        """Return list of dataset IDs (alias for get_datasets)."""
+        return self.get_datasets()
 
 
 # Singleton client instance
@@ -157,8 +214,8 @@ def get_artifact_file(job_id: str, filename: str) -> bytes:
     return _client.get_artifact_file(job_id, filename)
 
 
-def get_stdout_tail(job_id: str, n: int = 200) -> dict:
-    """Return stdout tail lines."""
+def get_stdout_tail(job_id: str, n: int = 200) -> str:
+    """Return stdout tail lines as string."""
     return _client.get_stdout_tail(job_id, n)
 
 
@@ -172,8 +229,39 @@ def check_readiness(season: str, dataset_id: str, timeframe: str) -> dict:
     return _client.check_readiness(season, dataset_id, timeframe)
 
 
+def get_job_artifacts(job_id: str) -> dict:
+    """Return artifact index for a job (alias for get_artifacts)."""
+    return _client.get_job_artifacts(job_id)
+
+
+def get_strategy_report_v1(job_id: str) -> dict:
+    """Get StrategyReportV1 for a job."""
+    return _client.get_strategy_report_v1(job_id)
+
+
+def get_portfolio_report_v1(portfolio_id: str) -> dict:
+    """Get PortfolioReportV1 for a portfolio."""
+    return _client.get_portfolio_report_v1(portfolio_id)
+
+
+def get_registry_strategies() -> List[dict]:
+    """Return list of registry strategies with details."""
+    return _client.get_registry_strategies()
+
+
+def get_registry_instruments() -> List[str]:
+    """Return list of instrument symbols."""
+    return _client.get_registry_instruments()
+
+
+def get_registry_datasets() -> List[str]:
+    """Return list of dataset IDs."""
+    return _client.get_registry_datasets()
+
+
 __all__ = [
     "SupervisorClient",
+    "SupervisorClientError",
     "get_client",
     "health",
     "get_datasets",
@@ -187,4 +275,10 @@ __all__ = [
     "get_stdout_tail",
     "get_reveal_evidence_path",
     "check_readiness",
+    "get_job_artifacts",
+    "get_strategy_report_v1",
+    "get_portfolio_report_v1",
+    "get_registry_strategies",
+    "get_registry_instruments",
+    "get_registry_datasets",
 ]

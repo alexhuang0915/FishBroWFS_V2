@@ -944,7 +944,7 @@ class StrategyReportWidget(QWidget):
             if evidence_path:
                 # Open folder in file explorer
                 QDesktopServices.openUrl(QUrl.fromLocalFile(evidence_path))
-                self.log_signal.emit                self.log_signal.emit(f"Opened evidence folder: {evidence_path}")
+                self.log_signal.emit(f"Opened evidence folder: {evidence_path}")
             else:
                 QMessageBox.warning(
                     self,

@@ -334,7 +334,7 @@ class HistogramWidget(QWidget):
             painter.restore()
     
     def mouseMoveEvent(self, event):
-        """Handle mouse move for bar highlighting."""
+        """Handle mouse move for bar highlighting and tooltips."""
         if not self.bin_counts:
             return
         
@@ -352,13 +352,26 @@ class HistogramWidget(QWidget):
         if 0 <= bar_idx < n_bins:
             self.hovered_bar = bar_idx
             
-            # Emit signal
+            # Get bar data
             count = self.bin_counts[bar_idx]
             bin_start = self.bin_edges[bar_idx]
             bin_end = self.bin_edges[bar_idx + 1]
+            
+            # Calculate percentage if total count is available
+            total_count = sum(self.bin_counts)
+            percentage = (count / total_count * 100) if total_count > 0 else 0
+            
+            # Show tooltip
+            tooltip_text = f"Bin: [{bin_start:.3f}, {bin_end:.3f})\nCount: {count}\nPercentage: {percentage:.1f}%"
+            from PySide6.QtWidgets import QToolTip
+            QToolTip.showText(event.globalPosition().toPoint(), tooltip_text, self)
+            
+            # Emit signal
             self.bar_hovered.emit(bar_idx, bin_start, bin_end, count)
         else:
             self.hovered_bar = None
+            from PySide6.QtWidgets import QToolTip
+            QToolTip.hideText()
         
         self.update()
     
@@ -387,6 +400,13 @@ class HistogramWidget(QWidget):
     def set_show_grid(self, show: bool):
         """Enable or disable grid lines."""
         self.show_grid = show
+        self.update()
+    
+    def leaveEvent(self, event):
+        """Hide tooltip when mouse leaves widget."""
+        from PySide6.QtWidgets import QToolTip
+        QToolTip.hideText()
+        self.hovered_bar = None
         self.update()
     
     def get_statistics(self) -> Dict[str, float]:

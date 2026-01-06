@@ -25,6 +25,7 @@ from ..widgets.report_host import ReportHostWidget
 from ..widgets.charts.line_chart import LineChartWidget
 from ..widgets.charts.heatmap import HeatmapWidget
 from ..widgets.charts.histogram import HistogramWidget
+from ..widgets.report_widgets.strategy_report_widget import StrategyReportWidget
 from ...services.supervisor_client import (
     get_jobs, get_strategy_report_v1, get_portfolio_report_v1,
     SupervisorClientError
@@ -183,135 +184,6 @@ class ReportExplorerModel(QAbstractItemModel):
         
         item = index.internalPointer()
         return item
-
-
-class StrategyReportWidget(QWidget):
-    """Widget for displaying StrategyReportV1."""
-    
-    def __init__(self, report_data: Dict[str, Any]):
-        super().__init__()
-        self.report_data = report_data
-        self.setup_ui()
-    
-    def setup_ui(self):
-        """Initialize the UI components."""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 12, 12, 12)
-        main_layout.setSpacing(12)
-        
-        # Header section
-        header_group = QGroupBox("Strategy Report")
-        header_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #1a237e;
-                background-color: #1E1E1E;
-                margin-top: 5px;
-                padding-top: 8px;
-                font-size: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px 0 4px;
-                color: #E6E6E6;
-            }
-        """)
-        
-        header_layout = QGridLayout()
-        
-        # Basic info
-        meta = self.report_data.get('meta', {})
-        header_layout.addWidget(QLabel(f"<b>Strategy:</b> {meta.get('strategy_name', 'Unknown')}"), 0, 0)
-        header_layout.addWidget(QLabel(f"<b>Job ID:</b> {meta.get('job_id', 'N/A')}"), 0, 1)
-        header_layout.addWidget(QLabel(f"<b>Created:</b> {meta.get('created_at', 'N/A')}"), 1, 0)
-        header_layout.addWidget(QLabel(f"<b>Status:</b> {meta.get('status', 'N/A')}"), 1, 1)
-        
-        header_group.setLayout(header_layout)
-        main_layout.addWidget(header_group)
-        
-        # Metrics row
-        metrics = self.report_data.get('metrics', {})
-        metric_row = MetricRow([
-            ("Score", f"{metrics.get('score', 0):.2f}", "Strategy score"),
-            ("Net Profit", f"${metrics.get('net_profit', 0):,.0f}", "Total profit"),
-            ("Max Drawdown", f"{metrics.get('max_drawdown', 0):.1%}", "Maximum drawdown"),
-            ("Trades", str(metrics.get('trades', 0)), "Total trades"),
-            ("Win Rate", f"{metrics.get('win_rate', 0):.1%}", "Win rate"),
-            ("Admissible", "Yes" if metrics.get('downstream_admissible', False) else "No", "Downstream admissible")
-        ])
-        main_layout.addWidget(metric_row)
-        
-        # Charts section
-        charts_group = QGroupBox("Charts")
-        charts_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 1px solid #555555;
-                background-color: #1E1E1E;
-                margin-top: 5px;
-                padding-top: 8px;
-                font-size: 11px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px 0 4px;
-                color: #E6E6E6;
-            }
-        """)
-        
-        charts_layout = QGridLayout()
-        
-        # Equity curve
-        series = self.report_data.get('series', {})
-        equity_data = series.get('equity', [])
-        if equity_data:
-            equity_chart = LineChartWidget(equity_data, "Equity Curve", "Time", "Equity")
-            charts_layout.addWidget(equity_chart, 0, 0)
-        
-        # Drawdown curve
-        drawdown_data = series.get('drawdown', [])
-        if drawdown_data:
-            drawdown_chart = LineChartWidget(drawdown_data, "Drawdown Curve", "Time", "Drawdown %")
-            charts_layout.addWidget(drawdown_chart, 0, 1)
-        
-        # Rolling metric
-        rolling_data = series.get('rolling_metric', [])
-        if rolling_data:
-            rolling_chart = LineChartWidget(rolling_data, "Rolling Metric", "Time", "Metric")
-            charts_layout.addWidget(rolling_chart, 1, 0)
-        
-        # Returns histogram
-        distributions = self.report_data.get('distributions', {})
-        returns_hist = distributions.get('returns_histogram', {})
-        if returns_hist:
-            bin_edges = returns_hist.get('bin_edges', [])
-            counts = returns_hist.get('counts', [])
-            if bin_edges and counts:
-                hist_chart = HistogramWidget(bin_edges, counts, "Returns Distribution", "Return", "Frequency")
-                charts_layout.addWidget(hist_chart, 1, 1)
-        
-        charts_group.setLayout(charts_layout)
-        main_layout.addWidget(charts_group)
-        
-        # Trade summary table
-        trade_summary = self.report_data.get('trade_summary', {})
-        if trade_summary:
-            summary_group = QGroupBox("Trade Summary")
-            summary_layout = QFormLayout()
-            
-            for key, value in trade_summary.items():
-                if isinstance(value, (int, float)):
-                    summary_layout.addRow(key, QLabel(f"{value:,.2f}"))
-                else:
-                    summary_layout.addRow(key, QLabel(str(value)))
-            
-            summary_group.setLayout(summary_layout)
-            main_layout.addWidget(summary_group)
-        
-        # Add stretch at the bottom
-        main_layout.addStretch()
 
 
 class PortfolioReportWidget(QWidget):
@@ -723,7 +595,7 @@ class AuditTab(QWidget):
                 return
             
             # Create widget
-            widget = StrategyReportWidget(report_data)
+            widget = StrategyReportWidget(job_id, report_data)
             tab_title = f"Strategy: {report_data.get('meta', {}).get('strategy_name', 'Unknown')}"
             
             # Add to tabs

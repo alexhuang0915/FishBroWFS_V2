@@ -8,11 +8,14 @@ import signal
 import subprocess
 import sys
 import time
+import mimetypes
+import hashlib
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, APIRouter
 from pydantic import BaseModel
 
 from collections import deque
@@ -27,7 +30,7 @@ from control.jobs_db import (
 )
 from control.paths import run_log_path
 from control.preflight import PreflightResult, run_preflight
-from control.control_types import DBJobSpec, JobRecord, StopMode
+from control.control_types import DBJobSpec, JobRecord, StopMode, JobStatus
 
 # Phase 13: Batch submit
 from control.batch_submit import (
@@ -118,12 +121,20 @@ from contracts.data.snapshot_models import SnapshotMetadata
 from control.data_snapshot import create_snapshot, compute_snapshot_id, normalize_bars
 from control.dataset_registry_mutation import register_snapshot_as_dataset
 
+# Phase A: Registry endpoints
+from portfolio.instruments import load_instruments_config
+
+# Phase A: Data readiness helpers
+from control.bars_store import bars_dir, resampled_bars_path
+from control.features_store import features_dir, features_path
+
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
 
 # Phase 12: Registry cache
 _DATASET_INDEX: DatasetIndex | None = None
 _STRATEGY_REGISTRY: StrategyRegistryResponse | None = None
+_INSTRUMENTS_CONFIG: Any | None = None  # InstrumentsConfig from portfolio.instruments
 
 
 def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
@@ -169,6 +180,57 @@ def _load_dataset_index_from_file() -> DatasetIndex:
 
     data = json.loads(index_path.read_text())
     return DatasetIndex.model_validate(data)
+
+
+def _load_instruments_config_from_file() -> dict[str, Any]:
+    """Private implementation: load instruments config from file (fail fast)."""
+    import json
+    from pathlib import Path
+
+    config_path = Path("configs/portfolio/instruments.yaml")
+    if not config_path.exists():
+        raise RuntimeError(
+            f"Instruments config not found: {config_path}\n"
+            "Please ensure configs/portfolio/instruments.yaml exists"
+        )
+
+    # Use portfolio.instruments.load_instruments_config to parse YAML
+    from portfolio.instruments import load_instruments_config
+    config = load_instruments_config(config_path)
+    return config
+
+
+def _get_instruments_config() -> dict[str, Any]:
+    """Return cached instruments config, loading if necessary."""
+    global _INSTRUMENTS_CONFIG
+    if _INSTRUMENTS_CONFIG is None:
+        _INSTRUMENTS_CONFIG = _load_instruments_config_from_file()
+    return _INSTRUMENTS_CONFIG
+
+
+def _reload_instruments_config() -> dict[str, Any]:
+    """Force reload instruments config from file and update cache."""
+    global _INSTRUMENTS_CONFIG
+    _INSTRUMENTS_CONFIG = _load_instruments_config_from_file()
+    return _INSTRUMENTS_CONFIG
+
+
+def load_instruments_config() -> dict[str, Any]:
+    """Load instruments config. Supports monkeypatching."""
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_instruments_config")
+
+    # If monkeypatched, call patched function
+    if current is not _LOAD_INSTRUMENTS_CONFIG_ORIGINAL:
+        return current()
+
+    # If cache is available, return it
+    if _INSTRUMENTS_CONFIG is not None:
+        return _INSTRUMENTS_CONFIG
+
+    # Fallback for CLI/unit-test paths (may touch filesystem)
+    return _load_instruments_config_from_file()
 
 
 def _get_dataset_index() -> DatasetIndex:
@@ -245,27 +307,32 @@ def load_strategy_registry() -> StrategyRegistryResponse:
 # Original function references for monkeypatch detection (must be after function definitions)
 _LOAD_DATASET_INDEX_ORIGINAL = load_dataset_index
 _LOAD_STRATEGY_REGISTRY_ORIGINAL = load_strategy_registry
+_LOAD_INSTRUMENTS_CONFIG_ORIGINAL = load_instruments_config
 
 
 def _try_prime_registries() -> None:
     """Prime cache on startup."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG
     try:
         _DATASET_INDEX = load_dataset_index()
         _STRATEGY_REGISTRY = load_strategy_registry()
+        _INSTRUMENTS_CONFIG = load_instruments_config()
     except Exception:
         _DATASET_INDEX = None
         _STRATEGY_REGISTRY = None
+        _INSTRUMENTS_CONFIG = None
 
 
 def _prime_registries_with_feedback() -> dict[str, Any]:
     """Prime registries and return detailed feedback."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG
     result = {
         "dataset_loaded": False,
         "strategy_loaded": False,
+        "instruments_loaded": False,
         "dataset_error": None,
         "strategy_error": None,
+        "instruments_error": None,
     }
     
     # Try dataset
@@ -284,7 +351,15 @@ def _prime_registries_with_feedback() -> dict[str, Any]:
         _STRATEGY_REGISTRY = None
         result["strategy_error"] = str(e)
     
-    result["success"] = result["dataset_loaded"] and result["strategy_loaded"]
+    # Try instruments
+    try:
+        _INSTRUMENTS_CONFIG = load_instruments_config()
+        result["instruments_loaded"] = True
+    except Exception as e:
+        _INSTRUMENTS_CONFIG = None
+        result["instruments_error"] = str(e)
+    
+    result["success"] = result["dataset_loaded"] and result["strategy_loaded"] and result["instruments_loaded"]
     return result
 
 
@@ -304,13 +379,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="B5-C Mission Control API", lifespan=lifespan)
 
+# API v1 router for versioned endpoints
+api_v1 = APIRouter(prefix="/api/v1")
+
 
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/run_status")
+@api_v1.get("/run_status")
 async def get_run_status() -> dict[str, Any]:
     """
     Read-only endpoint for run status observability via HTTP pull (Heartbeat Pattern).
@@ -339,7 +417,7 @@ async def get_run_status() -> dict[str, Any]:
         }
 
 
-@app.get("/__identity")
+@api_v1.get("/identity")
 async def identity() -> dict[str, Any]:
     """Service identity endpoint for topology observability."""
     db_path = get_db_path()
@@ -347,7 +425,7 @@ async def identity() -> dict[str, Any]:
     return ident
 
 
-@app.get("/meta/datasets", response_model=DatasetIndex)
+@api_v1.get("/meta/datasets", response_model=DatasetIndex)
 async def meta_datasets() -> DatasetIndex:
     """
     Read-only endpoint for GUI.
@@ -371,7 +449,7 @@ async def meta_datasets() -> DatasetIndex:
     return DatasetIndex(generated_at=idx.generated_at, datasets=sorted_ds)
 
 
-@app.get("/meta/strategies", response_model=StrategyRegistryResponse)
+@api_v1.get("/meta/strategies", response_model=StrategyRegistryResponse)
 async def meta_strategies() -> StrategyRegistryResponse:
     """
     Read-only endpoint for GUI.
@@ -399,7 +477,7 @@ async def meta_strategies() -> StrategyRegistryResponse:
     return StrategyRegistryResponse(strategies=strategies)
 
 
-@app.post("/meta/prime")
+@api_v1.post("/meta/prime")
 async def prime_registries() -> dict[str, Any]:
     """
     Prime registries cache (explicit trigger).
@@ -412,26 +490,290 @@ async def prime_registries() -> dict[str, Any]:
     return _prime_registries_with_feedback()
 
 
-@app.get("/jobs")
-async def list_jobs_endpoint() -> list[JobRecord]:
-    db_path = get_db_path()
-    return list_jobs(db_path)
+@api_v1.get("/registry/instruments")
+async def registry_instruments() -> list[str]:
+    """
+    Return list of instrument symbols (keys from instruments config).
+    
+    Contract:
+    - Returns simple array of strings, e.g., ["MNQ", "MES", ...]
+    - If instruments config not loaded, returns 503.
+    - Must not access filesystem during request handling.
+    """
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_instruments_config")
+
+    # Enforce no filesystem access during request handling
+    if _INSTRUMENTS_CONFIG is None and current is _LOAD_INSTRUMENTS_CONFIG_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Instruments registry not preloaded")
+
+    config = load_instruments_config()
+    # config is a dict with instrument symbols as keys? Let's assume it's a dict mapping symbol -> instrument definition
+    # We'll extract keys.
+    if isinstance(config, dict):
+        symbols = list(config.keys())
+    else:
+        # If config is something else (maybe a list), fallback
+        symbols = []
+    return symbols
 
 
-@app.get("/jobs/{job_id}")
-async def get_job_endpoint(job_id: str) -> JobRecord:
-    db_path = get_db_path()
-    try:
-        return get_job(db_path, job_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+@api_v1.get("/registry/datasets")
+async def registry_datasets() -> list[str]:
+    """
+    Return list of dataset IDs (simple strings).
+    
+    Contract:
+    - Returns simple array of strings, e.g., ["None", "VX", "ZN", ...]
+    - If dataset registry not loaded, returns 503.
+    - Must not access filesystem during request handling.
+    """
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_dataset_index")
+
+    # Enforce no filesystem access during request handling
+    if _DATASET_INDEX is None and current is _LOAD_DATASET_INDEX_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Dataset registry not preloaded")
+
+    idx = load_dataset_index()
+    # Return dataset IDs sorted
+    dataset_ids = sorted([ds.id for ds in idx.datasets])
+    return dataset_ids
+
+
+@api_v1.get("/registry/strategies")
+async def registry_strategies() -> list[str]:
+    """
+    Return list of strategy IDs (simple strings).
+    
+    Contract:
+    - Returns simple array of strings, e.g., ["s1_v1", "s2_v1", ...]
+    - If strategy registry not loaded, returns 503.
+    - Must not access filesystem during request handling.
+    """
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_strategy_registry")
+
+    # Enforce no filesystem access during request handling
+    if _STRATEGY_REGISTRY is None and current is _LOAD_STRATEGY_REGISTRY_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Strategy registry not preloaded")
+
+    reg = load_strategy_registry()
+    strategy_ids = sorted([s.strategy_id for s in reg.strategies])
+    return strategy_ids
+
+
+class ReadinessResponse(BaseModel):
+    """Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}."""
+    season: str
+    dataset_id: str
+    timeframe: str
+    bars_ready: bool
+    features_ready: bool
+    bars_path: Optional[str] = None
+    features_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+@api_v1.get("/readiness/{season}/{dataset_id}/{timeframe}", response_model=ReadinessResponse)
+async def readiness_check(season: str, dataset_id: str, timeframe: str) -> ReadinessResponse:
+    """
+    Check if bars and features are ready for a given season, dataset, and timeframe.
+    
+    Contract:
+    - Returns readiness status without performing any writes.
+    - If bars/features files exist, returns paths (relative to outputs root).
+    - If missing, returns false with optional error.
+    - Must not construct filesystem paths in UI; UI must call this endpoint.
+    """
+    # Determine outputs root (default "outputs")
+    outputs_root = Path("outputs")
+    # Build paths using the imported helpers
+    bars_path = resampled_bars_path(outputs_root, season, dataset_id, timeframe)
+    features_path = features_path(outputs_root, season, dataset_id, timeframe)
+    
+    bars_ready = bars_path.exists()
+    features_ready = features_path.exists()
+    
+    return ReadinessResponse(
+        season=season,
+        dataset_id=dataset_id,
+        timeframe=timeframe,
+        bars_ready=bars_ready,
+        features_ready=features_ready,
+        bars_path=str(bars_path) if bars_ready else None,
+        features_path=str(features_path) if features_ready else None,
+        error=None,
+    )
 
 
 class SubmitJobRequest(BaseModel):
     spec: DBJobSpec
 
 
-@app.post("/jobs")
+class JobListResponse(BaseModel):
+    """Response for GET /api/v1/jobs."""
+    job_id: str
+    type: str = "strategy"  # default type
+    status: str
+    created_at: str
+    finished_at: Optional[str] = None
+    strategy_name: Optional[str] = None
+    instrument: Optional[str] = None
+    timeframe: Optional[str] = None
+
+
+def _job_record_to_response(job: JobRecord) -> JobListResponse:
+    """Convert a JobRecord to a JobListResponse."""
+    # Extract config snapshot
+    config = job.spec.config_snapshot if job.spec.config_snapshot else {}
+    # Determine type (could be "strategy" or "portfolio"? default "strategy")
+    job_type = "strategy"
+    # Extract strategy_name from config
+    strategy_name = config.get("strategy_id")
+    # Extract instrument and timeframe from config (may be nested)
+    instrument = None
+    timeframe = None
+    # Look for instrument in config (could be under "instrument" or "symbol")
+    if "instrument" in config:
+        instrument = config["instrument"]
+    elif "symbol" in config:
+        instrument = config["symbol"]
+    # Look for timeframe
+    if "timeframe" in config:
+        timeframe = config["timeframe"]
+    # Format timestamps
+    created_at = job.created_at.isoformat() if job.created_at else ""
+    finished_at = job.finished_at.isoformat() if job.finished_at else None
+    return JobListResponse(
+        job_id=job.job_id,
+        type=job_type,
+        status=job.status.value if isinstance(job.status, JobStatus) else job.status,
+        created_at=created_at,
+        finished_at=finished_at,
+        strategy_name=strategy_name,
+        instrument=instrument,
+        timeframe=timeframe,
+    )
+
+
+@api_v1.get("/jobs", response_model=list[JobListResponse])
+async def list_jobs_endpoint(limit: int = 50) -> list[JobListResponse]:
+    db_path = get_db_path()
+    jobs = list_jobs(db_path, limit=limit)
+    return [_job_record_to_response(job) for job in jobs]
+
+
+@api_v1.get("/jobs/{job_id}", response_model=JobListResponse)
+async def get_job_endpoint(job_id: str) -> JobListResponse:
+    db_path = get_db_path()
+    try:
+        job = get_job(db_path, job_id)
+        return _job_record_to_response(job)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# -----------------------------------------------------------------------------
+# Phase A: Artifact endpoints helpers
+# -----------------------------------------------------------------------------
+
+def _get_jobs_evidence_root() -> Path:
+    """
+    Return the root directory for job evidence bundles (Phase C).
+    LOCKED: outputs/jobs/
+    """
+    return Path("outputs/jobs")
+
+
+def _get_job_evidence_dir(job_id: str) -> Path:
+    """Return the evidence directory for a job, ensuring containment."""
+    root = _get_jobs_evidence_root()
+    job_dir = root / job_id
+    # Security: ensure job_dir is within root (no path traversal)
+    try:
+        job_dir.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Job ID contains path traversal")
+    return job_dir
+
+
+def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
+    """
+    List files in the job evidence directory.
+    Returns list of dicts with filename, size_bytes, content_type, sha256, url.
+    """
+    job_dir = _get_job_evidence_dir(job_id)
+    if not job_dir.exists():
+        return []
+    
+    artifacts = []
+    for file_path in job_dir.rglob("*"):
+        if file_path.is_file():
+            rel_path = file_path.relative_to(job_dir)
+            # Skip hidden files and internal evidence files? Include all.
+            # Ensure filename is a simple basename (no slashes) for URL safety
+            # We'll store relative path as filename (string)
+            filename = str(rel_path)
+            # Compute size
+            size = file_path.stat().st_size
+            # Guess content type
+            content_type, _ = mimetypes.guess_type(str(file_path))
+            if content_type is None:
+                content_type = "application/octet-stream"
+            # Compute SHA256 (optional, can be expensive for large files)
+            sha256 = None
+            try:
+                if size < 10 * 1024 * 1024:  # 10 MB limit
+                    with open(file_path, "rb") as f:
+                        sha256 = hashlib.sha256(f.read()).hexdigest()
+            except Exception:
+                pass
+            artifacts.append({
+                "filename": filename,
+                "size_bytes": size,
+                "content_type": content_type,
+                "sha256": sha256,
+                "url": f"/api/v1/jobs/{job_id}/artifacts/{filename}"
+            })
+    return artifacts
+
+
+def _get_policy_check_link(job_id: str) -> Optional[str]:
+    """Return URL to policy_check.json if it exists."""
+    job_dir = _get_job_evidence_dir(job_id)
+    policy_path = job_dir / "policy_check.json"
+    if policy_path.exists():
+        return f"/api/v1/jobs/{job_id}/artifacts/policy_check.json"
+    return None
+
+
+def _get_stdout_tail_link(job_id: str) -> Optional[str]:
+    """Return URL to stdout tail endpoint."""
+    # Always present if job evidence directory exists
+    job_dir = _get_job_evidence_dir(job_id)
+    if job_dir.exists():
+        return f"/api/v1/jobs/{job_id}/logs/stdout_tail"
+    return None
+
+
+class ArtifactIndexResponse(BaseModel):
+    """Response for GET /api/v1/jobs/{job_id}/artifacts."""
+    job_id: str
+    links: dict[str, Optional[str]]
+    files: list[dict[str, Any]]
+
+
+class RevealEvidencePathResponse(BaseModel):
+    """Response for GET /api/v1/jobs/{job_id}/reveal_evidence_path."""
+    approved: bool
+    path: str
+
+
+@api_v1.post("/jobs")
 async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Create a job.
@@ -458,14 +800,14 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     return {"ok": True, "job_id": job_id}
 
 
-@app.post("/jobs/{job_id}/stop")
+@api_v1.post("/jobs/{job_id}/stop")
 async def stop_job_endpoint(job_id: str, mode: StopMode = StopMode.SOFT) -> dict[str, Any]:
     db_path = get_db_path()
     request_stop(db_path, job_id, mode)
     return {"ok": True}
 
 
-@app.post("/jobs/{job_id}/pause")
+@api_v1.post("/jobs/{job_id}/pause")
 async def pause_job_endpoint(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     db_path = get_db_path()
     pause = payload.get("pause", True)
@@ -473,14 +815,14 @@ async def pause_job_endpoint(job_id: str, payload: dict[str, Any]) -> dict[str, 
     return {"ok": True}
 
 
-@app.get("/jobs/{job_id}/preflight", response_model=PreflightResult)
+@api_v1.get("/jobs/{job_id}/preflight", response_model=PreflightResult)
 async def preflight_endpoint(job_id: str) -> PreflightResult:
     db_path = get_db_path()
     job = get_job(db_path, job_id)
     return run_preflight(job.spec.config_snapshot)
 
 
-@app.post("/jobs/{job_id}/check", response_model=PreflightResult)
+@api_v1.post("/jobs/{job_id}/check", response_model=PreflightResult)
 async def check_job_endpoint(job_id: str) -> PreflightResult:
     """
     Check a job spec (preflight).
@@ -496,7 +838,7 @@ async def check_job_endpoint(job_id: str) -> PreflightResult:
     return run_preflight(job.spec.config_snapshot)
 
 
-@app.get("/jobs/{job_id}/run_log_tail")
+@api_v1.get("/jobs/{job_id}/run_log_tail")
 async def run_log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
     db_path = get_db_path()
     job = get_job(db_path, job_id)
@@ -508,7 +850,7 @@ async def run_log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
     return {"ok": True, "lines": lines, "truncated": truncated}
 
 
-@app.get("/jobs/{job_id}/log_tail")
+@api_v1.get("/jobs/{job_id}/log_tail")
 async def log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
     """
     Return last n lines of the job log.
@@ -531,7 +873,140 @@ async def log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
     return {"ok": True, "lines": lines, "truncated": truncated}
 
 
-@app.get("/jobs/{job_id}/report_link")
+# -----------------------------------------------------------------------------
+# Phase A: Artifact endpoints
+# -----------------------------------------------------------------------------
+
+@api_v1.get("/jobs/{job_id}/artifacts", response_model=ArtifactIndexResponse)
+async def get_artifacts_index(job_id: str) -> ArtifactIndexResponse:
+    """
+    Return artifact index for a job (Phase C evidence bundle).
+    
+    Contract:
+    - job_id must exist in jobs DB (404 if not)
+    - Evidence directory must exist (may be empty)
+    - Links include reveal_evidence_url, stdout_tail_url, policy_check_url, strategy_report_v1_url (null)
+    - Files list includes all files under outputs/jobs/<job_id>/
+    """
+    db_path = get_db_path()
+    try:
+        job = get_job(db_path, job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+    # Build links
+    links = {
+        "reveal_evidence_url": f"/api/v1/jobs/{job_id}/reveal_evidence_path",
+        "stdout_tail_url": _get_stdout_tail_link(job_id),
+        "policy_check_url": _get_policy_check_link(job_id),
+        "strategy_report_v1_url": None,
+    }
+    
+    files = _list_artifacts(job_id)
+    
+    return ArtifactIndexResponse(
+        job_id=job_id,
+        links=links,
+        files=files,
+    )
+
+
+@api_v1.get("/jobs/{job_id}/artifacts/{filename}")
+async def get_artifact_file(job_id: str, filename: str):
+    """
+    Serve a single artifact file from the job evidence directory.
+    
+    Security:
+    - filename must be a simple basename (no slashes, no path traversal)
+    - Must enforce containment within outputs/jobs/<job_id>/
+    - Returns 404 if file not found, 403 if path traversal detected.
+    """
+    # Validate filename does not contain slashes or path traversal attempts
+    if "/" in filename or "\\" in filename or filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    
+    job_dir = _get_job_evidence_dir(job_id)
+    file_path = job_dir / filename
+    
+    # Ensure file_path is within job_dir (double-check containment)
+    try:
+        file_path.resolve().relative_to(job_dir.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Path traversal detected")
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type
+    content_type, _ = mimetypes.guess_type(str(file_path))
+    if content_type is None:
+        content_type = "application/octet-stream"
+    
+    # For text/plain or JSON, we can return as plain text; for binary, use FileResponse
+    from fastapi.responses import FileResponse
+    return FileResponse(
+        path=file_path,
+        media_type=content_type,
+        filename=filename,
+    )
+
+
+@api_v1.get("/jobs/{job_id}/logs/stdout_tail")
+async def stdout_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
+    """
+    Return last n lines of the job's stdout log (from evidence bundle).
+    
+    Contract:
+    - If stdout.log exists in evidence directory, return its tail.
+    - If not, fallback to run_log_tail (legacy).
+    - Returns 200 even if log file missing.
+    """
+    job_dir = _get_job_evidence_dir(job_id)
+    stdout_path = job_dir / "stdout.log"
+    
+    if stdout_path.exists():
+        lines, truncated = read_tail(stdout_path, n=n)
+        return {"ok": True, "lines": lines, "truncated": truncated}
+    
+    # Fallback to existing log_tail endpoint (which uses run_log_path)
+    # We'll reuse the same logic as log_tail_endpoint but with a different path.
+    db_path = get_db_path()
+    try:
+        job = get_job(db_path, job_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    
+    outputs_root = Path(job.spec.outputs_root)
+    season = job.spec.season
+    log_path = run_log_path(outputs_root, season, job_id)
+    
+    lines, truncated = read_tail(log_path, n=n)
+    return {"ok": True, "lines": lines, "truncated": truncated}
+
+
+@api_v1.get("/jobs/{job_id}/reveal_evidence_path", response_model=RevealEvidencePathResponse)
+async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
+    """
+    Return the absolute path to the job evidence directory after containment check.
+    
+    Security:
+    - Must ensure job_id does not contain path traversal.
+    - Must ensure the resolved path is within the locked evidence root (outputs/jobs/).
+    - Returns 404 if evidence directory does not exist.
+    """
+    job_dir = _get_job_evidence_dir(job_id)
+    
+    if not job_dir.exists():
+        raise HTTPException(status_code=404, detail="Job evidence directory not found")
+    
+    # Already validated containment in _get_job_evidence_dir
+    return RevealEvidencePathResponse(
+        approved=True,
+        path=str(job_dir.resolve()),
+    )
+
+
+@api_v1.get("/jobs/{job_id}/report_link")
 async def get_report_link_endpoint(job_id: str) -> dict[str, Any]:
     """
     Get report_link for a job.
@@ -742,7 +1217,7 @@ def _ensure_worker_running(db_path: Path) -> None:
 
 
 # Phase 13: Batch submit endpoint
-@app.post("/jobs/batch", response_model=BatchSubmitResponse)
+@api_v1.post("/jobs/batch", response_model=BatchSubmitResponse)
 async def batch_submit_endpoint(req: BatchSubmitRequest) -> BatchSubmitResponse:
     """
     Submit a batch of jobs.
@@ -893,7 +1368,7 @@ def _get_season_store() -> SeasonStore:
     return SeasonStore(_get_season_index_root())
 
 
-@app.get("/batches/{batch_id}/status", response_model=BatchStatusResponse)
+@api_v1.get("/batches/{batch_id}/status", response_model=BatchStatusResponse)
 async def get_batch_status(batch_id: str) -> BatchStatusResponse:
     """Get batch execution status (read-only)."""
     artifacts_root = _get_artifacts_root()
@@ -914,7 +1389,7 @@ async def get_batch_status(batch_id: str) -> BatchStatusResponse:
     )
 
 
-@app.get("/batches/{batch_id}/summary", response_model=BatchSummaryResponse)
+@api_v1.get("/batches/{batch_id}/summary", response_model=BatchSummaryResponse)
 async def get_batch_summary(batch_id: str) -> BatchSummaryResponse:
     """Get batch summary (read-only)."""
     artifacts_root = _get_artifacts_root()
@@ -930,7 +1405,7 @@ async def get_batch_summary(batch_id: str) -> BatchSummaryResponse:
     return BatchSummaryResponse(batch_id=batch_id, topk=topk, metrics=metrics)
 
 
-@app.post("/batches/{batch_id}/retry")
+@api_v1.post("/batches/{batch_id}/retry")
 async def retry_batch(batch_id: str, req: BatchRetryRequest) -> dict[str, str]:
     """Retry failed jobs in a batch."""
     # Contract hardening: do not allow hidden override paths.
@@ -959,7 +1434,7 @@ async def retry_batch(batch_id: str, req: BatchRetryRequest) -> dict[str, str]:
         raise HTTPException(status_code=500, detail=f"Failed to retry batch: {e}")
 
 
-@app.get("/batches/{batch_id}/index")
+@api_v1.get("/batches/{batch_id}/index")
 async def get_batch_index(batch_id: str) -> dict[str, Any]:
     """Get batch index.json (read-only)."""
     artifacts_root = _get_artifacts_root()
@@ -970,7 +1445,7 @@ async def get_batch_index(batch_id: str) -> dict[str, Any]:
     return idx
 
 
-@app.get("/batches/{batch_id}/artifacts")
+@api_v1.get("/batches/{batch_id}/artifacts")
 async def get_batch_artifacts(batch_id: str) -> dict[str, Any]:
     """List artifacts tree for a batch (read-only)."""
     artifacts_root = _get_artifacts_root()
@@ -981,7 +1456,7 @@ async def get_batch_artifacts(batch_id: str) -> dict[str, Any]:
     return tree
 
 
-@app.get("/batches/{batch_id}/metadata", response_model=BatchMetadata)
+@api_v1.get("/batches/{batch_id}/metadata", response_model=BatchMetadata)
 async def get_batch_metadata(batch_id: str) -> BatchMetadata:
     """Get batch metadata."""
     store = _get_governance_store()
@@ -997,7 +1472,7 @@ async def get_batch_metadata(batch_id: str) -> BatchMetadata:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/batches/{batch_id}/metadata", response_model=BatchMetadata)
+@api_v1.patch("/batches/{batch_id}/metadata", response_model=BatchMetadata)
 async def update_batch_metadata(batch_id: str, req: BatchMetadataUpdate) -> BatchMetadata:
     """Update batch metadata (enforcing frozen rules)."""
     store = _get_governance_store()
@@ -1016,7 +1491,7 @@ async def update_batch_metadata(batch_id: str, req: BatchMetadataUpdate) -> Batc
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/batches/{batch_id}/freeze")
+@api_v1.post("/batches/{batch_id}/freeze")
 async def freeze_batch(batch_id: str) -> dict[str, str]:
     """Freeze a batch (irreversible)."""
     store = _get_governance_store()
@@ -1028,7 +1503,7 @@ async def freeze_batch(batch_id: str) -> dict[str, str]:
 
 
 # Phase 15.0: Season-level governance and index endpoints
-@app.get("/seasons/{season}/index")
+@api_v1.get("/seasons/{season}/index")
 async def get_season_index(season: str) -> dict[str, Any]:
     """Get season_index.json (read-only)."""
     store = _get_season_store()
@@ -1038,7 +1513,7 @@ async def get_season_index(season: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="season_index.json not found")
 
 
-@app.post("/seasons/{season}/rebuild_index")
+@api_v1.post("/seasons/{season}/rebuild_index")
 async def rebuild_season_index(season: str) -> dict[str, Any]:
     """
     Rebuild season index (controlled mutation).
@@ -1058,7 +1533,7 @@ async def rebuild_season_index(season: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/seasons/{season}/metadata")
+@api_v1.get("/seasons/{season}/metadata")
 async def get_season_metadata(season: str) -> dict[str, Any]:
     """Get season metadata."""
     store = _get_season_store()
@@ -1080,7 +1555,7 @@ async def get_season_metadata(season: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.patch("/seasons/{season}/metadata")
+@api_v1.patch("/seasons/{season}/metadata")
 async def update_season_metadata(season: str, req: SeasonMetadataUpdate) -> dict[str, Any]:
     """
     Update season metadata (controlled mutation).
@@ -1110,7 +1585,7 @@ async def update_season_metadata(season: str, req: SeasonMetadataUpdate) -> dict
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/seasons/{season}/freeze")
+@api_v1.post("/seasons/{season}/freeze")
 async def freeze_season(season: str) -> dict[str, Any]:
     """Freeze a season (irreversible)."""
     store = _get_season_store()
@@ -1122,7 +1597,7 @@ async def freeze_season(season: str) -> dict[str, Any]:
 
 
 # Phase 15.1: Season-level cross-batch comparison endpoint
-@app.get("/seasons/{season}/compare/topk")
+@api_v1.get("/seasons/{season}/compare/topk")
 async def season_compare_topk(season: str, k: int = 20) -> dict[str, Any]:
     """
     Cross-batch TopK for a season (read-only).
@@ -1153,7 +1628,7 @@ async def season_compare_topk(season: str, k: int = 20) -> dict[str, Any]:
 
 
 # Phase 15.2: Season compare batch cards + lightweight leaderboard endpoints
-@app.get("/seasons/{season}/compare/batches")
+@api_v1.get("/seasons/{season}/compare/batches")
 async def season_compare_batches(season: str) -> dict[str, Any]:
     """
     Batch-level compare cards for a season (read-only).
@@ -1182,7 +1657,7 @@ async def season_compare_batches(season: str) -> dict[str, Any]:
     }
 
 
-@app.get("/seasons/{season}/compare/leaderboard")
+@api_v1.get("/seasons/{season}/compare/leaderboard")
 async def season_compare_leaderboard(
     season: str,
     group_by: str = "strategy_id",
@@ -1216,7 +1691,7 @@ async def season_compare_leaderboard(
 
 
 # Phase 15.3: Season export endpoint
-@app.post("/seasons/{season}/export")
+@api_v1.post("/seasons/{season}/export")
 async def export_season(season: str) -> dict[str, Any]:
     """
     Export a frozen season into outputs/exports/seasons/{season}/ (controlled mutation).
@@ -1257,7 +1732,7 @@ async def export_season(season: str) -> dict[str, Any]:
 
 
 # Phase 16: Export pack replay mode endpoints
-@app.get("/exports/seasons/{season}/compare/topk")
+@api_v1.get("/exports/seasons/{season}/compare/topk")
 async def export_season_compare_topk(season: str, k: int = 20) -> dict[str, Any]:
     """
     Cross-batch TopK from exported season package (read-only).
@@ -1283,7 +1758,7 @@ async def export_season_compare_topk(season: str, k: int = 20) -> dict[str, Any]
     }
 
 
-@app.get("/exports/seasons/{season}/compare/batches")
+@api_v1.get("/exports/seasons/{season}/compare/batches")
 async def export_season_compare_batches(season: str) -> dict[str, Any]:
     """
     Batch-level compare cards from exported season package (read-only).
@@ -1307,7 +1782,7 @@ async def export_season_compare_batches(season: str) -> dict[str, Any]:
     }
 
 
-@app.get("/exports/seasons/{season}/compare/leaderboard")
+@api_v1.get("/exports/seasons/{season}/compare/leaderboard")
 async def export_season_compare_leaderboard(
     season: str,
     group_by: str = "strategy_id",
@@ -1343,7 +1818,7 @@ async def export_season_compare_leaderboard(
 
 # Phase 16.5: Real Data Snapshot Integration endpoints
 
-@app.post("/datasets/snapshots", response_model=SnapshotMetadata)
+@api_v1.post("/datasets/snapshots", response_model=SnapshotMetadata)
 async def create_snapshot_endpoint(payload: SnapshotCreatePayload) -> SnapshotMetadata:
     """
     Create a deterministic snapshot from raw bars.
@@ -1371,7 +1846,7 @@ async def create_snapshot_endpoint(payload: SnapshotCreatePayload) -> SnapshotMe
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/datasets/snapshots")
+@api_v1.get("/datasets/snapshots")
 async def list_snapshots() -> dict[str, Any]:
     """
     List all snapshots (read‑only).
@@ -1415,7 +1890,7 @@ async def list_snapshots() -> dict[str, Any]:
     return {"snapshots": snapshots}
 
 
-@app.post("/datasets/registry/register_snapshot")
+@api_v1.post("/datasets/registry/register_snapshot")
 async def register_snapshot_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     """
     Register an existing snapshot as a dataset (controlled mutation).
@@ -1484,7 +1959,7 @@ def _get_outputs_root() -> Path:
     return Path(os.environ.get("FISHBRO_OUTPUTS_ROOT", "outputs"))
 
 
-@app.post("/portfolio/plans", response_model=PortfolioPlan)
+@api_v1.post("/portfolio/plans", response_model=PortfolioPlan)
 async def create_portfolio_plan(payload: PlanCreatePayload) -> PortfolioPlan:
     """
     Create a deterministic portfolio plan from an export (controlled mutation).
@@ -1528,7 +2003,7 @@ async def create_portfolio_plan(payload: PlanCreatePayload) -> PortfolioPlan:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/portfolio/plans")
+@api_v1.get("/portfolio/plans")
 async def list_portfolio_plans() -> dict[str, Any]:
     """
     List all portfolio plans (read‑only).
@@ -1574,7 +2049,7 @@ async def list_portfolio_plans() -> dict[str, Any]:
     return {"plans": plans}
 
 
-@app.get("/portfolio/plans/{plan_id}")
+@api_v1.get("/portfolio/plans/{plan_id}")
 async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
     """
     Get a portfolio plan by ID (read‑only).
@@ -1597,7 +2072,7 @@ async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
 
 
 # Worker Status API (Phase 4: DEEPSEEK — NUCLEAR SPEC)
-@app.get("/worker/status")
+@api_v1.get("/worker/status")
 async def worker_status() -> dict[str, Any]:
     """
     Get worker daemon status (read‑only).
@@ -1641,7 +2116,7 @@ class WorkerStopRequest(BaseModel):
     reason: Optional[str] = None
 
 
-@app.post("/worker/stop")
+@api_v1.post("/worker/stop")
 async def worker_stop(req: WorkerStopRequest) -> dict[str, Any]:
     """
     Emergency stop worker daemon (controlled mutation).
@@ -1811,7 +2286,7 @@ async def worker_stop(req: WorkerStopRequest) -> dict[str, Any]:
 
 
 # Phase PV.1: Plan Quality endpoints
-@app.get("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
+@api_v1.get("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
 async def get_plan_quality(plan_id: str) -> PlanQualityReport:
     """
     Compute quality metrics for a portfolio plan (read‑only).
@@ -1837,7 +2312,7 @@ async def get_plan_quality(plan_id: str) -> PlanQualityReport:
         raise HTTPException(status_code=500, detail=f"Failed to compute quality: {e}")
 
 
-@app.post("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
+@api_v1.post("/portfolio/plans/{plan_id}/quality", response_model=PlanQualityReport)
 async def write_plan_quality(plan_id: str) -> PlanQualityReport:
     """
     Compute quality metrics and write quality files (controlled mutation).
@@ -1868,5 +2343,9 @@ async def write_plan_quality(plan_id: str) -> PlanQualityReport:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write quality: {e}")
+
+
+# Register API v1 router
+app.include_router(api_v1)
 
 

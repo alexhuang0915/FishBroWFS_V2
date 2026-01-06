@@ -28,6 +28,7 @@ from ..artifact_validation import (
 from ..analysis import AnalysisWidget
 from ..styles.state_styles import set_widget_state, DISABLED_REASONS
 from ..widgets.cleanup_dialog import CleanupDialog
+from ..services.supervisor_client import get_datasets, get_strategies, health
 
 # Import new run index resolver
 try:
@@ -89,6 +90,7 @@ class OpTab(QWidget):
         
         self.setup_ui()
         self.load_datasets()
+        self.load_strategies()
         self.load_context_feeds()
         self.setup_connections()
         self.update_cache_status()
@@ -955,43 +957,53 @@ class OpTab(QWidget):
         return card
     
     def load_datasets(self):
-        """Load dataset options from raw data directory for Primary Market dropdown."""
-        raw_dir = Path("/home/fishbro/FishBroWFS_V2/FishBroData/raw")
-        if not raw_dir.exists():
-            self.log(f"ERROR: Raw data directory not found: {raw_dir}")
-            return
+        """Load dataset options from supervisor API for Primary Market dropdown."""
+        try:
+            datasets = get_datasets()
+            if not datasets:
+                self.log("WARNING: No datasets returned from supervisor")
+                datasets = []
+        except Exception as e:
+            self.log(f"ERROR: Failed to load datasets from supervisor: {e}")
+            datasets = []
         
-        identifiers = set()
-        for item in raw_dir.iterdir():
-            if not item.is_file():
-                continue
-            
-            name = item.name
-            if name.endswith(" HOT-Minute-Trade.txt"):
-                identifier = name[:-len(" HOT-Minute-Trade.txt")]
-            elif name.endswith("_SUBSET.txt"):
-                identifier = name[:-len("_SUBSET.txt")]
-            else:
-                identifier = name.split()[0] if ' ' in name else name.split('_')[0]
-                identifier = identifier.rsplit('.', 1)[0] if '.' in identifier else identifier
-            
-            if identifier and '.' in identifier:
-                identifiers.add(identifier)
-        
-        datasets = sorted(identifiers)
         self.primary_market_cb.clear()
         self.primary_market_cb.addItems(datasets)
         
         if datasets:
             self.log(f"Loaded {len(datasets)} datasets for Primary Market")
         else:
-            self.log("WARNING: No datasets found in raw directory")
+            self.log("WARNING: No datasets available")
+    
+    def load_strategies(self):
+        """Load strategy options from supervisor API for Research Template dropdown."""
+        try:
+            strategies = get_strategies()
+            if not strategies:
+                self.log("WARNING: No strategies returned from supervisor")
+                strategies = ["S1", "S2", "S3"]  # fallback
+        except Exception as e:
+            self.log(f"ERROR: Failed to load strategies from supervisor: {e}")
+            strategies = ["S1", "S2", "S3"]  # fallback
+        
+        self.strategy_cb.clear()
+        self.strategy_cb.addItems(strategies)
+        
+        if strategies:
+            self.log(f"Loaded {len(strategies)} strategies for Research Template")
+        else:
+            self.log("WARNING: No strategies available")
     
     def load_context_feeds(self):
-        """Load available auxiliary datasets for Context Feeds."""
-        raw_dir = Path("/home/fishbro/FishBroWFS_V2/FishBroData/raw")
-        if not raw_dir.exists():
-            return
+        """Load available auxiliary datasets for Context Feeds from supervisor API."""
+        try:
+            datasets = get_datasets()
+            if not datasets:
+                self.log("WARNING: No datasets returned from supervisor for context feeds")
+                datasets = []
+        except Exception as e:
+            self.log(f"ERROR: Failed to load datasets for context feeds: {e}")
+            datasets = []
         
         while self.context_feeds_layout.count():
             child = self.context_feeds_layout.takeAt(0)
@@ -1001,27 +1013,18 @@ class OpTab(QWidget):
         # Clear stored checkboxes
         self.context_feed_checkboxes = {}
         
+        # Filter auxiliary datasets (optional: we can filter by pattern)
         auxiliary_patterns = ["VX", "DX", "ZN", "6J", "ES", "NQ", "YM", "RTY"]
         auxiliary_datasets = []
-        
-        for item in raw_dir.iterdir():
-            if not item.is_file():
-                continue
-            
-            name = item.name
+        for dataset in datasets:
             for pattern in auxiliary_patterns:
-                if pattern in name:
-                    if name.endswith(" HOT-Minute-Trade.txt"):
-                        identifier = name[:-len(" HOT-Minute-Trade.txt")]
-                    elif name.endswith("_SUBSET.txt"):
-                        identifier = name[:-len("_SUBSET.txt")]
-                    else:
-                        identifier = name.split()[0] if ' ' in name else name.split('_')[0]
-                        identifier = identifier.rsplit('.', 1)[0] if '.' in identifier else identifier
-                    
-                    if identifier and '.' in identifier:
-                        auxiliary_datasets.append(identifier)
+                if pattern in dataset:
+                    auxiliary_datasets.append(dataset)
                     break
+        
+        # If no filtered datasets, use all datasets
+        if not auxiliary_datasets:
+            auxiliary_datasets = datasets
         
         auxiliary_datasets = sorted(set(auxiliary_datasets))
         
@@ -1215,58 +1218,20 @@ class OpTab(QWidget):
         self.update_run_analysis_button()
     
     def _legacy_cache_status_check(self, primary_market: str, season: str):
-        """Legacy cache status check using hardcoded paths."""
-        # Check if ANY selected timeframe has bars ready
-        selected_timeframes = self.get_selected_timeframes()
-        bars_ready = False
-        bars_timestamp = None
+        """Legacy cache status check - fallback when API unavailable."""
+        # UI must not construct filesystem paths; treat as unknown.
+        self.log("WARNING: Using legacy cache status check (API unavailable)")
+        self.bars_cache_status = "UNKNOWN"
+        self.bars_status_label.setText("UNKNOWN")
+        self.bars_status_label.setStyleSheet("font-weight: bold; color: #9A9A9A;")
+        self.bars_timestamp_label.setText("")
+        self.prepare_bars_btn.setEnabled(False)
         
-        if selected_timeframes:
-            for tf in selected_timeframes:
-                timeframe = int(tf.replace('m', ''))
-                bars_path = Path("outputs") / "seasons" / season / "shared" / primary_market / f"{timeframe}m.npz"
-                if bars_path.exists():
-                    bars_ready = True
-                    mtime = bars_path.stat().st_mtime
-                    timestamp = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
-                    bars_timestamp = timestamp
-                    break
-        
-        if bars_ready:
-            self.bars_cache_status = "READY"
-            self.bars_status_label.setText("READY")
-            self.bars_status_label.setStyleSheet("font-weight: bold; color: #29D38D;")
-            if bars_timestamp:
-                self.bars_timestamp_label.setText(f"Updated: {bars_timestamp}")
-            else:
-                self.bars_timestamp_label.setText("")
-            self.prepare_bars_btn.setEnabled(False)
-        else:
-            self.bars_cache_status = "MISSING"
-            self.bars_status_label.setText("MISSING")
-            self.bars_status_label.setStyleSheet("font-weight: bold; color: #FF4D4D;")
-            self.bars_timestamp_label.setText("")
-            self.prepare_bars_btn.setEnabled(True)
-        
-        features_dir = Path("outputs") / "seasons" / season / "shared" / primary_market / "features"
-        if features_dir.exists() and any(features_dir.iterdir()):
-            self.features_cache_status = "READY"
-            self.features_status_label.setText("READY")
-            self.features_status_label.setStyleSheet("font-weight: bold; color: #29D38D;")
-            try:
-                first_file = next(features_dir.iterdir())
-                mtime = first_file.stat().st_mtime
-                timestamp = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M')
-                self.features_timestamp_label.setText(f"Updated: {timestamp}")
-            except StopIteration:
-                self.features_timestamp_label.setText("")
-            self.prepare_features_btn.setEnabled(False)
-        else:
-            self.features_cache_status = "MISSING"
-            self.features_status_label.setText("MISSING")
-            self.features_status_label.setStyleSheet("font-weight: bold; color: #FF4D4D;")
-            self.features_timestamp_label.setText("")
-            self.prepare_features_btn.setEnabled(True)
+        self.features_cache_status = "UNKNOWN"
+        self.features_status_label.setText("UNKNOWN")
+        self.features_status_label.setStyleSheet("font-weight: bold; color: #9A9A9A;")
+        self.features_timestamp_label.setText("")
+        self.prepare_features_btn.setEnabled(False)
     
     def get_selected_timeframes(self) -> List[str]:
         """Get list of selected timeframes."""

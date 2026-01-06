@@ -114,6 +114,7 @@ def detect_port_occupant_8000() -> Dict:
                         "uvicorn control.api:app",
                         "FishBroWFS_V2",
                         "src/control/api.py",
+                        "scripts/run_supervisor.py",
                     ]
                     result["is_fishbro_supervisor"] = any(
                         indicator in cmdline_str for indicator in fishbro_indicators
@@ -155,86 +156,26 @@ def discover_supervisor_command() -> List[str]:
     """
     Discover canonical supervisor entrypoint.
     
-    Discovery order (STRICT):
-    1) pyproject.toml - look for [project.scripts] or [tool.poetry.scripts]
-    2) Makefile - identify target used to start supervisor in dev/test
-    3) CI configuration - inspect how supervisor is launched in integration tests
+    The UI MUST call only scripts/run_supervisor.py (Phase A constraint).
     
     Returns:
         List of command arguments to start supervisor
     """
     repo_root = Path(__file__).parent.parent.parent.parent
+    script_path = repo_root / "scripts" / "run_supervisor.py"
     
-    # 1) Check pyproject.toml
-    pyproject_path = repo_root / "pyproject.toml"
-    if pyproject_path.exists():
-        try:
-            import tomli
-            with open(pyproject_path, "rb") as f:
-                data = tomli.load(f)
-            
-            # Check for [project.scripts]
-            if "project" in data and "scripts" in data["project"]:
-                for script_name, script_path in data["project"]["scripts"].items():
-                    if "supervisor" in script_name.lower() or "api" in script_name.lower():
-                        # Convert module path to command
-                        # e.g., "src.control.api:main" -> ["python", "-m", "src.control.api"]
-                        if ":" in script_path:
-                            module_path = script_path.split(":")[0]
-                            return [sys.executable, "-m", module_path]
-            
-            # Check for [tool.poetry.scripts]
-            if "tool" in data and "poetry" in data["tool"] and "scripts" in data["tool"]["poetry"]:
-                for script_name, script_path in data["tool"]["poetry"]["scripts"].items():
-                    if "supervisor" in script_name.lower() or "api" in script_name.lower():
-                        if ":" in script_path:
-                            module_path = script_path.split(":")[0]
-                            return [sys.executable, "-m", module_path]
-        except Exception as e:
-            logger.debug(f"Failed to parse pyproject.toml: {e}")
-    
-    # 2) Check Makefile for supervisor/backend targets
-    makefile_path = repo_root / "Makefile"
-    if makefile_path.exists():
-        try:
-            with open(makefile_path, "r") as f:
-                content = f.read()
-            
-            # Look for backend/supervisor startup patterns
-            import re
-            
-            # Pattern for uvicorn command
-            uvicorn_pattern = r'uvicorn\s+control\.api:app\s+--host\s+[\w\.]+\s+--port\s+\d+'
-            match = re.search(uvicorn_pattern, content)
-            if match:
-                cmd = match.group(0)
-                # Parse into list
-                parts = cmd.split()
-                # Insert python executable
-                return [sys.executable, "-m"] + parts
-            
-            # Pattern for spawn_backend in run_stack.py
-            backend_pattern = r'spawn_backend.*?\[.*?uvicorn.*?control\.api:app'
-            match = re.search(backend_pattern, content, re.DOTALL)
-            if match:
-                # Extract the command list
-                cmd_section = match.group(0)
-                # Look for actual command list
-                cmd_match = re.search(r'\[.*?\]', cmd_section, re.DOTALL)
-                if cmd_match:
-                    # This is complex, fall back to default
-                    pass
-        except Exception as e:
-            logger.debug(f"Failed to parse Makefile: {e}")
-    
-    # 3) Default canonical command from run_stack.py
-    # The canonical supervisor is uvicorn control.api:app
-    return [
-        sys.executable, "-m", "uvicorn", "control.api:app",
-        "--host", "127.0.0.1",
-        "--port", "8000",
-        "--reload"
-    ]
+    if script_path.exists():
+        # Use the dedicated script with default host/port (script will handle defaults)
+        return [sys.executable, str(script_path)]
+    else:
+        # Fallback to direct uvicorn (should not happen in Phase A)
+        logger.warning("scripts/run_supervisor.py not found, falling back to direct uvicorn")
+        return [
+            sys.executable, "-m", "uvicorn", "control.api:app",
+            "--host", "127.0.0.1",
+            "--port", "8000",
+            "--reload"
+        ]
 
 
 def start_supervisor_subprocess() -> subprocess.Popen:

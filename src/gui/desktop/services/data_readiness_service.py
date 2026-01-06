@@ -1,8 +1,7 @@
 """
 Data Readiness Service for Desktop UI - checks if bars and features are ready.
 
-Implements deterministic checks using existing data layout contracts.
-Read-only: only checks filesystem existence, no writes.
+Implements API calls to supervisor (dumb client). No filesystem reads.
 """
 
 import logging
@@ -26,125 +25,75 @@ def check_bars(
     primary_market: str,
     timeframe: int,
     season: str,
-    outputs_root: Path
+    outputs_root: Optional[Path] = None  # kept for backward compatibility, ignored
 ) -> tuple[bool, str]:
     """
-    Check if bars data is ready.
+    Check if bars data is ready via API.
     
-    Bars check (Market Data) should PASS if any one of:
-    - expected bars directory exists with at least one shard file, e.g. *.parquet
-    - OR an index file exists (e.g. index.json) and referenced shards exist
+    Returns (ready, reason) where reason is a human-readable string.
     """
-    # Use existing path builders from control module
     try:
-        from control.bars_store import bars_dir, resampled_bars_path
-    except ImportError:
-        logger.warning("control.bars_store not available, using fallback paths")
-        # Fallback path construction
-        bars_dir_path = outputs_root / "shared" / season / primary_market / "bars"
-        bars_file = bars_dir_path / f"resampled_{timeframe}m.npz"
-        
-        if bars_file.exists():
-            return True, f"Bars file exists: {bars_file.name}"
-        elif bars_dir_path.exists() and any(bars_dir_path.glob("*.npz")):
-            return True, f"Bars directory has NPZ files"
-        elif bars_dir_path.exists() and any(bars_dir_path.glob("*.parquet")):
-            return True, f"Bars directory has parquet files"
-        elif bars_dir_path.exists() and (bars_dir_path / "index.json").exists():
-            return True, f"Bars index.json exists"
+        from src.gui.services.supervisor_client import check_readiness
+        response = check_readiness(season, primary_market, f"{timeframe}m")
+        bars_ready = response.get("bars_ready", False)
+        bars_path = response.get("bars_path")
+        if bars_ready:
+            return True, f"Bars ready at {bars_path}" if bars_path else "Bars ready"
         else:
-            return False, f"No bars data found at {bars_dir_path}"
-    
-    # Use the canonical path builders
-    try:
-        bars_file = resampled_bars_path(outputs_root, season, primary_market, timeframe)
-        if bars_file.exists():
-            return True, f"Bars file exists: {bars_file.name}"
-        
-        # Check for any NPZ or parquet files in bars directory
-        bars_dir_path = bars_dir(outputs_root, season, primary_market)
-        if bars_dir_path.exists():
-            if any(bars_dir_path.glob("*.npz")):
-                return True, f"Bars directory has NPZ files"
-            if any(bars_dir_path.glob("*.parquet")):
-                return True, f"Bars directory has parquet files"
-            if (bars_dir_path / "index.json").exists():
-                return True, f"Bars index.json exists"
-        
-        return False, f"No bars data found for {primary_market}/{timeframe}m"
+            return False, "Bars not ready (missing)"
     except Exception as e:
-        logger.error(f"Error checking bars: {e}")
-        return False, f"Error checking bars: {e}"
+        logger.error(f"Error checking bars via API: {e}")
+        return False, f"API error: {e}"
 
 
 def check_features(
     primary_market: str,
     timeframe: int,
     season: str,
-    outputs_root: Path
+    outputs_root: Optional[Path] = None
 ) -> tuple[bool, str]:
     """
-    Check if features data is ready.
-    
-    Features check (Analysis Data) should PASS if any one of:
-    - expected features directory exists with at least one artifact file (e.g. *.npz, *.parquet)
-    - OR a features_index.json exists and entries exist
+    Check if features data is ready via API.
     """
-    # Use existing path builders from control module
     try:
-        from control.features_store import features_dir, features_path
-    except ImportError:
-        logger.warning("control.features_store not available, using fallback paths")
-        # Fallback path construction
-        features_dir_path = outputs_root / "shared" / season / primary_market / "features"
-        features_file = features_dir_path / f"features_{timeframe}m.npz"
-        
-        if features_file.exists():
-            return True, f"Features file exists: {features_file.name}"
-        elif features_dir_path.exists() and any(features_dir_path.glob("*.npz")):
-            return True, f"Features directory has NPZ files"
-        elif features_dir_path.exists() and any(features_dir_path.glob("*.parquet")):
-            return True, f"Features directory has parquet files"
-        elif features_dir_path.exists() and (features_dir_path / "features_index.json").exists():
-            return True, f"Features index.json exists"
+        from src.gui.services.supervisor_client import check_readiness
+        response = check_readiness(season, primary_market, f"{timeframe}m")
+        features_ready = response.get("features_ready", False)
+        features_path = response.get("features_path")
+        if features_ready:
+            return True, f"Features ready at {features_path}" if features_path else "Features ready"
         else:
-            return False, f"No features data found at {features_dir_path}"
-    
-    # Use the canonical path builders
-    try:
-        features_file = features_path(outputs_root, season, primary_market, timeframe)
-        if features_file.exists():
-            return True, f"Features file exists: {features_file.name}"
-        
-        # Check for any NPZ or parquet files in features directory
-        features_dir_path = features_dir(outputs_root, season, primary_market)
-        if features_dir_path.exists():
-            if any(features_dir_path.glob("*.npz")):
-                return True, f"Features directory has NPZ files"
-            if any(features_dir_path.glob("*.parquet")):
-                return True, f"Features directory has parquet files"
-            if (features_dir_path / "features_index.json").exists():
-                return True, f"Features index.json exists"
-        
-        return False, f"No features data found for {primary_market}/{timeframe}m"
+            return False, "Features not ready (missing)"
     except Exception as e:
-        logger.error(f"Error checking features: {e}")
-        return False, f"Error checking features: {e}"
+        logger.error(f"Error checking features via API: {e}")
+        return False, f"API error: {e}"
 
 
 def check_all(
     primary_market: str,
     timeframe: int,
     season: str,
-    outputs_root: Path
+    outputs_root: Optional[Path] = None
 ) -> Readiness:
-    """Check both bars and features readiness."""
-    bars_ready, bars_reason = check_bars(primary_market, timeframe, season, outputs_root)
-    features_ready, features_reason = check_features(primary_market, timeframe, season, outputs_root)
-    
-    return Readiness(
-        bars_ready=bars_ready,
-        features_ready=features_ready,
-        bars_reason=bars_reason,
-        features_reason=features_reason
-    )
+    """Check both bars and features readiness via a single API call."""
+    try:
+        from src.gui.services.supervisor_client import check_readiness
+        response = check_readiness(season, primary_market, f"{timeframe}m")
+        bars_ready = response.get("bars_ready", False)
+        features_ready = response.get("features_ready", False)
+        bars_reason = "Bars ready" if bars_ready else "Bars not ready"
+        features_reason = "Features ready" if features_ready else "Features not ready"
+        return Readiness(
+            bars_ready=bars_ready,
+            features_ready=features_ready,
+            bars_reason=bars_reason,
+            features_reason=features_reason
+        )
+    except Exception as e:
+        logger.error(f"Error checking readiness via API: {e}")
+        return Readiness(
+            bars_ready=False,
+            features_ready=False,
+            bars_reason=f"API error: {e}",
+            features_reason=f"API error: {e}"
+        )

@@ -31,7 +31,7 @@ PYTEST_ARGS ?= -q
 PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
 PYTEST_MARK_EXPR_ALL ?= not legacy_ui
 
-.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile desktop desktop-wayland desktop-offscreen snapshot forensics ui-forensics ui-contract status ports down doctor run logs
+.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile desktop desktop-wayland desktop-offscreen snapshot api-snapshot forensics ui-forensics ui-contract status ports down doctor run logs
 
 help:
 	@echo ""
@@ -130,6 +130,10 @@ desktop-offscreen:
 snapshot:
 	@echo "==> Generating Context Snapshot..."
 	$(ENV) $(PYTHON) -B scripts/dump_context.py
+
+api-snapshot:
+	@echo "==> Dumping OpenAPI contract snapshot..."
+	@$(ENV) $(PYTHON) -m src.control.tools.dump_openapi --out tests/policy/api_contract/openapi.json
 
 forensics ui-forensics:
 	@echo "==> Generating UI Forensics Dump..."

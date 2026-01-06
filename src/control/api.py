@@ -142,6 +142,9 @@ from control.reporting.io import (
 # Phase D: Portfolio Build API
 from control.portfolio.api_v1 import router as portfolio_router
 
+# Phase E.4: Outputs summary endpoint
+from control.supervisor import list_jobs
+
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
 
@@ -2539,6 +2542,147 @@ async def get_portfolio_report_v1(portfolio_id: str) -> PortfolioReportV1:
             status_code=500,
             detail=f"Failed to read or parse portfolio report: {e}"
         )
+
+
+@api_v1.get("/outputs/summary")
+async def get_outputs_summary() -> dict[str, Any]:
+    """
+    Return a human-usable summary of outputs (jobs and portfolios) for clean UI navigation.
+    
+    Contract:
+    - Version 1.0 schema
+    - No filesystem scanning (use supervisor job store)
+    - No filesystem paths returned
+    - Dumb client: UI must use this endpoint, not scan filesystem
+    """
+    import json
+    from datetime import datetime, timezone
+    
+    # Get jobs from supervisor
+    jobs = list_jobs()  # Returns list of JobRow objects
+    
+    # Separate strategy runs from portfolio builds
+    strategy_jobs = []
+    portfolio_jobs = []
+    
+    for job in jobs:
+        job_type = job.job_type
+        if job_type == "BUILD_PORTFOLIO_V2":
+            portfolio_jobs.append(job)
+        else:
+            strategy_jobs.append(job)
+    
+    # Process strategy jobs for "recent" list (most recent first)
+    recent_jobs = []
+    status_counts = {}
+    
+    for job in strategy_jobs[:20]:  # Limit to 20 most recent
+        job_id = job.job_id
+        status = job.state
+        
+        # Parse spec_json to get config
+        spec = {}
+        try:
+            spec = json.loads(job.spec_json)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        
+        params = spec.get("params", {})
+        metadata = spec.get("metadata", {})
+        
+        # Count statuses
+        status_counts[status] = status_counts.get(status, 0) + 1
+        
+        # Extract fields
+        strategy_name = params.get("strategy_id", "")
+        instrument = params.get("instrument") or params.get("symbol", "")
+        timeframe = params.get("timeframe", "")
+        season = metadata.get("season", "")
+        run_mode = params.get("run_mode", "")
+        created_at = job.created_at
+        finished_at = None  # Supervisor doesn't track finished_at directly
+        
+        # Check if report exists
+        report_url = None
+        report_path = _get_strategy_report_v1_path(job_id)
+        if report_path.exists():
+            report_url = f"/api/v1/reports/strategy/{job_id}"
+        
+        recent_jobs.append({
+            "job_id": job_id,
+            "status": status,
+            "strategy_name": strategy_name,
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "season": season,
+            "run_mode": run_mode,
+            "created_at": created_at,
+            "finished_at": finished_at,
+            "links": {
+                "artifacts_url": f"/api/v1/jobs/{job_id}/artifacts",
+                "report_url": report_url
+            }
+        })
+    
+    # Process portfolio builds for "recent" list
+    recent_portfolios = []
+    
+    for job in portfolio_jobs[:20]:  # Limit to 20 most recent
+        job_id = job.job_id
+        status = job.state
+        
+        # Parse spec_json
+        spec = {}
+        try:
+            spec = json.loads(job.spec_json)
+        except (json.JSONDecodeError, AttributeError):
+            pass
+        
+        params = spec.get("params", {})
+        metadata = spec.get("metadata", {})
+        
+        # Extract portfolio_id from params or use job_id
+        portfolio_id = params.get("portfolio_id") or job_id
+        
+        # Try to get admission counts (placeholder - would need to read admission artifacts)
+        admitted_count = 0
+        rejected_count = 0
+        
+        # Check if portfolio report exists
+        report_url = None
+        report_path = _get_portfolio_report_v1_path(portfolio_id)
+        if report_path.exists():
+            report_url = f"/api/v1/reports/portfolio/{portfolio_id}"
+        
+        recent_portfolios.append({
+            "portfolio_id": portfolio_id,
+            "created_at": job.created_at,
+            "season": metadata.get("season", ""),
+            "timeframe": params.get("timeframe", ""),
+            "admitted_count": admitted_count,
+            "rejected_count": rejected_count,
+            "links": {
+                "artifacts_url": f"/api/v1/portfolios/{portfolio_id}/artifacts",
+                "report_url": report_url
+            }
+        })
+    
+    # Build response
+    return {
+        "version": "1.0",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "jobs": {
+            "recent": recent_jobs,
+            "counts_by_status": status_counts
+        },
+        "portfolios": {
+            "recent": recent_portfolios
+        },
+        "informational": {
+            "orphaned_artifact_dirs_count": 0,  # Placeholder
+            "notes": ["Summary generated from supervisor job store"]
+        }
+    }
 
 
 # Register API v1 router

@@ -353,13 +353,52 @@ class AllocationTab(QWidget):
         return selected
     
     def build_portfolio(self):
-        """Build portfolio from selected strategies."""
+        """Build portfolio from selected strategies with guardrails."""
         # Get selected strategies
         selected_strategies = self.get_selected_strategies()
+        
+        # Guardrail B1: Empty portfolio build
         if not selected_strategies:
             QMessageBox.warning(self, "No Strategies Selected",
                                "Please select at least one strategy to include in the portfolio.")
             return
+        
+        # Guardrail B2: Check if all candidates are FAILED/REJECTED
+        # (We would need to fetch job statuses for each selected strategy,
+        # but for now we'll implement a simpler check)
+        try:
+            from ...services.supervisor_client import get_jobs
+            recent_jobs = get_jobs(limit=100)
+            job_status_map = {}
+            for job in recent_jobs:
+                job_id = job.get("job_id")
+                if job_id:
+                    job_status_map[job_id] = job.get("status", "UNKNOWN")
+            
+            # Count failed/rejected among selected strategies
+            failed_count = 0
+            for strategy_id in selected_strategies:
+                status = job_status_map.get(strategy_id, "UNKNOWN")
+                if status in ["FAILED", "REJECTED"]:
+                    failed_count += 1
+            
+            if failed_count == len(selected_strategies):
+                reply = QMessageBox.warning(
+                    self,
+                    "All Candidates Failed",
+                    f"All {failed_count} selected strategies have FAILED or REJECTED status.\n\n"
+                    "Building a portfolio with only failed candidates is unlikely to succeed.\n"
+                    "Do you want to continue anyway?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                if reply == QMessageBox.No:
+                    self.status_label.setText("Portfolio build cancelled (all candidates failed)")
+                    return
+        
+        except Exception as e:
+            # If we can't check job statuses, continue anyway
+            logger.warning(f"Failed to check candidate job statuses: {e}")
         
         # Get season and timeframe
         season = self.season_input.text().strip()
@@ -370,9 +409,42 @@ class AllocationTab(QWidget):
             return
         
         # Get governance parameters
+        corr_threshold = float(self.corr_threshold_spin.value())
+        risk_budget = float(self.risk_budget_spin.value())
+        
+        # Guardrail C: Correlation/risk override sanity
+        warnings = []
+        
+        if corr_threshold < 0.1 or corr_threshold > 0.99:
+            warnings.append(f"Correlation threshold ({corr_threshold}) is extreme (<0.1 or >0.99)")
+        
+        if risk_budget <= 0:
+            QMessageBox.critical(self, "Invalid Risk Budget",
+                               f"Risk budget must be positive (got ${risk_budget:.2f})")
+            return
+        
+        if risk_budget < 1000:
+            warnings.append(f"Risk budget (${risk_budget:.2f}) is very small")
+        
+        if warnings:
+            warning_msg = "Potential issues detected:\n\n" + "\n".join(f"• {w}" for w in warnings)
+            warning_msg += "\n\nDo you want to continue with these values?"
+            
+            reply = QMessageBox.warning(
+                self,
+                "Governance Parameter Warnings",
+                warning_msg,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No
+            )
+            
+            if reply == QMessageBox.No:
+                self.status_label.setText("Portfolio build cancelled (parameter warnings)")
+                return
+        
         governance_params_overrides = {
-            "max_pairwise_correlation": float(self.corr_threshold_spin.value()),
-            "portfolio_risk_budget_max": float(self.risk_budget_spin.value())
+            "max_pairwise_correlation": corr_threshold,
+            "portfolio_risk_budget_max": risk_budget
         }
         
         # Compose request payload

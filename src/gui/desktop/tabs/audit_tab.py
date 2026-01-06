@@ -29,69 +29,142 @@ from ..widgets.report_widgets.strategy_report_widget import StrategyReportWidget
 from ..widgets.report_widgets.portfolio_report_widget import PortfolioReportWidget
 from ...services.supervisor_client import (
     get_jobs, get_strategy_report_v1, get_portfolio_report_v1,
-    SupervisorClientError
+    get_outputs_summary, SupervisorClientError
 )
 
 logger = logging.getLogger(__name__)
 
 
 class ReportExplorerModel(QAbstractItemModel):
-    """Tree model for report explorer."""
+    """Tree model for report explorer using outputs summary."""
     
     def __init__(self):
         super().__init__()
         self.root_item = {
             'name': 'Reports',
+            'type': 'root',
             'children': [
-                {'name': 'Strategy Reports', 'type': 'category', 'children': []},
-                {'name': 'Portfolio Reports', 'type': 'category', 'children': []}
+                {'name': 'Strategy Runs', 'type': 'category', 'children': []},
+                {'name': 'Portfolios', 'type': 'category', 'children': []}
             ]
         }
-        self.strategy_reports = []
-        self.portfolio_reports = []
+        self.all_items = []  # Flat list of all items for filtering
+        self.filter_text = ""
+        self.filter_type = "all"  # "jobs", "portfolios", "all"
     
     def refresh(self):
-        """Refresh report data from supervisor."""
+        """Refresh report data from supervisor outputs summary."""
         try:
-            # Get jobs with reports
-            jobs = get_jobs(limit=100)
-            self.strategy_reports = []
+            # Get outputs summary from supervisor
+            summary = get_outputs_summary()
             
-            for job in jobs:
-                artifacts = job.get("artifacts", {})
-                links = artifacts.get("links", {})
-                if links.get("strategy_report_v1_url"):
-                    self.strategy_reports.append({
-                        'name': f"{job.get('strategy_id', 'Unknown')} - {job.get('job_id', '')[:8]}",
-                        'type': 'strategy_report',
-                        'job_id': job.get('job_id'),
-                        'created_at': job.get('created_at'),
-                        'status': job.get('status')
-                    })
+            # Clear existing data
+            self.all_items = []
             
-            # TODO: Get portfolio reports from API when endpoint exists
-            # For now, use mock portfolio reports
-            self.portfolio_reports = [
-                {'name': 'Portfolio_2026Q1', 'type': 'portfolio_report', 'portfolio_id': 'portfolio_2026q1'},
-                {'name': 'Portfolio_2025Q4', 'type': 'portfolio_report', 'portfolio_id': 'portfolio_2025q4'},
-            ]
+            # Process jobs
+            jobs_category = self.root_item['children'][0]
+            jobs_category['children'] = []
             
-            self.update_tree()
+            for job in summary.get('jobs', {}).get('recent', []):
+                # Create human-readable label
+                status = job.get('status', 'UNKNOWN')
+                strategy_name = job.get('strategy_name', 'Unknown')
+                instrument = job.get('instrument', 'Unknown')
+                timeframe = job.get('timeframe', 0)
+                season = job.get('season', 'Unknown')
+                short_id = job.get('job_id', '')[:8]
+                
+                label = f"{status} • {strategy_name} • {instrument} • {timeframe}m • {season} • {short_id}"
+                
+                item = {
+                    'name': label,
+                    'type': 'job',
+                    'job_id': job.get('job_id'),
+                    'status': status,
+                    'strategy_name': strategy_name,
+                    'instrument': instrument,
+                    'timeframe': timeframe,
+                    'season': season,
+                    'run_mode': job.get('run_mode'),
+                    'created_at': job.get('created_at'),
+                    'finished_at': job.get('finished_at'),
+                    'links': job.get('links', {}),
+                    'original_data': job
+                }
+                jobs_category['children'].append(item)
+                self.all_items.append(item)
+            
+            # Process portfolios
+            portfolios_category = self.root_item['children'][1]
+            portfolios_category['children'] = []
+            
+            for portfolio in summary.get('portfolios', {}).get('recent', []):
+                # Create human-readable label
+                portfolio_id = portfolio.get('portfolio_id', 'Unknown')
+                season = portfolio.get('season', 'Unknown')
+                timeframe = portfolio.get('timeframe', 0)
+                admitted_count = portfolio.get('admitted_count', 0)
+                rejected_count = portfolio.get('rejected_count', 0)
+                short_id = portfolio_id[:8] if portfolio_id else 'Unknown'
+                
+                label = f"Portfolio • {season} • {timeframe}m • admitted {admitted_count} • {short_id}"
+                
+                item = {
+                    'name': label,
+                    'type': 'portfolio',
+                    'portfolio_id': portfolio_id,
+                    'season': season,
+                    'timeframe': timeframe,
+                    'admitted_count': admitted_count,
+                    'rejected_count': rejected_count,
+                    'created_at': portfolio.get('created_at'),
+                    'links': portfolio.get('links', {}),
+                    'original_data': portfolio
+                }
+                portfolios_category['children'].append(item)
+                self.all_items.append(item)
+            
+            self.apply_filters()
             
         except SupervisorClientError as e:
             logger.error(f"Failed to refresh reports: {e}")
     
-    def update_tree(self):
-        """Update tree structure with current reports."""
+    def set_filter(self, text: str = "", filter_type: str = "all"):
+        """Set filter text and type."""
+        self.filter_text = text.lower()
+        self.filter_type = filter_type
+        self.apply_filters()
+    
+    def apply_filters(self):
+        """Apply current filters to the tree."""
         self.beginResetModel()
         
-        # Update strategy reports
-        strategy_category = self.root_item['children'][0]
-        strategy_category['children'] = self.strategy_reports
+        # Get categories
+        jobs_category = self.root_item['children'][0]
+        portfolios_category = self.root_item['children'][1]
         
-        # Update portfolio reports
-        portfolio_category = self.root_item['children'][1]
-        portfolio_category['children'] = self.portfolio_reports
+        # Reset categories
+        jobs_category['children'] = []
+        portfolios_category['children'] = []
+        
+        # Apply filters to all items
+        for item in self.all_items:
+            # Type filter
+            if self.filter_type == "jobs" and item['type'] != 'job':
+                continue
+            if self.filter_type == "portfolios" and item['type'] != 'portfolio':
+                continue
+            
+            # Text filter
+            if self.filter_text:
+                if self.filter_text not in item['name'].lower():
+                    continue
+            
+            # Add to appropriate category
+            if item['type'] == 'job':
+                jobs_category['children'].append(item)
+            elif item['type'] == 'portfolio':
+                portfolios_category['children'].append(item)
         
         self.endResetModel()
     
@@ -156,18 +229,21 @@ class ReportExplorerModel(QAbstractItemModel):
         if role == Qt.DisplayRole:
             return item.get('name', '')
         
-        elif role == Qt.DecorationRole:
-            # TODO: Add icons for different report types
-            pass
-        
         elif role == Qt.ForegroundRole:
             item_type = item.get('type', '')
+            status = item.get('status', '').upper()
+            
             if item_type == 'category':
                 return QColor("#4A90E2")
-            elif item_type == 'strategy_report':
-                return QColor("#50E3C2")
-            elif item_type == 'portfolio_report':
-                return QColor("#F5A623")
+            elif item_type == 'job':
+                if status in ['FAILED', 'REJECTED']:
+                    return QColor("#FF5252")  # Red for failed
+                elif status == 'SUCCEEDED':
+                    return QColor("#50E3C2")  # Green for succeeded
+                else:
+                    return QColor("#E6E6E6")  # Default
+            elif item_type == 'portfolio':
+                return QColor("#F5A623")  # Orange for portfolios
         
         elif role == Qt.FontRole:
             item_type = item.get('type', '')
@@ -229,7 +305,7 @@ class AuditTab(QWidget):
         left_layout.setSpacing(8)
         
         # Report Explorer group
-        explorer_group = QGroupBox("Report Explorer")
+        explorer_group = QGroupBox("Evidence Explorer")
         explorer_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
@@ -247,6 +323,38 @@ class AuditTab(QWidget):
             }
         """)
         
+        # Search box
+        search_layout = QHBoxLayout()
+        search_layout.addWidget(QLabel("Search:"))
+        self.search_input = QLineEdit()
+        self.search_input.setPlaceholderText("Filter by name, instrument, season...")
+        self.search_input.setClearButtonEnabled(True)
+        search_layout.addWidget(self.search_input)
+        left_layout.addLayout(search_layout)
+        
+        # Quick filters
+        filter_layout = QHBoxLayout()
+        filter_layout.addWidget(QLabel("Show:"))
+        
+        self.filter_all_btn = QPushButton("All")
+        self.filter_all_btn.setCheckable(True)
+        self.filter_all_btn.setChecked(True)
+        self.filter_all_btn.setToolTip("Show both jobs and portfolios")
+        filter_layout.addWidget(self.filter_all_btn)
+        
+        self.filter_jobs_btn = QPushButton("Jobs Only")
+        self.filter_jobs_btn.setCheckable(True)
+        self.filter_jobs_btn.setToolTip("Show only strategy runs")
+        filter_layout.addWidget(self.filter_jobs_btn)
+        
+        self.filter_portfolios_btn = QPushButton("Portfolios Only")
+        self.filter_portfolios_btn.setCheckable(True)
+        self.filter_portfolios_btn.setToolTip("Show only portfolio builds")
+        filter_layout.addWidget(self.filter_portfolios_btn)
+        
+        filter_layout.addStretch()
+        left_layout.addLayout(filter_layout)
+        
         # Control buttons
         control_layout = QHBoxLayout()
         
@@ -254,26 +362,8 @@ class AuditTab(QWidget):
         self.refresh_btn.setToolTip("Refresh report list")
         control_layout.addWidget(self.refresh_btn)
         
-        self.load_portfolio_btn = QPushButton("📊 Load Portfolio")
-        self.load_portfolio_btn.setToolTip("Load portfolio report by ID")
-        control_layout.addWidget(self.load_portfolio_btn)
-        
         control_layout.addStretch()
         left_layout.addLayout(control_layout)
-        
-        # Portfolio ID input (for manual loading)
-        portfolio_layout = QHBoxLayout()
-        portfolio_layout.addWidget(QLabel("Portfolio ID:"))
-        
-        self.portfolio_id_input = QLineEdit()
-        self.portfolio_id_input.setPlaceholderText("Enter portfolio ID...")
-        portfolio_layout.addWidget(self.portfolio_id_input)
-        
-        self.load_specific_btn = QPushButton("Load")
-        self.load_specific_btn.setToolTip("Load specific portfolio report")
-        portfolio_layout.addWidget(self.load_specific_btn)
-        
-        left_layout.addLayout(portfolio_layout)
         
         # Tree view for reports
         self.report_tree = QTreeView()
@@ -301,6 +391,88 @@ class AuditTab(QWidget):
         self.report_tree.expandAll()
         
         left_layout.addWidget(self.report_tree)
+        
+        # Actions panel (initially hidden)
+        self.actions_group = QGroupBox("Actions")
+        self.actions_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #4CAF50;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        self.actions_group.setVisible(False)
+        
+        actions_layout = QVBoxLayout(self.actions_group)
+        
+        # Action buttons
+        self.open_report_btn = QPushButton("📄 Open Report")
+        self.open_report_btn.setToolTip("Open the selected report")
+        self.open_report_btn.setEnabled(False)
+        actions_layout.addWidget(self.open_report_btn)
+        
+        self.view_logs_btn = QPushButton("📋 View Logs")
+        self.view_logs_btn.setToolTip("View logs for the selected job")
+        self.view_logs_btn.setEnabled(False)
+        actions_layout.addWidget(self.view_logs_btn)
+        
+        self.open_evidence_btn = QPushButton("📁 Open Evidence Folder")
+        self.open_evidence_btn.setToolTip("Open the evidence folder for the selected item")
+        self.open_evidence_btn.setEnabled(False)
+        actions_layout.addWidget(self.open_evidence_btn)
+        
+        self.export_json_btn = QPushButton("💾 Export JSON")
+        self.export_json_btn.setToolTip("Export report data as JSON")
+        self.export_json_btn.setEnabled(False)
+        actions_layout.addWidget(self.export_json_btn)
+        
+        # Advanced section (collapsible)
+        self.advanced_group = QGroupBox("Advanced")
+        self.advanced_group.setCheckable(True)
+        self.advanced_group.setChecked(False)
+        self.advanced_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: normal;
+                border: 1px solid #555555;
+                background-color: #1A1A1A;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 11px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #AAAAAA;
+            }
+        """)
+        
+        advanced_layout = QVBoxLayout(self.advanced_group)
+        self.advanced_text = QTextEdit()
+        self.advanced_text.setReadOnly(True)
+        self.advanced_text.setMaximumHeight(150)
+        self.advanced_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #1A1A1A;
+                color: #CCCCCC;
+                font-family: monospace;
+                font-size: 10px;
+                border: 1px solid #333333;
+            }
+        """)
+        advanced_layout.addWidget(self.advanced_text)
+        actions_layout.addWidget(self.advanced_group)
+        
+        left_layout.addWidget(self.actions_group)
         
         # Add explorer group to left panel
         explorer_layout = QVBoxLayout(explorer_group)
@@ -382,7 +554,7 @@ class AuditTab(QWidget):
         # Add panels to splitter
         main_splitter.addWidget(left_widget)
         main_splitter.addWidget(right_widget)
-        main_splitter.setSizes([300, 700])  # 30% left, 70% right
+        main_splitter.setSizes([350, 650])  # 35% left, 65% right
         
         # Add splitter to main layout
         main_layout.addWidget(main_splitter)
@@ -390,10 +562,26 @@ class AuditTab(QWidget):
     def setup_connections(self):
         """Connect signals and slots."""
         self.refresh_btn.clicked.connect(self.refresh_reports)
-        self.load_portfolio_btn.clicked.connect(self.load_portfolio_report)
-        self.load_specific_btn.clicked.connect(self.load_specific_portfolio)
         self.report_tree.doubleClicked.connect(self.on_report_double_clicked)
         self.report_tabs.tabCloseRequested.connect(self.close_report_tab)
+        
+        # Search and filter connections
+        self.search_input.textChanged.connect(self.on_search_changed)
+        self.filter_all_btn.clicked.connect(lambda: self.on_filter_changed("all"))
+        self.filter_jobs_btn.clicked.connect(lambda: self.on_filter_changed("jobs"))
+        self.filter_portfolios_btn.clicked.connect(lambda: self.on_filter_changed("portfolios"))
+        
+        # Action button connections
+        self.open_report_btn.clicked.connect(self.on_open_report_clicked)
+        self.view_logs_btn.clicked.connect(self.on_view_logs_clicked)
+        self.open_evidence_btn.clicked.connect(self.on_open_evidence_clicked)
+        self.export_json_btn.clicked.connect(self.on_export_json_clicked)
+        
+        # Selection change
+        self.report_tree.selectionModel().selectionChanged.connect(self.on_selection_changed)
+        
+        # Advanced section
+        self.advanced_group.toggled.connect(self.on_advanced_toggled)
     
     def refresh_reports(self):
         """Refresh report explorer data."""
@@ -416,15 +604,33 @@ class AuditTab(QWidget):
         
         item_type = item_data.get('type', '')
         
-        if item_type == 'strategy_report':
+        if item_type == 'job':
             job_id = item_data.get('job_id')
-            if job_id:
+            links = item_data.get('links', {})
+            report_url = links.get('report_url')
+            
+            if report_url:
+                # Open strategy report
                 self.load_strategy_report(job_id)
+            else:
+                # Show logs dialog
+                self.show_logs_dialog(job_id)
         
-        elif item_type == 'portfolio_report':
+        elif item_type == 'portfolio':
             portfolio_id = item_data.get('portfolio_id')
-            if portfolio_id:
+            links = item_data.get('links', {})
+            report_url = links.get('report_url')
+            
+            if report_url:
+                # Open portfolio report
                 self.load_portfolio_report_by_id(portfolio_id)
+            else:
+                # Show "Report not available" dialog
+                QMessageBox.information(
+                    self,
+                    "Report Not Available",
+                    f"No report available for portfolio {portfolio_id}"
+                )
     
     def load_strategy_report(self, job_id: str):
         """Load and display strategy report."""
@@ -469,18 +675,20 @@ class AuditTab(QWidget):
             logger.error(f"Failed to load strategy report {job_id}: {e}")
     
     def load_portfolio_report(self):
-        """Load default portfolio report."""
-        # For now, load a mock portfolio
-        self.load_portfolio_report_by_id("portfolio_2026q1")
+        """Load default portfolio report (legacy method)."""
+        QMessageBox.information(
+            self,
+            "Info",
+            "Use the Evidence Explorer to select and open portfolio reports."
+        )
     
     def load_specific_portfolio(self):
-        """Load portfolio report by ID from input."""
-        portfolio_id = self.portfolio_id_input.text().strip()
-        if not portfolio_id:
-            QMessageBox.warning(self, "Input Required", "Please enter a portfolio ID")
-            return
-        
-        self.load_portfolio_report_by_id(portfolio_id)
+        """Load portfolio report by ID from input (legacy method)."""
+        QMessageBox.information(
+            self,
+            "Info",
+            "Use the Evidence Explorer to select and open portfolio reports."
+        )
     
     def load_portfolio_report_by_id(self, portfolio_id: str):
         """Load and display portfolio report by ID."""
@@ -551,3 +759,187 @@ class AuditTab(QWidget):
         """Append message to log."""
         self.log_signal.emit(message)
         self.status_label.setText(message)
+    
+    # ===== Search and Filter Methods =====
+    
+    def on_search_changed(self, text: str):
+        """Handle search text changed."""
+        self.report_explorer_model.set_filter(text=text)
+    
+    def on_filter_changed(self, filter_type: str):
+        """Handle filter button clicked."""
+        # Update button states
+        self.filter_all_btn.setChecked(filter_type == "all")
+        self.filter_jobs_btn.setChecked(filter_type == "jobs")
+        self.filter_portfolios_btn.setChecked(filter_type == "portfolios")
+        
+        # Apply filter
+        self.report_explorer_model.set_filter(filter_type=filter_type)
+    
+    # ===== Selection Handling =====
+    
+    def on_selection_changed(self):
+        """Handle tree selection change."""
+        indexes = self.report_tree.selectedIndexes()
+        if not indexes:
+            self.actions_group.setVisible(False)
+            return
+        
+        index = indexes[0]
+        item_data = self.report_explorer_model.get_item_data(index)
+        if not item_data:
+            self.actions_group.setVisible(False)
+            return
+        
+        # Show actions panel
+        self.actions_group.setVisible(True)
+        
+        # Update action buttons based on item type
+        item_type = item_data.get('type', '')
+        links = item_data.get('links', {})
+        has_report_url = bool(links.get('report_url'))
+        
+        # Enable/disable buttons
+        self.open_report_btn.setEnabled(has_report_url)
+        self.view_logs_btn.setEnabled(item_type == 'job')
+        self.open_evidence_btn.setEnabled(True)
+        self.export_json_btn.setEnabled(True)
+        
+        # Store current selection
+        self.current_selection = item_data
+        
+        # Clear advanced text
+        self.advanced_text.clear()
+    
+    # ===== Action Button Handlers =====
+    
+    def on_open_report_clicked(self):
+        """Handle Open Report button click."""
+        if not hasattr(self, 'current_selection') or not self.current_selection:
+            return
+        
+        item_data = self.current_selection
+        item_type = item_data.get('type', '')
+        
+        if item_type == 'job':
+            job_id = item_data.get('job_id')
+            if job_id:
+                self.load_strategy_report(job_id)
+        elif item_type == 'portfolio':
+            portfolio_id = item_data.get('portfolio_id')
+            if portfolio_id:
+                self.load_portfolio_report_by_id(portfolio_id)
+    
+    def on_view_logs_clicked(self):
+        """Handle View Logs button click."""
+        if not hasattr(self, 'current_selection') or not self.current_selection:
+            return
+        
+        item_data = self.current_selection
+        if item_data.get('type') != 'job':
+            return
+        
+        job_id = item_data.get('job_id')
+        if job_id:
+            self.show_logs_dialog(job_id)
+    
+    def on_open_evidence_clicked(self):
+        """Handle Open Evidence Folder button click."""
+        if not hasattr(self, 'current_selection') or not self.current_selection:
+            return
+        
+        item_data = self.current_selection
+        item_type = item_data.get('type', '')
+        
+        if item_type == 'job':
+            job_id = item_data.get('job_id')
+            if job_id:
+                # Open job evidence folder
+                import subprocess
+                import os
+                path = os.path.join("outputs", "jobs", job_id)
+                if os.path.exists(path):
+                    subprocess.Popen(['xdg-open', path])
+                else:
+                    QMessageBox.warning(self, "Folder Not Found", f"Evidence folder not found: {path}")
+        
+        elif item_type == 'portfolio':
+            portfolio_id = item_data.get('portfolio_id')
+            if portfolio_id:
+                # Open portfolio admission folder
+                import subprocess
+                import os
+                path = os.path.join("outputs", "portfolios", portfolio_id, "admission")
+                if os.path.exists(path):
+                    subprocess.Popen(['xdg-open', path])
+                else:
+                    QMessageBox.warning(self, "Folder Not Found", f"Admission folder not found: {path}")
+    
+    def on_export_json_clicked(self):
+        """Handle Export JSON button click."""
+        if not hasattr(self, 'current_selection') or not self.current_selection:
+            return
+        
+        item_data = self.current_selection
+        original_data = item_data.get('original_data', {})
+        
+        # For now, just show in advanced text area
+        import json
+        formatted_json = json.dumps(original_data, indent=2)
+        self.advanced_text.setText(formatted_json)
+        self.advanced_group.setChecked(True)
+    
+    # ===== Advanced Section =====
+    
+    def on_advanced_toggled(self, checked: bool):
+        """Handle advanced section toggled."""
+        if checked and hasattr(self, 'current_selection') and self.current_selection:
+            # Fetch artifact details if needed
+            item_data = self.current_selection
+            item_type = item_data.get('type', '')
+            
+            if item_type == 'job':
+                job_id = item_data.get('job_id')
+                if job_id:
+                    # TODO: Fetch artifact index from API
+                    artifacts_info = f"Artifacts for job {job_id}:\n- strategy_report.json\n- metrics.csv\n- logs.txt"
+                    self.advanced_text.setText(artifacts_info)
+            elif item_type == 'portfolio':
+                portfolio_id = item_data.get('portfolio_id')
+                if portfolio_id:
+                    artifacts_info = f"Artifacts for portfolio {portfolio_id}:\n- admission_report.json\n- candidates.csv"
+                    self.advanced_text.setText(artifacts_info)
+    
+    # ===== Helper Methods =====
+    
+    def show_logs_dialog(self, job_id: str):
+        """Show logs dialog for a job."""
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
+        
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Logs for Job {job_id[:8]}")
+        dialog.setMinimumSize(600, 400)
+        
+        layout = QVBoxLayout(dialog)
+        
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet("""
+            QTextEdit {
+                background-color: #1E1E1E;
+                color: #E6E6E6;
+                font-family: monospace;
+                font-size: 10px;
+            }
+        """)
+        
+        # TODO: Fetch actual logs from API
+        text_edit.setText(f"Logs for job {job_id}\n\nLogs would be fetched from supervisor API...")
+        
+        layout.addWidget(text_edit)
+        
+        close_btn = QPushButton("Close")
+        close_btn.clicked.connect(dialog.close)
+        layout.addWidget(close_btn)
+        
+        dialog.exec()

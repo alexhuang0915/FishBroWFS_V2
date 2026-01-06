@@ -175,6 +175,10 @@ class SupervisorClient:
         """Get portfolio metadata."""
         return self._get(f"/api/v1/portfolios/{portfolio_id}")
 
+    def get_outputs_summary(self) -> dict:
+        """Get outputs summary for clean UI navigation."""
+        return self._get("/api/v1/outputs/summary")
+
 
 # Singleton client instance
 _client = SupervisorClient()
@@ -293,6 +297,10 @@ def get_portfolio(portfolio_id: str) -> dict:
     """Get portfolio metadata."""
     return _client.get_portfolio(portfolio_id)
 
+def get_outputs_summary() -> dict:
+    """Get outputs summary for clean UI navigation."""
+    return _client.get_outputs_summary()
+
 
 __all__ = [
     "SupervisorClient",
@@ -321,4 +329,6 @@ __all__ = [
     "get_portfolio_artifacts",
     "reveal_portfolio_admission_path",
     "get_portfolio",
+    # Phase E.4 additions
+    "get_outputs_summary",
 ]

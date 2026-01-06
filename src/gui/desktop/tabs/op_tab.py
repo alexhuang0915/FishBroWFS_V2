@@ -919,7 +919,7 @@ class OpTab(QWidget):
         # apply_filters will be triggered by the signals
     
     def run_strategy(self):
-        """Submit a new strategy job."""
+        """Submit a new strategy job with duplicate job warning guardrail."""
         # Get form values
         strategy_idx = self.strategy_cb.currentIndex()
         strategy_id = self.strategy_cb.itemData(strategy_idx) if strategy_idx >= 0 else None
@@ -945,6 +945,66 @@ class OpTab(QWidget):
         
         if dataset:
             params["dataset"] = dataset
+        
+        # Guardrail A: Duplicate job warning
+        try:
+            # Check for recent identical successful jobs
+            recent_jobs = get_jobs(limit=50)
+            duplicate_job = None
+            
+            for job in recent_jobs:
+                # Check if job is identical (same strategy, instrument, timeframe, season, run_mode)
+                job_strategy = job.get("strategy_id") or job.get("strategy_name", "")
+                job_instrument = job.get("instrument", "")
+                job_timeframe = job.get("timeframe", "")
+                job_season = job.get("season", "")
+                job_run_mode = job.get("run_mode", "")
+                job_status = job.get("status", "")
+                
+                # Convert timeframe to string for comparison
+                if isinstance(job_timeframe, int):
+                    job_timeframe_str = f"{job_timeframe}m"
+                else:
+                    job_timeframe_str = str(job_timeframe)
+                
+                # Compare parameters
+                if (job_strategy == strategy_id and
+                    job_instrument == instrument and
+                    job_timeframe_str == timeframe and
+                    job_season == season and
+                    job_run_mode == run_mode and
+                    job_status == "SUCCEEDED"):
+                    
+                    duplicate_job = job
+                    break
+            
+            if duplicate_job:
+                duplicate_job_id = duplicate_job.get("job_id", "")
+                short_id = duplicate_job_id[:8] + "..." if len(duplicate_job_id) > 8 else duplicate_job_id
+                
+                # Show confirmation dialog
+                reply = QMessageBox.question(
+                    self,
+                    "Duplicate Job Warning",
+                    f"A similar job succeeded recently (job_id={short_id}).\n\n"
+                    f"Strategy: {strategy_id}\n"
+                    f"Instrument: {instrument}\n"
+                    f"Timeframe: {timeframe}\n"
+                    f"Season: {season}\n"
+                    f"Mode: {run_mode}\n\n"
+                    "Run again anyway?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No  # Default to No (Cancel)
+                )
+                
+                if reply == QMessageBox.No:
+                    self.status_label.setText("Job submission cancelled (duplicate warning)")
+                    self.log_signal.emit("Job submission cancelled due to duplicate warning")
+                    return
+        
+        except SupervisorClientError as e:
+            # If we can't check for duplicates, log but continue
+            logger.warning(f"Failed to check for duplicate jobs: {e}")
         
         try:
             # Submit job via supervisor API

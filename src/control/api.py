@@ -666,6 +666,10 @@ class JobListResponse(BaseModel):
     strategy_name: Optional[str] = None
     instrument: Optional[str] = None
     timeframe: Optional[str] = None
+    run_mode: Optional[str] = None
+    season: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    score: Optional[float] = None
 
 
 def _job_record_to_response(job: JobRecord) -> JobListResponse:
@@ -687,9 +691,35 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
     # Look for timeframe
     if "timeframe" in config:
         timeframe = config["timeframe"]
+    # Extract run_mode from config
+    run_mode = config.get("run_mode")
+    # Extract season from spec
+    season = job.spec.season
     # Format timestamps
     created_at = job.created_at.isoformat() if job.created_at else ""
     finished_at = job.finished_at.isoformat() if job.finished_at else None
+    # Compute duration_seconds
+    duration_seconds = None
+    if created_at and finished_at:
+        try:
+            from datetime import datetime
+            created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            finished_dt = datetime.fromisoformat(finished_at.replace('Z', '+00:00'))
+            duration_seconds = (finished_dt - created_dt).total_seconds()
+        except Exception:
+            pass
+    elif created_at and job.status == JobStatus.RUNNING:
+        # For RUNNING jobs, compute duration from now
+        try:
+            from datetime import datetime, timezone
+            created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            now_dt = datetime.now(timezone.utc)
+            duration_seconds = (now_dt - created_dt).total_seconds()
+        except Exception:
+            pass
+    # Score extraction (from report artifacts) - placeholder for now
+    score = None
+    # TODO: fetch from strategy_report_v1.json if exists
     return JobListResponse(
         job_id=job.job_id,
         type=job_type,
@@ -699,6 +729,10 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
         strategy_name=strategy_name,
         instrument=instrument,
         timeframe=timeframe,
+        run_mode=run_mode,
+        season=season,
+        duration_seconds=duration_seconds,
+        score=score,
     )
 
 

@@ -26,6 +26,7 @@ from ..widgets.charts.line_chart import LineChartWidget
 from ..widgets.charts.heatmap import HeatmapWidget
 from ..widgets.charts.histogram import HistogramWidget
 from ..widgets.report_widgets.strategy_report_widget import StrategyReportWidget
+from ..widgets.report_widgets.portfolio_report_widget import PortfolioReportWidget
 from ...services.supervisor_client import (
     get_jobs, get_strategy_report_v1, get_portfolio_report_v1,
     SupervisorClientError
@@ -186,152 +187,6 @@ class ReportExplorerModel(QAbstractItemModel):
         return item
 
 
-class PortfolioReportWidget(QWidget):
-    """Widget for displaying PortfolioReportV1."""
-    
-    def __init__(self, report_data: Dict[str, Any]):
-        super().__init__()
-        self.report_data = report_data
-        self.setup_ui()
-    
-    def setup_ui(self):
-        """Initialize the UI components."""
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(12, 12, 12, 12)
-        main_layout.setSpacing(12)
-        
-        # Header section
-        header_group = QGroupBox("Portfolio Report")
-        header_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #1b5e20;
-                background-color: #1E1E1E;
-                margin-top: 5px;
-                padding-top: 8px;
-                font-size: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px 0 4px;
-                color: #E6E6E6;
-            }
-        """)
-        
-        header_layout = QGridLayout()
-        
-        # Basic info
-        meta = self.report_data.get('meta', {})
-        header_layout.addWidget(QLabel(f"<b>Portfolio ID:</b> {meta.get('portfolio_id', 'Unknown')}"), 0, 0)
-        header_layout.addWidget(QLabel(f"<b>Created:</b> {meta.get('created_at', 'N/A')}"), 0, 1)
-        header_layout.addWidget(QLabel(f"<b>Status:</b> {meta.get('status', 'N/A')}"), 1, 0)
-        
-        header_group.setLayout(header_layout)
-        main_layout.addWidget(header_group)
-        
-        # Metrics row
-        metrics = self.report_data.get('metrics', {})
-        metric_row = MetricRow([
-            ("Admitted", str(metrics.get('admitted_count', 0)), "Admitted strategies"),
-            ("Rejected", str(metrics.get('rejected_count', 0)), "Rejected strategies"),
-            ("Total Risk", f"${metrics.get('total_risk_budget', 0):,.0f}", "Total risk budget"),
-            ("Corr Threshold", f"{metrics.get('correlation_threshold', 0):.3f}", "Correlation threshold"),
-        ])
-        main_layout.addWidget(metric_row)
-        
-        # Correlation heatmap
-        correlation = self.report_data.get('correlation', {})
-        matrix = correlation.get('matrix', [])
-        labels = correlation.get('labels', [])
-        
-        if matrix and labels:
-            heatmap_group = QGroupBox("Correlation Heatmap")
-            heatmap_layout = QVBoxLayout()
-            
-            heatmap = HeatmapWidget(matrix, labels, "Strategy Correlations")
-            heatmap_layout.addWidget(heatmap)
-            
-            heatmap_group.setLayout(heatmap_layout)
-            main_layout.addWidget(heatmap_group)
-        
-        # Tables section
-        tables_splitter = QSplitter(Qt.Horizontal)
-        
-        # Admitted strategies table
-        admitted = self.report_data.get('admitted', [])
-        if admitted:
-            admitted_table = self.create_table(
-                "Admitted Strategies",
-                ["Strategy", "Weight", "Risk Budget", "Score"],
-                admitted
-            )
-            tables_splitter.addWidget(admitted_table)
-        
-        # Rejected strategies table
-        rejected = self.report_data.get('rejected', [])
-        if rejected:
-            rejected_table = self.create_table(
-                "Rejected Strategies",
-                ["Strategy", "Reason", "Score"],
-                rejected
-            )
-            tables_splitter.addWidget(rejected_table)
-        
-        if tables_splitter.count() > 0:
-            tables_splitter.setSizes([400, 400])
-            main_layout.addWidget(tables_splitter)
-        
-        # Risk budget steps
-        risk_steps = self.report_data.get('risk_budget_steps', [])
-        if risk_steps:
-            steps_group = QGroupBox("Risk Budget Allocation Steps")
-            steps_layout = QVBoxLayout()
-            
-            steps_table = QTableView()
-            # TODO: Create model for risk steps
-            steps_layout.addWidget(steps_table)
-            
-            steps_group.setLayout(steps_layout)
-            main_layout.addWidget(steps_group)
-        
-        # Add stretch at the bottom
-        main_layout.addStretch()
-    
-    def create_table(self, title: str, headers: List[str], data: List[Dict]) -> QGroupBox:
-        """Create a table widget with given data."""
-        group = QGroupBox(title)
-        layout = QVBoxLayout()
-        
-        table = QTableView()
-        table.setAlternatingRowColors(True)
-        table.setStyleSheet("""
-            QTableView {
-                background-color: #1E1E1E;
-                alternate-background-color: #252525;
-                gridline-color: #333333;
-                color: #E6E6E6;
-                font-size: 11px;
-            }
-            QTableView::item {
-                padding: 4px;
-            }
-            QHeaderView::section {
-                background-color: #2a2a2a;
-                color: #E6E6E6;
-                padding: 6px;
-                border: 1px solid #333333;
-                font-weight: bold;
-            }
-        """)
-        
-        # TODO: Create proper table model
-        # For now, use simple display
-        table.setModel(None)
-        
-        layout.addWidget(table)
-        group.setLayout(layout)
-        return group
 
 
 class AuditTab(QWidget):
@@ -650,8 +505,8 @@ class AuditTab(QWidget):
                 self.status_label.setText(f"Report not found")
                 return
             
-            # Create widget
-            widget = PortfolioReportWidget(report_data)
+            # Create widget (pass both portfolio_id and report_data)
+            widget = PortfolioReportWidget(portfolio_id, report_data)
             tab_title = f"Portfolio: {portfolio_id}"
             
             # Add to tabs

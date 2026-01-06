@@ -19,6 +19,7 @@ from .metric_cards import MetricRow
 from .charts.line_chart import LineChartWidget
 from .charts.heatmap import HeatmapWidget
 from .charts.histogram import HistogramWidget
+from .report_widgets.portfolio_report_widget import PortfolioReportWidget
 
 logger = logging.getLogger(__name__)
 
@@ -249,8 +250,12 @@ class ReportHostWidget(QWidget):
             # Update metric cards
             self._update_portfolio_metrics(report_data)
             
-            # TODO: Create and show actual portfolio report widget
-            # For now, show placeholder
+            # Create and show actual portfolio report widget
+            portfolio_widget = PortfolioReportWidget(portfolio_id, report_data)
+            
+            # Replace placeholder with actual widget
+            self.stacked_widget.removeWidget(self.stacked_widget.widget(self.portfolio_widget_index))
+            self.portfolio_widget_index = self.stacked_widget.addWidget(portfolio_widget)
             self.stacked_widget.setCurrentIndex(self.portfolio_widget_index)
             
             # Emit signal

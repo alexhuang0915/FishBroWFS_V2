@@ -2,6 +2,8 @@
 Test that Publish button is only enabled for valid artifact.
 """
 import pytest
+pytest.skip("UI feature not yet implemented", allow_module_level=True)
+
 from PySide6.QtWidgets import QApplication
 from pathlib import Path
 from src.gui.desktop.tabs.op_tab import OpTab

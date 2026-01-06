@@ -42,7 +42,8 @@ def test_check_bars_exists(tmp_path):
         
         ready, reason = check_bars("MNQ", 5, "2026Q1", tmp_path)
         assert ready is True
-        assert "exists" in reason.lower()
+        # The function now returns "Bars ready at ..." via supervisor API
+        assert "ready" in reason.lower()
     finally:
         # Restore original module if it exists
         if "control.bars_store" in sys.modules:
@@ -53,6 +54,7 @@ def test_check_bars_missing(tmp_path):
     """Test check_bars when bars file doesn't exist."""
     import sys
     import types
+    from unittest.mock import patch
     
     mock_bars_store = types.ModuleType("control.bars_store")
     
@@ -63,14 +65,23 @@ def test_check_bars_missing(tmp_path):
     
     sys.modules["control.bars_store"] = mock_bars_store
     
-    try:
-        # Don't create the file
-        ready, reason = check_bars("MNQ", 5, "2026Q1", tmp_path)
-        assert ready is False
-        assert "no bars data" in reason.lower() or "not found" in reason.lower()
-    finally:
-        if "control.bars_store" in sys.modules:
-            del sys.modules["control.bars_store"]
+    # Override the global mock to return bars_ready=False
+    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        mock_check.return_value = {
+            "bars_ready": False,
+            "features_ready": False,
+            "bars_path": None,
+            "features_path": None,
+        }
+        try:
+            # Don't create the file
+            ready, reason = check_bars("MNQ", 5, "2026Q1", tmp_path)
+            assert ready is False
+            # The function returns "Bars not ready (missing)" via supervisor API
+            assert "not ready" in reason.lower()
+        finally:
+            if "control.bars_store" in sys.modules:
+                del sys.modules["control.bars_store"]
 
 
 def test_check_features_exists(tmp_path):
@@ -99,7 +110,8 @@ def test_check_features_exists(tmp_path):
         
         ready, reason = check_features("MNQ", 5, "2026Q1", tmp_path)
         assert ready is True
-        assert "exists" in reason.lower()
+        # The function now returns "Features ready at ..." via supervisor API
+        assert "ready" in reason.lower()
     finally:
         if "control.features_store" in sys.modules:
             del sys.modules["control.features_store"]
@@ -109,6 +121,7 @@ def test_check_features_missing(tmp_path):
     """Test check_features when features file doesn't exist."""
     import sys
     import types
+    from unittest.mock import patch
     
     mock_features_store = types.ModuleType("control.features_store")
     
@@ -119,13 +132,22 @@ def test_check_features_missing(tmp_path):
     
     sys.modules["control.features_store"] = mock_features_store
     
-    try:
-        ready, reason = check_features("MNQ", 5, "2026Q1", tmp_path)
-        assert ready is False
-        assert "no features data" in reason.lower() or "not found" in reason.lower()
-    finally:
-        if "control.features_store" in sys.modules:
-            del sys.modules["control.features_store"]
+    # Override the global mock to return features_ready=False
+    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        mock_check.return_value = {
+            "bars_ready": False,
+            "features_ready": False,
+            "bars_path": None,
+            "features_path": None,
+        }
+        try:
+            ready, reason = check_features("MNQ", 5, "2026Q1", tmp_path)
+            assert ready is False
+            # The function returns "Features not ready (missing)" via supervisor API
+            assert "not ready" in reason.lower()
+        finally:
+            if "control.features_store" in sys.modules:
+                del sys.modules["control.features_store"]
 
 
 def test_check_all_both_ready(tmp_path):
@@ -146,14 +168,16 @@ def test_check_all_both_ready(tmp_path):
     assert isinstance(readiness, Readiness)
     assert readiness.bars_ready is True
     assert readiness.features_ready is True
-    assert "exists" in readiness.bars_reason.lower()
-    assert "exists" in readiness.features_reason.lower()
+    # The functions now return "ready" via supervisor API
+    assert "ready" in readiness.bars_reason.lower()
+    assert "ready" in readiness.features_reason.lower()
 
 
 def test_check_all_none_ready(tmp_path):
     """Test check_all when neither bars nor features are ready."""
     import sys
     import types
+    from unittest.mock import patch
     
     mock_bars_store = types.ModuleType("control.bars_store")
     mock_features_store = types.ModuleType("control.features_store")
@@ -170,21 +194,34 @@ def test_check_all_none_ready(tmp_path):
     sys.modules["control.bars_store"] = mock_bars_store
     sys.modules["control.features_store"] = mock_features_store
     
-    try:
-        readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
-        assert readiness.bars_ready is False
-        assert readiness.features_ready is False
-        assert "no bars data" in readiness.bars_reason.lower() or "not found" in readiness.bars_reason.lower()
-        assert "no features data" in readiness.features_reason.lower() or "not found" in readiness.features_reason.lower()
-    finally:
-        if "control.bars_store" in sys.modules:
-            del sys.modules["control.bars_store"]
-        if "control.features_store" in sys.modules:
-            del sys.modules["control.features_store"]
+    # Override the global mock to return both not ready
+    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        mock_check.return_value = {
+            "bars_ready": False,
+            "features_ready": False,
+            "bars_path": None,
+            "features_path": None,
+        }
+        try:
+            readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
+            assert readiness.bars_ready is False
+            assert readiness.features_ready is False
+            # The functions now return "not ready" via supervisor API
+            assert "not ready" in readiness.bars_reason.lower()
+            assert "not ready" in readiness.features_reason.lower()
+        finally:
+            if "control.bars_store" in sys.modules:
+                del sys.modules["control.bars_store"]
+            if "control.features_store" in sys.modules:
+                del sys.modules["control.features_store"]
 
 
 def test_check_all_mixed(tmp_path):
     """Test check_all when only bars are ready."""
+    import sys
+    import types
+    from unittest.mock import patch
+    
     # Create bars file in fallback location
     bars_dir = tmp_path / "shared" / "2026Q1" / "MNQ" / "bars"
     bars_dir.mkdir(parents=True)
@@ -193,11 +230,20 @@ def test_check_all_mixed(tmp_path):
     
     # Don't create features file
     
-    readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
-    assert readiness.bars_ready is True
-    assert readiness.features_ready is False
-    assert "exists" in readiness.bars_reason.lower()
-    assert "no features data" in readiness.features_reason.lower() or "not found" in readiness.features_reason.lower()
+    # Override the global mock to return bars ready, features not ready
+    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        mock_check.return_value = {
+            "bars_ready": True,
+            "features_ready": False,
+            "bars_path": "/tmp/bars.parquet",
+            "features_path": None,
+        }
+        readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
+        assert readiness.bars_ready is True
+        assert readiness.features_ready is False
+        # The functions now return "ready" / "not ready" via supervisor API
+        assert "ready" in readiness.bars_reason.lower()
+        assert "not ready" in readiness.features_reason.lower()
 
 
 def test_readiness_dataclass():
@@ -224,6 +270,7 @@ def test_readiness_dataclass():
 def test_module_import_fallback(tmp_path):
     """Test that functions handle missing imports gracefully (use fallback paths)."""
     import sys
+    from unittest.mock import patch
     
     # Temporarily remove the modules if they exist
     bars_store_original = sys.modules.pop("control.bars_store", None)
@@ -236,21 +283,47 @@ def test_module_import_fallback(tmp_path):
         bars_file = bars_dir / "resampled_5m.npz"
         bars_file.write_text("mock bars")
         
-        # Test with existing file (should return True)
-        ready, reason = check_bars("MNQ", 5, "2026Q1", tmp_path)
-        assert ready is True
-        assert "exists" in reason.lower()
+        # Patch check_readiness for check_bars call (bars ready)
+        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+            mock_check.return_value = {
+                "bars_ready": True,
+                "features_ready": False,
+                "bars_path": "/tmp/bars.parquet",
+                "features_path": None,
+            }
+            # Test with existing file (should return True)
+            ready, reason = check_bars("MNQ", 5, "2026Q1", tmp_path)
+            assert ready is True
+            # The function now returns "ready" via supervisor API
+            assert "ready" in reason.lower()
         
-        # Test without file (should return False)
-        ready, reason = check_features("MNQ", 5, "2026Q1", tmp_path)
-        assert ready is False
-        assert "no features data" in reason.lower() or "not found" in reason.lower()
+        # Patch again for check_features call (features not ready)
+        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+            mock_check.return_value = {
+                "bars_ready": True,
+                "features_ready": False,
+                "bars_path": "/tmp/bars.parquet",
+                "features_path": None,
+            }
+            # Test without file (should return False)
+            ready, reason = check_features("MNQ", 5, "2026Q1", tmp_path)
+            assert ready is False
+            # The function returns "not ready" via supervisor API
+            assert "not ready" in reason.lower()
         
-        readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
-        assert readiness.bars_ready is True
-        assert readiness.features_ready is False
-        assert "exists" in readiness.bars_reason.lower()
-        assert "no features data" in readiness.features_reason.lower() or "not found" in readiness.features_reason.lower()
+        # Patch for check_all call (bars ready, features not ready)
+        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+            mock_check.return_value = {
+                "bars_ready": True,
+                "features_ready": False,
+                "bars_path": "/tmp/bars.parquet",
+                "features_path": None,
+            }
+            readiness = check_all("MNQ", 5, "2026Q1", tmp_path)
+            assert readiness.bars_ready is True
+            assert readiness.features_ready is False
+            assert "ready" in readiness.bars_reason.lower()
+            assert "not ready" in readiness.features_reason.lower()
     finally:
         # Restore original modules
         if bars_store_original:

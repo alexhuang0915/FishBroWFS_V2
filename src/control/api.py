@@ -128,6 +128,17 @@ from portfolio.instruments import load_instruments_config
 from control.bars_store import bars_dir, resampled_bars_path
 from control.features_store import features_dir, features_path
 
+# Phase B: Reporting endpoints
+from core.reporting.models import StrategyReportV1, PortfolioReportV1
+from control.reporting.io import (
+    read_job_artifact,
+    read_portfolio_admission_artifact,
+    job_report_exists,
+    portfolio_report_exists,
+    read_job_report,
+    read_portfolio_report,
+)
+
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
 
@@ -701,6 +712,36 @@ def _get_job_evidence_dir(job_id: str) -> Path:
     return job_dir
 
 
+def _get_strategy_report_v1_path(job_id: str) -> Path:
+    """
+    Return the path to strategy_report_v1.json for a job.
+    Security: ensure containment within outputs/jobs/<job_id>/
+    """
+    root = Path("outputs/jobs")
+    job_dir = root / job_id
+    # Security: ensure job_dir is within root (no path traversal)
+    try:
+        job_dir.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Job ID contains path traversal")
+    return job_dir / "strategy_report_v1.json"
+
+
+def _get_portfolio_report_v1_path(portfolio_id: str) -> Path:
+    """
+    Return the path to portfolio_report_v1.json for a portfolio admission.
+    Security: ensure containment within outputs/portfolios/<portfolio_id>/admission/
+    """
+    root = Path("outputs/portfolios")
+    admission_dir = root / portfolio_id / "admission"
+    # Security: ensure admission_dir is within root (no path traversal)
+    try:
+        admission_dir.resolve().relative_to(root.resolve())
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Portfolio ID contains path traversal")
+    return admission_dir / "portfolio_report_v1.json"
+
+
 def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
     """
     List files in the job evidence directory.
@@ -899,8 +940,13 @@ async def get_artifacts_index(job_id: str) -> ArtifactIndexResponse:
         "reveal_evidence_url": f"/api/v1/jobs/{job_id}/reveal_evidence_path",
         "stdout_tail_url": _get_stdout_tail_link(job_id),
         "policy_check_url": _get_policy_check_link(job_id),
-        "strategy_report_v1_url": None,
+        "strategy_report_v1_url": None,  # Will be updated below if report exists
     }
+    
+    # Check if strategy report exists
+    report_path = _get_strategy_report_v1_path(job_id)
+    if report_path.exists():
+        links["strategy_report_v1_url"] = f"/api/v1/reports/strategy/{job_id}"
     
     files = _list_artifacts(job_id)
     
@@ -2343,6 +2389,72 @@ async def write_plan_quality(plan_id: str) -> PlanQualityReport:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to write quality: {e}")
+
+
+# -----------------------------------------------------------------------------
+# Phase B: Reporting endpoints
+# -----------------------------------------------------------------------------
+
+@api_v1.get("/reports/strategy/{job_id}", response_model=StrategyReportV1)
+async def get_strategy_report_v1(job_id: str) -> StrategyReportV1:
+    """
+    Return precomputed StrategyReportV1 JSON for a job.
+    
+    Contract:
+    - If outputs/jobs/<job_id>/strategy_report_v1.json exists:
+      - return its JSON content with application/json
+    - Else:
+      - 404 with clear message: "strategy_report_v1.json not found; run job or upgrade workers"
+    - No heavy compute inside request handler.
+    """
+    report_path = _get_strategy_report_v1_path(job_id)
+    if not report_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="strategy_report_v1.json not found; run job or upgrade workers"
+        )
+    
+    try:
+        import json
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+        # Validate against Pydantic model
+        return StrategyReportV1.model_validate(data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read or parse strategy report: {e}"
+        )
+
+
+@api_v1.get("/reports/portfolio/{portfolio_id}", response_model=PortfolioReportV1)
+async def get_portfolio_report_v1(portfolio_id: str) -> PortfolioReportV1:
+    """
+    Return precomputed PortfolioReportV1 JSON for a portfolio admission.
+    
+    Contract:
+    - If outputs/portfolios/<portfolio_id>/admission/portfolio_report_v1.json exists:
+      - return its JSON content with application/json
+    - Else:
+      - 404 with clear message: "portfolio_report_v1.json not found; run portfolio build or upgrade workers"
+    - No heavy compute inside request handler.
+    """
+    report_path = _get_portfolio_report_v1_path(portfolio_id)
+    if not report_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="portfolio_report_v1.json not found; run portfolio build or upgrade workers"
+        )
+    
+    try:
+        import json
+        data = json.loads(report_path.read_text(encoding="utf-8"))
+        # Validate against Pydantic model
+        return PortfolioReportV1.model_validate(data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to read or parse portfolio report: {e}"
+        )
 
 
 # Register API v1 router

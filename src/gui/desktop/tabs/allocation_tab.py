@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QLabel, QPushButton, QTableView, QSplitter,
     QGroupBox, QHeaderView, QMessageBox, QDoubleSpinBox,
     QLineEdit, QComboBox, QCheckBox, QScrollArea,
-    QApplication, QSizePolicy
+    QApplication, QSizePolicy, QSpacerItem
 )
 from PySide6.QtGui import QFont, QColor
 
@@ -35,6 +35,7 @@ class AllocationTab(QWidget):
     
     # Signals for communication with main window
     log_signal = Signal(str)
+    allocation_changed = Signal(dict)  # audit_event
     
     def __init__(self):
         super().__init__()
@@ -161,7 +162,7 @@ class AllocationTab(QWidget):
         form_layout.addRow(checkbox_buttons_layout)
         
         # Add stretch to push button to bottom
-        form_layout.addItem(QSizePolicy(QSizePolicy.Minimum, QSizePolicy.Expanding))
+        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
         
         # BUILD PORTFOLIO button (enabled when strategies selected)
         self.build_button = QPushButton("BUILD PORTFOLIO")

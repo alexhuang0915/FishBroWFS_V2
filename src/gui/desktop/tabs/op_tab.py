@@ -55,6 +55,11 @@ class JobsTableModel(QAbstractTableModel):
         self.filter_season = "ALL"
         self.filter_search = ""
     
+    @property
+    def jobs(self):
+        """Backward-compatible property returning filtered_jobs."""
+        return self.filtered_jobs
+    
     def start_auto_refresh(self, interval: int = 5000):
         """Start automatic refresh timer."""
         self.refresh_interval = interval
@@ -482,6 +487,8 @@ class OpTab(QWidget):
     # Signals for communication with main window
     log_signal = Signal(str)
     switch_to_audit_tab = Signal(str)  # job_id for report
+    progress_signal = Signal(int)  # progress updates
+    artifact_state_changed = Signal(str, str, str)  # state, run_id, run_dir
     
     def __init__(self):
         super().__init__()

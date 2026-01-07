@@ -7,7 +7,7 @@ configfile: pytest.ini
 testpaths: tests
 plugins: playwright-0.7.2, cov-5.0.0, asyncio-0.26.0, timeout-2.4.0, anyio-4.12.0, base-url-2.1.0
 asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
-collected 1435 items / 3 deselected / 7 skipped / 1432 selected
+collected 1436 items / 3 deselected / 7 skipped / 1433 selected
 
 tests/boundary/test_portfolio_ingestion_boundary.py ....                 [  0%]
 tests/contracts/test_dimensions_registry.py .............                [  1%]
@@ -72,7 +72,7 @@ tests/governance/test_anti_shadowing.py ..                               [ 35%]
 tests/gui/test_desktop_auto_starts_supervisor.py ......                  [ 35%]
 tests/gui/test_desktop_port_occupied_message.py .....                    [ 36%]
 tests/gui/test_desktop_uses_psutil_for_port_detection.py .....           [ 36%]
-tests/gui_desktop/test_analytics_tabs_clickable.py .....                 [ 37%]
+tests/gui_desktop/test_analytics_tabs_clickable.py .....                 [ 36%]
 tests/gui_desktop/test_artifact_contract_lock.py ......                  [ 37%]
 tests/gui_desktop/test_artifact_validation.py .........                  [ 38%]
 tests/gui_desktop/test_artifact_validation_regex.py ...                  [ 38%]
@@ -86,7 +86,7 @@ tests/gui_desktop/test_partial_run_behavior.py .sss                      [ 40%]
 tests/gui_desktop/test_run_artifact_bundle_written.py ....               [ 41%]
 tests/gui_desktop/test_run_index_service.py ...........                  [ 41%]
 tests/gui_desktop/test_tab_architecture.py .........                     [ 42%]
-tests/gui_desktop/test_table_dark_header.py ......                       [ 43%]
+tests/gui_desktop/test_table_dark_header.py ......                       [ 42%]
 tests/gui_desktop/test_wayland_safe_geometry.py ....                     [ 43%]
 tests/hardening/test_manifest_tree_completeness.py .......               [ 43%]
 tests/hardening/test_outputs_config_toplevel_guard.py .                  [ 43%]
@@ -98,6 +98,7 @@ tests/hardening/test_plan_view_manifest_hash_chain.py .                  [ 44%]
 tests/hardening/test_plan_view_write_scope_and_idempotent.py .           [ 44%]
 tests/hardening/test_plan_view_zero_write_read_path.py .                 [ 44%]
 tests/hardening/test_plan_view_zero_write_streamlit.py s                 [ 44%]
+tests/hardening/test_rooignore_presence_and_guard.py .                   [ 44%]
 tests/hardening/test_writer_scope_guard.py .........                     [ 45%]
 tests/policy/test_action_policy_engine.py ............                   [ 46%]
 tests/policy/test_all_handlers_are_governed.py ..                        [ 46%]
@@ -137,7 +138,7 @@ tests/portfolio/test_signal_series_exporter_v1.py ........               [ 59%]
 tests/portfolio/test_store.py .........                                  [ 60%]
 tests/reporting/test_reporting_models_validate.py ..................     [ 61%]
 tests/reporting/test_reports_endpoints.py ............                   [ 62%]
-tests/research/test_run_index.py .....                                   [ 62%]
+tests/research/test_run_index.py .....                                   [ 63%]
 tests/research/test_run_writer.py ......                                 [ 63%]
 tests/stage0/test_precision_rank_correlation.py .                        [ 63%]
 tests/stage2/test_kernel_exit_gap_semantics.py .....                     [ 63%]
@@ -160,7 +161,7 @@ tests/test_control_preflight.py ..                                       [ 71%]
 tests/test_control_worker_integration.py ..                              [ 71%]
 tests/test_data_cache_rebuild_fingerprint_stable.py ..                   [ 71%]
 tests/test_data_ingest_e2e.py ..                                         [ 71%]
-tests/test_data_ingest_monkeypatch_trap.py ..                            [ 71%]
+tests/test_data_ingest_monkeypatch_trap.py ..                            [ 72%]
 tests/test_data_ingest_raw_means_raw.py ......                           [ 72%]
 tests/test_data_layout.py ..                                             [ 72%]
 tests/test_day_bar_definition.py ..                                      [ 72%]
@@ -1099,4 +1100,4 @@ tests/test_funnel_topk_no_human_contract.py::test_funnel_stage0_no_pnl_fields
     result = run_funnel(
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-== 1393 passed, 36 skipped, 3 deselected, 10 xfailed, 400 warnings in 34.02s ===
+== 1394 passed, 36 skipped, 3 deselected, 10 xfailed, 400 warnings in 33.68s ===

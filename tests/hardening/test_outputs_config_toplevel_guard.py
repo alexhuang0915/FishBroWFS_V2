@@ -28,7 +28,7 @@ def test_outputs_config_toplevel_guard():
     
     # C) Load allowlists
     outputs_allowlist_path = repo_root / "docs" / "contracts" / "OUTPUTS_TOPLEVEL_ALLOWLIST_V1.txt"
-    configs_allowlist_path = repo_root / "docs" / "contracts" / "CONFIGS_TOPLEVEL_ALLOWLIST_V1.txt"
+    configs_allowlist_path = repo_root / "docs" / "contracts" / "CONFIG_TOPLEVEL_ALLOWLIST_V1.txt"
     
     # Read and parse outputs allowlist
     allowed_outputs = set()
@@ -64,7 +64,7 @@ def test_outputs_config_toplevel_guard():
         raise AssertionError(f"Unexpected outputs top-level entries: {sorted(unexpected_outputs)}. If intentional, update docs/contracts/OUTPUTS_TOPLEVEL_ALLOWLIST_V1.txt")
     
     if unexpected_configs:
-        raise AssertionError(f"Unexpected configs top-level entries: {sorted(unexpected_configs)}. If intentional, update docs/contracts/CONFIGS_TOPLEVEL_ALLOWLIST_V1.txt")
+        raise AssertionError(f"Unexpected configs top-level entries: {sorted(unexpected_configs)}. If intentional, update docs/contracts/CONFIG_TOPLEVEL_ALLOWLIST_V1.txt")
     
     # If we reach here, all is good
     assert True

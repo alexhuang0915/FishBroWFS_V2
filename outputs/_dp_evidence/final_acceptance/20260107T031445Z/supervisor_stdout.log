@@ -1,0 +1,623 @@
+INFO:     Will watch for changes in these directories: ['/home/fishbro/FishBroWFS_V2']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [315197] using WatchFiles
+INFO:     Started server process [315199]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41731 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41747 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41757 - "GET /api/v1/registry/strategies HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:41767 - "GET /api/v1/registry/instruments HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:41777 - "GET /api/v1/registry/datasets HTTP/1.1" 503 Service Unavailable
+INFO:     127.0.0.1:41783 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41799 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/applications.py", line 1135, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 424, in reject_path_traversal_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 115, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 101, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 355, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 243, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 745, in list_jobs_endpoint
+    jobs = list_jobs(db_path, limit=limit)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: list_jobs() got an unexpected keyword argument 'limit'
+INFO:     127.0.0.1:41805 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41817 - "GET /api/v1/registry/strategies HTTP/1.1" 503 Service Unavailable
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [315199]
+INFO:     Started server process [324030]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [324030]
+INFO:     Started server process [324330]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [324330]
+INFO:     Started server process [325464]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [325464]
+INFO:     Started server process [325548]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:40081 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38667 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40649 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37925 - "GET /api/v1/meta/prime HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:37935 - "GET /api/v1/meta/prime HTTP/1.1" 405 Method Not Allowed
+INFO:     127.0.0.1:38379 - "POST /api/v1/meta/prime HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [325548]
+INFO:     Started server process [327008]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38341 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'scripts/acceptance/final_acceptance_probe.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [327008]
+INFO:     Started server process [327344]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41497 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39207 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41195 - "GET /api/v1/jobs?limit=5 HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/applications.py", line 1135, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 433, in reject_path_traversal_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 115, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 101, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 355, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 243, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 755, in list_jobs_endpoint
+    return [_job_record_to_response(job) for job in jobs]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 711, in _job_record_to_response
+    created_at = job.created_at.isoformat() if job.created_at else ""
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'isoformat'. Did you mean: 'format'?
+INFO:     127.0.0.1:40281 - "GET /api/v1/jobs?limit=5 HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/applications.py", line 1135, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 433, in reject_path_traversal_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 115, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 101, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 355, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 243, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 755, in list_jobs_endpoint
+    return [_job_record_to_response(job) for job in jobs]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 711, in _job_record_to_response
+    created_at = job.created_at.isoformat() if job.created_at else ""
+                 ^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: 'str' object has no attribute 'isoformat'. Did you mean: 'format'?
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [327344]
+INFO:     Started server process [328430]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:40053 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38507 - "GET /api/v1/jobs?limit=5 HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/protocols/http/httptools_impl.py", line 419, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/uvicorn/middleware/proxy_headers.py", line 84, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/applications.py", line 1135, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 191, in __call__
+    with recv_stream, send_stream, collapse_excgroups():
+  File "/usr/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_utils.py", line 85, in collapse_excgroups
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 193, in __call__
+    response = await self.dispatch_func(request, call_next)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 433, in reject_path_traversal_middleware
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 115, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 101, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 355, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/fastapi/routing.py", line 243, in run_endpoint_function
+    return await dependant.call(**values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 758, in list_jobs_endpoint
+    return [_job_record_to_response(job) for job in jobs]
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/api.py", line 738, in _job_record_to_response
+    return JobListResponse(
+           ^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for JobListResponse
+timeframe
+  Input should be a valid string [type=string_type, input_value=240, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+WARNING:  WatchFiles detected changes in 'src/control/api.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [328430]
+INFO:     Started server process [330729]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38783 - "GET /api/v1/jobs?limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40369 - "GET /api/v1/jobs?limit=5 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40375 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40813 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38731 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40519 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40525 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40527 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40537 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40545 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40551 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40553 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40555 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/../../etc/passwd HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/this_file_should_not_exist.json HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:40573 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40575 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40577 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'scripts/acceptance/final_acceptance_probe.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [330729]
+INFO:     Started server process [331601]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38553 - "GET /api/v1/jobs?limit=1 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39819 - "GET /api/v1/jobs/etc/passwd HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:39823 - "GET /api/v1/jobs/etc/passwd HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41381 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/../etc/passwd HTTP/1.1" 403 Forbidden
+WARNING:  WatchFiles detected changes in 'scripts/acceptance/final_acceptance_probe.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [331601]
+INFO:     Started server process [332414]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'scripts/acceptance/final_acceptance_probe.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [332414]
+INFO:     Started server process [332491]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:40115 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38075 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38091 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38099 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38109 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38119 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38125 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38129 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38137 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/../etc/passwd HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:38151 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/this_file_should_not_exist.json HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:38153 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38159 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38165 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [332491]
+INFO:     Started server process [333388]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333388]
+INFO:     Started server process [333403]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333403]
+INFO:     Started server process [333429]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333429]
+INFO:     Started server process [333443]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333443]
+INFO:     Started server process [333475]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333475]
+INFO:     Started server process [333501]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333501]
+INFO:     Started server process [333521]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333521]
+INFO:     Started server process [333541]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333541]
+INFO:     Started server process [333561]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333561]
+INFO:     Started server process [333581]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333581]
+INFO:     Started server process [333595]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333595]
+INFO:     Started server process [333615]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333615]
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Started server process [333649]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333649]
+INFO:     Started server process [333669]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333669]
+INFO:     Started server process [333689]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333689]
+INFO:     Started server process [333703]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333703]
+INFO:     Started server process [333723]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333723]
+INFO:     Started server process [333743]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333743]
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Started server process [333771]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333771]
+INFO:     Started server process [333791]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333791]
+INFO:     Started server process [333811]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333811]
+INFO:     Started server process [333837]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/control/test_registry_preload_headless.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [333837]
+INFO:     Started server process [333853]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41779 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41793 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41805 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41819 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41833 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41847 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41849 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41859 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/../etc/passwd HTTP/1.1" 403 Forbidden
+INFO:     127.0.0.1:41869 - "GET /api/v1/jobs/20bb0ccf-0c36-43ae-aace-990aec1d8c93/artifacts/this_file_should_not_exist.json HTTP/1.1" 404 Not Found
+INFO:     127.0.0.1:41883 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37803 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:37819 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK

@@ -143,7 +143,7 @@ from control.reporting.io import (
 from control.portfolio.api_v1 import router as portfolio_router
 
 # Phase E.4: Outputs summary endpoint
-from control.supervisor import list_jobs
+from control.supervisor import list_jobs as list_supervisor_jobs
 
 # Default DB path (can be overridden via environment)
 DEFAULT_DB_PATH = Path("outputs/jobs.db")
@@ -187,12 +187,16 @@ def _load_dataset_index_from_file() -> DatasetIndex:
     """Private implementation: load dataset index from file (fail fast)."""
     import json
     from pathlib import Path
+    from datetime import datetime, timezone
 
     index_path = Path("outputs/datasets/datasets_index.json")
     if not index_path.exists():
-        raise RuntimeError(
-            f"Dataset index not found: {index_path}\n"
-            "Please run: python scripts/build_dataset_registry.py"
+        # Return empty dataset index (headless-safe)
+        # This ensures registry preload succeeds even without derived data.
+        # The dataset endpoint will return empty list (200 OK) instead of 503.
+        return DatasetIndex(
+            generated_at=datetime.now(timezone.utc),
+            datasets=[]
         )
 
     data = json.loads(index_path.read_text())
@@ -328,15 +332,20 @@ _LOAD_INSTRUMENTS_CONFIG_ORIGINAL = load_instruments_config
 
 
 def _try_prime_registries() -> None:
-    """Prime cache on startup."""
+    """Prime cache on startup (per‑load tolerance)."""
     global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG
+    # Try each load independently; if one fails, set its cache to None but continue.
     try:
         _DATASET_INDEX = load_dataset_index()
-        _STRATEGY_REGISTRY = load_strategy_registry()
-        _INSTRUMENTS_CONFIG = load_instruments_config()
     except Exception:
         _DATASET_INDEX = None
+    try:
+        _STRATEGY_REGISTRY = load_strategy_registry()
+    except Exception:
         _STRATEGY_REGISTRY = None
+    try:
+        _INSTRUMENTS_CONFIG = load_instruments_config()
+    except Exception:
         _INSTRUMENTS_CONFIG = None
 
 
@@ -554,13 +563,13 @@ async def registry_instruments() -> list[str]:
         raise HTTPException(status_code=503, detail="Instruments registry not preloaded")
 
     config = load_instruments_config()
-    # config is a dict with instrument symbols as keys? Let's assume it's a dict mapping symbol -> instrument definition
-    # We'll extract keys.
+    # config could be InstrumentsConfig or dict
     if isinstance(config, dict):
+        # If it's a dict, assume keys are instrument symbols
         symbols = list(config.keys())
     else:
-        # If config is something else (maybe a list), fallback
-        symbols = []
+        # Assume it's an InstrumentsConfig with instruments attribute
+        symbols = list(config.instruments.keys())
     return symbols
 
 
@@ -698,9 +707,23 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
     run_mode = config.get("run_mode")
     # Extract season from spec
     season = job.spec.season
+    # Coerce optional fields to string if they are not None (Pydantic expects Optional[str])
+    if strategy_name is not None and not isinstance(strategy_name, str):
+        strategy_name = str(strategy_name)
+    if instrument is not None and not isinstance(instrument, str):
+        instrument = str(instrument)
+    if timeframe is not None and not isinstance(timeframe, str):
+        timeframe = str(timeframe)
+    if run_mode is not None and not isinstance(run_mode, str):
+        run_mode = str(run_mode)
+    if season is not None and not isinstance(season, str):
+        season = str(season)
     # Format timestamps
-    created_at = job.created_at.isoformat() if job.created_at else ""
-    finished_at = job.finished_at.isoformat() if job.finished_at else None
+    created_at = job.created_at if job.created_at else ""
+    # Determine finished_at based on terminal status
+    finished_at = None
+    if job.status in (JobStatus.DONE, JobStatus.FAILED, JobStatus.KILLED):
+        finished_at = job.updated_at  # updated_at is a string
     # Compute duration_seconds
     duration_seconds = None
     if created_at and finished_at:
@@ -2559,7 +2582,7 @@ async def get_outputs_summary() -> dict[str, Any]:
     from datetime import datetime, timezone
     
     # Get jobs from supervisor
-    jobs = list_jobs()  # Returns list of JobRow objects
+    jobs = list_supervisor_jobs()  # Returns list of JobRow objects
     
     # Separate strategy runs from portfolio builds
     strategy_jobs = []

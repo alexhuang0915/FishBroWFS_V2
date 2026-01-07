@@ -1436,3 +1436,308 @@ INFO:     127.0.0.1:39321 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39325 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39339 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
 INFO:     127.0.0.1:39345 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40519 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40519 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40519 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'src/gui/desktop/tabs/op_tab.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [381912]
+INFO:     Started server process [385958]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:39015 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39015 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39015 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39015 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'src/gui/desktop/tabs/allocation_tab.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [385958]
+INFO:     Started server process [386314]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/gui/desktop/tabs/allocation_tab.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [386314]
+INFO:     Started server process [386373]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41007 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'src/gui/desktop/tabs/op_tab.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [386373]
+INFO:     Started server process [386534]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'src/gui/desktop/tabs/allocation_tab.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [386534]
+INFO:     Started server process [386594]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:38509 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38509 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39559 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40557 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41113 - "GET /api/v1/jobs?limit=50 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41343 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41357 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41359 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41369 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41381 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41397 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41401 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41413 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41415 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41431 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [386594]
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Started server process [392489]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392489]
+INFO:     Started server process [392509]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392509]
+INFO:     Started server process [392529]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392529]
+INFO:     Started server process [392559]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392559]
+INFO:     Started server process [392573]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset2.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392573]
+INFO:     Started server process [392716]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset2.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392716]
+INFO:     Started server process [392747]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset2.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392747]
+INFO:     Started server process [392783]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phase_z_cleanup/filter_deleteset2.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392783]
+INFO:     Started server process [392797]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phaseD_portfolio_build_api/capture_openapi.py', 'outputs/_dp_evidence/phaseD_portfolio_build_api/generate_openapi.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [392797]
+INFO:     Started server process [394215]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'outputs/_dp_evidence/phaseA_api_v1/generate_openapi.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [394215]
+INFO:     Started server process [394325]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:40587 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40601 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40611 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40621 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40637 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40643 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40657 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40667 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40675 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40685 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK

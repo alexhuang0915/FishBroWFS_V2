@@ -1,0 +1,1102 @@
+==> Running product CI tests (mark expr: not slow and not legacy_ui)...
+PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src .venv/bin/python -m pytest -q -m "not slow and not legacy_ui"
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0
+rootdir: /home/fishbro/FishBroWFS_V2
+configfile: pytest.ini
+testpaths: tests
+plugins: playwright-0.7.2, cov-5.0.0, asyncio-0.26.0, timeout-2.4.0, anyio-4.12.0, base-url-2.1.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 1435 items / 3 deselected / 7 skipped / 1432 selected
+
+tests/boundary/test_portfolio_ingestion_boundary.py ....                 [  0%]
+tests/contracts/test_dimensions_registry.py .............                [  1%]
+tests/contracts/test_fingerprint_index.py ............                   [  2%]
+tests/control/test_baseline_experiments.py ...................           [  3%]
+tests/control/test_build_portfolio_artifact_validation.py .....          [  3%]
+tests/control/test_build_portfolio_job_lifecycle.py ......               [  4%]
+tests/control/test_bypass_prevention_qt_desktop.py ....                  [  4%]
+tests/control/test_deploy_manifest_integrity.py .....................    [  5%]
+tests/control/test_evidence_bundle_completeness.py ...                   [  6%]
+tests/control/test_export_scope_allows_only_exports_tree.py ....         [  6%]
+tests/control/test_feature_resolver.py ........sss                       [  7%]
+tests/control/test_input_manifest.py .............                       [  8%]
+tests/control/test_job_rejection.py ...                                  [  8%]
+tests/control/test_job_wizard.py ............                            [  9%]
+tests/control/test_jobs_db_has_params_hash_index.py ..                   [  9%]
+tests/control/test_jobspec_api_surface.py s..                            [  9%]
+tests/control/test_outputs_reset_safe.py x.xxxxx                         [  9%]
+tests/control/test_outputs_summary_endpoint.py ......                    [ 10%]
+tests/control/test_replay_compare_no_writes.py .                         [ 10%]
+tests/control/test_replay_sort_key_determinism.py ...                    [ 10%]
+tests/control/test_research_cli_loads_builtin_strategies.py ...          [ 10%]
+tests/control/test_research_runner.py .....                              [ 11%]
+tests/control/test_research_runner_s2_s3.py .........                    [ 11%]
+tests/control/test_root_hygiene_guard.py .                               [ 11%]
+tests/control/test_run_compile_artifact_validation.py .....              [ 12%]
+tests/control/test_run_compile_job_lifecycle.py ......                   [ 12%]
+tests/control/test_run_freeze_artifact_validation.py .....               [ 12%]
+tests/control/test_run_freeze_job_lifecycle.py ......                    [ 13%]
+tests/control/test_run_plateau_artifact_validation.py .....              [ 13%]
+tests/control/test_run_plateau_job_lifecycle.py ......                   [ 14%]
+tests/control/test_run_research_artifact_validation.py .....             [ 14%]
+tests/control/test_run_research_job_lifecycle.py ......                  [ 14%]
+tests/control/test_season_index_root_autocreate.py .......               [ 15%]
+tests/control/test_shared_bars_cache.py ......                           [ 15%]
+tests/control/test_shared_build_gate.py .........                        [ 16%]
+tests/control/test_shared_features_cache.py ........sss..                [ 17%]
+tests/control/test_slippage_stress_gate.py ...................           [ 18%]
+tests/control/test_strategy_rotation.py ..................               [ 19%]
+tests/control/test_supervisor_abort_contract_v1.py .......               [ 20%]
+tests/control/test_supervisor_db_contract_v1.py ..........               [ 21%]
+tests/control/test_supervisor_handler_build_data_v1.py .....             [ 21%]
+tests/control/test_supervisor_handler_clean_cache_v1.py ....             [ 21%]
+tests/control/test_supervisor_handler_generate_reports_v1.py .......     [ 22%]
+tests/control/test_supervisor_heartbeat_timeout_v1.py .....              [ 22%]
+tests/control/test_supervisor_ping_contract_v1.py ......                 [ 23%]
+tests/control/test_supervisor_unknown_job_type_v1.py ........            [ 23%]
+tests/control/test_worker_spawn_policy.py .................              [ 24%]
+tests/core/test_slippage_policy.py .....................                 [ 26%]
+tests/data/test_dataset_registry.py .......                              [ 26%]
+tests/data/test_registry_register_snapshot.py .......                    [ 27%]
+tests/data/test_snapshot_create_deterministic.py ....                    [ 27%]
+tests/data/test_snapshot_metadata_stats.py ......                        [ 27%]
+tests/features/test_feature_bank_v2_new_families.py .................... [ 29%]
+................................................                         [ 32%]
+tests/features/test_feature_causality.py .............                   [ 33%]
+tests/features/test_feature_lookahead_rejection.py .........             [ 34%]
+tests/features/test_feature_window_honesty.py ........                   [ 34%]
+tests/features/test_registry_isolation.py ....                           [ 35%]
+tests/features/test_source_agnostic_naming.py .....                      [ 35%]
+tests/governance/test_anti_shadowing.py ..                               [ 35%]
+tests/gui/test_desktop_auto_starts_supervisor.py ......                  [ 35%]
+tests/gui/test_desktop_port_occupied_message.py .....                    [ 36%]
+tests/gui/test_desktop_uses_psutil_for_port_detection.py .....           [ 36%]
+tests/gui_desktop/test_analytics_tabs_clickable.py .....                 [ 37%]
+tests/gui_desktop/test_artifact_contract_lock.py ......                  [ 37%]
+tests/gui_desktop/test_artifact_validation.py .........                  [ 38%]
+tests/gui_desktop/test_artifact_validation_regex.py ...                  [ 38%]
+tests/gui_desktop/test_cleanup_guardrails.py ........                    [ 38%]
+tests/gui_desktop/test_context_feeds_multiselect.py ssssss               [ 39%]
+tests/gui_desktop/test_data2_auto_prepare.py ....                        [ 39%]
+tests/gui_desktop/test_data2_prepare_enforcement.py sss..                [ 39%]
+tests/gui_desktop/test_data_readiness_service.py .........               [ 40%]
+tests/gui_desktop/test_makefile_targets.py ..                            [ 40%]
+tests/gui_desktop/test_partial_run_behavior.py .sss                      [ 40%]
+tests/gui_desktop/test_run_artifact_bundle_written.py ....               [ 41%]
+tests/gui_desktop/test_run_index_service.py ...........                  [ 41%]
+tests/gui_desktop/test_tab_architecture.py .........                     [ 42%]
+tests/gui_desktop/test_table_dark_header.py ......                       [ 43%]
+tests/gui_desktop/test_wayland_safe_geometry.py ....                     [ 43%]
+tests/hardening/test_manifest_tree_completeness.py .......               [ 43%]
+tests/hardening/test_outputs_config_toplevel_guard.py .                  [ 43%]
+tests/hardening/test_plan_quality_contract_lock.py .                     [ 43%]
+tests/hardening/test_plan_quality_grading.py ...                         [ 44%]
+tests/hardening/test_plan_quality_write_scope_idempotent.py .            [ 44%]
+tests/hardening/test_plan_quality_zero_write_read_path.py .              [ 44%]
+tests/hardening/test_plan_view_manifest_hash_chain.py .                  [ 44%]
+tests/hardening/test_plan_view_write_scope_and_idempotent.py .           [ 44%]
+tests/hardening/test_plan_view_zero_write_read_path.py .                 [ 44%]
+tests/hardening/test_plan_view_zero_write_streamlit.py s                 [ 44%]
+tests/hardening/test_writer_scope_guard.py .........                     [ 45%]
+tests/policy/test_action_policy_engine.py ............                   [ 46%]
+tests/policy/test_all_handlers_are_governed.py ..                        [ 46%]
+tests/policy/test_api_contract.py ..                                     [ 46%]
+tests/policy/test_no_duplicate_test_basenames.py .                       [ 46%]
+tests/policy/test_no_fragile_src_path_hacks.py x                         [ 46%]
+tests/policy/test_no_localhost_network_tests.py .                        [ 46%]
+tests/policy/test_params_hash_stability.py ..                            [ 46%]
+tests/policy/test_post_flight_policies.py ...                            [ 46%]
+tests/policy/test_pre_flight_policies.py ....                            [ 47%]
+tests/policy/test_profiles_exist_in_configs.py ...                       [ 47%]
+tests/policy/test_subprocess_policy.py .                                 [ 47%]
+tests/portfolio/test_admission_gates.py ..............                   [ 48%]
+tests/portfolio/test_admission_missing_artifacts_fails_cleanly.py ...... [ 48%]
+                                                                         [ 48%]
+tests/portfolio/test_allocation_vol_target.py ........                   [ 49%]
+tests/portfolio/test_allocator.py ..........                             [ 50%]
+tests/portfolio/test_artifact_immutability.py ....                       [ 50%]
+tests/portfolio/test_audit.py ...........                                [ 51%]
+tests/portfolio/test_boundary_violation.py .......                       [ 51%]
+tests/portfolio/test_decisions_reader_parser.py .........                [ 52%]
+tests/portfolio/test_gatekeeper.py .....                                 [ 52%]
+tests/portfolio/test_governance_params_thresholds_loaded.py ...          [ 52%]
+tests/portfolio/test_governance_state.py ........................        [ 54%]
+tests/portfolio/test_governance_state_machine.py .....                   [ 54%]
+tests/portfolio/test_kill_switch.py ............                         [ 55%]
+tests/portfolio/test_manager.py .........                                [ 56%]
+tests/portfolio/test_plan_constraints.py ......                          [ 56%]
+tests/portfolio/test_plan_determinism.py .....                           [ 57%]
+tests/portfolio/test_plan_hash_chain.py .....                            [ 57%]
+tests/portfolio/test_portfolio_artifacts_security.py .......             [ 57%]
+tests/portfolio/test_portfolio_engine_v1.py .......                      [ 58%]
+tests/portfolio/test_portfolio_replay_readonly.py ..                     [ 58%]
+tests/portfolio/test_portfolio_writer_outputs.py ......                  [ 58%]
+tests/portfolio/test_research_bridge_builds_portfolio.py ......          [ 59%]
+tests/portfolio/test_signal_series_exporter_v1.py ........               [ 59%]
+tests/portfolio/test_store.py .........                                  [ 60%]
+tests/reporting/test_reporting_models_validate.py ..................     [ 61%]
+tests/reporting/test_reports_endpoints.py ............                   [ 62%]
+tests/research/test_run_index.py .....                                   [ 62%]
+tests/research/test_run_writer.py ......                                 [ 63%]
+tests/stage0/test_precision_rank_correlation.py .                        [ 63%]
+tests/stage2/test_kernel_exit_gap_semantics.py .....                     [ 63%]
+tests/strategy/test_ast_identity.py .................                    [ 65%]
+tests/strategy/test_s2_none_modes.py .........                           [ 65%]
+tests/strategy/test_s2_s3_content_identity.py ..........                 [ 66%]
+tests/strategy/test_s2_s3_parameter_validation.py ..............         [ 67%]
+tests/strategy/test_s3_none_modes.py ...........                         [ 68%]
+tests/strategy/test_strategy_registry.py ........                        [ 68%]
+tests/test_api_worker_no_pipe_deadlock.py .                              [ 68%]
+tests/test_api_worker_spawn_no_pipes.py .                                [ 68%]
+tests/test_artifact_contract.py .........                                [ 69%]
+tests/test_artifacts_winners_v2_written.py ...                           [ 69%]
+tests/test_audit_schema_contract.py .......                              [ 70%]
+tests/test_b5_query_params.py ....                                       [ 70%]
+tests/test_baseline_lock.py .                                            [ 70%]
+tests/test_builder_sparse_contract.py ....                               [ 70%]
+tests/test_control_jobs_db.py ........                                   [ 71%]
+tests/test_control_preflight.py ..                                       [ 71%]
+tests/test_control_worker_integration.py ..                              [ 71%]
+tests/test_data_cache_rebuild_fingerprint_stable.py ..                   [ 71%]
+tests/test_data_ingest_e2e.py ..                                         [ 71%]
+tests/test_data_ingest_monkeypatch_trap.py ..                            [ 71%]
+tests/test_data_ingest_raw_means_raw.py ......                           [ 72%]
+tests/test_data_layout.py ..                                             [ 72%]
+tests/test_day_bar_definition.py ..                                      [ 72%]
+tests/test_dtype_compression_contract.py ............                    [ 73%]
+tests/test_engine_constitution.py ......                                 [ 73%]
+tests/test_engine_fill_buffer_capacity.py .                              [ 74%]
+tests/test_engine_gaps_and_priority.py ....                              [ 74%]
+tests/test_engine_jit_active_book_contract.py ......                     [ 74%]
+tests/test_engine_jit_fill_buffer_capacity.py ...                        [ 74%]
+tests/test_entry_only_regression.py x                                    [ 75%]
+tests/test_funnel_contract.py ........                                   [ 75%]
+tests/test_funnel_oom_integration.py ....                                [ 75%]
+tests/test_funnel_smoke_contract.py ....                                 [ 76%]
+tests/test_funnel_topk_determinism.py ...                                [ 76%]
+tests/test_funnel_topk_no_human_contract.py ......                       [ 76%]
+tests/test_generate_research_cli.py ....                                 [ 77%]
+tests/test_golden_kernel_verification.py ...                             [ 77%]
+tests/test_governance_accepts_winners_v2.py ..                           [ 77%]
+tests/test_governance_eval_rules.py ....                                 [ 77%]
+tests/test_governance_schema_contract.py ...                             [ 77%]
+tests/test_governance_transition.py ................                     [ 78%]
+tests/test_governance_writer_contract.py ...                             [ 79%]
+tests/test_grid_runner_smoke.py ..                                       [ 79%]
+tests/test_indicators_consistency.py ..............                      [ 80%]
+tests/test_indicators_precompute_bit_exact.py .                          [ 80%]
+tests/test_intent_idempotency.py ......ss..                              [ 81%]
+tests/test_jobs_db_concurrency_smoke.py .                                [ 81%]
+tests/test_jobs_db_concurrency_wal.py .                                  [ 81%]
+tests/test_jobs_db_tags.py ......                                        [ 81%]
+tests/test_kbar_anchor_alignment.py ..                                   [ 81%]
+tests/test_kbar_no_cross_session.py ..                                   [ 81%]
+tests/test_kernel_parity_contract.py ..............                      [ 82%]
+tests/test_local_scan_policy.py .....                                    [ 83%]
+tests/test_log_tail_reads_last_n_lines.py ....                           [ 83%]
+tests/test_mnq_maintenance_break_no_cross.py ..                          [ 83%]
+tests/test_oom_gate.py .............                                     [ 84%]
+tests/test_oom_gate_contract.py .....                                    [ 84%]
+tests/test_oom_gate_pure_function_hash_consistency.py .                  [ 84%]
+tests/test_perf_breakdown_contract.py ....                               [ 85%]
+tests/test_perf_env_config_contract.py ....                              [ 85%]
+tests/test_perf_evidence_chain.py .                                      [ 85%]
+tests/test_perf_grid_profile_report.py .                                 [ 85%]
+tests/test_perf_obs_contract.py ..                                       [ 85%]
+tests/test_perf_trigger_rate_contract.py ........                        [ 86%]
+tests/test_phase13_batch_submit.py .......                               [ 86%]
+tests/test_phase13_job_expand.py ............                            [ 87%]
+tests/test_phase13_param_grid.py .................                       [ 88%]
+tests/test_phase14_artifacts.py .....                                    [ 89%]
+tests/test_phase14_batch_aggregate.py .....                              [ 89%]
+tests/test_phase14_batch_execute.py .......                              [ 90%]
+tests/test_phase14_batch_index.py ...                                    [ 90%]
+tests/test_phase14_governance.py .......                                 [ 90%]
+tests/test_portfolio_artifacts_hash_stable.py ....                       [ 91%]
+tests/test_portfolio_compile_jobs.py ..                                  [ 91%]
+tests/test_portfolio_spec_loader.py ....                                 [ 91%]
+tests/test_portfolio_validate.py .....                                   [ 91%]
+tests/test_report_link_allows_minimal_artifacts.py .........             [ 92%]
+tests/test_research_decision.py .....                                    [ 92%]
+tests/test_research_extract.py ......                                    [ 93%]
+tests/test_research_registry.py ...                                      [ 93%]
+tests/test_runner_adapter_contract.py ...                                [ 93%]
+tests/test_runner_adapter_input_coercion.py .....                        [ 93%]
+tests/test_runner_grid_perf_observability.py .                           [ 94%]
+tests/test_seed_demo_run.py ......                                       [ 94%]
+tests/test_service_identity.py ....x.......                              [ 95%]
+tests/test_session_classification_mnq.py ...                             [ 95%]
+tests/test_session_classification_mxf.py ...                             [ 95%]
+tests/test_session_dst_mnq.py ...                                        [ 95%]
+tests/test_snapshot_compiler.py ......                                   [ 96%]
+tests/test_sparse_intents_contract.py ...                                [ 96%]
+tests/test_sparse_intents_mvp_contract.py ...                            [ 96%]
+tests/test_state_processor_serialization.py ssss..ss.s                   [ 97%]
+tests/test_strategy_contract_purity.py ...                               [ 97%]
+tests/test_strategy_registry_basic.py .....                              [ 98%]
+tests/test_strategy_registry_contains_s1.py ....                         [ 98%]
+tests/test_strategy_registry_contains_s2_s3.py .......                   [ 98%]
+tests/test_strategy_runner_outputs_intents.py ....                       [ 99%]
+tests/test_trigger_rate_param_subsample_contract.py ...                  [ 99%]
+tests/test_vectorization_parity.py x.                                    [ 99%]
+tests/test_winners_schema_v2_contract.py ......                          [ 99%]
+tests/test_worker_writes_traceback_to_log.py .                           [ 99%]
+tests/wfs/test_wfs_no_io.py .                                            [100%]
+
+=============================== warnings summary ===============================
+tests/control/test_evidence_bundle_completeness.py:13
+  /home/fishbro/FishBroWFS_V2/tests/control/test_evidence_bundle_completeness.py:13: PytestCollectionWarning: cannot collect test class 'TestGovernedHandler' because it has a __init__ constructor (from: tests/control/test_evidence_bundle_completeness.py)
+    class TestGovernedHandler(BaseGovernedHandler):
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'sma_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'sma_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'sma_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'sma_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'hh_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'll_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'hh_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'll_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'hh_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'll_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'hh_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'll_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_14' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'percentile_126' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'vx_percentile_126' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'percentile_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'vx_percentile_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'rsi_7' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'rsi_14' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'rsi_21' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'ema_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'wma_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'stdev_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'zscore_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'zscore_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'zscore_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'zscore_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'zscore_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'momentum_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_60' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_100' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'roc_200' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_pb_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'bb_width_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_14' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_14' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_14' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_upper_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_lower_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'atr_ch_pos_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'donchian_width_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_10' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_40' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_80' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_160' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_hh_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dist_ll_252' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/control/test_shared_features_cache.py::test_full_build_features_integration
+tests/features/test_registry_isolation.py::test_reset_clears_context[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'percentile_63' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_duplicate_feature_rejection
+tests/features/test_feature_window_honesty.py::test_remove_dishonest_feature
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'test_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_verify_all_registered
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'lookahead1' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_get_unverified_features
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'unverified' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_get_features_with_lookahead
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'lookahead' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_to_contract_registry
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'verified_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_lookahead_rejection.py::test_to_contract_registry
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'unverified_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_window_honesty_affects_max_lookback
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'honest_5' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_window_honesty_affects_max_lookback
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dishonest_20' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_specs_for_tf_excludes_dishonest
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'honest' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_specs_for_tf_excludes_dishonest
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dishonest' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_get_dishonest_window_features
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'honest_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_get_dishonest_window_features
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'dishonest_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_clear_registry
+tests/features/test_registry_isolation.py::test_sync_context_isolation
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'feature1' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_feature_window_honesty.py::test_clear_registry
+tests/features/test_registry_isolation.py::test_sync_context_isolation
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'feature2' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_registry_isolation.py::test_registry_context_isolation[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'feature_A' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_registry_isolation.py::test_registry_context_isolation[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'feature_B' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_registry_isolation.py::test_registry_context_inheritance_break[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'parent_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/features/test_registry_isolation.py::test_registry_context_inheritance_break[asyncio]
+  /home/fishbro/FishBroWFS_V2/src/features/registry.py:163: UserWarning: Feature 'child_feature' registered without causality verification. This is dangerous and may lead to lookahead bias.
+    warnings.warn(
+
+tests/test_funnel_smoke_contract.py::test_funnel_smoke_basic
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_smoke_contract.py:32: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_smoke_contract.py::test_funnel_smoke_empty_params
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_smoke_contract.py:83: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_smoke_contract.py::test_funnel_smoke_k_larger_than_params
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_smoke_contract.py:115: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_smoke_contract.py::test_funnel_smoke_pipeline_order
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_smoke_contract.py:146: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_topk_determinism.py::test_funnel_determinism
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_topk_determinism.py:99: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result_1 = run_funnel(
+
+tests/test_funnel_topk_determinism.py::test_funnel_determinism
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_topk_determinism.py:110: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result_2 = run_funnel(
+
+tests/test_funnel_topk_no_human_contract.py::test_funnel_topk_no_manual_filtering
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_topk_no_human_contract.py:105: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_topk_no_human_contract.py::test_funnel_stage2_only_runs_topk
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_topk_no_human_contract.py:149: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+tests/test_funnel_topk_no_human_contract.py::test_funnel_stage0_no_pnl_fields
+  /home/fishbro/FishBroWFS_V2/tests/test_funnel_topk_no_human_contract.py:196: DeprecationWarning: pipeline.funnel.run_funnel is deprecated. Use pipeline.funnel_runner.run_funnel instead.
+    result = run_funnel(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+== 1393 passed, 36 skipped, 3 deselected, 10 xfailed, 400 warnings in 34.02s ===

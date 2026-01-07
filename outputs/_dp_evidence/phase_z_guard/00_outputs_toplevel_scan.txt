@@ -1,0 +1,11 @@
+_dp_evidence
+_trash
+deployment
+jobs.db
+jobs_v2.db
+portfolio_store
+research
+seasons
+shared
+strategies
+run_status.json

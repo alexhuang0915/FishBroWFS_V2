@@ -5,57 +5,42 @@ import re
 from pathlib import Path
 
 
-def test_makefile_contains_desktop_target():
-    """Check that Makefile has desktop: target."""
+def test_makefile_contains_up_target():
+    """Check that Makefile has up: target that launches desktop UI."""
     makefile_path = Path("Makefile")
     assert makefile_path.exists(), "Makefile not found"
     
     content = makefile_path.read_text()
     
-    # Check for desktop: target
-    assert "desktop:" in content, "Makefile missing 'desktop:' target"
+    # Check for up: target
+    assert "up:" in content, "Makefile missing 'up:' target"
     
-    # Check for desktop-offscreen: target
-    assert "desktop-offscreen:" in content, "Makefile missing 'desktop-offscreen:' target"
-    
-    # Check that desktop target runs the launcher script
+    # Check that up target runs the launcher script
     lines = content.splitlines()
-    desktop_found = False
-    desktop_offscreen_found = False
+    up_found = False
     
     for i, line in enumerate(lines):
-        if line.strip().startswith("desktop:"):
+        if line.strip().startswith("up:"):
             # Check next non-empty line for command (skip echo lines and comments)
             # Need to handle multi-line commands with backslashes
-            for j in range(i + 1, min(i + 15, len(lines))):
+            for j in range(i + 1, min(i + 40, len(lines))):
                 if lines[j].strip() and not lines[j].startswith("\t#") and not lines[j].strip().startswith("@echo") and not lines[j].strip().startswith("@#"):
                     # Should contain scripts/desktop_launcher.py
                     # Check current line and following lines (for multi-line commands)
                     check_lines = [lines[j]]
                     # If line ends with backslash, include next line
                     k = j
-                    while k < min(i + 15, len(lines)) and lines[k].strip().endswith('\\'):
+                    while k < min(i + 40, len(lines)) and lines[k].strip().endswith('\\'):
                         k += 1
                         if k < len(lines):
                             check_lines.append(lines[k])
                     
                     combined = ' '.join([l.strip() for l in check_lines])
                     if "scripts/desktop_launcher.py" in combined:
-                        desktop_found = True
+                        up_found = True
                     break
     
-    for i, line in enumerate(lines):
-        if line.strip().startswith("desktop-offscreen:"):
-            # Check next non-empty line for command (skip echo lines)
-            for j in range(i + 1, min(i + 10, len(lines))):
-                if lines[j].strip() and not lines[j].startswith("\t#") and not lines[j].strip().startswith("@echo"):
-                    # Should contain QT_QPA_PLATFORM=offscreen or $(DESKTOP_OFFSCREEN)
-                    if "QT_QPA_PLATFORM=offscreen" in lines[j] or "$(DESKTOP_OFFSCREEN)" in lines[j]:
-                        desktop_offscreen_found = True
-                    break
-    
-    assert desktop_found, "desktop: target should run scripts/desktop_launcher.py"
-    assert desktop_offscreen_found, "desktop-offscreen: target should set QT_QPA_PLATFORM=offscreen"
+    assert up_found, "up: target should run scripts/desktop_launcher.py"
 
 
 def test_makefile_help_includes_desktop():
@@ -71,7 +56,11 @@ def test_makefile_help_includes_desktop():
     help_text = help_section.group(0)
     
     # Check for Desktop mention
-    assert "Desktop" in help_text, "Makefile help should mention Desktop"
+    assert "Desktop is the ONLY product UI" in help_text, "Makefile help should mention 'Desktop is the ONLY product UI'"
     
-    # Check for desktop-offscreen mention
-    assert "desktop-offscreen" in help_text.lower(), "Makefile help should mention desktop-offscreen"
+    # Check for PRODUCT COMMANDS
+    assert "PRODUCT COMMANDS" in help_text, "Makefile help should contain 'PRODUCT COMMANDS'"
+    
+    # Check for up and down commands
+    assert "make up" in help_text, "Makefile help should mention 'make up'"
+    assert "make down" in help_text, "Makefile help should mention 'make down'"

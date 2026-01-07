@@ -74,17 +74,20 @@ class TestDesktopTabArchitecture:
 
 
 class TestMakefileDesktopTargets:
-    """Test that Makefile has correct desktop targets."""
+    """Test that Makefile has correct desktop targets after pruning."""
     
-    def test_makefile_has_desktop_target(self):
-        """Test that Makefile has 'make desktop' target."""
+    def test_makefile_has_up_down_targets(self):
+        """Test that Makefile has 'make up' and 'make down' targets (product UI entrypoints)."""
         makefile_path = Path(__file__).parent.parent.parent / "Makefile"
         with open(makefile_path, 'r') as f:
             content = f.read()
         
-        # Check for desktop target
-        assert "desktop:" in content
-        assert "desktop-offscreen:" in content
+        # Check for up and down targets (product UI entrypoints)
+        assert "up:" in content, "Makefile missing 'up:' target"
+        assert "down:" in content, "Makefile missing 'down:' target"
+        # desktop and desktop-offscreen targets should be removed
+        assert "desktop:" not in content, "Makefile should not have 'desktop:' target after pruning"
+        assert "desktop-offscreen:" not in content, "Makefile should not have 'desktop-offscreen:' target after pruning"
     
     def test_makefile_legacy_targets_renamed(self):
         """Test that legacy web UI targets have been removed (Phase 1 cleanup)."""

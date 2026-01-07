@@ -1,0 +1,24 @@
+{
+  "datasets": {
+    "body": [],
+    "status": 200
+  },
+  "instruments": {
+    "body": [
+      "CME.MNQ",
+      "TWF.MXF"
+    ],
+    "status": 200
+  },
+  "strategies": {
+    "body": [
+      "S1",
+      "S2",
+      "S3",
+      "breakout_channel",
+      "mean_revert_zscore",
+      "sma_cross"
+    ],
+    "status": 200
+  }
+}

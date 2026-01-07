@@ -4,6 +4,7 @@
     ".gitattributes",
     ".gitignore",
     ".pre-commit-config.yaml",
+    "FishBroWFS_UI.bat",
     "Makefile",
     "README.md",
     "SNAPSHOT_CLEAN.jsonl",
@@ -49,6 +50,7 @@
     ".gitignore",
     ".pre-commit-config.yaml",
     ".vscode",
+    "FishBroWFS_UI.bat",
     "Makefile",
     "README.md",
     "configs",
@@ -63,5 +65,5 @@
     "tests"
   ],
   "violations": [],
-  "timestamp": "2026-01-07T13:42:56.254129"
+  "timestamp": "2026-01-07T16:26:45.839276"
 }

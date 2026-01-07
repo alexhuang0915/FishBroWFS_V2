@@ -33,7 +33,7 @@ def check_bars(
     Returns (ready, reason) where reason is a human-readable string.
     """
     try:
-        from src.gui.services.supervisor_client import check_readiness
+        from gui.services.supervisor_client import check_readiness
         response = check_readiness(season, primary_market, f"{timeframe}m")
         bars_ready = response.get("bars_ready", False)
         bars_path = response.get("bars_path")
@@ -56,7 +56,7 @@ def check_features(
     Check if features data is ready via API.
     """
     try:
-        from src.gui.services.supervisor_client import check_readiness
+        from gui.services.supervisor_client import check_readiness
         response = check_readiness(season, primary_market, f"{timeframe}m")
         features_ready = response.get("features_ready", False)
         features_path = response.get("features_path")
@@ -77,7 +77,7 @@ def check_all(
 ) -> Readiness:
     """Check both bars and features readiness via a single API call."""
     try:
-        from src.gui.services.supervisor_client import check_readiness
+        from gui.services.supervisor_client import check_readiness
         response = check_readiness(season, primary_market, f"{timeframe}m")
         bars_ready = response.get("bars_ready", False)
         features_ready = response.get("features_ready", False)

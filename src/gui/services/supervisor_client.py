@@ -11,7 +11,7 @@ from typing import Any, Optional, List, Dict
 
 import requests
 
-from src.gui.desktop.config import SUPERVISOR_BASE_URL
+from gui.desktop.config import SUPERVISOR_BASE_URL
 
 logger = logging.getLogger(__name__)
 

@@ -11,19 +11,19 @@ import pytest
 def mock_supervisor_client():
     """Mock supervisor client functions to avoid network calls.
     
-    Patches the imported functions in src.gui.desktop.tabs.op_tab where they are used,
+    Patches the imported functions in gui.desktop.tabs.op_tab where they are used,
     and also patches supervisor_client functions used by other services.
     """
-    with patch("src.gui.desktop.tabs.op_tab.get_registry_strategies") as mock_strategies, \
-         patch("src.gui.desktop.tabs.op_tab.get_registry_instruments") as mock_instruments, \
-         patch("src.gui.desktop.tabs.op_tab.get_registry_datasets") as mock_datasets, \
-         patch("src.gui.desktop.tabs.op_tab.get_jobs") as mock_jobs, \
-         patch("src.gui.desktop.tabs.op_tab.get_reveal_evidence_path") as mock_reveal, \
-         patch("src.gui.desktop.tabs.op_tab.get_strategy_report_v1") as mock_report, \
-         patch("src.gui.desktop.tabs.op_tab.submit_job") as mock_submit, \
-         patch("src.gui.desktop.tabs.op_tab.get_artifacts") as mock_artifacts, \
-         patch("src.gui.desktop.tabs.op_tab.get_stdout_tail") as mock_stdout_tail, \
-         patch("src.gui.services.supervisor_client.check_readiness") as mock_check_readiness:
+    with patch("gui.services.supervisor_client.get_registry_strategies") as mock_strategies, \
+         patch("gui.services.supervisor_client.get_registry_instruments") as mock_instruments, \
+         patch("gui.services.supervisor_client.get_registry_datasets") as mock_datasets, \
+         patch("gui.services.supervisor_client.get_jobs") as mock_jobs, \
+         patch("gui.services.supervisor_client.get_reveal_evidence_path") as mock_reveal, \
+         patch("gui.services.supervisor_client.get_strategy_report_v1") as mock_report, \
+         patch("gui.services.supervisor_client.submit_job") as mock_submit, \
+         patch("gui.services.supervisor_client.get_artifacts") as mock_artifacts, \
+         patch("gui.services.supervisor_client.get_stdout_tail") as mock_stdout_tail, \
+         patch("gui.services.supervisor_client.check_readiness") as mock_check_readiness:
         
         # Mock strategies: list of dicts with id and name
         mock_strategies.return_value = [

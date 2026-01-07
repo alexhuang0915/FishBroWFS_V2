@@ -66,7 +66,7 @@ def test_check_bars_missing(tmp_path):
     sys.modules["control.bars_store"] = mock_bars_store
     
     # Override the global mock to return bars_ready=False
-    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+    with patch("gui.services.supervisor_client.check_readiness") as mock_check:
         mock_check.return_value = {
             "bars_ready": False,
             "features_ready": False,
@@ -133,7 +133,7 @@ def test_check_features_missing(tmp_path):
     sys.modules["control.features_store"] = mock_features_store
     
     # Override the global mock to return features_ready=False
-    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+    with patch("gui.services.supervisor_client.check_readiness") as mock_check:
         mock_check.return_value = {
             "bars_ready": False,
             "features_ready": False,
@@ -195,7 +195,7 @@ def test_check_all_none_ready(tmp_path):
     sys.modules["control.features_store"] = mock_features_store
     
     # Override the global mock to return both not ready
-    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+    with patch("gui.services.supervisor_client.check_readiness") as mock_check:
         mock_check.return_value = {
             "bars_ready": False,
             "features_ready": False,
@@ -231,7 +231,7 @@ def test_check_all_mixed(tmp_path):
     # Don't create features file
     
     # Override the global mock to return bars ready, features not ready
-    with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+    with patch("gui.services.supervisor_client.check_readiness") as mock_check:
         mock_check.return_value = {
             "bars_ready": True,
             "features_ready": False,
@@ -284,7 +284,7 @@ def test_module_import_fallback(tmp_path):
         bars_file.write_text("mock bars")
         
         # Patch check_readiness for check_bars call (bars ready)
-        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        with patch("gui.services.supervisor_client.check_readiness") as mock_check:
             mock_check.return_value = {
                 "bars_ready": True,
                 "features_ready": False,
@@ -298,7 +298,7 @@ def test_module_import_fallback(tmp_path):
             assert "ready" in reason.lower()
         
         # Patch again for check_features call (features not ready)
-        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        with patch("gui.services.supervisor_client.check_readiness") as mock_check:
             mock_check.return_value = {
                 "bars_ready": True,
                 "features_ready": False,
@@ -312,7 +312,7 @@ def test_module_import_fallback(tmp_path):
             assert "not ready" in reason.lower()
         
         # Patch for check_all call (bars ready, features not ready)
-        with patch("src.gui.services.supervisor_client.check_readiness") as mock_check:
+        with patch("gui.services.supervisor_client.check_readiness") as mock_check:
             mock_check.return_value = {
                 "bars_ready": True,
                 "features_ready": False,

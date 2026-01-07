@@ -27,6 +27,7 @@ def test_root_hygiene_no_forbidden_files():
         '.gitignore',
         '.pre-commit-config.yaml',
         'FishBroWFS_UI.bat',  # Sole human entrypoint. Approved by constitution.
+        '.rooignore',  # AI context guard for API cost control
     }
     
     allowed_dirs = {

@@ -25,13 +25,19 @@ DESKTOP_QPA ?=
 # Desktop offscreen helper (CI/dev)
 DESKTOP_OFFSCREEN ?= QT_QPA_PLATFORM=offscreen
 
+# Supervisor variables (make up/down)
+SUP_URL ?= http://127.0.0.1:8000
+SUP_HEALTH ?= $(SUP_URL)/health
+SUP_PID ?= outputs/_trash/supervisor.pid
+SUP_LOG ?= outputs/_trash/supervisor_stdout.log
+
 # Test selection variables (override-friendly)
 PYTEST ?= $(PYTHON) -m pytest
 PYTEST_ARGS ?= -q
 PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
 PYTEST_MARK_EXPR_ALL ?= not legacy_ui
 
-.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile desktop desktop-wayland desktop-offscreen snapshot api-snapshot forensics ui-forensics ui-contract status ports down doctor run logs
+.PHONY: help check check-legacy test portfolio-gov-test portfolio-gov-smoke precommit clean-cache clean-all clean-snapshot clean-caches clean-caches-dry compile desktop desktop-wayland desktop-offscreen snapshot api-snapshot forensics ui-forensics ui-contract status ports down doctor run logs supervisor up down up-status
 
 help:
 	@echo ""
@@ -45,6 +51,9 @@ help:
 	@echo "  make down             Stop all fishbro processes"
 	@echo "  make status           Check backend/worker health"
 	@echo "  make logs             Show logs"
+	@echo "  make supervisor       Start supervisor (backend API) in foreground"
+	@echo "  make up               Ensure supervisor healthy, then launch desktop UI"
+	@echo "  make up-status        Show supervisor PID and health status"
 	@echo ""
 	@echo "ENVIRONMENT VARIABLES:"
 	@echo "  DESKTOP_QPA=platform  Set Qt platform (wayland, xcb, offscreen, etc.)"
@@ -97,6 +106,75 @@ ports-canonical:
 	$(ENV) $(PYTHON) -B scripts/run_stack.py ports
 
 ports: ports-canonical
+
+
+# -----------------------------------------------------------------------------
+# Supervisor + Desktop Integration (make up)
+# -----------------------------------------------------------------------------
+
+supervisor:
+	@echo "==> Starting supervisor (backend API) in foreground..."
+	$(ENV) $(PYTHON) -B scripts/run_stack.py run --no-worker
+
+up:
+	@set -euo pipefail; \
+	echo "==> Checking supervisor health..."; \
+	if curl -s -f $(SUP_HEALTH) >/dev/null 2>&1; then \
+		echo "✓ Supervisor already healthy at $(SUP_HEALTH)"; \
+	else \
+		echo "==> Supervisor not healthy, starting in background..."; \
+		mkdir -p $(dir $(SUP_PID)); \
+		$(ENV) $(PYTHON) -B scripts/run_stack.py run --no-worker >$(SUP_LOG) 2>&1 & \
+			pid=$$!; \
+			echo $$pid >$(SUP_PID); \
+		echo "==> Waiting for supervisor to become healthy (max 30s)..."; \
+		for i in $$(seq 1 30); do \
+			if curl -s -f $(SUP_HEALTH) >/dev/null 2>&1; then \
+				echo "✓ Supervisor healthy after $$i seconds"; \
+				break; \
+			fi; \
+			sleep 1; \
+			if [ $$i -eq 30 ]; then \
+				echo "✗ Supervisor failed to start within 30s"; \
+				tail -n 120 $(SUP_LOG); \
+				exit 2; \
+			fi; \
+		done; \
+	fi; \
+	echo "==> Launching desktop UI..."; \
+	$(MAKE) desktop
+
+up-status:
+	@if [ -f $(SUP_PID) ]; then \
+		pid=$$(cat $(SUP_PID)); \
+		if kill -0 $$pid 2>/dev/null; then \
+			echo "Supervisor PID $$pid is alive"; \
+			if curl -s -f $(SUP_HEALTH) >/dev/null 2>&1; then \
+				echo "Health check: OK"; \
+			else \
+				echo "Health check: FAILED"; \
+			fi; \
+		else \
+			echo "Supervisor PID $$pid is dead"; \
+		fi; \
+	else \
+		echo "No supervisor PID file ($(SUP_PID))"; \
+	fi
+
+down:
+	@if [ -f $(SUP_PID) ]; then \
+		pid=$$(cat $(SUP_PID)); \
+		if kill -0 $$pid 2>/dev/null; then \
+			echo "==> Stopping supervisor (PID $$pid)..."; \
+			kill $$pid; \
+			sleep 2; \
+			if kill -0 $$pid 2>/dev/null; then \
+				kill -9 $$pid; \
+			fi; \
+		fi; \
+		rm -f $(SUP_PID); \
+	fi
+	@$(MAKE) down-canonical
 
 
 # -----------------------------------------------------------------------------

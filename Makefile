@@ -2,6 +2,10 @@
 # FishBroWFS Makefile (V3 War Room Edition)
 # =========================================================
 
+# Force bash for all recipes (required for set -o pipefail)
+SHELL := /bin/bash
+.SHELLFLAGS := -lc
+
 # Runtime variables (override-friendly)
 PYTHON ?= .venv/bin/python
 ENV ?= PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
@@ -73,8 +77,6 @@ doctor:
 down-canonical:
 	@echo "==> Stopping all fishbro processes..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py down
-
-down: down-canonical
 
 status-canonical:
 	@echo "==> Checking stack health..."

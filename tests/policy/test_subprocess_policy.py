@@ -37,6 +37,8 @@ ALLOWLIST = [
     "gui/services/runtime_context.py",
     # Funnel runner (git info, not UI entrypoint) – allowed with comment
     "pipeline/funnel_runner.py",
+    # Audit tab - opening evidence folders (legitimate UI feature)
+    "gui/desktop/tabs/audit_tab.py",
     # Scripts directory (non‑product)
     # Note: scripts/ is not under src/, but we can allow any file under scripts/
 ]

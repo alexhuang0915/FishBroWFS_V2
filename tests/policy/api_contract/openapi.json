@@ -2267,6 +2267,27 @@
         }
       }
     },
+    "/api/v1/outputs/summary": {
+      "get": {
+        "summary": "Get Outputs Summary",
+        "description": "Return a human-usable summary of outputs (jobs and portfolios) for clean UI navigation.\n\nContract:\n- Version 1.0 schema\n- No filesystem scanning (use supervisor job store)\n- No filesystem paths returned\n- Dumb client: UI must use this endpoint, not scan filesystem",
+        "operationId": "get_outputs_summary_api_v1_outputs_summary_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Outputs Summary Api V1 Outputs Summary Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/portfolios/build": {
       "post": {
         "tags": [

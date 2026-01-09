@@ -128,67 +128,6 @@ class BacktestWorker(QObject):
             timestamp = datetime.now().isoformat()
             run_id = f"run_{hashlib.sha1(timestamp.encode()).hexdigest()[:8]}"
         
-        # Try to create canonical run using run_writer
-        try:
-            from research.run_writer import create_canonical_run, complete_run
-            from pathlib import Path
-            import datetime
-            
-            season = result.get("season", "2026Q1")
-            strategy_id = result.get("strategy_id", self.strategy)
-            dataset_id = result.get("dataset_id", self.primary_market)
-            
-            # Create manifest
-            manifest = {
-                "season": season,
-                "run_id": run_id,
-                "dataset_id": dataset_id,
-                "strategy_id": strategy_id,
-                "timeframe": f"{self.timeframe}m",
-                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
-                "git_sha": "desktop-run",  # TODO: Get actual git sha
-                "bars": 0,  # Placeholder - would need actual bar count
-                "params_total": 0,
-                "params_effective": 0,
-            }
-            
-            # Create metrics
-            run_metrics = {
-                "stage_name": "research",
-                "net_profit": float(pnl),
-                "max_dd": float(maxdd),
-                "trades": int(trades),
-                "created_at": datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"),
-                "fills_count": int(fills_count),
-                "param_subsample_rate": 1.0,
-                "params_effective": 0,
-                "params_total": 0,
-                "bars": 0,
-            }
-            
-            # Create canonical run
-            run_dir = create_canonical_run(
-                outputs_root=Path("outputs"),
-                season=season,
-                run_id=run_id,
-                manifest=manifest,
-                metrics=run_metrics,
-                initial_status="RUNNING"
-            )
-            
-            # Mark as completed and generate Phase 18 artifacts
-            complete_run(run_dir, generate_phase18_artifacts=True)
-            
-            # Update artifact_path to point to canonical run
-            artifact_path = str(run_dir)
-            self.log_signal.emit(f"Created canonical run: {run_id} at {run_dir}")
-            
-        except ImportError as e:
-            self.log_signal.emit(f"WARNING: Could not import run_writer: {e}")
-        except Exception as e:
-            self.log_signal.emit(f"WARNING: Failed to create canonical run: {e}")
-            import traceback
-            self.log_signal.emit(traceback.format_exc())
         
         return {
             "success": True,
@@ -413,9 +352,6 @@ class ArtifactWorker(QObject):
                 self.log_signal.emit(f"WARNING: Failed to write Phase 18 files: {e}")
                 self.log_signal.emit("Artifact will be incomplete (missing trades/equity/report)")
             
-            # Update jobs.db
-            self._update_jobs_db(run_id, run_dir)
-            
             self.progress_signal.emit(100)
             self.log_signal.emit(f"Artifact build completed successfully")
             
@@ -436,44 +372,6 @@ class ArtifactWorker(QObject):
             import traceback
             self.log_signal.emit(traceback.format_exc())
             self.failed_signal.emit(error_msg)
-    
-    def _update_jobs_db(self, run_id: str, run_dir: Path):
-        """Update jobs.db with artifact information."""
-        try:
-            from control.jobs_db import init_db, create_job, mark_done
-            from control.control_types import DBJobSpec
-            import json
-            
-            db_path = Path("outputs/jobs.db")
-            init_db(db_path)
-            
-            # Create job spec
-            spec = DBJobSpec(
-                season=self.season,
-                dataset_id=self.dataset,
-                outputs_root="outputs",
-                config_snapshot={
-                    "strategy_id": self.strategy,
-                    "dataset_id": self.dataset,
-                    "season": self.season,
-                    "artifact_build": True,
-                },
-                config_hash="desktop-artifact",
-                data_fingerprint_sha256_40="",
-            )
-            
-            # Create job
-            job_id = create_job(db_path, spec, tags=["desktop", "artifact"])
-            
-            # Mark as done with run_id
-            report_link = f"/b5?season={self.season}&run_id={run_id}"
-            mark_done(db_path, job_id, run_id=run_id, report_link=report_link)
-            
-            self.log_signal.emit(f"Updated jobs.db: job_id={job_id}, run_id={run_id}")
-            
-        except Exception as e:
-            self.log_signal.emit(f"WARNING: Failed to update jobs.db: {e}")
-            # Continue anyway - artifact creation is more important
     
     def stop(self):
         """Request stop of the worker."""

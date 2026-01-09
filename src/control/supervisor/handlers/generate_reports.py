@@ -235,13 +235,9 @@ class GenerateReportsHandler(BaseJobHandler):
             # Generate canonical results
             canonical_path = generate_canonical_results(base_path, research_dir)
             
-            # Also generate research index if available
+            # Also generate research index if available (legacy, removed)
             index_path = None
-            try:
-                from research.registry import generate_research_index
-                index_path = generate_research_index(base_path, research_dir)
-            except ImportError:
-                logger.warning("generate_research_index not available")
+            # research.registry module has been deleted; index generation is no longer supported.
             
             # Collect report paths
             report_paths = [str(canonical_path)]

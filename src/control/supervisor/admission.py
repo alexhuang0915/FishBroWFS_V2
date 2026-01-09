@@ -8,7 +8,7 @@ from dataclasses import asdict
 from datetime import datetime
 
 from .db import SupervisorDB
-from .models import JobSpec
+from .models import JobSpec, JobStatus
 from src.contracts.supervisor.evidence_schemas import (
     PolicyCheck,
     PolicyCheckBundle,
@@ -58,8 +58,8 @@ class AdmissionController:
                 SELECT job_id FROM jobs
                 WHERE job_type = ?
                 AND params_hash = ?
-                AND state IN ('QUEUED', 'RUNNING', 'SUCCEEDED')
-            """, (job_type, params_hash))
+                AND state IN (?, ?, ?)
+            """, (job_type, params_hash, JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.SUCCEEDED))
             duplicate = cursor.fetchone()
         
         if duplicate:
@@ -202,17 +202,17 @@ def submit_with_admission(
             "job_id": job_id,
             "job_type": spec.job_type,
             "submitted_at": now_iso(),
-            "state": "REJECTED",
+            "state": JobStatus.REJECTED,
             "rejection_reason": rejection_reason
         }
         manifest_path = job_evidence_dir / "manifest.json"
         with open(manifest_path, 'w') as f:
             json.dump(manifest, f, indent=2)
         
-        return job_id, "REJECTED", bundle
+        return job_id, JobStatus.REJECTED, bundle
     else:
         # Job is admissible, submit as QUEUED with params_hash
-        job_id = db.submit_job(spec, params_hash=params_hash, state="QUEUED")
+        job_id = db.submit_job(spec, params_hash=params_hash, state=JobStatus.QUEUED)
         
         # Still write initial evidence (optional)
         job_evidence_dir = Path(evidence_dir) / job_id
@@ -223,4 +223,4 @@ def submit_with_admission(
         with open(policy_check_path, 'w') as f:
             json.dump(asdict(bundle), f, indent=2)
         
-        return job_id, "QUEUED", bundle
+        return job_id, JobStatus.QUEUED, bundle

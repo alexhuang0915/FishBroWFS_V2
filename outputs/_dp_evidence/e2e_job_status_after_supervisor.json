@@ -1,0 +1,14 @@
+{
+  "job_id": "9c1d7d35-ca71-4836-9986-4d6344e74d3f",
+  "type": "strategy",
+  "status": "SUCCEEDED",
+  "created_at": "2026-01-08T14:44:57.437963+00:00",
+  "finished_at": "2026-01-08T14:47:24.028860+00:00",
+  "strategy_name": "",
+  "instrument": "",
+  "timeframe": "",
+  "run_mode": "",
+  "season": "",
+  "duration_seconds": 146.590897,
+  "score": null
+}

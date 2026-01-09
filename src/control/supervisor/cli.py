@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional, List
 
 from .db import SupervisorDB, get_default_db_path
-from .models import JobSpec, JobRow, JobState
+from .models import JobSpec, JobRow, JobState, JobStatus, JobType, normalize_job_type
 from .job_handler import validate_job_spec
 
 
@@ -28,7 +28,10 @@ def submit_job(db_path: Path, job_type: str, params_json: str, metadata_json: Op
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid metadata JSON: {e}")
     
-    spec = JobSpec(job_type=job_type, params=params, metadata=metadata)
+    # Convert string to canonical JobType enum (including legacy aliases)
+    canonical_job_type = normalize_job_type(job_type)
+    
+    spec = JobSpec(job_type=canonical_job_type, params=params, metadata=metadata)
     validate_job_spec(spec)
     
     db = SupervisorDB(db_path)
@@ -63,7 +66,7 @@ def abort_job(db_path: Path, job_id: str) -> bool:
     if job is None:
         return False
     
-    if job.state not in ("QUEUED", "RUNNING"):
+    if job.state not in (JobStatus.QUEUED, JobStatus.RUNNING):
         return False
     
     db.request_abort(job_id)

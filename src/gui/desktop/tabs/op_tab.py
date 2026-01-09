@@ -584,7 +584,7 @@ class OpTab(QWidget):
         
         # Run mode combobox
         self.run_mode_cb = QComboBox()
-        self.run_mode_cb.addItems(["Backtest", "Research", "Optimize"])
+        self.run_mode_cb.addItems(["Backtest", "Research", "Optimize", "WFS"])
         self.run_mode_cb.setToolTip("Select run mode")
         form_layout.addRow("Mode:", self.run_mode_cb)
         

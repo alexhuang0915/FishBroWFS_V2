@@ -7,10 +7,10 @@ Phase 11 research bridge uses PortfolioSpec (no spec split).
 
 from __future__ import annotations
 
-from portfolio.decisions_reader import parse_decisions_log_lines, read_decisions_log
-from portfolio.research_bridge import build_portfolio_from_research
-from portfolio.spec import PortfolioLeg, PortfolioSpec
-from portfolio.writer import write_portfolio_artifacts
+from .decisions_reader import parse_decisions_log_lines, read_decisions_log
+from .research_bridge import build_portfolio_from_research
+from .spec import PortfolioLeg, PortfolioSpec
+from .writer import write_portfolio_artifacts
 
 __all__ = [
     "PortfolioLeg",

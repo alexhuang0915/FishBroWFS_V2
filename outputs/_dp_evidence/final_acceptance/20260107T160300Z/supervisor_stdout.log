@@ -14,3 +14,102 @@ INFO:     127.0.0.1:41715 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
 INFO:     127.0.0.1:41729 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
 INFO:     127.0.0.1:41733 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
 INFO:     127.0.0.1:41739 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [528209]
+INFO:     Started server process [531611]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531611]
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Started server process [531631]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Started server process [531651]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531651]
+INFO:     Started server process [531671]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531671]
+INFO:     Started server process [531685]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531685]
+INFO:     Started server process [531705]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531705]
+INFO:     Started server process [531725]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531725]
+INFO:     Started server process [531745]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531745]
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Started server process [531759]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Started server process [531779]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_makefile_targets.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531779]
+INFO:     Started server process [531802]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  WatchFiles detected changes in 'tests/gui_desktop/test_tab_architecture.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [531802]
+INFO:     Started server process [532343]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     127.0.0.1:39787 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39803 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39807 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39815 - "GET /api/v1/registry/instruments HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39817 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39831 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39847 - "GET /api/v1/jobs?limit=20 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39855 - "GET /api/v1/outputs/summary HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39867 - "GET /api/v1/registry/strategies HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39879 - "GET /api/v1/registry/datasets HTTP/1.1" 200 OK
+INFO:     127.0.0.1:40155 - "GET /health HTTP/1.1" 200 OK

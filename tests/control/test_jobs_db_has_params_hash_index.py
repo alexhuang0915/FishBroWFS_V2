@@ -60,14 +60,14 @@ def test_index_improves_query_performance():
         db = SupervisorDB(db_path)
         
         # Insert a test job
-        from src.control.supervisor.models import JobSpec
-        spec = JobSpec(job_type="TEST_JOB", params={"test": "value"})
+        from src.control.supervisor.models import JobSpec, JobStatus
+        spec = JobSpec(job_type="RUN_RESEARCH_V2", params={"test": "value"})
         
         # Use the new submit_job method with params_hash
         import json
         from src.contracts.supervisor.evidence_schemas import stable_params_hash
         params_hash = stable_params_hash(spec.params)
-        job_id = db.submit_job(spec, params_hash=params_hash, state="QUEUED")
+        job_id = db.submit_job(spec, params_hash=params_hash, state=JobStatus.QUEUED)
         
         # Query using the index (should be fast)
         with db._connect() as conn:
@@ -77,7 +77,7 @@ def test_index_improves_query_performance():
                 SELECT job_id FROM jobs 
                 WHERE job_type = ? AND params_hash = ?
                 AND state IN ('QUEUED', 'RUNNING', 'SUCCEEDED')
-            """, ("TEST_JOB", params_hash))
+            """, ("RUN_RESEARCH_V2", params_hash))
             
             plan = cursor.fetchall()
             plan_text = "\n".join(str(row) for row in plan)

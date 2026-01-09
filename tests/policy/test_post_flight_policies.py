@@ -69,7 +69,7 @@ def test_manifest_present_check():
         # Test valid manifest
         manifest = {
             "job_id": "test_job",
-            "job_type": "TEST_JOB",
+            "job_type": "PING",
             "state": "SUCCEEDED",
             "start_time": "2024-01-01T00:00:00Z",
             "end_time": "2024-01-01T01:00:00Z"

@@ -2,7 +2,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 import json
-from .models import JobSpec
+from pathlib import Path
+from .models import JobSpec, JobStatus
+from .artifact_writer import CanonicalArtifactWriter
 
 
 HANDLER_REGISTRY: dict[str, "BaseJobHandler"] = {}
@@ -17,13 +19,17 @@ class JobContext:
       - check abort via ctx.is_abort_requested()
       - write artifacts only under ctx.artifacts_dir
     """
-    def __init__(self, job_id: str, db: Any, artifacts_dir: str):
+    def __init__(self, job_id: str, db: Any, artifacts_dir: str, writer: Optional[CanonicalArtifactWriter] = None):
         self.job_id = job_id
         self._db = db
         self.artifacts_dir = artifacts_dir
+        self._writer = writer
 
     def heartbeat(self, progress: float | None = None, phase: str | None = None) -> None:
         self._db.update_heartbeat(self.job_id, progress=progress, phase=phase)
+        # Also write state.json snapshot
+        if self._writer is not None:
+            self._writer.write_state(JobStatus.RUNNING, progress=progress, phase=phase)
 
     def is_abort_requested(self) -> bool:
         return self._db.is_abort_requested(self.job_id)
@@ -71,5 +77,25 @@ def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict
     if handler is None:
         raise ValueError(f"No handler registered for job_type: {spec.job_type}")
     
-    context = JobContext(job_id, db, artifacts_dir)
-    return handler.execute(spec.params, context)
+    # Convert artifacts_dir to Path
+    artifacts_path = Path(artifacts_dir)
+    
+    # Create artifact writer and write spec.json, state.json (RUNNING)
+    writer = CanonicalArtifactWriter(job_id, spec, artifacts_path)
+    writer.write_spec()
+    writer.write_state(JobStatus.RUNNING, progress=0.0, phase="start")
+    
+    # Execute with captured stdout/stderr
+    context = JobContext(job_id, db, artifacts_dir, writer=writer)
+    try:
+        with writer:
+            result = handler.execute(spec.params, context)
+    except Exception as e:
+        # Write state with FAILED
+        writer.write_state(JobStatus.FAILED, error=str(e))
+        raise
+    
+    # Write state with SUCCEEDED and result
+    writer.write_state(JobStatus.SUCCEEDED, progress=100.0, phase="complete")
+    writer.write_result(result)
+    return result

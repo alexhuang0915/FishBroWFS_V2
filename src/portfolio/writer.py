@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from portfolio.spec import PortfolioSpec
+from .spec import PortfolioSpec
 
 
 def _utc_now_z() -> str:

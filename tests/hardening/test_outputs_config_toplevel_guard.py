@@ -53,7 +53,24 @@ def test_outputs_config_toplevel_guard():
             allowed_configs.add(line)
     
     # D) Compute actual top-level sets
-    actual_outputs = {p.name for p in outputs_dir.iterdir() if p.name not in {".DS_Store", "Thumbs.db"}}
+    # Exclude common temporary/system files
+    excluded_names = {
+        ".DS_Store", "Thumbs.db",
+        # SQLite temporary files
+        "*.db-shm", "*.db-wal", "*.db-journal"
+    }
+    
+    actual_outputs = set()
+    for p in outputs_dir.iterdir():
+        name = p.name
+        # Skip excluded system files
+        if name in {".DS_Store", "Thumbs.db"}:
+            continue
+        # Skip SQLite temporary files
+        if name.endswith("-shm") or name.endswith("-wal") or name.endswith("-journal"):
+            continue
+        actual_outputs.add(name)
+    
     actual_configs = {p.name for p in configs_dir.iterdir() if p.name not in {".DS_Store", "Thumbs.db"}}
     
     # E) Compare

@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 from .models import (
-    JobSpec, JobRow, WorkerRow, JobState,
+    JobSpec, JobRow, WorkerRow, JobState, JobStatus, JobStateMachine,
     new_job_id, new_worker_id, now_iso, parse_iso, seconds_since
 )
 
@@ -82,12 +82,36 @@ class SupervisorDB:
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status)")
                 # Index for duplicate fingerprint checks
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_type_params_hash ON jobs(job_type, params_hash)")
+                # Unique index for duplicate prevention (only for non-empty params_hash and active states)
+                conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_jobs_type_params_hash_unique
+                    ON jobs(job_type, params_hash)
+                    WHERE params_hash != '' AND state IN ('QUEUED', 'RUNNING', 'SUCCEEDED')
+                """)
+                
+                # Repair invalid state records (quarantine)
+                valid_states = [
+                    JobStatus.QUEUED,
+                    JobStatus.RUNNING,
+                    JobStatus.SUCCEEDED,
+                    JobStatus.FAILED,
+                    JobStatus.ABORTED,
+                    JobStatus.ORPHANED,
+                    JobStatus.REJECTED,
+                ]
+                placeholders = ",".join(["?"] * len(valid_states))
+                conn.execute(f"""
+                    UPDATE jobs
+                    SET state = ?, state_reason = ?
+                    WHERE state NOT IN ({placeholders})
+                """, (JobStatus.ORPHANED, "invalid state repaired", *valid_states))
+                
                 conn.commit()
             except Exception:
                 conn.rollback()
                 raise
     
-    def submit_job(self, spec: JobSpec, params_hash: str = "", state: str = "QUEUED") -> str:
+    def submit_job(self, spec: JobSpec, params_hash: str = "", state: JobStatus = JobStatus.QUEUED) -> str:
         """Submit a new job and return job_id."""
         job_id = new_job_id()
         now = now_iso()
@@ -126,8 +150,8 @@ class SupervisorDB:
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
                         abort_requested, progress, phase, params_hash
-                    ) VALUES (?, ?, ?, 'REJECTED', ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
-                """, (job_id, spec.job_type, spec_json, rejection_reason, now, now, params_hash))
+                    ) VALUES (?, ?, ?, ?, ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
+                """, (job_id, spec.job_type, spec_json, JobStatus.REJECTED, rejection_reason, now, now, params_hash))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -142,22 +166,26 @@ class SupervisorDB:
             try:
                 cursor = conn.execute("""
                     SELECT job_id FROM jobs
-                    WHERE state = 'QUEUED'
+                    WHERE state = ?
                     AND abort_requested = 0
                     ORDER BY created_at ASC
                     LIMIT 1
-                """)
+                """, (JobStatus.QUEUED,))
                 row = cursor.fetchone()
                 if row is None:
                     conn.commit()
                     return None
                 job_id = row["job_id"]
+                # Validate transition QUEUED -> RUNNING
+                JobStateMachine.validate_transition(
+                    JobStatus.QUEUED, JobStatus.RUNNING
+                )
                 # Mark as RUNNING (no worker assigned yet)
                 conn.execute("""
                     UPDATE jobs
-                    SET state = 'RUNNING', updated_at = ?
-                    WHERE job_id = ? AND state = 'QUEUED'
-                """, (now_iso(), job_id))
+                    SET state = ?, updated_at = ?
+                    WHERE job_id = ? AND state = ?
+                """, (JobStatus.RUNNING, now_iso(), job_id, JobStatus.QUEUED))
                 conn.commit()
                 return job_id
             except Exception:
@@ -181,14 +209,14 @@ class SupervisorDB:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 conn.execute("""
-                    UPDATE jobs 
-                    SET state = 'RUNNING', updated_at = ?, 
+                    UPDATE jobs
+                    SET state = ?, updated_at = ?,
                         worker_id = ?, worker_pid = ?, last_heartbeat = ?
-                    WHERE job_id = ? AND state IN ('QUEUED', 'RUNNING')
-                """, (now_iso(), worker_id, pid, now_iso(), job_id))
+                    WHERE job_id = ? AND state IN (?, ?)
+                """, (JobStatus.RUNNING, now_iso(), worker_id, pid, now_iso(), job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 # Update worker
                 conn.execute("""
-                    UPDATE workers 
+                    UPDATE workers
                     SET current_job_id = ?, status = 'BUSY'
                     WHERE worker_id = ?
                 """, (job_id, worker_id))
@@ -203,25 +231,30 @@ class SupervisorDB:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                # Get worker info for verification
-                cursor = conn.execute("SELECT worker_id, worker_pid FROM jobs WHERE job_id = ?", (job_id,))
-                job = cursor.fetchone()
-                if job is None:
+                # Get current state for validation
+                cursor = conn.execute("SELECT state, worker_id, worker_pid FROM jobs WHERE job_id = ?", (job_id,))
+                row = cursor.fetchone()
+                if row is None:
                     raise ValueError(f"Job {job_id} not found")
+                current_state = row["state"]
+                # Validate transition
+                JobStateMachine.validate_transition(
+                    JobStatus(current_state), JobStatus.SUCCEEDED
+                )
                 
                 conn.execute("""
-                    UPDATE jobs 
-                    SET state = 'SUCCEEDED', updated_at = ?, 
+                    UPDATE jobs
+                    SET state = ?, updated_at = ?,
                         result_json = ?, state_reason = ''
-                    WHERE job_id = ? AND state = 'RUNNING'
-                """, (now_iso(), result_json, job_id))
+                    WHERE job_id = ? AND state = ?
+                """, (JobStatus.SUCCEEDED, now_iso(), result_json, job_id, JobStatus.RUNNING))
                 # Clear worker assignment
-                if job["worker_id"]:
+                if row["worker_id"]:
                     conn.execute("""
-                        UPDATE workers 
+                        UPDATE workers
                         SET current_job_id = NULL, status = 'IDLE'
                         WHERE worker_id = ?
-                    """, (job["worker_id"],))
+                    """, (row["worker_id"],))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -232,22 +265,29 @@ class SupervisorDB:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                # Get worker info
-                cursor = conn.execute("SELECT worker_id FROM jobs WHERE job_id = ?", (job_id,))
-                job = cursor.fetchone()
+                # Get current state for validation
+                cursor = conn.execute("SELECT state, worker_id FROM jobs WHERE job_id = ?", (job_id,))
+                row = cursor.fetchone()
+                if row is None:
+                    raise ValueError(f"Job {job_id} not found")
+                current_state = row["state"]
+                # Validate transition
+                JobStateMachine.validate_transition(
+                    JobStatus(current_state), JobStatus.FAILED
+                )
                 
                 conn.execute("""
-                    UPDATE jobs 
-                    SET state = 'FAILED', updated_at = ?, state_reason = ?
-                    WHERE job_id = ? AND state IN ('QUEUED', 'RUNNING')
-                """, (now_iso(), reason, job_id))
+                    UPDATE jobs
+                    SET state = ?, updated_at = ?, state_reason = ?
+                    WHERE job_id = ? AND state IN (?, ?)
+                """, (JobStatus.FAILED, now_iso(), reason, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 # Clear worker assignment if any
-                if job and job["worker_id"]:
+                if row["worker_id"]:
                     conn.execute("""
-                        UPDATE workers 
+                        UPDATE workers
                         SET current_job_id = NULL, status = 'IDLE'
                         WHERE worker_id = ?
-                    """, (job["worker_id"],))
+                    """, (row["worker_id"],))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -258,22 +298,29 @@ class SupervisorDB:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
-                # Get worker info
-                cursor = conn.execute("SELECT worker_id FROM jobs WHERE job_id = ?", (job_id,))
-                job = cursor.fetchone()
+                # Get current state for validation
+                cursor = conn.execute("SELECT state, worker_id FROM jobs WHERE job_id = ?", (job_id,))
+                row = cursor.fetchone()
+                if row is None:
+                    raise ValueError(f"Job {job_id} not found")
+                current_state = row["state"]
+                # Validate transition
+                JobStateMachine.validate_transition(
+                    JobStatus(current_state), JobStatus.ABORTED
+                )
                 
                 conn.execute("""
-                    UPDATE jobs 
-                    SET state = 'ABORTED', updated_at = ?, state_reason = ?
-                    WHERE job_id = ? AND state IN ('QUEUED', 'RUNNING')
-                """, (now_iso(), reason, job_id))
+                    UPDATE jobs
+                    SET state = ?, updated_at = ?, state_reason = ?
+                    WHERE job_id = ? AND state IN (?, ?)
+                """, (JobStatus.ABORTED, now_iso(), reason, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 # Clear worker assignment if any
-                if job and job["worker_id"]:
+                if row["worker_id"]:
                     conn.execute("""
-                        UPDATE workers 
+                        UPDATE workers
                         SET current_job_id = NULL, status = 'IDLE'
                         WHERE worker_id = ?
-                    """, (job["worker_id"],))
+                    """, (row["worker_id"],))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -284,11 +331,22 @@ class SupervisorDB:
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
+                # Get current state for validation
+                cursor = conn.execute("SELECT state FROM jobs WHERE job_id = ?", (job_id,))
+                row = cursor.fetchone()
+                if row is None:
+                    raise ValueError(f"Job {job_id} not found")
+                current_state = row["state"]
+                # Validate transition
+                JobStateMachine.validate_transition(
+                    JobStatus(current_state), JobStatus.ORPHANED
+                )
+                
                 conn.execute("""
-                    UPDATE jobs 
-                    SET state = 'ORPHANED', updated_at = ?, state_reason = ?
-                    WHERE job_id = ? AND state = 'RUNNING'
-                """, (now_iso(), reason, job_id))
+                    UPDATE jobs
+                    SET state = ?, updated_at = ?, state_reason = ?
+                    WHERE job_id = ? AND state = ?
+                """, (JobStatus.ORPHANED, now_iso(), reason, job_id, JobStatus.RUNNING))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -310,10 +368,11 @@ class SupervisorDB:
                     params.append(phase)
                 
                 params.append(job_id)
+                params.append(JobStatus.RUNNING)
                 query = f"""
-                    UPDATE jobs 
+                    UPDATE jobs
                     SET {', '.join(update_fields)}
-                    WHERE job_id = ? AND state = 'RUNNING'
+                    WHERE job_id = ? AND state = ?
                 """
                 conn.execute(query, params)
                 conn.commit()
@@ -327,10 +386,10 @@ class SupervisorDB:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 conn.execute("""
-                    UPDATE jobs 
+                    UPDATE jobs
                     SET abort_requested = 1, updated_at = ?
-                    WHERE job_id = ? AND state IN ('QUEUED', 'RUNNING')
-                """, (now_iso(), job_id))
+                    WHERE job_id = ? AND state IN (?, ?)
+                """, (now_iso(), job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -349,9 +408,9 @@ class SupervisorDB:
         """Find RUNNING jobs with stale heartbeat beyond timeout."""
         with self._connect() as conn:
             cursor = conn.execute("""
-                SELECT * FROM jobs 
-                WHERE state = 'RUNNING' AND last_heartbeat IS NOT NULL
-            """)
+                SELECT * FROM jobs
+                WHERE state = ? AND last_heartbeat IS NOT NULL
+            """, (JobStatus.RUNNING,))
             rows = cursor.fetchall()
         
         stale = []

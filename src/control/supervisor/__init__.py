@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 
-from .models import JobSpec, JobRow, SubmitResult
+from .models import JobSpec, JobRow, SubmitResult, JobType, normalize_job_type
 from .db import SupervisorDB, get_default_db_path
 from .job_handler import register_handler, get_handler, validate_job_spec
 
@@ -20,6 +20,8 @@ from .handlers.run_plateau import run_plateau_handler
 from .handlers.run_freeze import run_freeze_handler
 from .handlers.run_compile import run_compile_handler
 from .handlers.build_portfolio import build_portfolio_handler
+from .handlers.run_research_wfs import run_research_wfs_handler
+from .handlers.run_portfolio_admission import run_portfolio_admission_handler
 
 register_handler("PING", ping_handler)
 register_handler("CLEAN_CACHE", clean_cache_handler)
@@ -30,6 +32,8 @@ register_handler("RUN_PLATEAU_V2", run_plateau_handler)
 register_handler("RUN_FREEZE_V2", run_freeze_handler)
 register_handler("RUN_COMPILE_V2", run_compile_handler)
 register_handler("BUILD_PORTFOLIO_V2", build_portfolio_handler)
+register_handler("RUN_RESEARCH_WFS", run_research_wfs_handler)
+register_handler("RUN_PORTFOLIO_ADMISSION", run_portfolio_admission_handler)
 
 
 def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:
@@ -37,7 +41,10 @@ def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:
     if metadata is None:
         metadata = {}
     
-    spec = JobSpec(job_type=job_type, params=params, metadata=metadata)
+    # Convert string to canonical JobType enum (including legacy aliases)
+    canonical_job_type = normalize_job_type(job_type)
+    
+    spec = JobSpec(job_type=canonical_job_type, params=params, metadata=metadata)
     validate_job_spec(spec)
     
     db = SupervisorDB(get_default_db_path())

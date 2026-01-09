@@ -2,12 +2,15 @@
 # Purpose: Top-level allowlist for outputs/ to prevent drift beyond Phase Z baseline.
 _dp_evidence
 _trash
+_runtime
+jobs
+jobs.db
+jobs_v2.db
+run_status.json
+# Legacy directories (empty, allowed for now)
 deployment
 portfolio_store
 research
 seasons
 shared
 strategies
-jobs.db
-jobs_v2.db
-run_status.json

@@ -1,13 +1,9 @@
 
-"""FastAPI endpoints for B5-C Mission Control."""
+"""FastAPI endpoints for B5-C Mission Control (Thin Proxy to Supervisor)."""
 
 from __future__ import annotations
 
 import os
-import signal
-import subprocess
-import sys
-import time
 import mimetypes
 import hashlib
 from contextlib import asynccontextmanager
@@ -20,24 +16,10 @@ from pydantic import BaseModel
 
 from collections import deque
 
-from control.jobs_db import (
-    create_job,
-    get_job,
-    init_db,
-    list_jobs,
-    request_pause,
-    request_stop,
-)
-from control.paths import run_log_path
-from control.preflight import PreflightResult, run_preflight
-from control.control_types import DBJobSpec, JobRecord, StopMode, JobStatus
+# Supervisor imports
+from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job
+from control.supervisor.models import JobSpec as SupervisorJobSpec, JobType, normalize_job_type
 
-# Phase 13: Batch submit
-from control.batch_submit import (
-    BatchSubmitRequest,
-    BatchSubmitResponse,
-    submit_batch,
-)
 
 # Phase 14: Batch execution & governance
 from control.artifacts import (
@@ -47,13 +29,6 @@ from control.artifacts import (
     build_job_manifest,
 )
 from control.batch_index import build_batch_index
-from control.batch_execute import (
-    BatchExecutor,
-    BatchExecutionState,
-    JobExecutionState,
-    run_batch,
-    retry_failed,
-)
 from control.batch_aggregate import compute_batch_summary
 from control.governance import (
     BatchGovernanceStore,
@@ -112,9 +87,6 @@ from strategy.registry import StrategyRegistryResponse
 # Phase A: Service Identity
 from core.service_identity import get_service_identity
 
-# Phase B: Worker Spawn Governance
-from control.worker_spawn_policy import can_spawn_worker, validate_pidfile
-
 # Phase 16.5: Real Data Snapshot Integration
 from contracts.data.snapshot_payloads import SnapshotCreatePayload
 from contracts.data.snapshot_models import SnapshotMetadata
@@ -145,9 +117,6 @@ from control.portfolio.api_v1 import router as portfolio_router
 # Phase E.4: Outputs summary endpoint
 from control.supervisor import list_jobs as list_supervisor_jobs
 
-# Default DB path (can be overridden via environment)
-DEFAULT_DB_PATH = Path("outputs/jobs.db")
-
 # Phase 12: Registry cache
 _DATASET_INDEX: DatasetIndex | None = None
 _STRATEGY_REGISTRY: StrategyRegistryResponse | None = None
@@ -173,14 +142,6 @@ def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
 
     truncated = total > n
     return list(tail), truncated
-
-
-def get_db_path() -> Path:
-    """Get database path from environment or default."""
-    db_path_str = os.getenv("JOBS_DB_PATH")
-    if db_path_str:
-        return Path(db_path_str)
-    return DEFAULT_DB_PATH
 
 
 def _load_dataset_index_from_file() -> DatasetIndex:
@@ -393,9 +354,7 @@ def _prime_registries_with_feedback() -> dict[str, Any]:
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown."""
     # startup
-    db_path = get_db_path()
-    init_db(db_path)
-
+    # No DB initialization - supervisor owns the DB
     # Phase 12: Prime registries cache
     _try_prime_registries()
 
@@ -474,8 +433,8 @@ async def get_run_status() -> dict[str, Any]:
 @api_v1.get("/identity")
 async def identity() -> dict[str, Any]:
     """Service identity endpoint for topology observability."""
-    db_path = get_db_path()
-    ident = get_service_identity(service_name="control_api", db_path=db_path)
+    # API does not own a DB - supervisor owns jobs_v2.db
+    ident = get_service_identity(service_name="control_api", db_path=None)
     return ident
 
 
@@ -665,7 +624,13 @@ async def readiness_check(season: str, dataset_id: str, timeframe: str) -> Readi
 
 
 class SubmitJobRequest(BaseModel):
-    spec: DBJobSpec
+    # Accept GUI params directly
+    strategy_id: str
+    instrument: str
+    timeframe: str
+    run_mode: str
+    season: str
+    dataset: Optional[str] = None
 
 
 class JobListResponse(BaseModel):
@@ -684,46 +649,36 @@ class JobListResponse(BaseModel):
     score: Optional[float] = None
 
 
-def _job_record_to_response(job: JobRecord) -> JobListResponse:
-    """Convert a JobRecord to a JobListResponse."""
-    # Extract config snapshot
-    config = job.spec.config_snapshot if job.spec.config_snapshot else {}
-    # Determine type (could be "strategy" or "portfolio"? default "strategy")
-    job_type = "strategy"
-    # Extract strategy_name from config
-    strategy_name = config.get("strategy_id")
-    # Extract instrument and timeframe from config (may be nested)
-    instrument = None
-    timeframe = None
-    # Look for instrument in config (could be under "instrument" or "symbol")
-    if "instrument" in config:
-        instrument = config["instrument"]
-    elif "symbol" in config:
-        instrument = config["symbol"]
-    # Look for timeframe
-    if "timeframe" in config:
-        timeframe = config["timeframe"]
-    # Extract run_mode from config
-    run_mode = config.get("run_mode")
-    # Extract season from spec
-    season = job.spec.season
-    # Coerce optional fields to string if they are not None (Pydantic expects Optional[str])
-    if strategy_name is not None and not isinstance(strategy_name, str):
-        strategy_name = str(strategy_name)
-    if instrument is not None and not isinstance(instrument, str):
-        instrument = str(instrument)
-    if timeframe is not None and not isinstance(timeframe, str):
-        timeframe = str(timeframe)
-    if run_mode is not None and not isinstance(run_mode, str):
-        run_mode = str(run_mode)
-    if season is not None and not isinstance(season, str):
-        season = str(season)
-    # Format timestamps
-    created_at = job.created_at if job.created_at else ""
-    # Determine finished_at based on terminal status
+def _supervisor_job_to_response(job: Any) -> JobListResponse:
+    """Convert a supervisor JobRow to a JobListResponse."""
+    # job is a JobRow from supervisor
+    job_id = job.job_id
+    status = job.state
+    created_at = job.created_at
+    
+    # Parse spec_json to extract params
+    import json
+    spec = {}
+    try:
+        spec = json.loads(job.spec_json)
+    except (json.JSONDecodeError, AttributeError):
+        pass
+    
+    params = spec.get("params", {})
+    metadata = spec.get("metadata", {})
+    
+    # Extract fields
+    strategy_name = params.get("strategy_id", "")
+    instrument = params.get("instrument") or params.get("symbol", "")
+    timeframe = params.get("timeframe", "")
+    run_mode = params.get("run_mode", "")
+    season = metadata.get("season", "")
+    
+    # Determine finished_at (supervisor doesn't track finished_at directly)
     finished_at = None
-    if job.status in (JobStatus.DONE, JobStatus.FAILED, JobStatus.KILLED):
-        finished_at = job.updated_at  # updated_at is a string
+    if status in ["SUCCEEDED", "FAILED", "ABORTED", "REJECTED"]:
+        finished_at = job.updated_at
+    
     # Compute duration_seconds
     duration_seconds = None
     if created_at and finished_at:
@@ -734,7 +689,7 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
             duration_seconds = (finished_dt - created_dt).total_seconds()
         except Exception:
             pass
-    elif created_at and job.status == JobStatus.RUNNING:
+    elif created_at and status == "RUNNING":
         # For RUNNING jobs, compute duration from now
         try:
             from datetime import datetime, timezone
@@ -743,13 +698,14 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
             duration_seconds = (now_dt - created_dt).total_seconds()
         except Exception:
             pass
+    
     # Score extraction (from report artifacts) - placeholder for now
     score = None
-    # TODO: fetch from strategy_report_v1.json if exists
+    
     return JobListResponse(
-        job_id=job.job_id,
-        type=job_type,
-        status=job.status.value if isinstance(job.status, JobStatus) else job.status,
+        job_id=job_id,
+        type="strategy",
+        status=status,
         created_at=created_at,
         finished_at=finished_at,
         strategy_name=strategy_name,
@@ -764,18 +720,20 @@ def _job_record_to_response(job: JobRecord) -> JobListResponse:
 
 @api_v1.get("/jobs", response_model=list[JobListResponse])
 async def list_jobs_endpoint(limit: int = 50) -> list[JobListResponse]:
-    db_path = get_db_path()
-    jobs = list_jobs(db_path, limit=limit)
-    return [_job_record_to_response(job) for job in jobs]
+    jobs = supervisor_list_jobs()
+    # Apply limit
+    jobs = jobs[:limit]
+    return [_supervisor_job_to_response(job) for job in jobs]
 
 
 @api_v1.get("/jobs/{job_id}", response_model=JobListResponse)
 async def get_job_endpoint(job_id: str) -> JobListResponse:
-    db_path = get_db_path()
     try:
-        job = get_job(db_path, job_id)
-        return _job_record_to_response(job)
-    except KeyError as e:
+        job = supervisor_get_job(job_id)
+        if job is None:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        return _supervisor_job_to_response(job)
+    except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
@@ -928,216 +886,81 @@ class RevealEvidencePathResponse(BaseModel):
 @api_v1.post("/jobs")
 async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     """
-    Create a job.
-
-    Backward compatible body formats:
-    1) Legacy: POST a JobSpec as flat JSON fields
-    2) Wrapped: {"spec": <JobSpec>}
+    Create a job (thin proxy to supervisor).
+    
+    Accepts GUI params format:
+    {
+        "strategy_id": "...",
+        "instrument": "...",
+        "timeframe": "...",
+        "run_mode": "...",  # "backtest", "research", "optimize"
+        "season": "...",
+        "dataset": "..."  # optional
+    }
     """
-    db_path = get_db_path()
-    require_worker_or_503(db_path)
-
-    # Accept both { ...JobSpec... } and {"spec": {...JobSpec...}}
-    if "spec" in payload and isinstance(payload["spec"], dict):
-        spec_dict = payload["spec"]
+    # Extract params from payload
+    strategy_id = payload.get("strategy_id")
+    instrument = payload.get("instrument")
+    timeframe = payload.get("timeframe")
+    run_mode = payload.get("run_mode", "").lower()
+    season = payload.get("season")
+    dataset = payload.get("dataset")
+    
+    # Validate required fields
+    if not all([strategy_id, instrument, timeframe, season]):
+        raise HTTPException(
+            status_code=422,
+            detail="Missing required fields: strategy_id, instrument, timeframe, season"
+        )
+    
+    # Map run_mode to canonical supervisor job_type
+    if run_mode == "research":
+        job_type = JobType.RUN_RESEARCH_V2.value
+    elif run_mode == "optimize":
+        job_type = JobType.RUN_PLATEAU_V2.value
+    elif run_mode == "wfs":
+        job_type = JobType.RUN_RESEARCH_WFS.value
+    elif run_mode == "backtest":
+        job_type = JobType.RUN_RESEARCH_V2.value  # Default to research for backtest
     else:
-        spec_dict = payload
-
+        job_type = JobType.RUN_RESEARCH_V2.value  # Default
+    
+    # Build supervisor params
+    params = {
+        "strategy_id": strategy_id,
+        "instrument": instrument,
+        "timeframe": timeframe,
+        "run_mode": run_mode,
+    }
+    
+    if dataset:
+        params["dataset"] = dataset
+    
+    # Build metadata
+    metadata = {
+        "season": season,
+        "source": "api_v1",
+        "submitted_via": "gui"
+    }
+    
+    # Submit to supervisor
     try:
-        spec = DBJobSpec(**spec_dict)
+        job_id = supervisor_submit(job_type, params, metadata)
+        return {"ok": True, "job_id": job_id}
     except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Invalid JobSpec: {e}")
-
-    job_id = create_job(db_path, spec)
-    return {"ok": True, "job_id": job_id}
+        raise HTTPException(status_code=500, detail=f"Failed to submit job to supervisor: {e}")
 
 
-@api_v1.post("/jobs/{job_id}/stop")
-async def stop_job_endpoint(job_id: str, mode: StopMode = StopMode.SOFT) -> dict[str, Any]:
-    db_path = get_db_path()
-    request_stop(db_path, job_id, mode)
-    return {"ok": True}
-
-
-@api_v1.post("/jobs/{job_id}/pause")
-async def pause_job_endpoint(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
-    db_path = get_db_path()
-    pause = payload.get("pause", True)
-    request_pause(db_path, job_id, pause)
-    return {"ok": True}
-
-
-@api_v1.get("/jobs/{job_id}/preflight", response_model=PreflightResult)
-async def preflight_endpoint(job_id: str) -> PreflightResult:
-    db_path = get_db_path()
-    job = get_job(db_path, job_id)
-    return run_preflight(job.spec.config_snapshot)
-
-
-@api_v1.post("/jobs/{job_id}/check", response_model=PreflightResult)
-async def check_job_endpoint(job_id: str) -> PreflightResult:
-    """
-    Check a job spec (preflight).
-    Contract:
-    - Exists and returns 200 for valid job_id
-    """
-    db_path = get_db_path()
-    try:
-        job = get_job(db_path, job_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    return run_preflight(job.spec.config_snapshot)
-
-
-@api_v1.get("/jobs/{job_id}/run_log_tail")
-async def run_log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
-    db_path = get_db_path()
-    job = get_job(db_path, job_id)
-    run_id = job.run_id or ""
-    if not run_id:
-        return {"ok": True, "lines": [], "truncated": False}
-    path = run_log_path(Path(job.spec.outputs_root), job.spec.season, run_id)
-    lines, truncated = read_tail(path, n=n)
-    return {"ok": True, "lines": lines, "truncated": truncated}
-
-
-@api_v1.get("/jobs/{job_id}/log_tail")
-async def log_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
-    """
-    Return last n lines of the job log.
-
-    Contract expected by tests:
-    - Uses run_log_path(outputs_root, season, job_id)
-    - Returns 200 even if log file missing
-    """
-    db_path = get_db_path()
-    try:
-        job = get_job(db_path, job_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-    outputs_root = Path(job.spec.outputs_root)
-    season = job.spec.season
-    log_path = run_log_path(outputs_root, season, job_id)
-
-    lines, truncated = read_tail(log_path, n=n)
-    return {"ok": True, "lines": lines, "truncated": truncated}
 
 
 # -----------------------------------------------------------------------------
 # Phase A: Artifact endpoints
 # -----------------------------------------------------------------------------
 
-@api_v1.get("/jobs/{job_id}/artifacts", response_model=ArtifactIndexResponse)
-async def get_artifacts_index(job_id: str) -> ArtifactIndexResponse:
-    """
-    Return artifact index for a job (Phase C evidence bundle).
-    
-    Contract:
-    - job_id must exist in jobs DB (404 if not)
-    - Evidence directory must exist (may be empty)
-    - Links include reveal_evidence_url, stdout_tail_url, policy_check_url, strategy_report_v1_url (null)
-    - Files list includes all files under outputs/jobs/<job_id>/
-    """
-    db_path = get_db_path()
-    try:
-        job = get_job(db_path, job_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    
-    # Build links
-    links = {
-        "reveal_evidence_url": f"/api/v1/jobs/{job_id}/reveal_evidence_path",
-        "stdout_tail_url": _get_stdout_tail_link(job_id),
-        "policy_check_url": _get_policy_check_link(job_id),
-        "strategy_report_v1_url": None,  # Will be updated below if report exists
-    }
-    
-    # Check if strategy report exists
-    report_path = _get_strategy_report_v1_path(job_id)
-    if report_path.exists():
-        links["strategy_report_v1_url"] = f"/api/v1/reports/strategy/{job_id}"
-    
-    files = _list_artifacts(job_id)
-    
-    return ArtifactIndexResponse(
-        job_id=job_id,
-        links=links,
-        files=files,
-    )
 
 
-@api_v1.get("/jobs/{job_id}/artifacts/{filename}")
-async def get_artifact_file(job_id: str, filename: str):
-    """
-    Serve a single artifact file from the job evidence directory.
-    
-    Security:
-    - filename must be a simple basename (no slashes, no path traversal)
-    - Must enforce containment within outputs/jobs/<job_id>/
-    - Returns 404 if file not found, 403 if path traversal detected.
-    """
-    # Validate filename does not contain slashes or path traversal attempts
-    filename = _validate_artifact_filename_or_403(filename)
-    
-    job_dir = _get_job_evidence_dir(job_id)
-    file_path = job_dir / filename
-    
-    # Ensure file_path is within job_dir (double-check containment)
-    try:
-        file_path.resolve().relative_to(job_dir.resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Path traversal detected")
-    
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    # Determine content type
-    content_type, _ = mimetypes.guess_type(str(file_path))
-    if content_type is None:
-        content_type = "application/octet-stream"
-    
-    # For text/plain or JSON, we can return as plain text; for binary, use FileResponse
-    from fastapi.responses import FileResponse
-    return FileResponse(
-        path=file_path,
-        media_type=content_type,
-        filename=filename,
-    )
 
 
-@api_v1.get("/jobs/{job_id}/logs/stdout_tail")
-async def stdout_tail_endpoint(job_id: str, n: int = 200) -> dict[str, Any]:
-    """
-    Return last n lines of the job's stdout log (from evidence bundle).
-    
-    Contract:
-    - If stdout.log exists in evidence directory, return its tail.
-    - If not, fallback to run_log_tail (legacy).
-    - Returns 200 even if log file missing.
-    """
-    job_dir = _get_job_evidence_dir(job_id)
-    stdout_path = job_dir / "stdout.log"
-    
-    if stdout_path.exists():
-        lines, truncated = read_tail(stdout_path, n=n)
-        return {"ok": True, "lines": lines, "truncated": truncated}
-    
-    # Fallback to existing log_tail endpoint (which uses run_log_path)
-    # We'll reuse the same logic as log_tail_endpoint but with a different path.
-    db_path = get_db_path()
-    try:
-        job = get_job(db_path, job_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    
-    outputs_root = Path(job.spec.outputs_root)
-    season = job.spec.season
-    log_path = run_log_path(outputs_root, season, job_id)
-    
-    lines, truncated = read_tail(log_path, n=n)
-    return {"ok": True, "lines": lines, "truncated": truncated}
 
 
 @api_v1.get("/jobs/{job_id}/reveal_evidence_path", response_model=RevealEvidencePathResponse)
@@ -1162,283 +985,11 @@ async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
     )
 
 
-@api_v1.get("/jobs/{job_id}/report_link")
-async def get_report_link_endpoint(job_id: str) -> dict[str, Any]:
-    """
-    Get report_link for a job.
-
-    Phase 6 rule: Always return Viewer URL if run_id exists.
-    Viewer will handle missing/invalid artifacts gracefully.
-
-    Returns:
-        - ok: Always True if job exists
-        - report_link: Report link URL (always present if run_id exists)
-    """
-    from control.report_links import build_report_link
-
-    db_path = get_db_path()
-    try:
-        job = get_job(db_path, job_id)
-
-        # Respect DB: if report_link exists in DB, return it as-is
-        if job.report_link:
-            return {"ok": True, "report_link": job.report_link}
-
-        # If no report_link in DB but has run_id, build it
-        if job.run_id:
-            season = job.spec.season
-            report_link = build_report_link(season, job.run_id)
-            return {"ok": True, "report_link": report_link}
-
-        # If no run_id, return empty string (never None)
-        return {"ok": True, "report_link": ""}
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
 
 
-def _check_worker_status(db_path: Path) -> dict[str, Any]:
-    """
-    Check worker status (pidfile existence, process alive, heartbeat age).
-    
-    Returns dict with:
-        - alive: bool
-        - pid: int or None
-        - last_heartbeat_age_sec: float or None
-        - reason: str (diagnostic)
-        - expected_db: str
-    """
-    pidfile = db_path.parent / "worker.pid"
-    heartbeat_file = db_path.parent / "worker.heartbeat"
-    
-    if not pidfile.exists():
-        return {
-            "alive": False,
-            "pid": None,
-            "last_heartbeat_age_sec": None,
-            "reason": "pidfile missing",
-            "expected_db": str(db_path),
-        }
-    
-    # Validate pidfile
-    valid, reason = validate_pidfile(pidfile, db_path)
-    if not valid:
-        return {
-            "alive": False,
-            "pid": None,
-            "last_heartbeat_age_sec": None,
-            "reason": reason,
-            "expected_db": str(db_path),
-        }
-    
-    # Read PID
-    try:
-        pid = int(pidfile.read_text().strip())
-    except (ValueError, OSError):
-        return {
-            "alive": False,
-            "pid": None,
-            "last_heartbeat_age_sec": None,
-            "reason": "pidfile corrupted",
-            "expected_db": str(db_path),
-        }
-    
-    # Check heartbeat file age if exists
-    last_heartbeat_age_sec = None
-    if heartbeat_file.exists():
-        try:
-            mtime = heartbeat_file.stat().st_mtime
-            last_heartbeat_age_sec = time.time() - mtime
-        except OSError:
-            pass
-    
-    return {
-        "alive": True,
-        "pid": pid,
-        "last_heartbeat_age_sec": last_heartbeat_age_sec,
-        "reason": "worker alive",
-        "expected_db": str(db_path),
-    }
+# Worker management removed - supervisor handles its own workers
 
 
-def require_worker_or_503(db_path: Path) -> None:
-    """
-    If worker not alive, raise HTTPException(status_code=503, detail=...)
-    
-    Precondition check before accepting job submissions.
-    
-    Special case: In test mode with FISHBRO_ALLOW_SPAWN_IN_TESTS=1,
-    allow submission even without worker (tests assume worker auto-spawn).
-    """
-    import os
-    
-    # Check if we're in test mode with override
-    if os.getenv("FISHBRO_ALLOW_SPAWN_IN_TESTS") == "1":
-        # Test mode: skip worker check, assume worker will be auto-spawned
-        # or test doesn't need a real worker
-        return
-    
-    status = _check_worker_status(db_path)
-    
-    if not status["alive"]:
-        # Worker not alive
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "WORKER_UNAVAILABLE",
-                "message": "No active worker daemon detected. Start worker and retry.",
-                "worker": {
-                    "alive": False,
-                    "pid": None,
-                    "last_heartbeat_age_sec": None,
-                    "expected_db": str(db_path),
-                },
-                "action": f"Run: PYTHONPATH=src .venv/bin/python3 -u -m control.worker_main {db_path}"
-            }
-        )
-    
-    # Check heartbeat age if available
-    if status["last_heartbeat_age_sec"] is not None and status["last_heartbeat_age_sec"] > 5.0:
-        # Worker exists but heartbeat is stale
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "error": "WORKER_UNAVAILABLE",
-                "message": "Worker heartbeat stale (>5s). Restart worker.",
-                "worker": {
-                    "alive": True,
-                    "pid": status["pid"],
-                    "last_heartbeat_age_sec": status["last_heartbeat_age_sec"],
-                    "expected_db": str(db_path),
-                },
-                "action": f"Run: PYTHONPATH=src .venv/bin/python3 -u -m control.worker_main {db_path}"
-            }
-        )
-    
-    # Worker is alive and responsive
-    return
-
-
-def _ensure_worker_running(db_path: Path) -> None:
-    """
-    Ensure worker process is running (start if not).
-
-    Worker stdout/stderr are redirected to worker_process.log (append mode)
-    to avoid deadlock from unread PIPE buffers.
-
-    SECURITY/OPS:
-    - The parent process MUST close its file handle after spawning the child,
-      otherwise the API process leaks file descriptors over time.
-
-    Args:
-        db_path: Path to SQLite database
-    """
-    # Check if worker is already running (enhanced pidfile validation)
-    pidfile = db_path.parent / "worker.pid"
-    if pidfile.exists():
-        valid, reason = validate_pidfile(pidfile, db_path)
-        if valid:
-            return  # Worker already running
-        # pidfile is stale or mismatched, remove it
-        pidfile.unlink(missing_ok=True)
-
-    # Spawn guard: enforce governance rules
-    allowed, reason = can_spawn_worker(db_path)
-    if not allowed:
-        raise RuntimeError(f"Worker spawn denied: {reason}")
-
-    # Prepare log file (same directory as db_path)
-    logs_dir = db_path.parent  # usually outputs/.../control/
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    worker_log = logs_dir / "worker_process.log"
-
-    # Open in append mode, line-buffered
-    out = open(worker_log, "a", buffering=1, encoding="utf-8")  # noqa: SIM115
-    try:
-        # Start worker in background
-        proc = subprocess.Popen(
-            [sys.executable, "-m", "control.worker_main", str(db_path)],
-            stdout=out,
-            stderr=out,
-            stdin=subprocess.DEVNULL,
-            close_fds=True,
-            start_new_session=True,  # detach from API server session
-            env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
-        )
-    finally:
-        # Critical: close parent handle; child has its own fd.
-        out.close()
-
-    # Write pidfile
-    pidfile.write_text(str(proc.pid))
-
-
-# Phase 13: Batch submit endpoint
-@api_v1.post("/jobs/batch", response_model=BatchSubmitResponse)
-async def batch_submit_endpoint(req: BatchSubmitRequest) -> BatchSubmitResponse:
-    """
-    Submit a batch of jobs.
-
-    Flow:
-    1) Validate request jobs list not empty and <= cap
-    2) Compute batch_id
-    3) For each JobSpec in order: call existing "submit_job" internal function used by POST /jobs
-    4) return response model (200)
-    """
-    db_path = get_db_path()
-    require_worker_or_503(db_path)
-    
-    # Prepare dataset index for fingerprint lookup with reload-once fallback
-    dataset_index = {}
-    try:
-        idx = load_dataset_index()
-        # Convert to dict mapping dataset_id -> record dict
-        for ds in idx.datasets:
-            # Convert to dict with fingerprint fields
-            ds_dict = ds.model_dump(mode="json")
-            dataset_index[ds.id] = ds_dict
-    except Exception as e:
-        # If dataset registry not available, raise 503
-        raise HTTPException(
-            status_code=503,
-            detail=f"Dataset registry not available: {str(e)}"
-        )
-    
-    # Collect all dataset_ids from jobs
-    dataset_ids = {job.data1.dataset_id for job in req.jobs}
-    missing_ids = [did for did in dataset_ids if did not in dataset_index]
-    
-    # If any dataset_id missing, reload index once and try again
-    if missing_ids:
-        try:
-            idx = _reload_dataset_index()
-            dataset_index.clear()
-            for ds in idx.datasets:
-                ds_dict = ds.model_dump(mode="json")
-                dataset_index[ds.id] = ds_dict
-        except Exception as e:
-            # If reload fails, raise 503
-            raise HTTPException(
-                status_code=503,
-                detail=f"Dataset registry reload failed: {str(e)}"
-            )
-        # Check again after reload
-        missing_ids = [did for did in dataset_ids if did not in dataset_index]
-        if missing_ids:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Dataset(s) not found in registry: {', '.join(missing_ids)}"
-            )
-    
-    try:
-        response = submit_batch(db_path, req, dataset_index)
-        return response
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except RuntimeError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        # Catch any other unexpected errors and return 500
-        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # Phase 14: Batch execution & governance endpoints
@@ -1457,11 +1008,6 @@ class BatchSummaryResponse(BaseModel):
     batch_id: str
     topk: list[dict[str, Any]] = []
     metrics: dict[str, Any] = {}
-
-
-class BatchRetryRequest(BaseModel):
-    """Request for retrying failed jobs in a batch."""
-    force: bool = False  # explicitly rejected (see endpoint)
 
 
 class BatchMetadataUpdate(BaseModel):
@@ -1559,35 +1105,6 @@ async def get_batch_summary(batch_id: str) -> BatchSummaryResponse:
     metrics = s.get("metrics", {})
 
     return BatchSummaryResponse(batch_id=batch_id, topk=topk, metrics=metrics)
-
-
-@api_v1.post("/batches/{batch_id}/retry")
-async def retry_batch(batch_id: str, req: BatchRetryRequest) -> dict[str, str]:
-    """Retry failed jobs in a batch."""
-    # Contract hardening: do not allow hidden override paths.
-    if getattr(req, "force", False):
-        raise HTTPException(status_code=400, detail="force retry is not supported by contract")
-
-    # Check frozen
-    store = _get_governance_store()
-    if store.is_frozen(batch_id):
-        raise HTTPException(status_code=403, detail="Batch is frozen, cannot retry")
-
-    # Get artifacts root
-    artifacts_root = _get_artifacts_root()
-
-    # Call retry_failed function
-    try:
-        from control.batch_execute import retry_failed
-        _executor = retry_failed(batch_id, artifacts_root)
-
-        return {
-            "status": "retry_started",
-            "batch_id": batch_id,
-            "message": "Retry initiated for failed jobs",
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to retry batch: {e}")
 
 
 @api_v1.get("/batches/{batch_id}/index")
@@ -2227,218 +1744,7 @@ async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=500, detail=f"Failed to read plan: {e}")
 
 
-# Worker Status API (Phase 4: DEEPSEEK — NUCLEAR SPEC)
-@api_v1.get("/worker/status")
-async def worker_status() -> dict[str, Any]:
-    """
-    Get worker daemon status (read‑only).
-    
-    Returns:
-        - alive: bool (worker process is alive and responsive)
-        - pid: int or None
-        - last_heartbeat_age_sec: float or None (seconds since last heartbeat)
-        - reason: str (diagnostic message)
-        - expected_db: str (database path worker is attached to)
-        - can_spawn: bool (whether worker can be spawned according to policy)
-        - spawn_reason: str (if can_spawn is False, explains why)
-    
-    Safety Contract:
-    - Never kills or modifies worker state
-    - Read‑only: only checks pidfile, heartbeat, process existence
-    - Returns 200 even if worker is dead (alive: false)
-    - Worker daemon is never killed by default
-    """
-    db_path = get_db_path()
-    status = _check_worker_status(db_path)
-    
-    # Check if worker can be spawned according to policy
-    try:
-        from control.worker_spawn_policy import can_spawn_worker
-        allowed, reason = can_spawn_worker(db_path)
-        status["can_spawn"] = allowed
-        status["spawn_reason"] = reason
-    except Exception:
-        # If policy check fails, default to False
-        status["can_spawn"] = False
-        status["spawn_reason"] = "policy check failed"
-    
-    return status
-
-
-# Worker Emergency Stop API (Phase 5: DEEPSEEK — NUCLEAR SPEC)
-class WorkerStopRequest(BaseModel):
-    """Request for emergency worker stop."""
-    force: bool = False
-    reason: Optional[str] = None
-
-
-@api_v1.post("/worker/stop")
-async def worker_stop(req: WorkerStopRequest) -> dict[str, Any]:
-    """
-    Emergency stop worker daemon (controlled mutation).
-    
-    Safety Contract:
-    - Must validate worker is alive before attempting stop
-    - Must validate worker belongs to this control API instance (pidfile validation)
-    - Must NOT kill worker if there are active jobs (unless force=True)
-    - Must clean up pidfile and heartbeat file after successful stop
-    - Returns detailed status of what was stopped
-    
-    Validation Rules:
-    1. Worker must be alive (alive: true in status)
-    2. Worker must belong to this control API (pidfile validation passes)
-    3. If force=False, check for active jobs (jobs with status RUNNING)
-    4. If active jobs exist and force=False → 409 Conflict
-    5. If validation passes, send SIGTERM, wait up to 5s, then SIGKILL if needed
-    6. Clean up pidfile and heartbeat file after stop
-    
-    Returns:
-        - stopped: bool (whether worker was stopped)
-        - pid: int or None
-        - signal: str (TERM or KILL)
-        - active_jobs_count: int (number of active jobs at time of stop)
-        - force_used: bool (whether force=True was required)
-        - cleanup_performed: bool (whether pidfile/heartbeat were cleaned up)
-    """
-    import signal
-    import psutil
-    
-    db_path = get_db_path()
-    status = _check_worker_status(db_path)
-    
-    # 1. Check if worker is alive
-    if not status["alive"]:
-        return {
-            "stopped": False,
-            "pid": None,
-            "signal": None,
-            "active_jobs_count": 0,
-            "force_used": req.force,
-            "cleanup_performed": False,
-            "error": "Worker not alive",
-            "status": status
-        }
-    
-    pid = status["pid"]
-    if pid is None:
-        return {
-            "stopped": False,
-            "pid": None,
-            "signal": None,
-            "active_jobs_count": 0,
-            "force_used": req.force,
-            "cleanup_performed": False,
-            "error": "No PID found",
-            "status": status
-        }
-    
-    # 2. Validate pidfile (ensure worker belongs to this control API)
-    pidfile = db_path.parent / "worker.pid"
-    valid, reason = validate_pidfile(pidfile, db_path)
-    if not valid:
-        return {
-            "stopped": False,
-            "pid": pid,
-            "signal": None,
-            "active_jobs_count": 0,
-            "force_used": req.force,
-            "cleanup_performed": False,
-            "error": f"PID validation failed: {reason}",
-            "status": status
-        }
-    
-    # 3. Check for active jobs (unless force=True)
-    active_jobs_count = 0
-    if not req.force:
-        try:
-            from control.jobs_db import list_jobs
-            jobs = list_jobs(db_path)
-            active_jobs_count = sum(1 for job in jobs if job.status == "RUNNING")
-            if active_jobs_count > 0:
-                raise HTTPException(
-                    status_code=409,
-                    detail={
-                        "error": "ACTIVE_JOBS_RUNNING",
-                        "message": f"Cannot stop worker with {active_jobs_count} active jobs",
-                        "active_jobs_count": active_jobs_count,
-                        "action": "Use force=True to override, or stop jobs first"
-                    }
-                )
-        except Exception as e:
-            # If we can't check jobs, be conservative and require force
-            if not req.force:
-                raise HTTPException(
-                    status_code=500,
-                    detail={
-                        "error": "JOB_CHECK_FAILED",
-                        "message": "Cannot verify active jobs status",
-                        "action": "Use force=True to override"
-                    }
-                )
-    
-    # 4. Attempt to stop worker
-    stopped = False
-    signal_used = None
-    cleanup_performed = False
-    
-    try:
-        # Send SIGTERM first
-        os.kill(pid, signal.SIGTERM)
-        signal_used = "TERM"
-        
-        # Wait up to 5 seconds for graceful shutdown
-        for _ in range(50):  # 50 * 0.1 = 5 seconds
-            try:
-                os.kill(pid, 0)  # Check if process exists
-                time.sleep(0.1)
-            except ProcessLookupError:
-                # Process terminated
-                stopped = True
-                break
-        
-        # If still alive after SIGTERM, send SIGKILL
-        if not stopped:
-            try:
-                os.kill(pid, signal.SIGKILL)
-                signal_used = "KILL"
-                time.sleep(0.5)
-                stopped = True
-            except ProcessLookupError:
-                stopped = True
-    except ProcessLookupError:
-        # Process already dead
-        stopped = True
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail={
-                "error": "STOP_FAILED",
-                "message": f"Failed to stop worker: {str(e)}",
-                "pid": pid
-            }
-        )
-    
-    # 5. Clean up pidfile and heartbeat file
-    if stopped:
-        try:
-            pidfile.unlink(missing_ok=True)
-            heartbeat_file = db_path.parent / "worker.heartbeat"
-            heartbeat_file.unlink(missing_ok=True)
-            cleanup_performed = True
-        except Exception:
-            # Cleanup failed, but worker is stopped
-            pass
-    
-    return {
-        "stopped": stopped,
-        "pid": pid,
-        "signal": signal_used,
-        "active_jobs_count": active_jobs_count,
-        "force_used": req.force,
-        "cleanup_performed": cleanup_performed,
-        "status": status,
-        "reason": req.reason
-    }
+# Worker endpoints removed - supervisor handles its own workers
 
 
 # Phase PV.1: Plan Quality endpoints

@@ -20,7 +20,7 @@ def test_job_rejection_persists():
         
         # Create a job that will be rejected (duplicate fingerprint)
         payload1 = {"test": "value"}
-        spec1 = JobSpec(job_type="TEST_JOB", params=payload1)
+        spec1 = JobSpec(job_type="RUN_RESEARCH_V2", params=payload1)
         
         # First submission should be QUEUED
         job_id1, state1, bundle1 = submit_with_admission(
@@ -30,7 +30,7 @@ def test_job_rejection_persists():
         assert bundle1.downstream_admissible, "First job should be admissible"
         
         # Second identical submission should be REJECTED
-        spec2 = JobSpec(job_type="TEST_JOB", params=payload1.copy())
+        spec2 = JobSpec(job_type="RUN_RESEARCH_V2", params=payload1.copy())
         job_id2, state2, bundle2 = submit_with_admission(
             db, spec2, str(evidence_dir)
         )

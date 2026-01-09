@@ -4,6 +4,7 @@
     ".gitattributes",
     ".gitignore",
     ".pre-commit-config.yaml",
+    ".rooignore",
     "FishBroWFS_UI.bat",
     "Makefile",
     "README.md",
@@ -49,10 +50,9 @@
     ".github",
     ".gitignore",
     ".pre-commit-config.yaml",
+    ".rooignore",
     ".vscode",
-    "FishBroWFS_UI.bat",
     "Makefile",
-    "README.md",
     "configs",
     "docs",
     "outputs",
@@ -65,5 +65,5 @@
     "tests"
   ],
   "violations": [],
-  "timestamp": "2026-01-07T17:10:25.478631"
+  "timestamp": "2026-01-09T13:54:09.941583"
 }

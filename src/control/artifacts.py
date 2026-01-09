@@ -12,6 +12,14 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+# Import canonicalization helper from supervisor evidence schemas
+try:
+    from contracts.supervisor.evidence_schemas import _canonicalize_for_json
+except ImportError:
+    # Fallback definition (should not happen in normal operation)
+    def _canonicalize_for_json(obj: Any) -> Any:
+        return obj
+
 
 def canonical_json_bytes(obj: object) -> bytes:
     """Serialize object to canonical JSON bytes.
@@ -27,8 +35,10 @@ def canonical_json_bytes(obj: object) -> bytes:
     Raises:
         TypeError: If obj is not JSON serializable.
     """
+    # Canonicalize object before serialization (numpy scalars, tuples, Decimal)
+    canonical_obj = _canonicalize_for_json(obj)
     return json.dumps(
-        obj,
+        canonical_obj,
         sort_keys=True,
         ensure_ascii=False,
         separators=(",", ":"),

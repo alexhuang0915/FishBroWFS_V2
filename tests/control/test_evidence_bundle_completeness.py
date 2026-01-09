@@ -19,7 +19,7 @@ class TestGovernedHandler(BaseGovernedHandler):
         self.should_fail = False
     
     def get_job_type(self) -> str:
-        return "TEST_JOB"
+        return "PING"
     
     def core_logic(self, params: dict, context: JobContext) -> dict:
         self.core_logic_called = True
@@ -78,7 +78,7 @@ def test_succeeded_job_evidence_completeness():
         with open(artifacts_dir / "manifest.json", 'r') as f:
             manifest = json.load(f)
             assert manifest["job_id"] == job_id
-            assert manifest["job_type"] == "TEST_JOB"
+            assert manifest["job_type"] == "PING"
             assert manifest["state"] == "SUCCEEDED"
             assert "start_time" in manifest
             assert "end_time" in manifest

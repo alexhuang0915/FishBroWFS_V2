@@ -41,12 +41,13 @@ def main() -> int:
                        help="Root directory for artifacts (default: outputs/_dp_evidence/supervisor_artifacts)")
     args = parser.parse_args()
     
-    # Default artifacts directory
+    # Default artifacts directory: canonical job artifact root
     if args.artifacts_root is None:
-        args.artifacts_root = Path("outputs/_dp_evidence/supervisor_artifacts")
+        args.artifacts_root = Path("outputs")
     
-    # Create artifacts directory for this job
-    artifacts_dir = args.artifacts_root / args.job_id
+    # Create canonical artifact directory for this job
+    from .models import get_job_artifact_dir
+    artifacts_dir = get_job_artifact_dir(args.artifacts_root, args.job_id)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     
     db = SupervisorDB(args.db)

@@ -1,0 +1,138 @@
+{
+  "body": {
+    "generated_at": "2026-01-07T16:46:42.230909+00:00",
+    "informational": {
+      "notes": [
+        "Summary generated from supervisor job store"
+      ],
+      "orphaned_artifact_dirs_count": 0
+    },
+    "jobs": {
+      "counts_by_status": {
+        "QUEUED": 6
+      },
+      "recent": [
+        {
+          "created_at": "2026-01-07T16:43:49.014711+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "819ba7d6-8eea-44b2-9f61-e2770a217360",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/819ba7d6-8eea-44b2-9f61-e2770a217360/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "S1",
+          "timeframe": ""
+        },
+        {
+          "created_at": "2026-01-07T16:43:48.989419+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "91361569-f3f9-4ce8-9636-7a46dca724a4",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/91361569-f3f9-4ce8-9636-7a46dca724a4/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "",
+          "timeframe": ""
+        },
+        {
+          "created_at": "2026-01-07T16:43:48.963612+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "6d9a34f4-a5a6-45f0-9493-fbbdf0b2920c",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/6d9a34f4-a5a6-45f0-9493-fbbdf0b2920c/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "",
+          "timeframe": ""
+        },
+        {
+          "created_at": "2026-01-07T16:43:48.958583+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "211932d1-398c-422c-b555-43204d802172",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/211932d1-398c-422c-b555-43204d802172/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "",
+          "timeframe": ""
+        },
+        {
+          "created_at": "2026-01-07T16:43:48.932805+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "5fe974e3-405e-4368-b72e-ac5692457042",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/5fe974e3-405e-4368-b72e-ac5692457042/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "",
+          "timeframe": ""
+        },
+        {
+          "created_at": "2026-01-07T16:43:48.928645+00:00",
+          "finished_at": null,
+          "instrument": "",
+          "job_id": "7927648c-5939-45a1-b667-04e322caee4b",
+          "links": {
+            "artifacts_url": "/api/v1/jobs/7927648c-5939-45a1-b667-04e322caee4b/artifacts",
+            "report_url": null
+          },
+          "run_mode": "",
+          "season": "",
+          "status": "QUEUED",
+          "strategy_name": "",
+          "timeframe": ""
+        }
+      ]
+    },
+    "portfolios": {
+      "recent": [
+        {
+          "admitted_count": 0,
+          "created_at": "2026-01-07T16:43:48.556617+00:00",
+          "links": {
+            "artifacts_url": "/api/v1/portfolios/d964cb58-9137-4de6-851a-60d884245ed7/artifacts",
+            "report_url": null
+          },
+          "portfolio_id": "d964cb58-9137-4de6-851a-60d884245ed7",
+          "rejected_count": 0,
+          "season": "",
+          "timeframe": ""
+        },
+        {
+          "admitted_count": 0,
+          "created_at": "2026-01-07T16:43:48.551895+00:00",
+          "links": {
+            "artifacts_url": "/api/v1/portfolios/53a40cc7-411e-4309-af88-bba8ef9fe7db/artifacts",
+            "report_url": null
+          },
+          "portfolio_id": "53a40cc7-411e-4309-af88-bba8ef9fe7db",
+          "rejected_count": 0,
+          "season": "",
+          "timeframe": ""
+        }
+      ]
+    },
+    "version": "1.0"
+  },
+  "status": 200
+}

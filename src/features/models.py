@@ -10,9 +10,10 @@ from typing import Dict, List, Optional, Callable, Any, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import numpy as np
 from config.registry.timeframes import load_timeframes
+from contracts.features import FeatureSpec as ContractFeatureSpec
 
 
-class FeatureSpec(BaseModel):
+class FeatureSpec(ContractFeatureSpec):
     """
     Enhanced feature specification with causality verification metadata.
     
@@ -20,15 +21,6 @@ class FeatureSpec(BaseModel):
     causality verification and lookahead detection.
     
     Attributes:
-        name: Feature name (e.g., "atr_14")
-        timeframe_min: Applicable timeframe in minutes (must be from timeframe registry)
-        lookback_bars: Maximum lookback bars required for computation (e.g., ATR(14) needs 14)
-        params: Parameter dictionary (e.g., {"window": 14, "method": "log"})
-        window: Rolling window size (window=1 for non‑windowed features)
-        min_warmup_bars: Minimum bars required for warm‑up (output NaN during warm‑up)
-        dtype: Output data type (currently only float64)
-        div0_policy: Division‑by‑zero policy (currently only DIV0_RET_NAN)
-        family: Feature family (optional, e.g., "ma", "volatility", "momentum")
         compute_func: Optional reference to the compute function (for runtime verification)
         window_honest: Whether the window specification is honest (no lookahead)
         causality_verified: Whether this feature has passed causality verification
@@ -37,15 +29,6 @@ class FeatureSpec(BaseModel):
         notes: Optional notes about the feature (e.g., deprecation reason, usage guidance)
         canonical_name: For deprecated aliases, the canonical feature name to use instead
     """
-    name: str
-    timeframe_min: int
-    lookback_bars: int = Field(default=0, ge=0)
-    params: Dict[str, str | int | float] = Field(default_factory=dict)
-    window: int = Field(default=1, ge=1)
-    min_warmup_bars: int = Field(default=0, ge=0)
-    dtype: Literal["float64"] = Field(default="float64")
-    div0_policy: Literal["DIV0_RET_NAN"] = Field(default="DIV0_RET_NAN")
-    family: Optional[str] = Field(default=None)
     compute_func: Optional[Callable[..., np.ndarray]] = Field(default=None, exclude=True)
     window_honest: bool = Field(default=True)
     causality_verified: bool = Field(default=False)
@@ -84,14 +67,13 @@ class FeatureSpec(BaseModel):
         self.causality_verified = False
         self.verification_timestamp = None
     
-    def to_contract_spec(self) -> 'FeatureSpec':
+    def to_contract_spec(self) -> ContractFeatureSpec:
         """
         Convert to the contract FeatureSpec (without extra fields).
         
         Returns:
             A minimal FeatureSpec compatible with the contracts module.
         """
-        from contracts.features import FeatureSpec as ContractFeatureSpec
         return ContractFeatureSpec(
             name=self.name,
             timeframe_min=self.timeframe_min,
@@ -107,7 +89,7 @@ class FeatureSpec(BaseModel):
     @classmethod
     def from_contract_spec(
         cls,
-        contract_spec: 'FeatureSpec',
+        contract_spec: ContractFeatureSpec,
         compute_func: Optional[Callable[..., np.ndarray]] = None
     ) -> 'FeatureSpec':
         """

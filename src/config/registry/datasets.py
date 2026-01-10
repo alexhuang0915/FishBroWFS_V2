@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -45,6 +45,8 @@ class CalendarType(str, Enum):
 class DatasetSpec(BaseModel):
     """Specification for a single dataset."""
     
+    model_config = ConfigDict(frozen=True)
+    
     id: str = Field(..., description="Dataset identifier (e.g., 'CME.MNQ.60m.2020-2024')")
     instrument_id: str = Field(..., description="Instrument ID this dataset belongs to")
     timeframe: int = Field(..., description="Timeframe in minutes")
@@ -61,9 +63,6 @@ class DatasetSpec(BaseModel):
     bar_count: Optional[int] = Field(None, description="Approximate number of bars")
     size_mb: Optional[float] = Field(None, description="Approximate size in MB")
     checksum: Optional[str] = Field(None, description="Data checksum for validation")
-    
-    class Config:
-        frozen = True
     
     @field_validator('uri')
     @classmethod

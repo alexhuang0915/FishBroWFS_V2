@@ -20,7 +20,6 @@ class AdmissionDecision(BaseModel):
     model_config = ConfigDict(
         frozen=True,
         extra="forbid",
-        json_encoders={Enum: lambda e: e.value},
     )
 
     # Core decision

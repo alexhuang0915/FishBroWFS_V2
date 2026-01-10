@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -47,13 +47,15 @@ class StrategyStatus(str, Enum):
 class StrategyCatalogEntry(BaseModel):
     """Entry in the strategy catalog."""
     
+    model_config = ConfigDict(frozen=True)
+    
     id: str = Field(..., description="Strategy identifier (e.g., 's1_v1')")
     display_name: str = Field(..., description="Display name for UI")
     family: StrategyFamily = Field(..., description="Strategy family")
     status: StrategyStatus = Field(..., description="Strategy status")
     
     config_file: str = Field(
-        ..., 
+        ...,
         description="Path to strategy configuration file (relative to configs/strategies/)"
     )
     
@@ -71,9 +73,6 @@ class StrategyCatalogEntry(BaseModel):
         default_factory=list,
         description="List of timeframes this strategy supports"
     )
-    
-    class Config:
-        frozen = True
     
     @field_validator('config_file')
     @classmethod

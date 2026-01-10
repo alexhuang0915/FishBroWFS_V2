@@ -57,26 +57,24 @@ class SessionWindow(BaseModel):
             raise ValueError(f"Invalid time format: {v}. Expected HH:MM:SS")
         return v
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class CostModel(BaseModel):
     """Cost model with mandatory commission and slippage."""
     
     commission_per_side_usd: float = Field(
-        ..., 
+        ...,
         ge=0.0,
         description="Commission per side in USD (MANDATORY)"
     )
     slippage_per_side_usd: float = Field(
-        ..., 
+        ...,
         ge=0.0,
         description="Slippage per side in USD (MANDATORY)"
     )
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class SessionTaipeiSpec(BaseModel):
@@ -110,8 +108,7 @@ class SessionTaipeiSpec(BaseModel):
                 raise ValueError(f"Break end must be HH:MM format, got: {end}")
         return v
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class MemoryConfig(BaseModel):
@@ -140,8 +137,7 @@ class MemoryConfig(BaseModel):
         description="Minimum downsampling fraction"
     )
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class ProfileConfig(BaseModel):
@@ -163,7 +159,12 @@ class ProfileConfig(BaseModel):
     
     # Memory configuration
     memory: MemoryConfig = Field(
-        default_factory=MemoryConfig,
+        default=MemoryConfig(
+            default_limit_mb=2048,
+            allow_auto_downsample=True,
+            auto_downsample_step=0.5,
+            auto_downsample_min=0.02
+        ),
         description="Memory configuration"
     )
     

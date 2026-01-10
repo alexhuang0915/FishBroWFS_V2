@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -37,6 +37,8 @@ class InstrumentType(str, Enum):
 class InstrumentSpec(BaseModel):
     """Specification for a single instrument."""
     
+    model_config = ConfigDict(frozen=True)
+    
     id: str = Field(..., description="Instrument identifier (e.g., 'CME.MNQ')")
     display_name: str = Field(..., description="Display name for UI")
     type: InstrumentType = Field(..., description="Instrument type")
@@ -49,9 +51,6 @@ class InstrumentSpec(BaseModel):
     multiplier: Optional[float] = Field(None, description="Contract multiplier")
     tick_size: Optional[float] = Field(None, description="Minimum price increment")
     tick_value: Optional[float] = Field(None, description="Value per tick")
-    
-    class Config:
-        frozen = True
 
 
 class InstrumentRegistry(BaseModel):

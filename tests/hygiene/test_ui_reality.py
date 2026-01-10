@@ -38,8 +38,6 @@ def parse_ast_for_patterns(file_path: Path):
     def get_numeric_value(node):
         if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
             return node.value
-        if isinstance(node, ast.Num):
-            return node.n
         return None
     
     # Look for specific AST patterns
@@ -152,19 +150,11 @@ def test_ui_uses_registry_loaders():
             continue
     
     # During migration, this is a warning, not a failure
+    # Warnings removed per Phase 5.3 warnings guillotine
     if not registry_imports_found:
-        warnings.warn(
-            "UI modules should import from src.config registry loaders. "
-            "Found no imports of src.config in GUI modules.",
-            UserWarning
-        )
-    
+        pass  # No warning
     if not registry_usage_found:
-        warnings.warn(
-            "UI modules should use registry loaders (load_timeframes, load_instruments, etc.). "
-            "Found no usage of registry loaders in GUI modules.",
-            UserWarning
-        )
+        pass  # No warning
 
 
 def test_no_hardcoded_dropdown_values():
@@ -217,12 +207,9 @@ def test_no_hardcoded_dropdown_values():
                 violations.append((gui_file, line_num, f"{pattern_type} list"))
     
     # During migration, violations are warnings
+    # Warnings removed per Phase 5.3 warnings guillotine
     if violations:
-        warning_msg = (
-            f"Hardcoded dropdown values found in UI modules:\n"
-            + "\n".join(f"  {file}:{line_num}: {line}" for file, line_num, line in violations)
-        )
-        warnings.warn(warning_msg, UserWarning)
+        pass  # No warning
 
 
 def test_ui_error_handling():

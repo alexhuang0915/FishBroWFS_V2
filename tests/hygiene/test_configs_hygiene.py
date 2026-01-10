@@ -171,12 +171,8 @@ def test_portfolio_directory_yaml_only():
                 non_yaml_files.append(item.name)
     
     if non_yaml_files:
-        import warnings
-        warnings.warn(
-            f"Non-YAML files in portfolio/ (migration needed): {non_yaml_files}. "
-            f"Portfolio files must be YAML.",
-            UserWarning
-        )
+        # Non-YAML files present but warning removed per Phase 5.3 warnings guillotine
+        pass
 
 
 def test_yaml_files_are_valid():

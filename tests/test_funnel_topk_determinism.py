@@ -3,8 +3,9 @@
 
 import numpy as np
 
-from pipeline.funnel import run_funnel
+from pipeline.funnel import FunnelResult
 from pipeline.stage0_runner import Stage0Result, run_stage0
+from pipeline.stage2_runner import run_stage2
 from pipeline.topk import select_topk
 
 
@@ -95,27 +96,43 @@ def test_funnel_determinism():
         np.random.uniform(1.0, 3.0, size=n_params),
     ]).astype(np.float64)
     
-    # Run funnel twice
-    result_1 = run_funnel(
+    # Run funnel twice using three-step logic (bypass deprecated run_funnel)
+    # First run
+    stage0_results_1 = run_stage0(close, params_matrix)
+    topk_param_ids_1 = select_topk(stage0_results_1, k=10)
+    stage2_results_1 = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=10,
+        topk_param_ids_1,
         commission=0.0,
         slip=0.0,
     )
+    result_1 = FunnelResult(
+        stage0_results=stage0_results_1,
+        topk_param_ids=topk_param_ids_1,
+        stage2_results=stage2_results_1,
+    )
     
-    result_2 = run_funnel(
+    # Second run
+    stage0_results_2 = run_stage0(close, params_matrix)
+    topk_param_ids_2 = select_topk(stage0_results_2, k=10)
+    stage2_results_2 = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=10,
+        topk_param_ids_2,
         commission=0.0,
         slip=0.0,
+    )
+    result_2 = FunnelResult(
+        stage0_results=stage0_results_2,
+        topk_param_ids=topk_param_ids_2,
+        stage2_results=stage2_results_2,
     )
     
     # Verify Top-K selection is identical

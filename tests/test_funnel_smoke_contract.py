@@ -6,7 +6,10 @@ Basic smoke tests to ensure the complete funnel pipeline works end-to-end.
 
 import numpy as np
 
-from pipeline.funnel import FunnelResult, run_funnel
+from pipeline.funnel import FunnelResult
+from pipeline.stage0_runner import run_stage0
+from pipeline.stage2_runner import run_stage2
+from pipeline.topk import select_topk
 from tests.helpers.costs import get_test_costs
 
 
@@ -29,17 +32,33 @@ def test_funnel_smoke_basic():
         np.random.uniform(1.0, 3.0, size=n_params), # stop_mult
     ]).astype(np.float64)
     
-    # Run funnel
+    # Run funnel steps manually (avoid deprecated run_funnel)
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    # Step 1: Stage0 - proxy ranking
+    stage0_results = run_stage0(
+        close,
+        params_matrix,
+        proxy_name="ma_proxy_v0",
+    )
+    # Step 2: Top-K selection
+    topk_param_ids = select_topk(stage0_results, k=5)
+    # Step 3: Stage2 - full backtest on Top-K
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=5,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+        order_qty=1,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
+        meta=None,
     )
     
     # Verify result structure
@@ -83,15 +102,31 @@ def test_funnel_smoke_empty_params():
     params_matrix = np.empty((0, 3), dtype=np.float64)
     
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    # Step 1: Stage0 - proxy ranking (empty params)
+    stage0_results = run_stage0(
+        close,
+        params_matrix,
+        proxy_name="ma_proxy_v0",
+    )
+    # Step 2: Top-K selection (empty)
+    topk_param_ids = select_topk(stage0_results, k=5)
+    # Step 3: Stage2 - full backtest on Top-K (empty)
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=5,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+        order_qty=1,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
+        meta=None,
     )
     
     assert len(result.stage0_results) == 0
@@ -118,15 +153,31 @@ def test_funnel_smoke_k_larger_than_params():
     
     # k=10 but only 5 params
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    # Step 1: Stage0 - proxy ranking
+    stage0_results = run_stage0(
+        close,
+        params_matrix,
+        proxy_name="ma_proxy_v0",
+    )
+    # Step 2: Top-K selection (k=10, but only 5 params)
+    topk_param_ids = select_topk(stage0_results, k=10)
+    # Step 3: Stage2 - full backtest on Top-K
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=10,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+        order_qty=1,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
+        meta=None,
     )
     
     # Should return all 5 params
@@ -152,15 +203,31 @@ def test_funnel_smoke_pipeline_order():
     ]).astype(np.float64)
     
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    # Step 1: Stage0 - proxy ranking
+    stage0_results = run_stage0(
+        close,
+        params_matrix,
+        proxy_name="ma_proxy_v0",
+    )
+    # Step 2: Top-K selection
+    topk_param_ids = select_topk(stage0_results, k=3)
+    # Step 3: Stage2 - full backtest on Top-K
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=3,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+        order_qty=1,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
+        meta=None,
     )
     
     # Verify Stage0 ran on all params

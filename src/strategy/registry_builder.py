@@ -231,12 +231,6 @@ class StrategyDiscovery:
             # node.value could be str, int, float, complex, bool, None, Ellipsis, bytes
             # Convert to string representation
             return str(node.value)
-        elif isinstance(node, ast.Str):  # Python < 3.8
-            return str(node.s)
-        elif isinstance(node, ast.Num):  # Python < 3.8
-            return str(node.n)
-        elif isinstance(node, ast.NameConstant):  # Python < 3.8
-            return str(node.value)
         return None
     
     def _extract_dict(self, node: ast.AST) -> Dict:

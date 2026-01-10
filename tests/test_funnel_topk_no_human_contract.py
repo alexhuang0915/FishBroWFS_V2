@@ -7,8 +7,9 @@ with no possibility of human intervention or manual filtering.
 
 import numpy as np
 
-from pipeline.funnel import run_funnel
+from pipeline.funnel import FunnelResult
 from pipeline.stage0_runner import Stage0Result, run_stage0
+from pipeline.stage2_runner import run_stage2
 from pipeline.topk import select_topk
 from tests.helpers.costs import get_test_costs
 
@@ -102,17 +103,24 @@ def test_funnel_topk_no_manual_filtering():
         np.random.uniform(1.0, 2.5, size=n_params),
     ]).astype(np.float64)
     
-    # Run funnel
+    # Run funnel using three-step logic (bypass deprecated run_funnel)
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    stage0_results = run_stage0(close, params_matrix)
+    topk_param_ids = select_topk(stage0_results, k=5)
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=5,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
     )
     
     # Verify Top-K is based solely on proxy_value
@@ -151,15 +159,22 @@ def test_funnel_stage2_only_runs_topk():
     ]).astype(np.float64)
     
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    stage0_results = run_stage0(close, params_matrix)
+    topk_param_ids = select_topk(stage0_results, k=3)
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=3,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
     )
     
     # Verify Stage0 ran on all params
@@ -201,15 +216,22 @@ def test_funnel_stage0_no_pnl_fields():
     ]).astype(np.float64)
     
     commission, slip = get_test_costs("MNQ")
-    result = run_funnel(
+    stage0_results = run_stage0(close, params_matrix)
+    topk_param_ids = select_topk(stage0_results, k=5)
+    stage2_results = run_stage2(
         open_,
         high,
         low,
         close,
         params_matrix,
-        k=5,
+        topk_param_ids,
         commission=commission,
         slip=slip,
+    )
+    result = FunnelResult(
+        stage0_results=stage0_results,
+        topk_param_ids=topk_param_ids,
+        stage2_results=stage2_results,
     )
     
     # Check all Stage0 results

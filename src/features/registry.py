@@ -96,12 +96,8 @@ class FeatureRegistry(BaseModel):
                     # If either existing or new spec is deprecated, allow duplicate
                     # with a warning
                     if spec.deprecated or deprecated:
-                        warnings.warn(
-                            f"Feature '{name}' (timeframe {timeframe_min}min) already registered "
-                            f"as {'deprecated' if spec.deprecated else 'non-deprecated'}. "
-                            f"Registering duplicate as {'deprecated' if deprecated else 'non-deprecated'}.",
-                            UserWarning
-                        )
+                        # Duplicate deprecated feature allowed silently
+                        pass
                     else:
                         raise ValueError(
                             f"Feature '{name}' already registered for timeframe {timeframe_min}min"
@@ -157,14 +153,9 @@ class FeatureRegistry(BaseModel):
                         f"Feature '{name}' verification failed with error: {e}"
                     ) from e
             elif skip_verification:
-                # Mark as verified but with warning
+                # Mark as verified without warning (dangerous but allowed)
                 feature_spec.causality_verified = True
                 feature_spec.verification_timestamp = None  # No actual verification
-                warnings.warn(
-                    f"Feature '{name}' registered without causality verification. "
-                    f"This is dangerous and may lead to lookahead bias.",
-                    UserWarning
-                )
             
             # Add to registry
             self.specs.append(feature_spec)

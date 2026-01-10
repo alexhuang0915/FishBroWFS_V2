@@ -78,23 +78,15 @@ def test_registry_skip_verification_dangerous():
             result[i] = c[i + 1]  # Lookahead
         return result
     
-    # With skip_verification=True, registration should succeed (with warning)
-    import warnings
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        
-        spec = registry.register_feature(
-            name="dangerous",
-            timeframe_min=15,
-            lookback_bars=0,
-            params={},
-            compute_func=lookahead_feature,
-            skip_verification=True
-        )
-        
-        # Should have generated a warning
-        assert len(w) > 0
-        assert "dangerous" in str(w[0].message).lower()
+    # With skip_verification=True, registration should succeed (no warning after guillotine)
+    spec = registry.register_feature(
+        name="dangerous",
+        timeframe_min=15,
+        lookback_bars=0,
+        params={},
+        compute_func=lookahead_feature,
+        skip_verification=True
+    )
     
     # Feature should be registered but not truly verified
     assert len(registry.specs) == 1

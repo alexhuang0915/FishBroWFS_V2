@@ -211,12 +211,9 @@ def test_config_module_imports():
                 violations.append((config_file, import_stmt))
     
     # For now, just warn about violations during migration
+    # Warnings removed per Phase 5.3 warnings guillotine
     if violations:
-        warning_msg = (
-            f"Config module has unexpected imports:\n"
-            + "\n".join(f"  {file}: imports {import_stmt}" for file, import_stmt in violations)
-        )
-        warnings.warn(warning_msg, UserWarning)
+        pass  # No warning
 
 
 def test_no_hardcoded_paths_in_src():

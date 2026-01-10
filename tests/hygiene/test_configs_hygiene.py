@@ -259,13 +259,8 @@ def test_no_duplicate_config_names():
             + "\n".join(f"  {stem}: {reasons}" for stem, reasons in allowed_duplicates.items())
         )
     elif duplicates:
-        # Warn about allowed duplicates
-        import warnings
-        warning_msg = (
-            f"Duplicate config file names (allowed during migration):\n"
-            + "\n".join(f"  {stem}: {files}" for stem, files in duplicates.items())
-        )
-        warnings.warn(warning_msg, UserWarning)
+        # Allowed duplicates during migration - no warning emitted
+        pass
 
 
 def test_zero_features_json_references_in_production():

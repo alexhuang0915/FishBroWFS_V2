@@ -12,6 +12,7 @@ from src.control.supervisor.job_handler import JobContext
 
 class TestGovernedHandler(BaseGovernedHandler):
     """Test handler for evidence bundle tests."""
+    __test__ = False  # Tell pytest not to collect this class as a test
     
     def __init__(self, evidence_base_dir: Path):
         super().__init__(evidence_base_dir)

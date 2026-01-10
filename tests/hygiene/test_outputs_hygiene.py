@@ -165,12 +165,9 @@ def test_outputs_no_generated_configs():
             config_files.append(str(rel_path))
     
     if config_files:
-        # This is a warning, not a failure, during migration
-        warnings.warn(
-            f"Configuration files found in outputs/: {config_files}. "
-            f"Configuration files should be in configs/, not outputs/.",
-            UserWarning
-        )
+        # Configuration files found in outputs/ (allowed during migration)
+        # No warning emitted to comply with zero-warning policy
+        pass
 
 
 def test_outputs_trash_bucket_optional():

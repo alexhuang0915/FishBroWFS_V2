@@ -108,7 +108,8 @@ class StrategyDiscovery:
                 version=spec_dict.get("version", "v1"),
                 description=f"Strategy from {filepath.name}",
                 author="FishBroWFS_V2",
-                tags=["discovered"]
+                tags=["discovered"],
+                created_at=None
             )
             
             # Extract parameter schema
@@ -183,22 +184,34 @@ class StrategyDiscovery:
         
         # Handle positional arguments (strategy_id, version, param_schema, defaults, fn)
         if len(node.args) >= 1:
-            spec_dict["strategy_id"] = self._extract_constant(node.args[0])
+            strategy_id = self._extract_constant(node.args[0])
+            if strategy_id is not None:
+                spec_dict["strategy_id"] = strategy_id
         if len(node.args) >= 2:
-            spec_dict["version"] = self._extract_constant(node.args[1])
+            version = self._extract_constant(node.args[1])
+            if version is not None:
+                spec_dict["version"] = version
         if len(node.args) >= 3:
-            spec_dict["param_schema"] = self._extract_dict(node.args[2])
+            param_schema = self._extract_dict(node.args[2])
+            if param_schema:
+                spec_dict["param_schema"] = param_schema
         if len(node.args) >= 4:
-            spec_dict["defaults"] = self._extract_dict(node.args[3])
+            defaults = self._extract_dict(node.args[3])
+            if defaults:
+                spec_dict["defaults"] = defaults
         # fn (5th arg) is a function reference, not extractable without importing
         
         # Handle keyword arguments
         for kw in node.keywords:
             if kw.arg in ["strategy_id", "version", "param_schema", "defaults", "content_id"]:
                 if kw.arg in ["param_schema", "defaults"]:
-                    spec_dict[kw.arg] = self._extract_dict(kw.value)
+                    val = self._extract_dict(kw.value)
+                    if val:
+                        spec_dict[kw.arg] = val
                 else:
-                    spec_dict[kw.arg] = self._extract_constant(kw.value)
+                    val = self._extract_constant(kw.value)
+                    if val is not None:
+                        spec_dict[kw.arg] = val
         
         return spec_dict if spec_dict else None
     
@@ -215,9 +228,11 @@ class StrategyDiscovery:
     def _extract_constant(self, node: ast.AST) -> Optional[str]:
         """Extract constant value from AST node."""
         if isinstance(node, ast.Constant):
+            # node.value could be str, int, float, complex, bool, None, Ellipsis, bytes
+            # Convert to string representation
             return str(node.value)
         elif isinstance(node, ast.Str):  # Python < 3.8
-            return node.s
+            return str(node.s)
         elif isinstance(node, ast.Num):  # Python < 3.8
             return str(node.n)
         elif isinstance(node, ast.NameConstant):  # Python < 3.8
@@ -229,6 +244,8 @@ class StrategyDiscovery:
         if isinstance(node, ast.Dict):
             result = {}
             for key, value in zip(node.keys, node.values):
+                if key is None:
+                    continue  # skip star unpacking
                 key_str = self._extract_constant(key)
                 if key_str is not None:
                     # Try to extract value as constant or dict
@@ -298,7 +315,7 @@ class RegistryBuilder:
             entries.append(entry)
         
         # Create manifest
-        self.manifest = StrategyManifest(strategies=entries)
+        self.manifest = StrategyManifest(version="ast-c14n-v1", strategies=entries)
         return self.manifest
     
     def save_manifest(self, output_path: Path) -> None:
@@ -310,6 +327,8 @@ class RegistryBuilder:
         if self.manifest is None:
             self.build_registry()
         
+        # After build_registry, self.manifest is guaranteed to be non-None
+        assert self.manifest is not None
         self.manifest.save(output_path)
         print(f"Strategy manifest saved to {output_path}")
         print(f"Total strategies: {len(self.manifest.strategies)}")

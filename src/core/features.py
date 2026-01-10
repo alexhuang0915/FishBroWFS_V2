@@ -12,10 +12,11 @@ from .feature_bundle import FeatureBundle
 
 import inspect
 import numpy as np
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, Union
 from datetime import datetime
 
-from contracts.features import FeatureRegistry, FeatureSpec
+from contracts.features import FeatureRegistry as ContractFeatureRegistry, FeatureSpec as ContractFeatureSpec
+from features.registry import FeatureRegistry as EnhancedFeatureRegistry
 from core.resampler import SessionSpecTaipei
 
 
@@ -258,7 +259,7 @@ def compute_features_for_tf(
     c: np.ndarray,
     v: np.ndarray,
     tf_min: int,
-    registry: FeatureRegistry,
+    registry: Union[ContractFeatureRegistry, EnhancedFeatureRegistry],
     session_spec: SessionSpecTaipei,
     breaks_policy: str = "drop",
 ) -> Dict[str, np.ndarray]:
@@ -301,9 +302,10 @@ def compute_features_for_tf(
     # 計算每個特徵
     for spec in specs:
         # 檢查是否有 compute_func
-        if hasattr(spec, 'compute_func') and spec.compute_func is not None:
+        compute_func = getattr(spec, 'compute_func', None)
+        if compute_func is not None:
             # 使用 compute_func
-            sig = inspect.signature(spec.compute_func)
+            sig = inspect.signature(compute_func)
             params = list(sig.parameters.values())
             # 只考慮沒有預設值的參數（必需參數）
             required_params = [p for p in params if p.default is inspect.Parameter.empty]
@@ -328,7 +330,7 @@ def compute_features_for_tf(
                         raise ValueError(f"Cannot map parameter {param.name} for feature {spec.name}")
             # 呼叫 compute_func
             try:
-                values = spec.compute_func(*args)
+                values = compute_func(*args)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             except Exception as e:
@@ -341,72 +343,72 @@ def compute_features_for_tf(
                 donchian_width, dist_to_hh, dist_to_ll
             )
             if spec.name.startswith("sma_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[1])))
                 values = sma(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("hh_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[1])))
                 values = hh(h, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("ll_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[1])))
                 values = ll(l, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("atr_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[1])))
                 values = atr_wilder(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("vx_percentile_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = percentile_rank(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("percentile_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[1])))
                 values = percentile_rank(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("bb_pb_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = bbands_pb(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("bb_width_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = bbands_width(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("atr_ch_upper_"):
-                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[3])))
                 values = atr_channel_upper(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("atr_ch_lower_"):
-                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[3])))
                 values = atr_channel_lower(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("atr_ch_pos_"):
-                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[3])))
                 values = atr_channel_pos(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("donchian_width_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = donchian_width(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("dist_hh_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = dist_to_hh(h, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("dist_ll_"):
-                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                window = int(spec.params.get("window", int(spec.name.split("_")[2])))
                 values = dist_to_ll(l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values

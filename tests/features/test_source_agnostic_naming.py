@@ -43,6 +43,9 @@ def test_deprecated_aliases_have_canonical_mapping():
             f"Deprecated feature '{spec.name}' missing 'canonical_name' attribute."
         )
         canonical = spec.canonical_name
+        assert canonical is not None, (
+            f"Deprecated feature '{spec.name}' has None canonical_name."
+        )
         # Canonical must exist in registry
         canonical_spec = None
         for s in registry.specs:
@@ -103,6 +106,9 @@ def test_vx_percentile_aliases_are_deprecated():
             f"Legacy feature '{spec.name}' missing canonical_name."
         )
         canonical = spec.canonical_name
+        assert canonical is not None, (
+            f"Legacy feature '{spec.name}' has None canonical_name."
+        )
         assert canonical.startswith("percentile_"), (
             f"Legacy feature '{spec.name}' canonical should start with 'percentile_', got '{canonical}'."
         )

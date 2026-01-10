@@ -9,7 +9,7 @@ Registry cannot be bypassed.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Callable, Any, Literal
+from typing import Dict, List, Optional, Callable, Any, Literal, Sequence
 import threading
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -33,7 +33,7 @@ class FeatureRegistry(BaseModel):
     Every feature must pass causality verification before being registered.
     
     Attributes:
-        specs: List of verified feature specifications
+        specs: List of verified feature specifications (causality‑aware)
         verification_reports: Map from feature name to causality report
         verification_enabled: Whether causality verification is enabled
         lock: Thread lock for thread-safe registration

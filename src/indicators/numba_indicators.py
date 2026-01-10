@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import numpy as np
+from numpy.typing import NDArray
 from numba import njit, float64
 
 
 @njit(cache=True)
-def safe_div(a: float64, b: float64) -> float64:
+def safe_div(a: float, b: float) -> float:
     """
     Safe division with DIV0_RET_NAN policy.
     
@@ -22,7 +23,7 @@ def safe_div(a: float64, b: float64) -> float64:
 
 
 @njit(cache=True)
-def safe_div_array(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+def safe_div_array(a: NDArray[np.float64], b: NDArray[np.float64]) -> NDArray[np.float64]:
     """
     Element‑wise safe division for arrays of equal length.
     """
@@ -34,7 +35,7 @@ def safe_div_array(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
 
 @njit(cache=True)
-def rolling_max(arr: np.ndarray, window: int) -> np.ndarray:
+def rolling_max(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     n = arr.shape[0]
     out = np.empty(n, dtype=np.float64)
     if window <= 0:
@@ -56,7 +57,7 @@ def rolling_max(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def rolling_min(arr: np.ndarray, window: int) -> np.ndarray:
+def rolling_min(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     n = arr.shape[0]
     out = np.empty(n, dtype=np.float64)
     if window <= 0:
@@ -78,7 +79,7 @@ def rolling_min(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def sma(arr: np.ndarray, window: int) -> np.ndarray:
+def sma(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     n = arr.shape[0]
     out = np.empty(n, dtype=np.float64)
     s = 0.0
@@ -92,19 +93,19 @@ def sma(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def hh(arr: np.ndarray, window: int) -> np.ndarray:
+def hh(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     # Highest High over trailing window (causal)
     return rolling_max(arr, window)
 
 
 @njit(cache=True)
-def ll(arr: np.ndarray, window: int) -> np.ndarray:
+def ll(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     # Lowest Low over trailing window (causal)
     return rolling_min(arr, window)
 
 
 @njit(cache=True)
-def atr_wilder(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def atr_wilder(high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Wilder ATR (causal).
     TR[i] = max(high-low, abs(high-close_prev), abs(low-close_prev))
@@ -156,7 +157,7 @@ def atr_wilder(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int
 
 
 @njit(cache=True)
-def rsi(close: np.ndarray, window: int) -> np.ndarray:
+def rsi(close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Classic RSI using Wilder smoothing (causal).
     Output in [0, 100].
@@ -166,6 +167,8 @@ def rsi(close: np.ndarray, window: int) -> np.ndarray:
 
     gain = 0.0
     loss = 0.0
+    avg_g = 0.0
+    avg_l = 0.0
 
     out[0] = 50.0
     for i in range(1, n):
@@ -193,7 +196,7 @@ def rsi(close: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def vx_percentile(arr: np.ndarray, window: int) -> np.ndarray:
+def vx_percentile(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Rolling percentile rank of current value within trailing window (causal).
     Returns in [0,1].
@@ -225,7 +228,7 @@ def vx_percentile(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def ema(arr: np.ndarray, window: int) -> np.ndarray:
+def ema(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Exponential Moving Average (causal).
     alpha = 2 / (window + 1)
@@ -244,7 +247,7 @@ def ema(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def wma(arr: np.ndarray, window: int) -> np.ndarray:
+def wma(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Weighted Moving Average (causal) with linear weights.
     Weights: window, window-1, ..., 1.
@@ -271,7 +274,7 @@ def wma(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def rolling_stdev(arr: np.ndarray, window: int) -> np.ndarray:
+def rolling_stdev(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Rolling sample standard deviation (causal, ddof=1).
     Returns NaN for i < window-1.
@@ -302,7 +305,7 @@ def rolling_stdev(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def zscore(arr: np.ndarray, window: int) -> np.ndarray:
+def zscore(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Z‑score: (arr[i] - SMA(arr, window)) / STDEV(arr, window).
     Returns NaN where stdev = 0.
@@ -327,7 +330,7 @@ def zscore(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def momentum(arr: np.ndarray, window: int) -> np.ndarray:
+def momentum(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Momentum: arr[i] - arr[i - window].
     Returns NaN for i < window.
@@ -346,7 +349,7 @@ def momentum(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def roc(arr: np.ndarray, window: int) -> np.ndarray:
+def roc(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Rate of Change: (arr[i] - arr[i - window]) / arr[i - window] * 100.
     Returns NaN where divisor is zero.
@@ -369,7 +372,7 @@ def roc(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def bbands_pb(arr: np.ndarray, window: int) -> np.ndarray:
+def bbands_pb(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Bollinger Bands %b: (close - lower) / (upper - lower).
     
@@ -403,7 +406,7 @@ def bbands_pb(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def bbands_width(arr: np.ndarray, window: int) -> np.ndarray:
+def bbands_width(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Bollinger Bands width: (upper - lower) / sma.
     
@@ -437,7 +440,7 @@ def bbands_width(arr: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def atr_channel_upper(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def atr_channel_upper(high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     ATR Channel upper band: SMA(close, window) + ATR(high, low, close, window).
     
@@ -462,7 +465,7 @@ def atr_channel_upper(high: np.ndarray, low: np.ndarray, close: np.ndarray, wind
 
 
 @njit(cache=True)
-def atr_channel_lower(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def atr_channel_lower(high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     ATR Channel lower band: SMA(close, window) - ATR(high, low, close, window).
     
@@ -487,7 +490,7 @@ def atr_channel_lower(high: np.ndarray, low: np.ndarray, close: np.ndarray, wind
 
 
 @njit(cache=True)
-def atr_channel_pos(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def atr_channel_pos(high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     ATR Channel position: (close - lower) / (upper - lower).
     
@@ -518,7 +521,7 @@ def atr_channel_pos(high: np.ndarray, low: np.ndarray, close: np.ndarray, window
 
 
 @njit(cache=True)
-def donchian_width(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def donchian_width(high: NDArray[np.float64], low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Donchian Channel width: (HH - LL) / close.
     
@@ -547,7 +550,7 @@ def donchian_width(high: np.ndarray, low: np.ndarray, close: np.ndarray, window:
 
 
 @njit(cache=True)
-def dist_to_hh(high: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def dist_to_hh(high: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Distance to Highest High: (close / HH) - 1.
     
@@ -575,7 +578,7 @@ def dist_to_hh(high: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def dist_to_ll(low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
+def dist_to_ll(low: NDArray[np.float64], close: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Distance to Lowest Low: (close / LL) - 1.
     
@@ -603,7 +606,7 @@ def dist_to_ll(low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
 
 
 @njit(cache=True)
-def percentile_rank(arr: np.ndarray, window: int) -> np.ndarray:
+def percentile_rank(arr: NDArray[np.float64], window: int) -> NDArray[np.float64]:
     """
     Rolling percentile rank of current value within trailing window (causal).
     Returns in [0,1].

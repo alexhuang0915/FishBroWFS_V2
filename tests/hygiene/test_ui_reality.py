@@ -34,6 +34,14 @@ def parse_ast_for_patterns(file_path: Path):
     
     patterns = []
     
+    # Helper to extract numeric value from AST node
+    def get_numeric_value(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            return node.value
+        if isinstance(node, ast.Num):
+            return node.n
+        return None
+    
     # Look for specific AST patterns
     for node in ast.walk(tree):
         # Look for random.choice() calls (common in mock data)
@@ -46,8 +54,14 @@ def parse_ast_for_patterns(file_path: Path):
         # Look for hardcoded lists that might be dropdown values
         if isinstance(node, ast.List):
             # Check if list contains typical timeframe values
-            if all(isinstance(el, ast.Num) for el in node.elts):
-                values = [el.n for el in node.elts]
+            values = []
+            for el in node.elts:
+                val = get_numeric_value(el)
+                if val is None:
+                    break
+                values.append(val)
+            else:
+                # All elements are numeric
                 # Common timeframe patterns
                 if set(values) == {15, 30, 60, 120, 240}:
                     patterns.append(("hardcoded_timeframes", node.lineno))

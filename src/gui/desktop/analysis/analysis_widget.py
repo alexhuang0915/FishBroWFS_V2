@@ -216,6 +216,7 @@ class AnalysisWidget(QWidget):
         metrics_group.setLayout(metrics_layout)
         layout.addWidget(metrics_group, 30)  # 30% stretch
         
+        assert self.tab_widget is not None
         self.tab_widget.addTab(tab, "Dashboard")
     
     def create_kpi_card(self, title: str, key: str, fmt: str, color: str) -> QFrame:
@@ -301,6 +302,7 @@ class AnalysisWidget(QWidget):
         risk_metrics_group.setLayout(risk_metrics_layout)
         layout.addWidget(risk_metrics_group)
         
+        assert self.tab_widget is not None
         self.tab_widget.addTab(tab, "Risk")
     
     def create_period_tab(self):
@@ -347,6 +349,7 @@ class AnalysisWidget(QWidget):
         summary_group.setLayout(summary_layout)
         layout.addWidget(summary_group)
         
+        assert self.tab_widget is not None
         self.tab_widget.addTab(tab, "Period")
     
     def create_trades_tab(self):
@@ -456,6 +459,7 @@ class AnalysisWidget(QWidget):
         
         main_layout.addWidget(splitter)
         
+        assert self.tab_widget is not None
         self.tab_widget.addTab(tab, "Trades")
     
     def set_report_loaded(self, loaded: bool):

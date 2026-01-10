@@ -19,6 +19,7 @@ def test_outputs_directory_structure():
     # These are the canonical buckets defined in Config Constitution v1
     allowed_buckets = {
         "_dp_evidence",      # Diagnostic/forensic evidence
+        "_audit_bundle",     # Audit artifacts
         "_runtime",          # Runtime temporary files
         "_trash",            # Soft-deleted files (can be cleaned)
         "deployment",        # Deployment artifacts

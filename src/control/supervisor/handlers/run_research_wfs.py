@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import json
 import logging
+import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,10 +48,12 @@ from src.contracts.research_wfs.result_schema import (
     RiskConfig,
     DataConfig,
     TimeRange,
+    WindowRule,
 )
 from src.wfs.evaluation import evaluate, RawMetrics
 from src.wfs.stitching import stitch_equity_series
 from src.wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
+from src.core.determinism import stable_seed_from_intent
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +91,11 @@ class RunResearchWFSHandler(BaseJobHandler):
         
         # Update heartbeat
         context.heartbeat(progress=0.1, phase="validating_inputs")
-        
+
+        seed = stable_seed_from_intent(params)
+        self.rng = random.Random(seed)
+        logger.info(f"ResearchWFS determinism seed: {seed}")
+
         try:
             # Parse and validate parameters
             strategy_id = params["strategy_id"]
@@ -129,7 +136,11 @@ class RunResearchWFSHandler(BaseJobHandler):
                 timeframe=timeframe,
                 start_season=start_season,
                 end_season=end_season,
-                window_rule={"is_years": 3, "oos_quarters": 1, "rolling": "quarterly"}
+                window_rule={
+                    "is_years": 3,
+                    "oos_quarters": 1,
+                    "rolling": "quarterly"
+                }  # type: ignore
             )
             
             # Execute WFS research
@@ -179,7 +190,7 @@ class RunResearchWFSHandler(BaseJobHandler):
             
             # Build verdict
             verdict = Verdict(
-                grade=evaluation_result.grade,
+                grade=evaluation_result.grade,  # type: ignore
                 is_tradable=evaluation_result.is_tradable,
                 summary=evaluation_result.summary
             )
@@ -296,10 +307,10 @@ class RunResearchWFSHandler(BaseJobHandler):
             data1=dataset,
             data2=None,
             timeframe=timeframe,
-            actual_time_range=TimeRange(
-                start="2020-01-01T00:00:00Z",  # Placeholder
-                end="2023-12-31T23:59:59Z"     # Placeholder
-            )
+            actual_time_range={
+                "start": "2020-01-01T00:00:00Z",  # Placeholder
+                "end": "2023-12-31T23:59:59Z"     # Placeholder
+            }
         )
         
         return Config(
@@ -317,7 +328,7 @@ class RunResearchWFSHandler(BaseJobHandler):
         timeframe: str,
         start_season: str,
         end_season: str,
-        window_rule: Dict[str, Any]
+        window_rule: WindowRule
     ) -> Meta:
         """Build meta information."""
         return Meta(
@@ -408,7 +419,6 @@ class RunResearchWFSHandler(BaseJobHandler):
     
     def _generate_synthetic_window_result(self, season: str) -> WindowResult:
         """Generate synthetic window result for testing."""
-        import random
         
         # Generate synthetic date ranges
         year = int(season[:4])
@@ -421,11 +431,11 @@ class RunResearchWFSHandler(BaseJobHandler):
         oos_end = f"{year}-03-31T23:59:59Z"
         
         # Generate synthetic metrics
-        is_net = random.uniform(-1000, 5000)
-        oos_net = random.uniform(-500, 3000)
+        is_net = self.rng.uniform(-1000, 5000)
+        oos_net = self.rng.uniform(-500, 3000)
         
         # Determine pass/fail (simple rule: OOS net > 0 and trades >= 10)
-        oos_trades = random.randint(5, 50)
+        oos_trades = self.rng.randint(5, 50)
         pass_window = oos_net > 0 and oos_trades >= 10
         fail_reasons = [] if pass_window else ["OOS net <= 0" if oos_net <= 0 else "Insufficient trades"]
         
@@ -436,21 +446,20 @@ class RunResearchWFSHandler(BaseJobHandler):
             best_params={"param1": 20, "param2": 1.5},  # Placeholder
             is_metrics={
                 "net": is_net,
-                "mdd": random.uniform(0, 1000),
-                "trades": random.randint(20, 100)
+                "mdd": self.rng.uniform(0, 1000),
+                "trades": self.rng.randint(20, 100)
             },
             oos_metrics={
                 "net": oos_net,
-                "mdd": random.uniform(0, 500),
+                "mdd": self.rng.uniform(0, 500),
                 "trades": oos_trades
             },
-            pass_=pass_window,  # Use pass_ with alias "pass"
+            pass_=pass_window,  # type: ignore
             fail_reasons=fail_reasons
         )
     
     def _generate_synthetic_equity_series(self, season: str, series_type: str) -> List[EquityPoint]:
         """Generate synthetic equity series for testing."""
-        import random
         from datetime import datetime, timedelta
         
         year = int(season[:4])
@@ -468,7 +477,7 @@ class RunResearchWFSHandler(BaseJobHandler):
             timestamp = start_date + timedelta(days=i)
             
             # Add random walk
-            equity += random.uniform(-50, 100)
+            equity += self.rng.uniform(-50, 100)
             
             points.append(EquityPoint(
                 t=timestamp.isoformat() + "Z",
@@ -479,7 +488,6 @@ class RunResearchWFSHandler(BaseJobHandler):
     
     def _aggregate_metrics(self, windows: List[WindowResult]) -> RawMetrics:
         """Aggregate metrics across windows."""
-        import random
         
         # Calculate aggregate metrics from windows
         pass_count = sum(1 for w in windows if w.pass_)
@@ -492,13 +500,13 @@ class RunResearchWFSHandler(BaseJobHandler):
         # Generate synthetic aggregate metrics (placeholder)
         # In real implementation, would compute from stitched equity series
         return RawMetrics(
-            rf=random.uniform(1.0, 5.0),  # Return Factor
-            wfe=random.uniform(0.3, 0.9),  # Walk-Forward Efficiency
-            ecr=random.uniform(1.0, 4.0),  # Efficiency to Capital Ratio
+            rf=self.rng.uniform(1.0, 5.0),  # Return Factor
+            wfe=self.rng.uniform(0.3, 0.9),  # Walk-Forward Efficiency
+            ecr=self.rng.uniform(1.0, 4.0),  # Efficiency to Capital Ratio
             trades=total_trades,
             pass_rate=pass_rate,
-            ulcer_index=random.uniform(0.0, 20.0),
-            max_underwater_days=random.randint(0, 50)
+            ulcer_index=self.rng.uniform(0.0, 20.0),
+            max_underwater_days=self.rng.randint(0, 50)
         )
 
 

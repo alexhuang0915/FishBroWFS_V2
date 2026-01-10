@@ -1,6 +1,7 @@
 # Version: V1
 # Purpose: Top-level allowlist for outputs/ to prevent drift beyond Phase Z baseline.
 _dp_evidence
+_audit_bundle
 _trash
 _runtime
 jobs

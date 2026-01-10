@@ -10,16 +10,17 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, cast
 
 import pandas as pd
 import numpy as np
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+from matplotlib.backends.backend_qt import NavigationToolbar2QT as NavigationToolbar
 import matplotlib.pyplot as plt
 
 from PySide6.QtCore import Qt, Signal, Slot
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
     QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout,
@@ -67,7 +68,7 @@ class AnalysisWidget(QWidget):
         
         # Tab widget - compact
         self.tab_widget = QTabWidget()
-        self.tab_widget.setTabPosition(QTabWidget.North)
+        self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
@@ -220,7 +221,7 @@ class AnalysisWidget(QWidget):
     def create_kpi_card(self, title: str, key: str, fmt: str, color: str) -> QFrame:
         """Create a KPI metric card widget."""
         card = QFrame()
-        card.setFrameStyle(QFrame.StyledPanel)
+        card.setFrameStyle(QFrame.Shape.StyledPanel)
         card.setStyleSheet(f"""
             QFrame {{
                 background-color: #1E1E1E;
@@ -240,13 +241,13 @@ class AnalysisWidget(QWidget):
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet("color: #9A9A9A; font-size: 10px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(title_label)
         
         # Value
         value_label = QLabel("—")
         value_label.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold;")
-        value_label.setAlignment(Qt.AlignCenter)
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(value_label)
         
         # Store reference
@@ -354,7 +355,7 @@ class AnalysisWidget(QWidget):
         main_layout = QVBoxLayout(tab)
         
         # Create vertical splitter for table (top) and stats (bottom)
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         
         # Top: Trade History table
         table_group = QGroupBox("Trade History")
@@ -368,7 +369,7 @@ class AnalysisWidget(QWidget):
         ])
         self.trades_table.setSortingEnabled(True)
         self.trades_table.setAlternatingRowColors(True)
-        self.trades_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.trades_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Apply dark theme styling
         self.trades_table.setStyleSheet("""
@@ -460,6 +461,7 @@ class AnalysisWidget(QWidget):
     def set_report_loaded(self, loaded: bool):
         """Set whether a report is loaded (show placeholder or content)."""
         # Always keep tabs enabled
+        assert self.tab_widget is not None
         self.tab_widget.setEnabled(True)
         
         # Update status label
@@ -585,6 +587,7 @@ class AnalysisWidget(QWidget):
     
     def update_dashboard(self):
         """Update dashboard tab with equity curve, KPI cards, and metrics."""
+        assert self.dashboard_canvas is not None
         # Clear previous plots
         self.dashboard_figure.clear()
         
@@ -675,6 +678,7 @@ class AnalysisWidget(QWidget):
     
     def update_risk_tab(self):
         """Update risk tab with underwater plot and PnL histogram."""
+        assert self.risk_canvas is not None
         # Clear previous plots
         self.risk_figure.clear()
         
@@ -687,7 +691,7 @@ class AnalysisWidget(QWidget):
             if "drawdown" in self.equity_df.columns:
                 drawdown = self.equity_df["drawdown"] * 100  # Convert to percentage
                 ax1.fill_between(self.equity_df["ts"], drawdown, 0,
-                               where=drawdown < 0, color="#f44336", alpha=0.7)
+                               where=list((drawdown < 0).to_numpy(dtype=bool)), color="#f44336", alpha=0.7)
                 ax1.plot(self.equity_df["ts"], drawdown, color="#d32f2f", linewidth=1)
                 ax1.axhline(y=0, color='black', linestyle='-', linewidth=0.5)
                 ax1.set_title("Underwater Plot (Drawdown)", fontsize=14, fontweight="bold")
@@ -718,8 +722,8 @@ class AnalysisWidget(QWidget):
                 "volatility_annual": self.report.get("analytics", {}).get("volatility_annual", 0),
                 "var_95": float(np.percentile(pnl, 5)) if len(pnl) > 0 else 0,
                 "cvar_95": float(pnl[pnl <= np.percentile(pnl, 5)].mean()) if len(pnl) > 0 else 0,
-                "skewness": float(pnl.skew()) if len(pnl) > 0 else 0,
-                "kurtosis": float(pnl.kurtosis()) if len(pnl) > 0 else 0,
+                "skewness": float(cast(float, pnl.skew())) if len(pnl) > 0 else 0,
+                "kurtosis": float(cast(float, pnl.kurtosis())) if len(pnl) > 0 else 0,
             }
             
             # Format and display
@@ -741,6 +745,7 @@ class AnalysisWidget(QWidget):
     
     def update_period_tab(self):
         """Update period tab with monthly returns heatmap."""
+        assert self.period_canvas is not None
         # Clear previous plots
         self.period_figure.clear()
         
@@ -802,6 +807,7 @@ class AnalysisWidget(QWidget):
     
     def update_trades_tab(self):
         """Update trades tab with table and statistics."""
+        assert self.trades_table is not None
         if self.trades_df is not None and not self.trades_df.empty:
             # Populate table
             self.trades_table.setRowCount(len(self.trades_df))
@@ -809,17 +815,17 @@ class AnalysisWidget(QWidget):
             for i, (_, trade) in enumerate(self.trades_df.iterrows()):
                 # Entry time
                 entry_item = QTableWidgetItem(str(trade.get("entry_ts", "")))
-                entry_item.setData(Qt.UserRole, trade.get("entry_ts"))
+                entry_item.setData(Qt.ItemDataRole.UserRole, trade.get("entry_ts"))
                 self.trades_table.setItem(i, 0, entry_item)
                 
                 # Exit time
                 exit_item = QTableWidgetItem(str(trade.get("exit_ts", "")))
-                exit_item.setData(Qt.UserRole, trade.get("exit_ts"))
+                exit_item.setData(Qt.ItemDataRole.UserRole, trade.get("exit_ts"))
                 self.trades_table.setItem(i, 1, exit_item)
                 
                 # Side
                 side_item = QTableWidgetItem(str(trade.get("side", "")))
-                side_item.setForeground(Qt.darkGreen if trade.get("side") == "LONG" else Qt.darkRed)
+                side_item.setForeground(QColor("darkgreen") if trade.get("side") == "LONG" else QColor("darkred"))
                 self.trades_table.setItem(i, 2, side_item)
                 
                 # Entry price
@@ -831,7 +837,7 @@ class AnalysisWidget(QWidget):
                 # PnL
                 pnl = trade.get("pnl", 0)
                 pnl_item = QTableWidgetItem(f"{pnl:,.2f}")
-                pnl_item.setForeground(Qt.darkGreen if pnl >= 0 else Qt.darkRed)
+                pnl_item.setForeground(QColor("darkgreen") if pnl >= 0 else QColor("darkred"))
                 self.trades_table.setItem(i, 5, pnl_item)
                 
                 # Bars held
@@ -841,7 +847,7 @@ class AnalysisWidget(QWidget):
                 entry_px = trade.get("entry_px", 1)
                 return_pct = (pnl / entry_px * 100) if entry_px != 0 else 0
                 return_item = QTableWidgetItem(f"{return_pct:.2f}%")
-                return_item.setForeground(Qt.darkGreen if return_pct >= 0 else Qt.darkRed)
+                return_item.setForeground(QColor("darkgreen") if return_pct >= 0 else QColor("darkred"))
                 self.trades_table.setItem(i, 7, return_item)
             
             # Resize columns to content

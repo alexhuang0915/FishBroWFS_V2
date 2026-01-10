@@ -10,7 +10,10 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 import time
 
-from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer, QModelIndex, QAbstractTableModel, QUrl, QSize
+from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer, QModelIndex, QPersistentModelIndex, QAbstractTableModel, QUrl, QSize, QRect
+from typing import Union
+
+IndexLike = Union[QModelIndex, QPersistentModelIndex]
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QComboBox, QPushButton, QTableView, QSplitter,
@@ -27,7 +30,7 @@ from ...services.supervisor_client import (
     get_jobs, get_job, get_artifacts, get_strategy_report_v1,
     get_stdout_tail, get_reveal_evidence_path, submit_job
 )
-from src.config import load_timeframes
+from src.config.registry.timeframes import load_timeframes
 
 logger = logging.getLogger(__name__)
 
@@ -168,13 +171,13 @@ class JobsTableModel(QAbstractTableModel):
                 values.add(str(val))
         return sorted(list(values))
     
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent: IndexLike = QModelIndex()):
         return len(self.filtered_jobs)
     
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent: IndexLike = QModelIndex()):
         return len(self.headers)
     
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: IndexLike, role: int = Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
         
@@ -186,7 +189,7 @@ class JobsTableModel(QAbstractTableModel):
         
         job = self.filtered_jobs[row]
         
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:  # Job ID
                 job_id = job.get("job_id", "")
                 return job_id[:8] + "..." if len(job_id) > 8 else job_id
@@ -244,17 +247,17 @@ class JobsTableModel(QAbstractTableModel):
                         return finished
                 return "—"
         
-        elif role == Qt.TextAlignmentRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in [9, 10]:  # Timestamps
-                return Qt.AlignLeft | Qt.AlignTop
+                return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
             elif col == 11:  # Actions column
-                return Qt.AlignCenter
+                return Qt.AlignmentFlag.AlignCenter
             elif col in [7, 8]:  # Duration, Score
-                return Qt.AlignRight | Qt.AlignVCenter
+                return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             else:
-                return Qt.AlignLeft | Qt.AlignVCenter
+                return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         
-        elif role == Qt.ForegroundRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             if col == 6:  # Status column
                 status = job.get("status", "")
                 # Phase E.1 color coding: amber for RUNNING, green for SUCCEEDED, red for FAILED/REJECTED
@@ -277,7 +280,7 @@ class JobsTableModel(QAbstractTableModel):
                         return QColor("#F44336")  # red for negative
                 return None
         
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.FontRole:
             if col == 6:  # Status column
                 font = QFont()
                 font.setBold(True)
@@ -285,8 +288,8 @@ class JobsTableModel(QAbstractTableModel):
         
         return None
     
-    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             if section < len(self.headers):
                 return self.headers[section]
         return None
@@ -308,7 +311,7 @@ class ActionsDelegate(QStyledItemDelegate):
         self.hovered_row = -1
         self.hovered_button = -1
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: IndexLike):
         """Paint action buttons."""
         # Draw default background
         super().paint(painter, option, index)
@@ -340,16 +343,17 @@ class ActionsDelegate(QStyledItemDelegate):
         button_height = 24
         button_spacing = 4
         total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-        start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+        rect: QRect = option.rect  # type: ignore
+        start_x = rect.left() + (rect.width() - total_width) // 2
         
         painter.save()
         
         for i, (action_type, text, enabled) in enumerate(buttons):
-            button_rect = option.rect.adjusted(
+            button_rect = option.rect.adjusted(  # type: ignore
                 start_x + i * (button_width + button_spacing),
-                (option.rect.height() - button_height) // 2,
-                start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                (option.rect.height() - button_height) // 2,  # type: ignore
+                start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,  # type: ignore
+                (option.rect.height() - button_height) // 2 - option.rect.height() + button_height  # type: ignore
             )
             
             # Determine button style
@@ -375,7 +379,7 @@ class ActionsDelegate(QStyledItemDelegate):
             # Draw text
             painter.setPen(text_color)
             painter.setFont(QFont("Arial", 9))
-            painter.drawText(button_rect, Qt.AlignCenter, text)
+            painter.drawText(button_rect, Qt.AlignmentFlag.AlignCenter, text)
         
         painter.restore()
     
@@ -409,15 +413,15 @@ class ActionsDelegate(QStyledItemDelegate):
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-            start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+            start_x = option.rect.left() + (option.rect.width() - total_width) // 2  # type: ignore
             
             # Check which button was clicked
             for i, (action_type, enabled) in enumerate(buttons):
-                button_rect = option.rect.adjusted(
+                button_rect = option.rect.adjusted(  # type: ignore
                     start_x + i * (button_width + button_spacing),
-                    (option.rect.height() - button_height) // 2,
-                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                    (option.rect.height() - button_height) // 2,  # type: ignore
+                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,  # type: ignore
+                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height  # type: ignore
                 )
                 
                 if button_rect.contains(event.pos()) and enabled:
@@ -455,16 +459,16 @@ class ActionsDelegate(QStyledItemDelegate):
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-            start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+            start_x = option.rect.left() + (option.rect.width() - total_width) // 2  # type: ignore
             
             # Check which button is hovered
             self.hovered_button = -1
             for i, (_, enabled) in enumerate(buttons):
-                button_rect = option.rect.adjusted(
+                button_rect = option.rect.adjusted(  # type: ignore
                     start_x + i * (button_width + button_spacing),
-                    (option.rect.height() - button_height) // 2,
-                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                    (option.rect.height() - button_height) // 2,  # type: ignore
+                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,  # type: ignore
+                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height  # type: ignore
                 )
                 
                 if button_rect.contains(event.pos()) and enabled:
@@ -508,7 +512,7 @@ class OpTab(QWidget):
         main_layout.setSpacing(8)
         
         # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setStyleSheet("""
             QSplitter::handle {
                 background-color: #555555;
@@ -559,7 +563,7 @@ class OpTab(QWidget):
         form_layout = QFormLayout(form_widget)
         form_layout.setContentsMargins(12, 12, 12, 12)
         form_layout.setSpacing(10)
-        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Strategy family combobox
         self.strategy_cb = QComboBox()
@@ -597,7 +601,7 @@ class OpTab(QWidget):
         form_layout.addRow("Season:", self.season_cb)
         
         # Add stretch to push button to bottom
-        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # RUN STRATEGY button (big)
         self.run_button = QPushButton("RUN STRATEGY")
@@ -714,8 +718,8 @@ class OpTab(QWidget):
         self.jobs_table = QTableView()
         self.jobs_table.setModel(self.jobs_model)
         self.jobs_table.setItemDelegateForColumn(11, self.actions_delegate)
-        self.jobs_table.setSelectionBehavior(QTableView.SelectRows)
-        self.jobs_table.setSelectionMode(QTableView.SingleSelection)
+        self.jobs_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.jobs_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.jobs_table.setAlternatingRowColors(True)
         self.jobs_table.setStyleSheet("""
             QTableView {
@@ -1002,11 +1006,11 @@ class OpTab(QWidget):
                     f"Season: {season}\n"
                     f"Mode: {run_mode}\n\n"
                     "Run again anyway?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No  # Default to No (Cancel)
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No  # Default to No (Cancel)
                 )
                 
-                if reply == QMessageBox.No:
+                if reply == QMessageBox.StandardButton.No:
                     self.status_label.setText("Job submission cancelled (duplicate warning)")
                     self.log_signal.emit("Job submission cancelled due to duplicate warning")
                     return
@@ -1050,7 +1054,7 @@ class OpTab(QWidget):
     def view_logs(self, job_id: str):
         """Open log viewer dialog for a job."""
         try:
-            dialog = LogViewerDialog(job_id, self)
+            dialog = LogViewerDialog(job_id, parent=self)
             dialog.exec()
         except Exception as e:
             QMessageBox.critical(self, "Log Viewer Error", f"Failed to open logs: {e}")
@@ -1059,10 +1063,12 @@ class OpTab(QWidget):
     def open_evidence(self, job_id: str):
         """Open evidence folder for a job."""
         try:
-            path = get_reveal_evidence_path(job_id)
-            if path:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
-                self.log_signal.emit(f"Opened evidence folder: {path}")
+            path_dict = get_reveal_evidence_path(job_id)
+            if path_dict and isinstance(path_dict, dict):
+                path_str = path_dict.get("path")
+                if path_str:
+                    QDesktopServices.openUrl(QUrl.fromLocalFile(path_str))
+                    self.log_signal.emit(f"Opened evidence folder: {path_str}")
             else:
                 QMessageBox.information(self, "No Evidence", "No evidence folder available for this job.")
         except SupervisorClientError as e:

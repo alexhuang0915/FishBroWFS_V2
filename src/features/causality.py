@@ -36,7 +36,7 @@ def generate_impulse_signal(
     impulse_position: int = 500,
     impulse_magnitude: float = 1.0,
     noise_std: float = 0.01
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generate synthetic OHLCV data with a single impulse.
     
@@ -92,7 +92,8 @@ def compute_impulse_response(
     compute_func: Callable[..., np.ndarray],
     impulse_position: int = 500,
     test_length: int = 1000,
-    lookahead_tolerance: int = 0
+    lookahead_tolerance: int = 0,
+    impulse_magnitude: float = 10.0
 ) -> np.ndarray:
     """
     Compute impulse response of a feature function.
@@ -105,6 +106,7 @@ def compute_impulse_response(
         impulse_position: Position of the impulse in test data
         test_length: Length of test signal
         lookahead_tolerance: Allowable lookahead (0 for strict causality)
+        impulse_magnitude: Magnitude of the impulse (default 10.0)
         
     Returns:
         Impulse response array (feature values)
@@ -116,7 +118,7 @@ def compute_impulse_response(
     ts, o, h, l, c, v = generate_impulse_signal(
         length=test_length,
         impulse_position=impulse_position,
-        impulse_magnitude=10.0,  # Large impulse for clear detection
+        impulse_magnitude=impulse_magnitude,
         noise_std=0.001  # Low noise for clean signal
     )
     
@@ -155,7 +157,8 @@ def detect_lookahead(
     impulse_response: np.ndarray,
     impulse_position: int = 500,
     lookahead_tolerance: int = 0,
-    significance_threshold: float = 1e-6
+    significance_threshold: float = 1e-6,
+    baseline_response: Optional[np.ndarray] = None
 ) -> Tuple[bool, int, float]:
     """
     Detect lookahead behavior from impulse response.
@@ -165,12 +168,22 @@ def detect_lookahead(
         impulse_position: Position of the impulse
         lookahead_tolerance: Allowable lookahead bars
         significance_threshold: Threshold for detecting non-zero response
+        baseline_response: Optional baseline feature values (without impulse).
+            If provided, the difference (impulse_response - baseline_response) is used.
         
     Returns:
         Tuple of (lookahead_detected, earliest_lookahead_index, max_violation)
     """
+    # If baseline provided, compute difference
+    if baseline_response is not None:
+        if baseline_response.shape != impulse_response.shape:
+            raise ValueError("baseline_response must have same shape as impulse_response")
+        response = impulse_response - baseline_response
+    else:
+        response = impulse_response
+    
     # Find indices before impulse where response is significant
-    pre_impulse = impulse_response[:impulse_position - lookahead_tolerance]
+    pre_impulse = response[:impulse_position - lookahead_tolerance]
     
     # Check for any significant response before impulse (allowing tolerance)
     violations = np.where(np.abs(pre_impulse) > significance_threshold)[0]
@@ -266,20 +279,31 @@ def verify_feature_causality(
     
     compute_func = feature_spec.compute_func
     
-    # 1. Impulse response test
+    # 1. Impulse response test (with impulse)
     impulse_response = compute_impulse_response(
         compute_func,
         impulse_position=500,
         test_length=1000,
-        lookahead_tolerance=0
+        lookahead_tolerance=0,
+        impulse_magnitude=10.0
     )
     
-    # 2. Detect lookahead
+    # Baseline response (without impulse)
+    baseline_response = compute_impulse_response(
+        compute_func,
+        impulse_position=500,
+        test_length=1000,
+        lookahead_tolerance=0,
+        impulse_magnitude=0.0
+    )
+    
+    # 2. Detect lookahead using difference
     lookahead_detected, earliest_lookahead, max_violation = detect_lookahead(
         impulse_response,
         impulse_position=500,
         lookahead_tolerance=0,
-        significance_threshold=1e-6
+        significance_threshold=1e-6,
+        baseline_response=baseline_response
     )
     
     # 3. Verify window honesty

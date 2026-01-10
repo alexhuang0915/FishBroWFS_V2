@@ -70,9 +70,10 @@ def test_dishonest_window_feature_detection():
 
 def test_window_honesty_affects_max_lookback():
     """Test that dishonest windows affect max lookback calculation."""
-    registry = FeatureRegistry(verification_enabled=True)
+    # Disable verification to allow registration of dishonest features
+    registry = FeatureRegistry(verification_enabled=False)
     
-    # Register an honest feature with lookback=5
+    # Register a feature with lookback=5 (dishonest, but we'll treat as honest for test)
     def honest_func(o, h, l, c):
         return np.zeros(len(c))
     
@@ -81,29 +82,33 @@ def test_window_honesty_affects_max_lookback():
         timeframe_min=15,
         lookback_bars=5,
         params={},
-        compute_func=honest_func,
-        skip_verification=True  # Skip to avoid false positives
+        compute_func=honest_func
     )
     
     # Register a dishonest feature with claimed lookback=20 (but actually 0)
     def dishonest_func(o, h, l, c):
         return np.ones(len(c))
     
-    # Register with skip_verification
     registry.register_feature(
         name="dishonest_20",
         timeframe_min=15,
         lookback_bars=20,
         params={},
-        compute_func=dishonest_func,
-        skip_verification=True
+        compute_func=dishonest_func
     )
     
     # Manually mark as dishonest for test
     for spec in registry.specs:
         if spec.name == "dishonest_20":
             spec.window_honest = False
+            spec.causality_verified = False
+        else:
+            # Mark the other as honest and verified (so max_lookback includes it)
+            spec.window_honest = True
+            spec.causality_verified = True
     
+    # Enable verification for max_lookback calculation (it only considers honest windows)
+    registry.verification_enabled = True
     # Max lookback should only consider honest windows
     max_lookback = registry.max_lookback_for_tf(15)
     
@@ -115,7 +120,7 @@ def test_specs_for_tf_excludes_dishonest():
     """Test that specs_for_tf excludes features with dishonest windows."""
     registry = FeatureRegistry(verification_enabled=True)
     
-    # Register an honest feature with skip_verification to avoid false positives
+    # Register an honest feature (verification enabled)
     def honest_func(o, h, l, c):
         return np.zeros(len(c))
     
@@ -124,29 +129,32 @@ def test_specs_for_tf_excludes_dishonest():
         timeframe_min=15,
         lookback_bars=0,  # Actually needs 0
         params={},
-        compute_func=honest_func,
-        skip_verification=True
+        compute_func=honest_func
     )
     
-    # Register a dishonest feature
+    # Temporarily disable verification to register a dishonest feature
+    registry.verification_enabled = False
     def dishonest_func(o, h, l, c):
         return np.ones(len(c))
     
-    # Register with skip_verification
     registry.register_feature(
         name="dishonest",
         timeframe_min=15,
         lookback_bars=20,
         params={},
-        compute_func=dishonest_func,
-        skip_verification=True
+        compute_func=dishonest_func
     )
+    registry.verification_enabled = True
     
     # Manually mark as dishonest and unverified
     for spec in registry.specs:
         if spec.name == "dishonest":
             spec.window_honest = False
             spec.causality_verified = False
+        else:
+            # Ensure honest feature is verified
+            spec.causality_verified = True
+            spec.window_honest = True
     
     # Get specs for timeframe
     specs = registry.specs_for_tf(15)
@@ -189,7 +197,7 @@ def test_get_dishonest_window_features():
     """Test retrieval of features with dishonest windows."""
     registry = FeatureRegistry(verification_enabled=True)
     
-    # Register an honest feature with skip_verification
+    # Register an honest feature (verification enabled)
     def honest_func(o, h, l, c):
         return np.zeros(len(c))
     
@@ -198,31 +206,27 @@ def test_get_dishonest_window_features():
         timeframe_min=15,
         lookback_bars=0,  # Actually needs 0
         params={},
-        compute_func=honest_func,
-        skip_verification=True
+        compute_func=honest_func
     )
     
-    # Register a dishonest feature
+    # Temporarily disable verification to register a dishonest feature
+    registry.verification_enabled = False
     def dishonest_func(o, h, l, c):
         return np.ones(len(c))
     
-    # Register with skip_verification
     registry.register_feature(
         name="dishonest_feature",
         timeframe_min=15,
         lookback_bars=20,
         params={},
-        compute_func=dishonest_func,
-        skip_verification=True
+        compute_func=dishonest_func
     )
+    registry.verification_enabled = True
     
-    # Run verification to detect dishonesty
-    # First, need to create a verification report that indicates dishonesty
-    # Since our simple verification may not detect it, we'll manually add a report
+    # Create a verification report that indicates dishonesty (manually)
     from features.models import CausalityReport
     import time
     
-    # Create a report indicating dishonesty
     dishonest_report = CausalityReport(
         feature_name="dishonest_feature",
         passed=False,
@@ -249,9 +253,9 @@ def test_get_dishonest_window_features():
 
 def test_remove_dishonest_feature():
     """Test removal of features with dishonest windows."""
-    registry = FeatureRegistry(verification_enabled=True)
+    registry = FeatureRegistry(verification_enabled=False)
     
-    # Register a feature
+    # Register a feature (dishonest window)
     def test_func(o, h, l, c):
         return np.zeros(len(c))
     
@@ -260,8 +264,7 @@ def test_remove_dishonest_feature():
         timeframe_min=15,
         lookback_bars=10,
         params={},
-        compute_func=test_func,
-        skip_verification=True
+        compute_func=test_func
     )
     
     # Mark as dishonest
@@ -279,9 +282,9 @@ def test_remove_dishonest_feature():
 
 def test_clear_registry():
     """Test clearing all features from registry."""
-    registry = FeatureRegistry(verification_enabled=True)
+    registry = FeatureRegistry(verification_enabled=False)
     
-    # Register some features
+    # Register some features (dishonest windows, but we disable verification)
     def func1(o, h, l, c):
         return np.zeros(len(c))
     
@@ -293,8 +296,7 @@ def test_clear_registry():
         timeframe_min=15,
         lookback_bars=10,
         params={},
-        compute_func=func1,
-        skip_verification=True
+        compute_func=func1
     )
     
     registry.register_feature(
@@ -302,8 +304,7 @@ def test_clear_registry():
         timeframe_min=30,
         lookback_bars=20,
         params={},
-        compute_func=func2,
-        skip_verification=True
+        compute_func=func2
     )
     
     # Add some verification reports

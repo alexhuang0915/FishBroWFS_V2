@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Callable, Any, Literal, Sequence
 import threading
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, SkipValidation
 
 from contracts.features import FeatureRegistry as ContractFeatureRegistry
 from contracts.features import FeatureSpec as ContractFeatureSpec
@@ -41,7 +41,7 @@ class FeatureRegistry(BaseModel):
     specs: List[FeatureSpec] = Field(default_factory=list)
     verification_reports: Dict[str, CausalityReport] = Field(default_factory=dict)
     verification_enabled: bool = Field(default=True)
-    lock: threading.Lock = Field(default_factory=threading.Lock, exclude=True)
+    lock: SkipValidation[threading.Lock] = Field(default_factory=threading.Lock, exclude=True)
     
     model_config = ConfigDict(arbitrary_types_allowed=True)
     
@@ -71,7 +71,7 @@ class FeatureRegistry(BaseModel):
             lookback_bars: Required lookback bars
             params: Feature parameters
             compute_func: Feature compute function (required for verification)
-            skip_verification: If True, skip causality verification (dangerous!)
+            skip_verification: If True, skip causality verification (FORBIDDEN - will raise RuntimeError)
             window: Rolling window size (default 1)
             min_warmup_bars: Minimum bars required for warm‑up (default 0)
             dtype: Output data type (must be "float64")
@@ -90,21 +90,8 @@ class FeatureRegistry(BaseModel):
             ValueError: If feature with same name/timeframe already exists and not deprecated
         """
         with self.lock:
-            # Check for duplicates (allow deprecated aliases)
-            for spec in self.specs:
-                if spec.name == name and spec.timeframe_min == timeframe_min:
-                    # If either existing or new spec is deprecated, allow duplicate
-                    # with a warning
-                    if spec.deprecated or deprecated:
-                        # Duplicate deprecated feature allowed silently
-                        pass
-                    else:
-                        raise ValueError(
-                            f"Feature '{name}' already registered for timeframe {timeframe_min}min"
-                        )
-            
-            # Create feature spec
-            feature_spec = FeatureSpec(
+            # Create feature spec for comparison
+            new_spec = FeatureSpec(
                 name=name,
                 timeframe_min=timeframe_min,
                 lookback_bars=lookback_bars,
@@ -122,6 +109,25 @@ class FeatureRegistry(BaseModel):
                 notes=notes,
                 canonical_name=canonical_name
             )
+            
+            # Check for duplicates (allow deprecated aliases and identical specs)
+            for existing_spec in self.specs:
+                if existing_spec.name == name and existing_spec.timeframe_min == timeframe_min:
+                    # If either existing or new spec is deprecated, allow duplicate silently
+                    if existing_spec.deprecated or deprecated:
+                        # Duplicate deprecated feature allowed silently
+                        pass
+                    else:
+                        # Check if specs are identical (idempotent re‑register)
+                        if existing_spec == new_spec:
+                            # Identical spec, return existing spec (idempotent)
+                            return existing_spec
+                        else:
+                            raise ValueError(
+                                f"Feature '{name}' already registered for timeframe {timeframe_min}min with different specification"
+                            )
+            
+            feature_spec = new_spec
             
             # Perform causality verification if enabled and not skipped
             if self.verification_enabled and not skip_verification:
@@ -153,9 +159,11 @@ class FeatureRegistry(BaseModel):
                         f"Feature '{name}' verification failed with error: {e}"
                     ) from e
             elif skip_verification:
-                # Mark as verified without warning (dangerous but allowed)
-                feature_spec.causality_verified = True
-                feature_spec.verification_timestamp = None  # No actual verification
+                # Skip verification is FORBIDDEN (Phase 6.0 Hard-Fail Hygiene)
+                raise RuntimeError(
+                    f"Feature '{name}' attempted to skip causality verification. "
+                    "Skip verification is forbidden and must hard-fail immediately."
+                )
             
             # Add to registry
             self.specs.append(feature_spec)
@@ -252,6 +260,21 @@ class FeatureRegistry(BaseModel):
     def get_unverified_features(self) -> List[FeatureSpec]:
         """Get list of features that haven't passed causality verification."""
         return [spec for spec in self.specs if not spec.causality_verified]
+    
+    def assert_all_causality_verified(self) -> None:
+        """
+        Hard‑fail if any registered feature lacks causality verification.
+        
+        Raises:
+            RuntimeError: If any feature is unverified.
+        """
+        unverified = self.get_unverified_features()
+        if unverified:
+            names = [spec.name for spec in unverified]
+            raise RuntimeError(
+                f"Found {len(unverified)} unverified features: {names}. "
+                "Unverified causality must fail at gate time."
+            )
     
     def get_features_with_lookahead(self) -> List[FeatureSpec]:
         """Get list of features that have detected lookahead."""

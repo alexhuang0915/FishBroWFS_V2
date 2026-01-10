@@ -60,6 +60,9 @@ def parse_ast_for_patterns(file_path: Path):
                 values.append(val)
             else:
                 # All elements are numeric
+                # Skip empty lists (false positives)
+                if not values:
+                    return patterns
                 # Common timeframe patterns
                 if set(values) == {15, 30, 60, 120, 240}:
                     patterns.append(("hardcoded_timeframes", node.lineno))
@@ -149,12 +152,9 @@ def test_ui_uses_registry_loaders():
         except UnicodeDecodeError:
             continue
     
-    # During migration, this is a warning, not a failure
-    # Warnings removed per Phase 5.3 warnings guillotine
-    if not registry_imports_found:
-        pass  # No warning
-    if not registry_usage_found:
-        pass  # No warning
+    # Hard fail if no registry imports or usage found
+    assert registry_imports_found, "No config registry imports found in UI modules"
+    assert registry_usage_found, "No registry loader usage (load_timeframes, load_instruments) found in UI modules"
 
 
 def test_no_hardcoded_dropdown_values():
@@ -206,10 +206,11 @@ def test_no_hardcoded_dropdown_values():
             if pattern_type.startswith("hardcoded_"):
                 violations.append((gui_file, line_num, f"{pattern_type} list"))
     
-    # During migration, violations are warnings
-    # Warnings removed per Phase 5.3 warnings guillotine
-    if violations:
-        pass  # No warning
+    # Hard fail on any hardcoded dropdown values
+    assert not violations, (
+        f"Hardcoded dropdown values found in UI modules:\n"
+        + "\n".join(f"  {file}:{line_num}: {line}" for file, line_num, line in violations)
+    )
 
 
 def test_ui_error_handling():

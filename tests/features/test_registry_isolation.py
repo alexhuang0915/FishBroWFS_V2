@@ -24,7 +24,7 @@ async def task(name: str):
         lookback_bars=10,
         params={},
         compute_func=lambda x: x,
-        skip_verification=True
+        skip_verification=False
     )
     current = get_default_registry()
     # Check that the feature was registered by looking at specs
@@ -61,7 +61,7 @@ async def test_registry_context_inheritance_break():
         lookback_bars=10,
         params={},
         compute_func=lambda x: x,
-        skip_verification=True
+        skip_verification=False
     )
     set_default_registry(parent_reg)
     
@@ -79,7 +79,7 @@ async def test_registry_context_inheritance_break():
             lookback_bars=10,
             params={},
             compute_func=lambda x: x,
-            skip_verification=True
+            skip_verification=False
         )
         return get_default_registry()
     
@@ -123,7 +123,7 @@ def test_sync_context_isolation():
         lookback_bars=10,
         params={},
         compute_func=lambda x: x,
-        skip_verification=True
+        skip_verification=False
     )
     
     # Save token and set new registry
@@ -141,7 +141,7 @@ def test_sync_context_isolation():
         lookback_bars=10,
         params={},
         compute_func=lambda x: x,
-        skip_verification=True
+        skip_verification=False
     )
     
     assert get_default_registry() is reg2

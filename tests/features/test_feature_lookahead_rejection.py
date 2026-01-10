@@ -67,7 +67,7 @@ def test_registry_accepts_causal_feature():
 
 
 def test_registry_skip_verification_dangerous():
-    """Test that skipping verification is possible but dangerous."""
+    """Test that skipping verification is forbidden and raises RuntimeError."""
     registry = FeatureRegistry(verification_enabled=True)
     
     # Define a function with lookahead
@@ -78,22 +78,19 @@ def test_registry_skip_verification_dangerous():
             result[i] = c[i + 1]  # Lookahead
         return result
     
-    # With skip_verification=True, registration should succeed (no warning after guillotine)
-    spec = registry.register_feature(
-        name="dangerous",
-        timeframe_min=15,
-        lookback_bars=0,
-        params={},
-        compute_func=lookahead_feature,
-        skip_verification=True
-    )
+    # With skip_verification=True, registration must hard-fail immediately
+    with pytest.raises(RuntimeError, match="Skip verification is forbidden"):
+        registry.register_feature(
+            name="dangerous",
+            timeframe_min=15,
+            lookback_bars=0,
+            params={},
+            compute_func=lookahead_feature,
+            skip_verification=True
+        )
     
-    # Feature should be registered but not truly verified
-    assert len(registry.specs) == 1
-    assert registry.specs[0].name == "dangerous"
-    assert registry.specs[0].causality_verified  # Marked as verified due to skip
-    # window_honest defaults to True when skipping verification
-    # This is expected behavior - we can't know if it's honest without verification
+    # Registry should remain empty
+    assert len(registry.specs) == 0
 
 
 def test_registry_verification_disabled():
@@ -137,7 +134,7 @@ def test_duplicate_feature_rejection():
         lookback_bars=0,
         params={},
         compute_func=causal_func,
-        skip_verification=True  # Skip for simplicity
+        skip_verification=False  # Skip for simplicity
     )
     
     # Second registration with same name/timeframe should fail
@@ -148,7 +145,7 @@ def test_duplicate_feature_rejection():
             lookback_bars=5,
             params={"window": 5},
             compute_func=causal_func,
-            skip_verification=True
+            skip_verification=False
         )
     
     # Different timeframe should be allowed
@@ -158,7 +155,7 @@ def test_duplicate_feature_rejection():
         lookback_bars=0,
         params={},
         compute_func=causal_func,
-        skip_verification=True
+        skip_verification=False
     )
     
     assert len(registry.specs) == 2
@@ -166,7 +163,8 @@ def test_duplicate_feature_rejection():
 
 def test_verify_all_registered():
     """Test verification of all registered features."""
-    registry = FeatureRegistry(verification_enabled=True)
+    # Start with verification disabled to allow registration of lookahead feature
+    registry = FeatureRegistry(verification_enabled=False)
     
     # Register a causal feature
     def causal_func(o, h, l, c):
@@ -180,7 +178,7 @@ def test_verify_all_registered():
         compute_func=causal_func
     )
     
-    # Register another with skip_verification
+    # Register a lookahead feature (verification disabled, so no error)
     def lookahead_func(o, h, l, c):
         n = len(c)
         result = np.zeros(n)
@@ -193,14 +191,15 @@ def test_verify_all_registered():
         timeframe_min=15,
         lookback_bars=0,
         params={},
-        compute_func=lookahead_func,
-        skip_verification=True
+        compute_func=lookahead_func
     )
     
-    # Initially, spec2 is marked as verified (due to skip) but not truly verified
-    assert spec2.causality_verified
+    # Initially, both features are unverified
+    assert not spec1.causality_verified
+    assert not spec2.causality_verified
     
-    # Verify all registered features
+    # Enable verification and verify all registered features
+    registry.verification_enabled = True
     reports = registry.verify_all_registered(reverify=True)
     
     # Should have reports for both features
@@ -221,6 +220,7 @@ def test_verify_all_registered():
 
 def test_get_unverified_features():
     """Test retrieval of unverified features."""
+    # Start with verification enabled for first feature
     registry = FeatureRegistry(verification_enabled=True)
     
     # Register a verified feature
@@ -235,7 +235,9 @@ def test_get_unverified_features():
         compute_func=causal_func
     )
     
-    # Register an unverified feature (skip verification)
+    # Temporarily disable verification to register an unverified feature
+    registry.verification_enabled = False
+    # Use a simple causal function that would pass verification if enabled
     def another_func(o, h, l, c):
         return np.ones(len(c))
     
@@ -244,28 +246,22 @@ def test_get_unverified_features():
         timeframe_min=15,
         lookback_bars=0,
         params={},
-        compute_func=another_func,
-        skip_verification=True
+        compute_func=another_func
     )
+    registry.verification_enabled = True
     
-    # Get unverified features
+    # Both features are now registered, but second is unverified
+    # (since verification was disabled at registration time)
     unverified = registry.get_unverified_features()
-    
-    # Only the skipped one should be unverified (even though marked as verified)
-    # Actually, skip_verification marks it as verified, so it won't appear
-    # Let's manually mark it as unverified for test
-    for spec in registry.specs:
-        if spec.name == "unverified":
-            spec.causality_verified = False
-    
-    unverified = registry.get_unverified_features()
+    # Should have exactly one unverified feature
     assert len(unverified) == 1
     assert unverified[0].name == "unverified"
 
 
 def test_get_features_with_lookahead():
     """Test retrieval of features with lookahead."""
-    registry = FeatureRegistry(verification_enabled=True)
+    # Start with verification disabled to allow registration of lookahead feature
+    registry = FeatureRegistry(verification_enabled=False)
     
     # Register a causal feature
     def causal_func(o, h, l, c):
@@ -279,7 +275,7 @@ def test_get_features_with_lookahead():
         compute_func=causal_func
     )
     
-    # Register a lookahead feature (skip verification first)
+    # Register a lookahead feature (verification disabled, so no error)
     def lookahead_func(o, h, l, c):
         n = len(c)
         result = np.zeros(n)
@@ -292,11 +288,11 @@ def test_get_features_with_lookahead():
         timeframe_min=15,
         lookback_bars=0,
         params={},
-        compute_func=lookahead_func,
-        skip_verification=True
+        compute_func=lookahead_func
     )
     
-    # Verify all to detect lookahead
+    # Enable verification and verify all to detect lookahead
+    registry.verification_enabled = True
     registry.verify_all_registered(reverify=True)
     
     # Get features with lookahead
@@ -310,8 +306,7 @@ def test_to_contract_registry():
     """Test conversion to contract registry."""
     registry = FeatureRegistry(verification_enabled=True)
     
-    # Register a verified feature with skip_verification to ensure it passes
-    # The causality verification has false positives, so we'll skip it for this test
+    # Register a verified feature (verification enabled)
     def causal_func(o, h, l, c):
         return np.zeros(len(c))
     
@@ -320,11 +315,11 @@ def test_to_contract_registry():
         timeframe_min=15,
         lookback_bars=0,
         params={},
-        compute_func=causal_func,
-        skip_verification=True  # Skip to avoid false positives
+        compute_func=causal_func
     )
     
-    # Register an unverified feature
+    # Temporarily disable verification to register an unverified feature
+    registry.verification_enabled = False
     def another_func(o, h, l, c):
         return np.ones(len(c))
     
@@ -333,14 +328,15 @@ def test_to_contract_registry():
         timeframe_min=15,
         lookback_bars=5,
         params={"window": 5},
-        compute_func=another_func,
-        skip_verification=True
+        compute_func=another_func
     )
+    registry.verification_enabled = True
     
-    # Manually mark the second as unverified
+    # The second feature is unverified (since verification was disabled)
+    # Ensure it's marked as unverified
     for spec in registry.specs:
         if spec.name == "unverified_feature":
-            spec.causality_verified = False
+            assert not spec.causality_verified
     
     # Convert to contract registry
     contract_reg = registry.to_contract_registry()

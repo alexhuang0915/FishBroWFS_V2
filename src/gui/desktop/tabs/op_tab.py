@@ -578,14 +578,9 @@ class OpTab(QWidget):
         
         # Timeframe combobox
         self.timeframe_cb = QComboBox()
-        try:
-            timeframe_registry = load_timeframes()
-            self.timeframe_cb.addItems(timeframe_registry.get_display_names())
-            self.timeframe_cb.setCurrentText(timeframe_registry.get_display_name(timeframe_registry.default))
-        except Exception as e:
-            logger.error(f"Failed to load timeframes from registry: {e}")
-            self.timeframe_cb.addItems(["15m", "30m", "60m", "120m", "240m", "1D"])
-            self.timeframe_cb.setCurrentText("60m")
+        timeframe_registry = load_timeframes()
+        self.timeframe_cb.addItems(timeframe_registry.get_display_names())
+        self.timeframe_cb.setCurrentText(timeframe_registry.get_display_name(timeframe_registry.default))
         self.timeframe_cb.setToolTip("Select timeframe")
         form_layout.addRow("Timeframe:", self.timeframe_cb)
         

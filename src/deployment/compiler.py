@@ -15,6 +15,9 @@ from typing import Dict, List, Any, Optional
 from governance.models import SeasonManifest
 from portfolio.spec import PortfolioSpec, PortfolioLeg
 from control.deploy_txt import write_deployment_txt
+from config.registry.instruments import load_instruments
+from config.profiles import load_profile
+from config.cost_utils import get_commission_slippage_for_instrument, CostModelError
 
 
 def parse_timeframe_to_minutes(timeframe_str: str) -> int:
@@ -59,7 +62,7 @@ def load_universe_spec(universe_path: Path) -> Dict[str, Dict[str, Any]]:
             ...
 
     Returns dict mapping symbol to dict with keys:
-        tick_size, multiplier, commission_per_side_usd, session_profile
+        tick_size, multiplier, commission_per_side_usd, slippage_per_side_usd, session_profile
     """
     import yaml
 
@@ -69,13 +72,32 @@ def load_universe_spec(universe_path: Path) -> Dict[str, Dict[str, Any]]:
     instruments = data.get("instruments", {})
     universe_spec = {}
 
+    # Load instruments registry to get profile mapping
+    instruments_registry = load_instruments()
+    symbol_to_profile = {}
+    for instrument in instruments_registry.instruments:
+        symbol_to_profile[instrument.id] = instrument.profile
+
     for symbol, spec in instruments.items():
         # Extract tick_size and multiplier (required)
         tick_size = spec.get("tick_size", 0.25)
         multiplier = spec.get("multiplier", 1.0)
 
-        # Commission per side not defined in instruments.yaml; default 0.0
-        commission_per_side_usd = spec.get("commission_per_side_usd", 0.0)
+        # Get commission and slippage from cost utilities (MANDATORY - no defaults)
+        # According to Config Constitution v1, all profiles must have cost models
+        try:
+            commission_per_side_usd, slippage_per_side_usd = get_commission_slippage_for_instrument(symbol)
+        except CostModelError as e:
+            # If cost model not found, raise error instead of falling back to 0.0
+            raise ValueError(
+                f"Failed to get cost model for instrument {symbol}: {e}. "
+                f"All profiles must define commission_per_side_usd and slippage_per_side_usd."
+            ) from e
+        except Exception as e:
+            # For any other error, also raise
+            raise ValueError(
+                f"Unexpected error getting cost model for {symbol}: {e}"
+            ) from e
 
         # Session profile: infer from exchange field or default to symbol's exchange part
         session_profile = spec.get("session_profile", None)
@@ -88,6 +110,7 @@ def load_universe_spec(universe_path: Path) -> Dict[str, Dict[str, Any]]:
             "tick_size": tick_size,
             "multiplier": multiplier,
             "commission_per_side_usd": commission_per_side_usd,
+            "slippage_per_side_usd": slippage_per_side_usd,
             "session_profile": session_profile,
         }
 

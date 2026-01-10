@@ -59,13 +59,16 @@ def write_deployment_txt(
 
     # 3. universe.txt
     with open(output_dir / "universe.txt", "w", encoding="utf-8") as f:
-        f.write("# symbol,tick_size,multiplier,commission_per_side_usd,session_profile\n")
+        f.write("# symbol,tick_size,multiplier,commission_per_side_usd,slippage_per_side_usd,session_profile\n")
         for symbol, spec in universe_spec.items():
-            tick = spec.get("tick_size", 0.25)
-            mult = spec.get("multiplier", 1.0)
-            comm = spec.get("commission_per_side_usd", 0.0)
-            sess = spec.get("session_profile", "GLOBEX")
-            f.write(f"{symbol},{tick},{mult},{comm},{sess}\n")
+            # According to Config Constitution v1, all required fields must be present
+            # No defaults allowed - raise KeyError if missing
+            tick = spec["tick_size"]
+            mult = spec["multiplier"]
+            comm = spec["commission_per_side_usd"]
+            slip = spec["slippage_per_side_usd"]
+            sess = spec.get("session_profile", "GLOBEX")  # session_profile can have default
+            f.write(f"{symbol},{tick},{mult},{comm},{slip},{sess}\n")
 
 
 def generate_example() -> None:
@@ -101,24 +104,28 @@ def generate_example() -> None:
         legs=legs,
     )
 
-    # Example universe spec
+    # Example universe spec (hardcoded for demonstration only)
+    # In production, these values should come from profiles via cost_utils
     universe = {
         "CME.MNQ": {
             "tick_size": 0.25,
             "multiplier": 2.0,
-            "commission_per_side_usd": 2.8,
+            "commission_per_side_usd": 2.8,  # Should come from CME_MNQ profile
+            "slippage_per_side_usd": 0.5,    # Should come from CME_MNQ profile
             "session_profile": "CME",
         },
         "CME.MES": {
             "tick_size": 0.25,
             "multiplier": 5.0,
-            "commission_per_side_usd": 2.8,
+            "commission_per_side_usd": 2.8,  # Should come from CME_MES profile
+            "slippage_per_side_usd": 0.5,    # Should come from CME_MES profile
             "session_profile": "CME",
         },
         "TWF.MXF": {
             "tick_size": 1.0,
             "multiplier": 50.0,
-            "commission_per_side_usd": 20.0,
+            "commission_per_side_usd": 20.0,  # Should come from TWF_MXF profile
+            "slippage_per_side_usd": 1.0,     # Should come from TWF_MXF profile
             "session_profile": "TAIFEX",
         },
     }

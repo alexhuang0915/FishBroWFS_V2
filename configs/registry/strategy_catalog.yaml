@@ -1,0 +1,20 @@
+version: "1.0"
+strategies:
+  - id: "s1_v1"
+    display_name: "Stage 1 Strategy"
+    family: "trend_following"
+    status: "active"
+    config_file: "s1_v1.yaml"
+    description: "Baseline Stage 1 strategy"
+    version: "1.0"
+    author: "FishBro"
+    created_date: "2025-01-01"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240

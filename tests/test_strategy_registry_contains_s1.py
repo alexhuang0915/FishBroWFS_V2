@@ -27,7 +27,7 @@ def test_default_strategy_registry_contains_s1():
 
 
 def test_s1_feature_requirements():
-    """Ensure S1 provides feature requirements (either via method or JSON)."""
+    """Ensure S1 provides feature requirements (Config Constitution v1: YAML only)."""
     from strategy.registry import get, load_builtin_strategies
     load_builtin_strategies()
     
@@ -42,14 +42,15 @@ def test_s1_feature_requirements():
         # Should have at least the 16 registry features + baseline
         assert len(req.required) >= 18
     else:
-        # Fallback: ensure JSON file exists
-        import json
+        # Config Constitution v1: Check for YAML file
+        import yaml
         from pathlib import Path
-        json_path = Path("configs/strategies/S1/features.json")
-        assert json_path.exists(), f"S1 feature requirements JSON not found at {json_path}"
-        data = json.loads(json_path.read_text())
-        assert data["strategy_id"] == "S1"
-        assert len(data["required"]) >= 18
+        yaml_path = Path("configs/strategies/s1_v1.yaml")
+        assert yaml_path.exists(), f"S1 feature requirements YAML not found at {yaml_path}"
+        with open(yaml_path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+        assert data["strategy_id"] == "s1_v1"
+        assert len(data.get("features", [])) >= 18
 
 
 def test_s1_registry_deterministic():
@@ -134,7 +135,7 @@ def test_run_research_resolves_s1():
         )
         write_features_manifest(manifest_data, features_dir / "features_manifest.json")
         
-        # Create strategy requirements JSON
+        # Create strategy requirements JSON (outputs artifact, allowed)
         strategy_dir = outputs_root / "strategies" / "S1"
         strategy_dir.mkdir(parents=True, exist_ok=True)
         import json

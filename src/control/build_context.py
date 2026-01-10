@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Literal
+from config.registry.timeframes import load_timeframes
 
 
 BuildMode = Literal["FULL", "INCREMENTAL"]
@@ -50,6 +51,8 @@ class BuildContext:
 
     def to_build_shared_kwargs(self) -> dict[str, Any]:
         """Return kwargs suitable for build_shared."""
+        # Use timeframe registry instead of hardcoded values
+        timeframe_registry = load_timeframes()
         return {
             "txt_path": self.txt_path,
             "mode": self.mode,
@@ -59,5 +62,5 @@ class BuildContext:
             "build_bars": self.build_bars_if_missing,
             "build_features": False,  # will be overridden by caller
             "feature_registry": None,
-            "tfs": [15, 30, 60, 120, 240],
+            "tfs": timeframe_registry.allowed_timeframes,
         }

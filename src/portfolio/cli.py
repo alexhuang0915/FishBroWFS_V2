@@ -123,7 +123,7 @@ def run_command(args):
             # Create auto-generated directory
             from datetime import datetime
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_dir = Path("outputs") / "portfolio" / f"run_{timestamp}"
+            output_dir = Path("outputs") / "jobs" / f"portfolio_{timestamp}"
         
         outputs_root = Path(args.outputs_root) if args.outputs_root else Path("outputs")
         

@@ -10,6 +10,7 @@ import numpy as np
 from pipeline.funnel import run_funnel
 from pipeline.stage0_runner import Stage0Result, run_stage0
 from pipeline.topk import select_topk
+from tests.helpers.costs import get_test_costs
 
 
 def test_topk_only_uses_proxy_value():
@@ -102,6 +103,7 @@ def test_funnel_topk_no_manual_filtering():
     ]).astype(np.float64)
     
     # Run funnel
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -109,6 +111,8 @@ def test_funnel_topk_no_manual_filtering():
         close,
         params_matrix,
         k=5,
+        commission=commission,
+        slip=slip,
     )
     
     # Verify Top-K is based solely on proxy_value
@@ -146,6 +150,7 @@ def test_funnel_stage2_only_runs_topk():
         np.random.uniform(1.0, 2.0, size=n_params),
     ]).astype(np.float64)
     
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -153,6 +158,8 @@ def test_funnel_stage2_only_runs_topk():
         close,
         params_matrix,
         k=3,
+        commission=commission,
+        slip=slip,
     )
     
     # Verify Stage0 ran on all params
@@ -193,6 +200,7 @@ def test_funnel_stage0_no_pnl_fields():
         np.random.uniform(1.0, 2.0, size=n_params),
     ]).astype(np.float64)
     
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -200,6 +208,8 @@ def test_funnel_stage0_no_pnl_fields():
         close,
         params_matrix,
         k=5,
+        commission=commission,
+        slip=slip,
     )
     
     # Check all Stage0 results

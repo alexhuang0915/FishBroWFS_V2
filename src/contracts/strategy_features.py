@@ -103,31 +103,98 @@ def load_requirements_from_json(json_path: str) -> StrategyFeatureRequirements:
         raise ValueError(f"需求資料驗證失敗 {json_path}: {e}")
 
 
+def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
+    """
+    從 YAML 策略配置檔案載入策略特徵需求
+
+    Args:
+        yaml_path: YAML 策略配置檔案路徑
+
+    Returns:
+        StrategyFeatureRequirements 實例
+
+    Raises:
+        FileNotFoundError: 檔案不存在
+        ValueError: YAML 解析失敗或驗證失敗
+    """
+    import yaml
+    from pathlib import Path
+    
+    path = Path(yaml_path)
+    if not path.exists():
+        raise FileNotFoundError(f"策略配置檔案不存在: {yaml_path}")
+    
+    try:
+        content = path.read_text(encoding="utf-8")
+    except (IOError, OSError) as e:
+        raise ValueError(f"無法讀取策略配置檔案 {yaml_path}: {e}")
+    
+    try:
+        data = yaml.safe_load(content)
+    except yaml.YAMLError as e:
+        raise ValueError(f"策略配置 YAML 解析失敗 {yaml_path}: {e}")
+    
+    # 提取 strategy_id
+    strategy_id = data.get("strategy_id")
+    if not strategy_id:
+        raise ValueError(f"策略配置缺少 strategy_id: {yaml_path}")
+    
+    # 提取 features 列表
+    features = data.get("features", [])
+    
+    # 轉換為 StrategyFeatureRequirements 格式
+    required = []
+    optional = []
+    
+    for feature in features:
+        name = feature.get("name")
+        timeframe = feature.get("timeframe")
+        required_flag = feature.get("required", True)
+        
+        if not name or not timeframe:
+            raise ValueError(f"特徵缺少 name 或 timeframe: {feature}")
+        
+        feature_ref = FeatureRef(name=name, timeframe_min=timeframe)
+        
+        if required_flag:
+            required.append(feature_ref)
+        else:
+            optional.append(feature_ref)
+    
+    return StrategyFeatureRequirements(
+        strategy_id=strategy_id,
+        required=required,
+        optional=optional,
+        min_schema_version="v1",
+        notes=f"Loaded from YAML: {yaml_path}"
+    )
+
+
 def save_requirements_to_json(
     req: StrategyFeatureRequirements,
     json_path: str,
 ) -> None:
     """
     將策略特徵需求儲存為 JSON 檔案
-    
+
     Args:
         req: StrategyFeatureRequirements 實例
         json_path: JSON 檔案路徑
-    
+
     Raises:
         ValueError: 寫入失敗
     """
     import json
     from pathlib import Path
-    
+
     path = Path(json_path)
-    
+
     # 建立目錄（如果不存在）
     path.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # 使用 canonical JSON 格式
     json_str = canonical_json_requirements(req)
-    
+
     try:
         path.write_text(json_str, encoding="utf-8")
     except (IOError, OSError) as e:

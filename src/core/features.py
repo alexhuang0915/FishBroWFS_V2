@@ -8,6 +8,8 @@ Feature 計算核心
 
 from __future__ import annotations
 
+from .feature_bundle import FeatureBundle
+
 import inspect
 import numpy as np
 from typing import Dict, Literal, Optional

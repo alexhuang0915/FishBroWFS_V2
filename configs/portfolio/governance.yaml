@@ -1,0 +1,62 @@
+# Portfolio Governance Configuration
+# Migrated from governance_params.json
+# Schema version: 2.0
+
+version: "2.0"
+
+# Risk model
+risk_model: "vol_target"
+allowed_risk_models: ["vol_target", "risk_parity"]
+
+# Bucket allocation
+bucket_slots:
+  "Carry/Income":
+    bucket_name: "Carry/Income"
+    slots: 1
+  
+  "LongVol":
+    bucket_name: "LongVol"
+    slots: 1
+  
+  "MeanRev":
+    bucket_name: "MeanRev"
+    slots: 2
+  
+  "Other":
+    bucket_name: "Other"
+    slots: 1
+  
+  "Trend":
+    bucket_name: "Trend"
+    slots: 2
+
+# Correlation policy
+correlation_policy:
+  method: "pearson"
+  member_hard_limit: 0.8
+  portfolio_hard_limit: 0.7
+  max_pairwise_correlation: 0.6
+  rolling_days: 30
+  min_samples: 20
+
+# Drawdown policy
+drawdown_policy:
+  portfolio_dd_cap: 0.2
+  dd_absolute_cap: 0.35
+  dd_k_multiplier: 1.0
+
+# Risk budget policy
+risk_budget_policy:
+  portfolio_risk_budget_max: 1.0
+  portfolio_vol_target: 0.1
+  vol_floor: 0.02
+  w_max: 0.35
+  w_min: 0.0
+
+# Circuit breaker policy
+breaker_policy:
+  exposure_reduction_on_breaker: 0.5
+
+notes: |
+  Migrated from governance_params.json.
+  All human-edited portfolio configuration must be in YAML format.

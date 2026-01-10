@@ -1,5 +1,16 @@
+# Profile for CME.MNQ instrument
+# Schema version: 2.0 with mandatory cost model
+# Extended with instrument specs for dimensions registry migration
+
+version: "2.0"
 symbol: CME.MNQ
-version: v2
+
+# MANDATORY cost model
+cost_model:
+  commission_per_side_usd: 0.0
+  slippage_per_side_usd: 0.0
+
+# Session configuration
 mode: tz_convert
 exchange_tz: America/Chicago
 data_tz: Asia/Taipei
@@ -10,3 +21,22 @@ windows:
   - state: TRADING
     start: "17:00:00"  # Chicago time (跨午夜)
     end: "16:00:00"    # Chicago time
+
+# Instrument specifications (for backward compatibility with dimensions registry)
+tick_size: 0.25
+currency: USD
+session_taipei:
+  open_taipei: "07:00"
+  close_taipei: "06:00"
+  breaks_taipei:
+    - ["16:15", "16:30"]
+    - ["22:00", "22:15"]
+  tz: "Asia/Taipei"
+  notes: "CME MNQ electronic session with intraday breaks"
+
+# Memory configuration
+memory:
+  default_limit_mb: 2048
+  allow_auto_downsample: true
+  auto_downsample_step: 0.5
+  auto_downsample_min: 0.02

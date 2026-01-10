@@ -185,10 +185,16 @@ class StrategyGovernance:
             for strategy_dir in config_dir.iterdir():
                 if strategy_dir.is_dir():
                     strategy_id = strategy_dir.name
-                    # Check for baseline.yaml or features.json
+                    # Check for baseline.yaml or strategy YAML config
                     baseline = strategy_dir / "baseline.yaml"
-                    features = strategy_dir / "features.json"
-                    config_exists[strategy_id] = baseline.exists() or features.exists()
+                    strategy_yaml = Path("configs/strategies") / f"{strategy_id}.yaml"
+                    strategy_yaml_v1 = Path("configs/strategies") / f"{strategy_id}_v1.yaml"
+                    # Config Constitution v1: Only YAML files are valid
+                    config_exists[strategy_id] = (
+                        baseline.exists() or
+                        strategy_yaml.exists() or
+                        strategy_yaml_v1.exists()
+                    )
         
         return config_exists
     

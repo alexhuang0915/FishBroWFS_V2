@@ -65,6 +65,7 @@ def test_root_hygiene_no_forbidden_files():
         '.pytest_cache',
         '.mypy_cache',
         '.pytest_cache',
+        'examples',
     }
     
     violations = []

@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Callable, Any, Literal
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import numpy as np
+from config.registry.timeframes import load_timeframes
 
 
 class FeatureSpec(BaseModel):
@@ -20,7 +21,7 @@ class FeatureSpec(BaseModel):
     
     Attributes:
         name: Feature name (e.g., "atr_14")
-        timeframe_min: Applicable timeframe in minutes (15, 30, 60, 120, 240)
+        timeframe_min: Applicable timeframe in minutes (must be from timeframe registry)
         lookback_bars: Maximum lookback bars required for computation (e.g., ATR(14) needs 14)
         params: Parameter dictionary (e.g., {"window": 14, "method": "log"})
         window: Rolling window size (window=1 for non‑windowed features)
@@ -64,10 +65,12 @@ class FeatureSpec(BaseModel):
     @field_validator('timeframe_min')
     @classmethod
     def validate_timeframe_min(cls, v: int) -> int:
-        """Ensure timeframe_min is a supported value."""
-        supported = [15, 30, 60, 120, 240]
-        if v not in supported:
-            raise ValueError(f"timeframe_min must be one of {supported}, got {v}")
+        """Ensure timeframe_min is a supported value from timeframe registry."""
+        timeframe_registry = load_timeframes()
+        if v not in timeframe_registry.allowed_timeframes:
+            raise ValueError(
+                f"timeframe_min must be one of {timeframe_registry.allowed_timeframes}, got {v}"
+            )
         return v
     
     def mark_causality_verified(self) -> None:

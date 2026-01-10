@@ -46,8 +46,8 @@ def run_funnel(
     params_matrix: np.ndarray,
     *,
     k: int = TOPK_K,
-    commission: float = 0.0,
-    slip: float = 0.0,
+    commission: float,
+    slip: float,
     order_qty: int = 1,
     proxy_name: str = "ma_proxy_v0",
 ) -> FunnelResult:
@@ -68,8 +68,8 @@ def run_funnel(
             - For Stage0: uses col0 (fast_len), col1 (slow_len) for MA proxy
             - For Stage2: uses col0 (channel_len), col1 (atr_len), col2 (stop_mult) for kernel
         k: number of top parameters to select (default: TOPK_K)
-        commission: commission per trade (absolute)
-        slip: slippage per trade (absolute)
+        commission: commission per trade (absolute) - REQUIRED, no default
+        slip: slippage per trade (absolute) - REQUIRED, no default
         order_qty: order quantity (default: 1)
         proxy_name: name of proxy to use for Stage0 (default: ma_proxy_v0)
         

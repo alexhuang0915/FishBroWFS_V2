@@ -27,6 +27,7 @@ from ...services.supervisor_client import (
     get_jobs, get_job, get_artifacts, get_strategy_report_v1,
     get_stdout_tail, get_reveal_evidence_path, submit_job
 )
+from src.config import load_timeframes
 
 logger = logging.getLogger(__name__)
 
@@ -577,8 +578,14 @@ class OpTab(QWidget):
         
         # Timeframe combobox
         self.timeframe_cb = QComboBox()
-        self.timeframe_cb.addItems(["15m", "30m", "60m", "120m", "240m", "1D"])
-        self.timeframe_cb.setCurrentText("60m")
+        try:
+            timeframe_registry = load_timeframes()
+            self.timeframe_cb.addItems(timeframe_registry.get_display_names())
+            self.timeframe_cb.setCurrentText(timeframe_registry.get_display_name(timeframe_registry.default))
+        except Exception as e:
+            logger.error(f"Failed to load timeframes from registry: {e}")
+            self.timeframe_cb.addItems(["15m", "30m", "60m", "120m", "240m", "1D"])
+            self.timeframe_cb.setCurrentText("60m")
         self.timeframe_cb.setToolTip("Select timeframe")
         form_layout.addRow("Timeframe:", self.timeframe_cb)
         

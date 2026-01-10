@@ -79,7 +79,7 @@ def build_shared(
     build_bars: bool = False,
     build_features: bool = False,
     feature_registry: Optional[FeatureRegistry] = None,
-    tfs: List[int] = [15, 30, 60, 120, 240],
+    tfs: Optional[List[int]] = None,
 ) -> dict:
     """
     Build shared data with governance gate.
@@ -125,6 +125,12 @@ def build_shared(
     
     if mode not in ("FULL", "INCREMENTAL"):
         raise ValueError(f"無效的 mode: {mode}，必須為 'FULL' 或 'INCREMENTAL'")
+    
+    # 如果未提供 tfs，從 registry 載入預設值
+    if tfs is None:
+        from src.config.registry.timeframes import load_timeframes
+        timeframe_registry = load_timeframes()
+        tfs = timeframe_registry.allowed_timeframes
     
     # 1. 載入舊指紋索引（如果存在）
     index_path = fingerprint_index_path(season, dataset_id, outputs_root)
@@ -427,7 +433,7 @@ def _build_bars_cache(
     outputs_root: Path,
     mode: BuildMode,
     diff: Dict[str, Any],
-    tfs: List[int] = [15, 30, 60, 120, 240],
+    tfs: Optional[List[int]] = None,
     build_bars: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -467,6 +473,12 @@ def _build_bars_cache(
             "bars_manifest_sha256": None,
             "bars_built": False,
         }
+    
+    # 如果未提供 tfs，從 registry 載入預設值
+    if tfs is None:
+        from src.config.registry.timeframes import load_timeframes
+        timeframe_registry = load_timeframes()
+        tfs = timeframe_registry.allowed_timeframes
     
     # 1. 取得 session spec
     session_spec, dimension_found = get_session_spec_for_dataset(dataset_id)
@@ -597,7 +609,7 @@ def _build_features_cache(
     outputs_root: Path,
     mode: BuildMode,
     diff: Dict[str, Any],
-    tfs: List[int] = [15, 30, 60, 120, 240],
+    tfs: Optional[List[int]] = None,
     registry: FeatureRegistry,
     session_spec: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -630,6 +642,12 @@ def _build_features_cache(
             - lookback_rewind_by_tf: dict
             - features_manifest_data: dict
     """
+    # 如果未提供 tfs，從 registry 載入預設值
+    if tfs is None:
+        from src.config.registry.timeframes import load_timeframes
+        timeframe_registry = load_timeframes()
+        tfs = timeframe_registry.allowed_timeframes
+    
     # 如果沒有 session_spec，嘗試取得預設值
     if session_spec is None:
         from core.resampler import get_session_spec_for_dataset

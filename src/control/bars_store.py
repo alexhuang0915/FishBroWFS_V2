@@ -13,8 +13,12 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Literal, Optional, Union
 import numpy as np
+from config.registry.timeframes import load_timeframes
 
-Timeframe = Literal[15, 30, 60, 120, 240]
+# Dynamically create Timeframe literal type based on timeframe registry
+_timeframe_registry = load_timeframes()
+_timeframe_values = tuple(_timeframe_registry.allowed_timeframes)
+Timeframe = Literal[_timeframe_values]  # type: ignore
 
 
 def bars_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:

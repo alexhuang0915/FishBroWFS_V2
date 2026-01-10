@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
+from config.registry.timeframes import load_timeframes
 
 
 class FeatureSpec(BaseModel):
@@ -17,7 +18,7 @@ class FeatureSpec(BaseModel):
     
     Attributes:
         name: 特徵名稱（例如 "atr_14"）
-        timeframe_min: 適用的 timeframe 分鐘數（15, 30, 60, 120, 240）
+        timeframe_min: 適用的 timeframe 分鐘數（必須來自 timeframe registry）
         lookback_bars: 計算所需的最大 lookback bar 數（例如 ATR(14) 需要 14）
         params: 參數字典（例如 {"window": 14, "method": "log"}）
         window: 滾動視窗大小（window=1 表示非視窗特徵）
@@ -50,7 +51,7 @@ class FeatureRegistry(BaseModel):
         取得適用於指定 timeframe 的所有特徵規格
         
         Args:
-            tf_min: timeframe 分鐘數（15, 30, 60, 120, 240）
+            tf_min: timeframe 分鐘數（必須來自 timeframe registry）
             
         Returns:
             特徵規格列表（按 name 排序以確保 deterministic）
@@ -84,10 +85,11 @@ def default_feature_registry() -> FeatureRegistry:
     2. ret_z_200: returns z-score (window=200), lookback=200
     3. session_vwap: session VWAP, lookback=0
     
-    每個特徵都適用於所有 timeframe（15, 30, 60, 120, 240）
+    每個特徵都適用於所有 timeframe（來自 timeframe registry）
     """
-    # 所有支援的 timeframe
-    timeframes = [15, 30, 60, 120, 240]
+    # 使用 timeframe registry 而不是硬編碼
+    timeframe_registry = load_timeframes()
+    timeframes = timeframe_registry.allowed_timeframes
     
     specs = []
     

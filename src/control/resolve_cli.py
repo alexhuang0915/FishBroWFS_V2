@@ -3,7 +3,7 @@
 Resolve CLI：特徵解析命令列介面
 
 命令：
-fishbro resolve features --season 2026Q1 --dataset-id CME.MNQ --strategy-id S1 --req configs/strategies/S1/features.json
+fishbro resolve features --season 2026Q1 --dataset-id CME.MNQ --strategy-id S1
 
 行為：
 - 不允許 build → 只做檢查與載入
@@ -27,6 +27,7 @@ from typing import Optional
 from contracts.strategy_features import (
     StrategyFeatureRequirements,
     load_requirements_from_json,
+    load_requirements_from_yaml,
 )
 from control.feature_resolver import (
     resolve_features,
@@ -179,28 +180,33 @@ def run_resolve(args) -> int:
 def load_requirements(args) -> StrategyFeatureRequirements:
     """載入策略特徵需求"""
     if args.req:
-        # 從指定 JSON 檔案載入
-        return load_requirements_from_json(str(args.req))
+        # 從指定檔案載入（支援 JSON 或 YAML）
+        path = Path(args.req)
+        if path.suffix.lower() in ['.yaml', '.yml']:
+            return load_requirements_from_yaml(str(path))
+        else:
+            # 預設為 JSON
+            return load_requirements_from_json(str(path))
     elif args.strategy_id:
         # 自動尋找需求檔案
         # 優先順序：
-        # 1. strategies/{strategy_id}/features.json
-        # 2. configs/strategies/{strategy_id}/features.json
-        # 3. 當前目錄下的 {strategy_id}_features.json
+        # 1. configs/strategies/{strategy_id}.yaml (YAML 策略配置)
+        # 2. configs/strategies/{strategy_id}_v1.yaml (帶版本號)
         
         possible_paths = [
-            Path(f"configs/strategies/{args.strategy_id}/features.json"),
-            Path(f"strategies/{args.strategy_id}/features.json"),  # legacy location
-            Path(f"{args.strategy_id}_features.json"),
+            # YAML only (Constitution v1)
+            Path(f"configs/strategies/{args.strategy_id}.yaml"),
+            Path(f"configs/strategies/{args.strategy_id}_v1.yaml"),
         ]
         
         for path in possible_paths:
             if path.exists():
-                return load_requirements_from_json(str(path))
+                return load_requirements_from_yaml(str(path))
         
         raise FileNotFoundError(
             f"找不到策略 {args.strategy_id} 的需求檔案。"
             f"嘗試的路徑: {[str(p) for p in possible_paths]}"
+            f"注意：Config Constitution v1 要求所有策略配置必須為 YAML 格式。"
         )
     else:
         # 這不應該發生，因為 argparse 確保了二選一

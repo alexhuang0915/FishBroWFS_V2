@@ -8,7 +8,7 @@ fishbro research run \
   --dataset-id CME.MNQ \
   --strategy-id S1 \
   --allow-build \
-  --txt-path /home/fishbro/FishBroData/raw/CME.MNQ-HOT-Minute-Trade.txt \
+  --txt-path FishBroData/raw/CME.MNQ-HOT-Minute-Trade.txt \
   --mode incremental \
   --json
 

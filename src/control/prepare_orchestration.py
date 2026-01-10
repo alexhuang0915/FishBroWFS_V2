@@ -12,6 +12,7 @@ import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, UTC
+from config.registry.timeframes import load_timeframes
 
 from control.shared_build import build_shared, load_shared_manifest
 from control.fingerprint_store import fingerprint_index_path, load_fingerprint_index_if_exists
@@ -30,7 +31,7 @@ def prepare_with_data2_enforcement(
     mode: str = "FULL",
     build_bars: bool = True,
     build_features: bool = True,
-    tfs: List[int] = [15, 30, 60, 120, 240],
+    tfs: Optional[List[int]] = None,
 ) -> Dict[str, Any]:
     """
     Prepare orchestration with Data2 dependency enforcement.
@@ -50,7 +51,7 @@ def prepare_with_data2_enforcement(
         mode: Build mode ("FULL" or "INCREMENTAL")
         build_bars: Whether to build bars cache
         build_features: Whether to build features cache
-        tfs: Timeframes to build
+        tfs: Timeframes to build (if None, uses timeframe registry)
         
     Returns:
         Dict containing:
@@ -61,6 +62,11 @@ def prepare_with_data2_enforcement(
             - data2_manifest_paths: dict mapping feed_id -> manifest_path
             - no_change: bool (False if any Data2 was newly prepared)
     """
+    # Use timeframe registry if tfs is not provided
+    if tfs is None:
+        timeframe_registry = load_timeframes()
+        tfs = timeframe_registry.allowed_timeframes
+    
     results = {
         "success": True,
         "data1_report": None,
@@ -172,7 +178,9 @@ def _find_txt_path_for_feed(feed_id: str) -> Optional[Path]:
     
     Looks in the standard raw data directory.
     """
-    raw_dir = Path("/home/fishbro/FishBroWFS_V2/FishBroData/raw")
+    # Raw data directory relative to workspace root
+    workspace_root = Path(__file__).parent.parent.parent.parent
+    raw_dir = workspace_root / "FishBroData" / "raw"
     if not raw_dir.exists():
         return None
     

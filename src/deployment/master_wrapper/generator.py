@@ -682,7 +682,7 @@ def generate_master_wrapper(
         strategies: List of parsed PowerLanguage strategies
         quarter: Quarter identifier (e.g., "2026Q1")
         deploy_id: Deployment ID (auto-generated if None)
-        output_dir: Output directory (default: outputs/deployments/{deploy_id}/)
+        output_dir: Output directory (default: outputs/jobs/{deploy_id}/deployments/)
     
     Returns:
         List of generated parts
@@ -691,7 +691,7 @@ def generate_master_wrapper(
         deploy_id = hashlib.md5(f"{quarter}_{datetime.now().isoformat()}".encode()).hexdigest()[:8]
     
     if output_dir is None:
-        output_dir = Path("outputs") / "deployments" / deploy_id
+        output_dir = Path("outputs") / "jobs" / deploy_id / "deployments"
     
     config = MasterWrapperConfig(
         quarter=quarter,

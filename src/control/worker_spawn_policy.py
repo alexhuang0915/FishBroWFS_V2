@@ -11,6 +11,7 @@ Worker can only be started when all are true:
 from __future__ import annotations
 
 import os
+import tempfile
 from pathlib import Path
 
 
@@ -20,16 +21,17 @@ def can_spawn_worker(db_path: Path) -> tuple[bool, str]:
     Rules:
     1. If PYTEST_CURRENT_TEST is set and FISHBRO_ALLOW_SPAWN_IN_TESTS != "1":
         deny with message about pytest.
-    2. If db_path is under /tmp and FISHBRO_ALLOW_TMP_DB != "1":
-        deny with message about /tmp.
+    2. If db_path is under system temporary directory and FISHBRO_ALLOW_TMP_DB != "1":
+        deny with message about temporary directory.
     3. Otherwise allow.
     """
     if os.getenv("PYTEST_CURRENT_TEST") and os.getenv("FISHBRO_ALLOW_SPAWN_IN_TESTS") != "1":
         return False, "Worker spawn disabled under pytest (set FISHBRO_ALLOW_SPAWN_IN_TESTS=1 to override)"
 
     rp = db_path.expanduser().resolve()
-    if str(rp).startswith("/tmp/") and os.getenv("FISHBRO_ALLOW_TMP_DB") != "1":
-        return False, "Refusing to spawn worker for /tmp db_path (set FISHBRO_ALLOW_TMP_DB=1 to override)"
+    tmp_dir = tempfile.gettempdir()
+    if str(rp).startswith(tmp_dir + "/") and os.getenv("FISHBRO_ALLOW_TMP_DB") != "1":
+        return False, f"Refusing to spawn worker for {tmp_dir} db_path (set FISHBRO_ALLOW_TMP_DB=1 to override)"
 
     return True, "ok"
 

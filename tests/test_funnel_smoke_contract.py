@@ -7,6 +7,7 @@ Basic smoke tests to ensure the complete funnel pipeline works end-to-end.
 import numpy as np
 
 from pipeline.funnel import FunnelResult, run_funnel
+from tests.helpers.costs import get_test_costs
 
 
 def test_funnel_smoke_basic():
@@ -29,6 +30,7 @@ def test_funnel_smoke_basic():
     ]).astype(np.float64)
     
     # Run funnel
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -36,8 +38,8 @@ def test_funnel_smoke_basic():
         close,
         params_matrix,
         k=5,
-        commission=0.0,
-        slip=0.0,
+        commission=commission,
+        slip=slip,
     )
     
     # Verify result structure
@@ -80,6 +82,7 @@ def test_funnel_smoke_empty_params():
     # Empty parameter grid
     params_matrix = np.empty((0, 3), dtype=np.float64)
     
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -87,6 +90,8 @@ def test_funnel_smoke_empty_params():
         close,
         params_matrix,
         k=5,
+        commission=commission,
+        slip=slip,
     )
     
     assert len(result.stage0_results) == 0
@@ -112,6 +117,7 @@ def test_funnel_smoke_k_larger_than_params():
     ]).astype(np.float64)
     
     # k=10 but only 5 params
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -119,6 +125,8 @@ def test_funnel_smoke_k_larger_than_params():
         close,
         params_matrix,
         k=10,
+        commission=commission,
+        slip=slip,
     )
     
     # Should return all 5 params
@@ -143,6 +151,7 @@ def test_funnel_smoke_pipeline_order():
         np.random.uniform(1.0, 2.0, size=n_params),
     ]).astype(np.float64)
     
+    commission, slip = get_test_costs("MNQ")
     result = run_funnel(
         open_,
         high,
@@ -150,6 +159,8 @@ def test_funnel_smoke_pipeline_order():
         close,
         params_matrix,
         k=3,
+        commission=commission,
+        slip=slip,
     )
     
     # Verify Stage0 ran on all params

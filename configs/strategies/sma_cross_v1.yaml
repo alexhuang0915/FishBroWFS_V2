@@ -1,0 +1,68 @@
+# SMA Cross Strategy Configuration
+# Migrated from configs/strategies/sma_cross/features.json
+version: "1.0"
+strategy_id: "sma_cross"
+
+# Determinism configuration
+determinism:
+  default_seed: 42
+
+# Parameters schema
+parameters:
+  fast_period:
+    type: "int"
+    default: 10
+    min: 5
+    max: 50
+    description: "Fast moving average period"
+    step: 1
+  
+  slow_period:
+    type: "int"
+    default: 30
+    min: 20
+    max: 100
+    description: "Slow moving average period"
+    step: 5
+  
+  threshold:
+    type: "float"
+    default: 0.5
+    min: 0.1
+    max: 2.0
+    description: "Signal threshold"
+    step: 0.1
+  
+  atr_multiplier:
+    type: "float"
+    default: 1.5
+    min: 0.5
+    max: 3.0
+    description: "ATR multiplier for stop loss"
+    step: 0.1
+  
+  use_vwap:
+    type: "bool"
+    default: false
+    description: "Whether to use VWAP for entry confirmation"
+
+# Features
+features:
+  - name: "atr_14"
+    timeframe: 60
+    required: true
+  
+  - name: "ret_z_200"
+    timeframe: 60
+    required: true
+  
+  - name: "session_vwap"
+    timeframe: 60
+    required: false
+
+# Default dataset and timeframe
+dataset_id: "CME.MNQ.60m.2020-2024"
+timeframe: 60
+
+# Notes
+notes: "Migrated from sma_cross/features.json with added determinism and parameter schema"

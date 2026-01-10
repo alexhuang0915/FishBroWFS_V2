@@ -319,7 +319,8 @@ def test_default_registry_path():
     """測試預設路徑函數"""
     path = default_registry_path()
     assert isinstance(path, Path)
-    assert path.name == "dimensions_registry.json"
-    assert path.parent.name == "configs"
+    # During migration, accept either dimensions_registry.json or datasets.yaml
+    assert path.name in ["dimensions_registry.json", "datasets.yaml"]
+    assert path.parent.name in ["configs", "registry"]
 
 

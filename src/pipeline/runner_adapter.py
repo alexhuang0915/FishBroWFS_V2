@@ -59,7 +59,9 @@ def run_stage_job(stage_cfg: dict) -> dict:
             - topk: Optional top-K count (for Stage0/1)
             - open_, high, low, close: OHLC arrays
             - params_matrix: Parameter matrix
-            - commission, slip, order_qty: Trading parameters
+            - commission: Commission per trade (REQUIRED, no default)
+            - slip: Slippage per trade (REQUIRED, no default)
+            - order_qty: Order quantity (default: 1)
             - Other stage-specific parameters
     
     Returns:
@@ -94,11 +96,11 @@ def _run_stage0_job(cfg: dict) -> dict:
     
     # Apply subsample if needed
     param_subsample_rate = cfg.get("param_subsample_rate", 1.0)
+    seed = cfg.get("subsample_seed", 42)
     if param_subsample_rate < 1.0:
         n_total = params_matrix.shape[0]
         n_effective = int(n_total * param_subsample_rate)
         # Deterministic selection (use seed from config if available)
-        seed = cfg.get("subsample_seed", 42)
         rng = np.random.default_rng(seed)
         perm = rng.permutation(n_total)
         selected_indices = np.sort(perm[:n_effective])
@@ -146,17 +148,26 @@ def _run_stage1_job(cfg: dict) -> dict:
     low = cfg["low"]
     close = cfg["close"]
     params_matrix = cfg["params_matrix"]
-    commission = cfg.get("commission", 0.0)
-    slip = cfg.get("slip", 0.0)
+    
+    # Commission and slippage must be provided by caller (no defaults)
+    # According to Config Constitution v1, cost models are mandatory in profiles
+    commission = cfg.get("commission")
+    slip = cfg.get("slip")
+    
+    if commission is None:
+        raise ValueError("commission must be provided in stage configuration")
+    if slip is None:
+        raise ValueError("slip must be provided in stage configuration")
+    
     order_qty = cfg.get("order_qty", 1)
     
     param_subsample_rate = cfg.get("param_subsample_rate", 1.0)
+    seed = cfg.get("subsample_seed", 42)
     
     # Apply subsample
     if param_subsample_rate < 1.0:
         n_total = params_matrix.shape[0]
         n_effective = int(n_total * param_subsample_rate)
-        seed = cfg.get("subsample_seed", 42)
         rng = np.random.default_rng(seed)
         perm = rng.permutation(n_total)
         selected_indices = np.sort(perm[:n_effective])
@@ -173,6 +184,7 @@ def _run_stage1_job(cfg: dict) -> dict:
         slip=slip,
         order_qty=order_qty,
         sort_params=True,
+        param_subsample_seed=seed,
     )
     
     metrics_array = result.get("metrics", np.array([]))
@@ -228,8 +240,17 @@ def _run_stage2_job(cfg: dict) -> dict:
     low = cfg["low"]
     close = cfg["close"]
     params_matrix = cfg["params_matrix"]
-    commission = cfg.get("commission", 0.0)
-    slip = cfg.get("slip", 0.0)
+    
+    # Commission and slippage must be provided by caller (no defaults)
+    # According to Config Constitution v1, cost models are mandatory in profiles
+    commission = cfg.get("commission")
+    slip = cfg.get("slip")
+    
+    if commission is None:
+        raise ValueError("commission must be provided in stage configuration")
+    if slip is None:
+        raise ValueError("slip must be provided in stage configuration")
+    
     order_qty = cfg.get("order_qty", 1)
     
     # Stage2 must use all params (subsample_rate = 1.0)

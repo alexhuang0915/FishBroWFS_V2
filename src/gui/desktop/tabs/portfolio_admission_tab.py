@@ -3,7 +3,6 @@ Portfolio Admission Sandbox - Phase 4-B Finalization Desktop UI.
 """
 
 import logging
-import random
 from typing import Optional, List, Dict, Any
 
 import pandas as pd
@@ -39,7 +38,7 @@ class PortfolioAdmissionTab(QWidget):
         
         self.setup_ui()
         self.setup_connections()
-        self.load_mock_jobs()
+        self.load_real_jobs()
     
     def setup_ui(self):
         """Initialize the UI."""
@@ -145,17 +144,75 @@ class PortfolioAdmissionTab(QWidget):
         self.debounce_timer.timeout.connect(self.recompute_analytics)
         self.submit_button.clicked.connect(self.submit_admission_job)
     
-    def load_mock_jobs(self):
-        """Load mock Phase4-A jobs."""
-        mock_jobs = [
-            {"job_id": "phase4a_001", "strategy_id": "SMA_Cross", "grade": "S"},
-            {"job_id": "phase4a_002", "strategy_id": "Breakout", "grade": "A"},
-            {"job_id": "phase4a_003", "strategy_id": "MeanRevert", "grade": "B"},
-            {"job_id": "phase4a_004", "strategy_id": "Momentum", "grade": "A"},
-            {"job_id": "phase4a_005", "strategy_id": "Channel", "grade": "S"},
-        ]
+    def load_real_jobs(self):
+        """Load real Phase4-A jobs from supervisor API."""
+        try:
+            # Load real jobs from supervisor
+            jobs_response = get_jobs(job_type="RUN_RESEARCH_WFS", limit=20)
+            if jobs_response and "jobs" in jobs_response:
+                real_jobs = []
+                for job in jobs_response["jobs"]:
+                    # Extract strategy_id from job spec
+                    strategy_id = "Unknown"
+                    if "spec_json" in job:
+                        import json
+                        try:
+                            spec = json.loads(job["spec_json"])
+                            strategy_id = spec.get("strategy_id", "Unknown")
+                        except:
+                            pass
+                    
+                    # Determine grade from job state or results
+                    grade = "B"  # Default
+                    if job.get("state") == "COMPLETED":
+                        grade = "A"  # Completed jobs get A grade
+                    
+                    real_jobs.append({
+                        "job_id": job.get("job_id", ""),
+                        "strategy_id": strategy_id,
+                        "grade": grade
+                    })
+                
+                if real_jobs:
+                    self.update_job_list_ui(real_jobs)
+                    return
+                else:
+                    # No real jobs available
+                    self.show_no_jobs_message()
+                    return
+        except Exception as e:
+            logger.error(f"Failed to load real jobs from supervisor: {e}")
+            self.show_error_message(f"Failed to load jobs: {e}")
         
-        self.update_job_list_ui(mock_jobs)
+        # No fallback - show empty state
+        self.show_no_jobs_message()
+    
+    def show_no_jobs_message(self):
+        """Show message when no jobs are available."""
+        while self.job_list_layout.count():
+            item = self.job_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        message = QLabel("No Phase4-A jobs available.\n\n"
+                        "Run research jobs first to generate candidate strategies.")
+        message.setAlignment(Qt.AlignCenter)
+        message.setStyleSheet("color: #9e9e9e; font-style: italic; padding: 20px;")
+        self.job_list_layout.addWidget(message)
+        self.job_list_layout.addStretch()
+    
+    def show_error_message(self, error_text):
+        """Show error message when job loading fails."""
+        while self.job_list_layout.count():
+            item = self.job_list_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        message = QLabel(f"Error loading jobs:\n{error_text}")
+        message.setAlignment(Qt.AlignCenter)
+        message.setStyleSheet("color: #F44336; padding: 20px;")
+        self.job_list_layout.addWidget(message)
+        self.job_list_layout.addStretch()
     
     def update_job_list_ui(self, jobs):
         """Update job list UI."""
@@ -226,41 +283,32 @@ class PortfolioAdmissionTab(QWidget):
             self.clear_analytics()
             return
         
-        # Mock analytics
-        self.sharpe_card.set_value(f"{random.uniform(0.5, 2.5):.2f}")
-        self.rf_card.set_value(f"{random.uniform(1.05, 1.25):.3f}")
-        self.cagr_card.set_value(f"{random.uniform(0.05, 0.20):.2%}")
-        self.full_mdd_card.set_value(f"{random.uniform(0.05, 0.15):.2%}")
-        self.rolling_3m_card.set_value(f"{random.uniform(0.03, 0.10):.2%}")
-        self.rolling_6m_card.set_value(f"{random.uniform(0.04, 0.12):.2%}")
+        # Real analytics would be loaded from job artifacts
+        # For now, show placeholder values
+        self.sharpe_card.set_value("--")
+        self.rf_card.set_value("--")
+        self.cagr_card.set_value("--")
+        self.full_mdd_card.set_value("--")
+        self.rolling_3m_card.set_value("--")
+        self.rolling_6m_card.set_value("--")
         
-        # Mock gate statuses
-        gate1 = random.choice(["PASS", "ALERT", "REJECT"])
-        gate2 = random.choice(["PASS", "REJECT"])
-        gate3 = random.choice(["PASS", "ALERT"])
-        
-        self.gate1_status.setText(gate1)
-        self.gate2_status.setText(gate2)
-        self.gate3_status.setText(gate3)
+        # Gate statuses would be computed from real admission logic
+        # For now, show PENDING (requires real admission evaluation)
+        self.gate1_status.setText("PENDING")
+        self.gate2_status.setText("PENDING")
+        self.gate3_status.setText("PENDING")
         
         colors = {"PASS": "#4CAF50", "ALERT": "#FF9800", "REJECT": "#F44336", "PENDING": "#FFC107"}
-        self.gate1_status.setStyleSheet(f"color: {colors.get(gate1, '#FFC107')};")
-        self.gate2_status.setStyleSheet(f"color: {colors.get(gate2, '#FFC107')};")
-        self.gate3_status.setStyleSheet(f"color: {colors.get(gate3, '#FFC107')};")
+        self.gate1_status.setStyleSheet("color: #FFC107;")
+        self.gate2_status.setStyleSheet("color: #FFC107;")
+        self.gate3_status.setStyleSheet("color: #FFC107;")
         
-        # Verdict
-        if gate1 == "REJECT" or gate2 == "REJECT":
-            verdict = "REJECT"
-        elif gate1 == "ALERT" or gate3 == "ALERT":
-            verdict = "ADMIT_WITH_CONSTRAINTS"
-        else:
-            verdict = "ADMIT"
+        # Verdict pending real evaluation
+        self.verdict_status.setText("PENDING")
+        self.verdict_status.setStyleSheet("color: #FFC107; font-weight: bold;")
         
-        self.verdict_status.setText(verdict)
-        self.verdict_status.setStyleSheet(f"color: {colors.get(verdict, '#FFC107')}; font-weight: bold;")
-        
-        # Update charts
-        self.update_charts()
+        # Clear charts (no placeholder data)
+        self.clear_charts()
         
         self.update_submit_button_state()
     
@@ -282,33 +330,14 @@ class PortfolioAdmissionTab(QWidget):
     def update_submit_button_state(self):
         gate1_reject = self.gate1_status.text() == "REJECT"
         gate2_reject = self.gate2_status.text() == "REJECT"
+        # Allow submission if we have selected jobs, even if status is PENDING
+        # (The actual server-side admission will do the final check)
         self.submit_button.setEnabled(bool(self.selected_jobs) and not (gate1_reject or gate2_reject))
-    
-    def update_charts(self):
-        """Update charts with mock data."""
-        dates = pd.date_range(start='2024-01-01', periods=100, freq='D')
-        np.random.seed(42)
-        
-        # Portfolio OOS
-        returns = np.random.normal(0.0005, 0.01, 100)
-        portfolio_oos = 1000000 * np.exp(np.cumsum(returns))
-        
-        # B&H
-        returns_bnh = np.random.normal(0.0003, 0.008, 100)
-        portfolio_bnh = 1000000 * np.exp(np.cumsum(returns_bnh))
-        
-        # Underwater
-        running_max = np.maximum.accumulate(portfolio_oos)
-        underwater = (portfolio_oos / running_max - 1) * 100
-        
-        self.portfolio_chart.set_series({
-            "Portfolio OOS": list(zip(dates, portfolio_oos)),
-            "Portfolio B&H": list(zip(dates, portfolio_bnh))
-        })
-        
-        self.underwater_chart.set_series({
-            "Underwater": list(zip(dates, underwater))
-        })
+
+    def clear_charts(self):
+        """Clear charts when no real data is available."""
+        self.portfolio_chart.set_series({})
+        self.underwater_chart.set_series({})
     
     def submit_admission_job(self):
         """Submit RUN_PORTFOLIO_ADMISSION job."""

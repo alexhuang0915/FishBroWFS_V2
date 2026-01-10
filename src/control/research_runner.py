@@ -17,7 +17,9 @@ from typing import Optional, Dict, Any
 from contracts.strategy_features import (
     StrategyFeatureRequirements,
     load_requirements_from_json,
+    load_requirements_from_yaml,
 )
+from src.config.strategies import load_strategy
 from control.build_context import BuildContext
 from control.feature_resolver import (
     resolve_features,
@@ -54,7 +56,7 @@ def _load_strategy_feature_requirements(
 
     順序：
     1. 先嘗試 strategy.feature_requirements()（Python）
-    2. 再 fallback strategies/{strategy_id}/features.json
+    2. 嘗試 YAML 策略配置（configs/strategies/{strategy_id}.yaml 或 {strategy_id}_v1.yaml）
 
     若都沒有 → raise ResearchRunError
     """
@@ -70,23 +72,26 @@ def _load_strategy_feature_requirements(
     except Exception as e:
         logger.debug(f"策略 {strategy_id} 無 Python 特徵需求方法: {e}")
 
-    # 2. 嘗試 JSON 檔案
-    json_path = outputs_root / "strategies" / strategy_id / "features.json"
-    if not json_path.exists():
-        # 也嘗試在 configs/strategies 資料夾
-        json_path = Path("configs/strategies") / strategy_id / "features.json"
-        if not json_path.exists():
-            raise ResearchRunError(
-                f"策略 {strategy_id} 無特徵需求定義："
-                f"既無 Python 方法，也找不到 JSON 檔案 ({json_path})"
-            )
+    # 2. 嘗試 YAML 策略配置（Config Constitution v1）
+    yaml_path = Path("configs/strategies") / f"{strategy_id}.yaml"
+    if not yaml_path.exists():
+        # 也嘗試 strategy_id 可能包含版本號，如 s1_v1
+        yaml_path = Path("configs/strategies") / f"{strategy_id}_v1.yaml"
+    
+    if yaml_path.exists():
+        try:
+            req = load_requirements_from_yaml(str(yaml_path))
+            logger.debug(f"從 YAML {yaml_path} 載入策略 {strategy_id} 特徵需求")
+            return req
+        except Exception as e:
+            logger.warning(f"從 YAML 載入策略 {strategy_id} 特徵需求失敗: {e}")
+            # 繼續嘗試 outputs JSON fallback
 
-    try:
-        req = load_requirements_from_json(str(json_path))
-        logger.debug(f"從 {json_path} 載入策略 {strategy_id} 特徵需求")
-        return req
-    except Exception as e:
-        raise ResearchRunError(f"載入策略 {strategy_id} 特徵需求失敗: {e}")
+    raise ResearchRunError(
+        f"策略 {strategy_id} 無特徵需求定義："
+        f"既無 Python 方法，也找不到 YAML 配置檔案。"
+        f"Config Constitution v1 要求所有策略配置必須為 YAML 格式。"
+    )
 
 
 def run_research(

@@ -4,4 +4,5 @@ dimensions_registry.json
 funnel_min.json
 portfolio
 profiles
+registry
 strategies

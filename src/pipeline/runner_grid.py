@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 import numpy as np
 import os
@@ -57,6 +57,7 @@ def run_grid(
     sort_params: bool = True,
     force_close_last: bool = False,
     return_debug: bool = False,
+    param_subsample_seed: Optional[int] = None,
 ) -> Dict[str, object]:
     """
     Phase 3B v1: Dynamic Grid Runner (homology locked).
@@ -69,6 +70,9 @@ def run_grid(
     Args:
         force_close_last: If True, force close any open positions at the last bar
             using close[-1] as exit price. This ensures trades > 0 when fills exist.
+        param_subsample_seed: Optional seed for param subsampling. If None, defaults to 42.
+            According to Config Constitution v1, seed precedence: job.seed > strategy.default_seed.
+            Environment variable overrides are not allowed.
 
     Returns:
       dict with:
@@ -194,7 +198,6 @@ def run_grid(
     # FISHBRO_PERF_PARAM_SUBSAMPLE_RATE controls param subsampling (separate from trigger_rate)
     # FISHBRO_PERF_TRIGGER_RATE is for bar/intent-level sparsity (handled in kernel)
     param_subsample_rate_env = os.environ.get("FISHBRO_PERF_PARAM_SUBSAMPLE_RATE", "").strip()
-    param_subsample_seed_env = os.environ.get("FISHBRO_PERF_PARAM_SUBSAMPLE_SEED", "").strip()
     
     param_subsample_rate = 1.0
     if param_subsample_rate_env:
@@ -205,18 +208,19 @@ def run_grid(
         except ValueError:
             param_subsample_rate = 1.0
     
-    param_subsample_seed = 42
-    if param_subsample_seed_env:
-        try:
-            param_subsample_seed = int(param_subsample_seed_env)
-        except ValueError:
-            param_subsample_seed = 42
+    # Use provided seed or default to 42 (no environment variable overrides)
+    # According to Config Constitution v1, seed precedence: job.seed > strategy.default_seed
+    # Environment variable overrides are not allowed
+    if param_subsample_seed is not None:
+        param_subsample_seed_value = param_subsample_seed
+    else:
+        param_subsample_seed_value = 42
     
     # Stage P2-3: Determine selected params (deterministic)
     # CURSOR TASK 1: Use "pos" (sorted space position) for selection, "orig" (original index) for scatter-back
     if param_subsample_rate < 1.0:
         k = max(1, int(round(n * param_subsample_rate)))
-        rng = np.random.default_rng(param_subsample_seed)
+        rng = np.random.default_rng(param_subsample_seed_value)
         # Generate deterministic permutation
         perm = rng.permutation(n)
         selected_pos = np.sort(perm[:k]).astype(INDEX_DTYPE)  # Sort to maintain deterministic loop order

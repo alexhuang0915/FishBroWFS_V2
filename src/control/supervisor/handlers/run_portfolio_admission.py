@@ -1148,7 +1148,7 @@ class RunPortfolioAdmissionHandler(BaseJobHandler):
             if enhanced_analytics:
                 budget_alerts = enhanced_analytics.get("budget_alerts", {})
                 if budget_alerts.get("any_triggered", False):
-                    f.write(f"\n⚠️  BUDGET ALERTS TRIGGERED:\n")
+                    f.write(f"\n[WARNING] BUDGET ALERTS TRIGGERED: \n")
                     for period in ["rolling_3m", "rolling_6m", "rolling_full"]:
                         alert = budget_alerts.get(period, {})
                         if alert.get("triggered", False):

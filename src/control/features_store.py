@@ -10,6 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Literal, Optional
 import numpy as np
+from config.registry.timeframes import load_timeframes
 
 from control.bars_store import (
     write_npz_atomic,
@@ -18,7 +19,10 @@ from control.bars_store import (
     canonical_json,
 )
 
-Timeframe = Literal[15, 30, 60, 120, 240]
+# Dynamically create Timeframe literal type based on timeframe registry
+_timeframe_registry = load_timeframes()
+_timeframe_values = tuple(_timeframe_registry.allowed_timeframes)
+Timeframe = Literal[_timeframe_values]  # type: ignore
 
 
 def features_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
@@ -159,7 +163,7 @@ def compute_features_sha256_dict(
     outputs_root: Path,
     season: str,
     dataset_id: str,
-    tfs: list[Timeframe] = [15, 30, 60, 120, 240],
+    tfs: Optional[list[Timeframe]] = None,
 ) -> Dict[str, str]:
     """
     計算所有 timeframe 的 features NPZ 檔案 SHA256 hash
@@ -168,11 +172,15 @@ def compute_features_sha256_dict(
         outputs_root: 輸出根目錄
         season: 季節標記
         dataset_id: 資料集 ID
-        tfs: timeframe 列表
+        tfs: timeframe 列表，若為 None 則使用 timeframe registry 中的所有 timeframe
         
     Returns:
         字典：filename -> sha256
     """
+    if tfs is None:
+        # Use all timeframes from registry
+        tfs = list(_timeframe_registry.allowed_timeframes)
+    
     result = {}
     
     for tf in tfs:

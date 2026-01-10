@@ -184,7 +184,7 @@ def main():
     gen_parser.add_argument(
         "--output-dir",
         type=str,
-        help="Output directory (default: outputs/deployments/{deploy_id}/)"
+        help="Output directory (default: outputs/jobs/{deploy_id}/deployments/)"
     )
     gen_parser.set_defaults(func=main_generate)
     

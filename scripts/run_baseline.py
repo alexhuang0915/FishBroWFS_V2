@@ -150,11 +150,6 @@ def ensure_feature_requirements(strategy: str, config: Dict[str, Any]) -> None:
     if outputs_json_path.exists():
         return
 
-    # Also check configs/strategies (if exists, we can skip)
-    configs_json_path = Path("configs/strategies") / strategy / "features.json"
-    if configs_json_path.exists():
-        return
-
     # Create outputs directory
     outputs_json_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -223,7 +218,7 @@ def ensure_feature_requirements(strategy: str, config: Dict[str, Any]) -> None:
         notes=f"Auto-generated from baseline config for {strategy}",
     )
 
-    # Save JSON
+    # Save JSON (outputs artifact, not config)
     save_requirements_to_json(req, str(outputs_json_path))
     print(f"Created feature requirements JSON at {outputs_json_path}")
 

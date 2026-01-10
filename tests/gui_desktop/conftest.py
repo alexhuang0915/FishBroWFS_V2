@@ -6,6 +6,9 @@ import sys
 from unittest.mock import Mock, patch
 import pytest
 
+# Skip all GUI tests if PySide6 is not installed
+pytest.importorskip("PySide6")
+
 
 @pytest.fixture(scope="function", autouse=True)
 def mock_supervisor_client():
@@ -72,6 +75,7 @@ def mock_supervisor_client():
 @pytest.fixture(scope="session")
 def qapp():
     """Provide a QApplication instance for Qt tests (session-scoped)."""
+    # PySide6 already imported via importorskip at module level
     from PySide6.QtWidgets import QApplication
     app = QApplication.instance()
     if app is None:

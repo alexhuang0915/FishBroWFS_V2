@@ -14,6 +14,7 @@ from indicators.numba_indicators import (
     zscore, momentum, roc, bbands_pb, bbands_width, atr_channel_upper,
     atr_channel_lower, atr_channel_pos, donchian_width, dist_to_hh, dist_to_ll
 )
+from config.registry.timeframes import load_timeframes
 
 def compute_min_warmup_bars(family: str, window: int) -> int:
     """
@@ -26,7 +27,9 @@ def compute_min_warmup_bars(family: str, window: int) -> int:
 
 
 def seed_default_registry(reg: FeatureRegistry) -> None:
-    timeframes = [15, 30, 60, 120, 240]
+    # Use timeframe registry instead of hardcoded values
+    timeframe_registry = load_timeframes()
+    timeframes = timeframe_registry.allowed_timeframes
 
     for tf in timeframes:
         # SMA

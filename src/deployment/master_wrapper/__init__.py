@@ -9,7 +9,7 @@ Key Features:
 - Strict validation against forbidden constructs (Set* syntax, IOG, etc.)
 - Automatic splitting for >50 strategies
 - MaxBarsBack calculation
-- Output to outputs/deployments/<DEPLOY_ID>/
+- Output to outputs/jobs/<DEPLOY_ID>/deployments/
 """
 
 from .generator import (

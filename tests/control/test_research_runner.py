@@ -247,7 +247,7 @@ def test_research_run_success(tmp_path: Path, monkeypatch):
     assert "session_vwap" in feat_names
 
 
-def test_research_missing_features_no_build(tmp_path: Path):
+def test_research_missing_features_no_build(tmp_path: Path, monkeypatch):
     """
     Case 2：features 缺失 → allow_build=False → 失敗（ResearchRunError）
     """
@@ -257,8 +257,41 @@ def test_research_missing_features_no_build(tmp_path: Path):
     
     # 不建立 features cache（完全缺失）
     
-    # 建立策略需求檔案
-    create_test_strategy_requirements(tmp_path, strategy_id, tmp_path / "outputs")
+    # Monkeypatch 策略註冊表，讓 get 返回一個假的策略 spec
+    from contracts.strategy_features import StrategyFeatureRequirements, FeatureRef
+    class FakeStrategySpec:
+        def __init__(self):
+            self.strategy_id = strategy_id
+            self.version = "v1"
+            self.param_schema = {}
+            self.defaults = {"fast_period": 10, "slow_period": 20}
+            # 策略函數：接受 strategy_input 和 params，返回包含 intents 的字典
+            self.fn = lambda strategy_input, params: {"intents": []}
+        
+        def feature_requirements(self):
+            return StrategyFeatureRequirements(
+                strategy_id=strategy_id,
+                required=[
+                    FeatureRef(name="atr_14", timeframe_min=60),
+                    FeatureRef(name="ret_z_200", timeframe_min=60),
+                ],
+                optional=[
+                    FeatureRef(name="session_vwap", timeframe_min=60),
+                ],
+                min_schema_version="v1",
+                notes="測試需求",
+            )
+    
+    import strategy.registry as registry_module
+    monkeypatch.setattr(registry_module, "get", lambda sid: FakeStrategySpec())
+    
+    # 也需要 monkeypatch wfs.runner.get_strategy_spec，因為它從 registry 導入 get
+    import wfs.runner as wfs_runner_module
+    monkeypatch.setattr(wfs_runner_module, "get_strategy_spec", lambda sid: FakeStrategySpec())
+    
+    # 還需要 monkeypatch strategy.runner.get，因為它直接從 registry 導入 get
+    import strategy.runner as runner_module
+    monkeypatch.setattr(runner_module, "get", lambda sid: FakeStrategySpec())
     
     # 執行研究（不允許 build）→ 應該拋出 ResearchRunError
     with pytest.raises(ResearchRunError) as exc_info:

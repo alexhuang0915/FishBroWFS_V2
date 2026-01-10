@@ -1,0 +1,8 @@
+version: "1.0"
+allowed_timeframes:
+  - 15
+  - 30
+  - 60
+  - 120
+  - 240
+default: 60

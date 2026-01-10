@@ -1,0 +1,23 @@
+version: "1.0"
+instruments:
+  - id: "CME.MNQ"
+    display_name: "E-mini Nasdaq-100"
+    type: "future"
+    profile: "CME_MNQ_v2"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CME"
+    multiplier: 2.0
+    tick_size: 0.25
+    tick_value: 0.50
+  - id: "TWF.MXF"
+    display_name: "Taiwan Futures Exchange Mini-TAIEX"
+    type: "future"
+    profile: "TWF_MXF_v2"
+    currency: "TWD"
+    default_timeframe: 60
+    exchange: "TAIFEX"
+    multiplier: 50.0
+    tick_size: 1.0
+    tick_value: 50.0
+default: "CME.MNQ"

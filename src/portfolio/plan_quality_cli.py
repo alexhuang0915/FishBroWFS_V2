@@ -25,7 +25,7 @@ def main() -> None:
     parser.add_argument(
         "--plan-id",
         required=True,
-        help="Plan ID (directory name under outputs/portfolio/plans/)",
+        help="Plan ID (directory name under outputs/jobs/{plan_id}/plan/)",
     )
     parser.add_argument(
         "--write",

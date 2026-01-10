@@ -191,6 +191,11 @@ class BuildWorker(QObject):
             self.log_signal.emit(f"Calling prepare_with_data2_enforcement with mode={self.mode}...")
             self.progress_signal.emit(10)
             
+            # Load allowed timeframes from registry
+            from src.config.registry.timeframes import load_timeframes
+            timeframe_registry = load_timeframes()
+            allowed_timeframes = timeframe_registry.allowed_timeframes
+            
             result = prepare_with_data2_enforcement(
                 season=season,
                 data1_dataset_id=self.dataset,
@@ -200,7 +205,7 @@ class BuildWorker(QObject):
                 mode=self.mode,
                 build_bars=self.build_bars,
                 build_features=self.build_features,
-                tfs=[15, 30, 60, 120, 240],
+                tfs=allowed_timeframes,
             )
             
             if not result["success"]:

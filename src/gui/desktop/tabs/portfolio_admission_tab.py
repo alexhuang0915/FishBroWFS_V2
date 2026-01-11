@@ -2,8 +2,10 @@
 Portfolio Admission Sandbox - Phase 4-B Finalization Desktop UI.
 """
 
+# pylint: disable=no-name-in-module,c-extension-no-member
+
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Mapping, Protocol, cast
 
 import pandas as pd
 import numpy as np
@@ -16,11 +18,30 @@ from PySide6.QtWidgets import (  # type: ignore
     QApplication, QFrame
 )
 
-from ..widgets.metric_cards import MetricCard
-from ..widgets.charts.line_chart import LineChartWidget
-from ...services.supervisor_client import get_jobs, SupervisorClientError
+from gui.desktop.widgets.metric_cards import MetricCard
+from gui.desktop.widgets.charts.line_chart import LineChartWidget
+from gui.services.supervisor_client import get_jobs, SupervisorClientError
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_jobs(resp: Any) -> list[dict[str, Any]]:
+    """Normalize get_jobs response to list[dict]."""
+    if isinstance(resp, list):
+        return [j for j in resp if isinstance(j, dict)]
+    if isinstance(resp, dict):
+        jobs = resp.get("jobs")
+        if isinstance(jobs, list):
+            return [j for j in jobs if isinstance(j, dict)]
+    return []
+
+
+class _MetricCardProto(Protocol):
+    def set_value(self, value: str) -> None: ...
+
+
+class _LineChartProto(Protocol):
+    def set_series(self, series: dict) -> None: ...
 
 
 class PortfolioAdmissionTab(QWidget):
@@ -152,38 +173,40 @@ class PortfolioAdmissionTab(QWidget):
         """Load real Phase4-A jobs from supervisor API."""
         try:
             # Load real jobs from supervisor
-            jobs_response = get_jobs(job_type="RUN_RESEARCH_WFS", limit=20)
-            if jobs_response and "jobs" in jobs_response:
-                real_jobs = []
-                for job in jobs_response["jobs"]:
-                    # Extract strategy_id from job spec
-                    strategy_id = "Unknown"
-                    if "spec_json" in job:
-                        import json
-                        try:
-                            spec = json.loads(job["spec_json"])
-                            strategy_id = spec.get("strategy_id", "Unknown")
-                        except:
-                            pass
-                    
-                    # Determine grade from job state or results
-                    grade = "B"  # Default
-                    if job.get("state") == "COMPLETED":
-                        grade = "A"  # Completed jobs get A grade
-                    
-                    real_jobs.append({
-                        "job_id": job.get("job_id", ""),
-                        "strategy_id": strategy_id,
-                        "grade": grade
-                    })
+            jobs_response = get_jobs(limit=20)
+            jobs = _normalize_jobs(jobs_response)
+            # Filter jobs by job_type
+            filtered_jobs = [j for j in jobs if j.get("job_type") == "RUN_RESEARCH_WFS"]
+            real_jobs = []
+            for job in filtered_jobs:
+                # Extract strategy_id from job spec
+                strategy_id = "Unknown"
+                if "spec_json" in job:
+                    import json
+                    try:
+                        spec = json.loads(job["spec_json"])
+                        strategy_id = spec.get("strategy_id", "Unknown")
+                    except:
+                        pass
                 
-                if real_jobs:
-                    self.update_job_list_ui(real_jobs)
-                    return
-                else:
-                    # No real jobs available
-                    self.show_no_jobs_message()
-                    return
+                # Determine grade from job state or results
+                grade = "B"  # Default
+                if job.get("state") == "COMPLETED":
+                    grade = "A"  # Completed jobs get A grade
+                
+                real_jobs.append({
+                    "job_id": job.get("job_id", ""),
+                    "strategy_id": strategy_id,
+                    "grade": grade
+                })
+            
+            if real_jobs:
+                self.update_job_list_ui(real_jobs)
+                return
+            else:
+                # No real jobs available
+                self.show_no_jobs_message()
+                return
         except Exception as e:
             logger.error(f"Failed to load real jobs from supervisor: {e}")
             self.show_error_message(f"Failed to load jobs: {e}")
@@ -195,8 +218,10 @@ class PortfolioAdmissionTab(QWidget):
         """Show message when no jobs are available."""
         while self.job_list_layout.count():
             item = self.job_list_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
         
         message = QLabel("No Phase4-A jobs available.\n\n"
                         "Run research jobs first to generate candidate strategies.")
@@ -209,8 +234,10 @@ class PortfolioAdmissionTab(QWidget):
         """Show error message when job loading fails."""
         while self.job_list_layout.count():
             item = self.job_list_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
         
         message = QLabel(f"Error loading jobs:\n{error_text}")
         message.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -222,8 +249,10 @@ class PortfolioAdmissionTab(QWidget):
         """Update job list UI."""
         while self.job_list_layout.count():
             item = self.job_list_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
         
         for job in jobs:
             row = QWidget()
@@ -289,12 +318,12 @@ class PortfolioAdmissionTab(QWidget):
         
         # Real analytics would be loaded from job artifacts
         # For now, show placeholder values
-        self.sharpe_card.set_value("--")
-        self.rf_card.set_value("--")
-        self.cagr_card.set_value("--")
-        self.full_mdd_card.set_value("--")
-        self.rolling_3m_card.set_value("--")
-        self.rolling_6m_card.set_value("--")
+        cast(_MetricCardProto, self.sharpe_card).set_value("--")
+        cast(_MetricCardProto, self.rf_card).set_value("--")
+        cast(_MetricCardProto, self.cagr_card).set_value("--")
+        cast(_MetricCardProto, self.full_mdd_card).set_value("--")
+        cast(_MetricCardProto, self.rolling_3m_card).set_value("--")
+        cast(_MetricCardProto, self.rolling_6m_card).set_value("--")
         
         # Gate statuses would be computed from real admission logic
         # For now, show PENDING (requires real admission evaluation)
@@ -317,12 +346,12 @@ class PortfolioAdmissionTab(QWidget):
         self.update_submit_button_state()
     
     def clear_analytics(self):
-        self.sharpe_card.set_value("0.00")
-        self.rf_card.set_value("0.00")
-        self.cagr_card.set_value("0.00%")
-        self.full_mdd_card.set_value("0.00%")
-        self.rolling_3m_card.set_value("0.00%")
-        self.rolling_6m_card.set_value("0.00%")
+        cast(_MetricCardProto, self.sharpe_card).set_value("0.00")
+        cast(_MetricCardProto, self.rf_card).set_value("0.00")
+        cast(_MetricCardProto, self.cagr_card).set_value("0.00%")
+        cast(_MetricCardProto, self.full_mdd_card).set_value("0.00%")
+        cast(_MetricCardProto, self.rolling_3m_card).set_value("0.00%")
+        cast(_MetricCardProto, self.rolling_6m_card).set_value("0.00%")
         
         self.gate1_status.setText("PENDING"); self.gate1_status.setStyleSheet("color: #FFC107;")
         self.gate2_status.setText("PENDING"); self.gate2_status.setStyleSheet("color: #FFC107;")
@@ -340,8 +369,8 @@ class PortfolioAdmissionTab(QWidget):
 
     def clear_charts(self):
         """Clear charts when no real data is available."""
-        self.portfolio_chart.set_series({})
-        self.underwater_chart.set_series({})
+        cast(_LineChartProto, self.portfolio_chart).set_series({})
+        cast(_LineChartProto, self.underwater_chart).set_series({})
     
     def submit_admission_job(self):
         """Submit RUN_PORTFOLIO_ADMISSION job."""

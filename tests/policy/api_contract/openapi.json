@@ -3904,6 +3904,29 @@
         "summary": "Registry Strategies"
       }
     },
+    "/api/v1/registry/timeframes": {
+      "get": {
+        "description": "Return list of timeframe display names (simple strings).\n\nContract:\n- Returns simple array of strings, e.g., [\"15m\", \"30m\", \"60m\", \"120m\", \"240m\"]\n- If timeframe registry not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_timeframes_api_v1_registry_timeframes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Timeframes Api V1 Registry Timeframes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Timeframes"
+      }
+    },
     "/api/v1/reports/portfolio/{portfolio_id}": {
       "get": {
         "description": "Return precomputed PortfolioReportV1 JSON for a portfolio admission.\n\nContract:\n- If outputs/portfolios/<portfolio_id>/admission/portfolio_report_v1.json exists:\n  - return its JSON content with application/json\n- Else:\n  - 404 with clear message: \"portfolio_report_v1.json not found; run portfolio build or upgrade workers\"\n- No heavy compute inside request handler.",

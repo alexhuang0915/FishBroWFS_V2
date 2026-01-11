@@ -9,7 +9,7 @@ from datetime import datetime
 
 from .db import SupervisorDB
 from .models import JobSpec, JobStatus
-from src.contracts.supervisor.evidence_schemas import (
+from contracts.supervisor.evidence_schemas import (
     PolicyCheck,
     PolicyCheckBundle,
     stable_params_hash,

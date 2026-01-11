@@ -44,17 +44,29 @@ ALLOWLIST = {
     # Example: "src/gui/legacy/old_module.py"
 }
 
-def is_timeframe_token(s: str) -> bool:
+def is_timeframe_token(s: object) -> bool:
     """Check if string looks like a timeframe token."""
+    if not isinstance(s, str):
+        return False
     return bool(TIMEFRAME_TOKEN_PATTERN.match(s))
 
 
 def extract_string_value(el: ast.AST) -> Optional[str]:
     """Extract string value from AST node safely."""
-    if hasattr(ast, 'Constant') and isinstance(el, ast.Constant) and isinstance(el.value, str):
-        return el.value
-    if hasattr(el, 's'):
-        return el.s
+    # Python 3.8+ uses ast.Constant for strings
+    if hasattr(ast, 'Constant') and isinstance(el, ast.Constant):
+        val = el.value
+        if isinstance(val, str):
+            return val
+        # Not a string (could be int, float, etc.)
+        return None
+    # Python <3.8 uses ast.Str (deprecated)
+    if isinstance(el, ast.Str):
+        val = el.s
+        if isinstance(val, str):
+            return val
+        # Should not happen, but guard
+        return None
     return None
 
 def is_options_like_name(name: str) -> bool:

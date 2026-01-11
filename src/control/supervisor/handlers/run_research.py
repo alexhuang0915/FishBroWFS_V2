@@ -7,12 +7,35 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 import traceback
+from dataclasses import fields
 
 from ..job_handler import BaseJobHandler, JobContext
-from src.contracts.supervisor.run_research import RunResearchPayload
-from src.control.paths import get_outputs_root
+from contracts.supervisor.run_research import RunResearchPayload
+from control.paths import get_outputs_root
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_run_research_params(raw: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Ensure params passed into RunResearchPayload(**params) contain only dataclass fields.
+    Any extra keys (instrument/timeframe/season/run_mode/...) are packed into params_override.
+    """
+    allowed = {f.name for f in fields(RunResearchPayload)}
+    params: Dict[str, Any] = dict(raw)  # shallow copy
+
+    extras = {k: params.pop(k) for k in list(params.keys()) if k not in allowed}
+    if extras:
+        override = params.get("params_override")
+        if override is None:
+            override = {}
+        # If override is not a dict, normalize to dict to avoid runtime crash
+        if not isinstance(override, dict):
+            override = {"_raw_params_override": override}
+        override.update(extras)
+        params["params_override"] = override
+
+    return params
 
 
 class RunResearchHandler(BaseJobHandler):
@@ -21,7 +44,8 @@ class RunResearchHandler(BaseJobHandler):
     def validate_params(self, params: Dict[str, Any]) -> None:
         """Validate RUN_RESEARCH_V2 parameters."""
         try:
-            payload = RunResearchPayload(**params)
+            normalized = _normalize_run_research_params(params)
+            payload = RunResearchPayload(**normalized)
             payload.validate()
         except Exception as e:
             raise ValueError(f"Invalid run_research payload: {e}")
@@ -29,7 +53,8 @@ class RunResearchHandler(BaseJobHandler):
     def execute(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute RUN_RESEARCH_V2 job."""
         # Validate payload
-        payload = RunResearchPayload(**params)
+        normalized = _normalize_run_research_params(params)
+        payload = RunResearchPayload(**normalized)
         payload.validate()
         
         # Check for abort before starting
@@ -41,7 +66,7 @@ class RunResearchHandler(BaseJobHandler):
                 "reason": "user_abort_preinvoke",
                 "payload": params
             }
-        
+            
         # Create run directory using job_id
         outputs_root = get_outputs_root()
         run_dir = outputs_root / "seasons" / "current" / context.job_id
@@ -50,7 +75,7 @@ class RunResearchHandler(BaseJobHandler):
         # Write payload to run directory
         payload_path = run_dir / "payload.json"
         with open(payload_path, "w") as f:
-            json.dump(params, f, indent=2)
+            json.dump({"raw_params": params, "normalized_params": normalized}, f, indent=2)
         
         # Update heartbeat with progress
         context.heartbeat(progress=0.1, phase="validating_inputs")

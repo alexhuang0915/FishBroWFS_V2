@@ -8,11 +8,11 @@ Layout: QSplitter horizontal with Launch Pad (left) and Job Tracker (right).
 # pylint: disable=no-name-in-module,c-extension-no-member
 
 import logging
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, cast, Protocol
 from datetime import datetime
 from PySide6.QtCore import (
     Qt, Signal, QTimer, QModelIndex, QAbstractTableModel, QAbstractItemModel,
-    QUrl, QSize, QPersistentModelIndex, QEvent
+    QUrl, QSize, QPersistentModelIndex, QEvent, QPoint, QRect
 )  # pylint: disable=no-name-in-module
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
@@ -21,22 +21,26 @@ from PySide6.QtWidgets import (
     QStyledItemDelegate, QStyleOptionViewItem,
     QMessageBox, QSpacerItem, QLineEdit
 )  # pylint: disable=no-name-in-module
-from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices  # pylint: disable=no-name-in-module
+from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices, QMouseEvent  # pylint: disable=no-name-in-module
 
-from src.gui.desktop.widgets.log_viewer import LogViewerDialog
-from src.gui.desktop.services.supervisor_client import (
+from gui.desktop.widgets.log_viewer import LogViewerDialog
+from gui.desktop.services.supervisor_client import (
     SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
     get_jobs, get_artifacts, get_strategy_report_v1,
     get_reveal_evidence_path, submit_job
 )
-from src.gui.services.timeframe_options import (
+from gui.services.timeframe_options import (
     get_timeframe_ids,
     get_default_timeframe,
     get_timeframe_registry
 )
 
 logger = logging.getLogger(__name__)
+
+
+class _HasRect(Protocol):
+    rect: QRect
 
 
 class JobsTableModel(QAbstractTableModel):
@@ -347,16 +351,18 @@ class ActionsDelegate(QStyledItemDelegate):
         button_height = 24
         button_spacing = 4
         total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-        start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+        opt = cast(_HasRect, option)
+        rect = opt.rect
+        start_x = rect.left() + (rect.width() - total_width) // 2
         
         painter.save()
         
         for i, (action_type, text, enabled) in enumerate(buttons):
-            button_rect = option.rect.adjusted(
+            button_rect = rect.adjusted(
                 start_x + i * (button_width + button_spacing),
-                (option.rect.height() - button_height) // 2,
-                start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                (rect.height() - button_height) // 2,
+                start_x + i * (button_width + button_spacing) - rect.width() + button_width,
+                (rect.height() - button_height) // 2 - rect.height() + button_height
             )
             
             # Determine button style
@@ -388,7 +394,10 @@ class ActionsDelegate(QStyledItemDelegate):
     
     def editorEvent(self, event: QEvent, model: QAbstractItemModel, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> bool:
         """Handle mouse events on buttons."""
-        if event.type() == event.Type.MouseButtonPress:
+        opt = cast(_HasRect, option)
+        rect = opt.rect
+        
+        if event.type() == QEvent.Type.MouseButtonPress:
             # Get job data
             job_model = index.model()
             if not isinstance(job_model, JobsTableModel):
@@ -416,22 +425,25 @@ class ActionsDelegate(QStyledItemDelegate):
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-            start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+            start_x = rect.left() + (rect.width() - total_width) // 2
             
             # Check which button was clicked
             for i, (action_type, enabled) in enumerate(buttons):
-                button_rect = option.rect.adjusted(
+                button_rect = rect.adjusted(
                     start_x + i * (button_width + button_spacing),
-                    (option.rect.height() - button_height) // 2,
-                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                    (rect.height() - button_height) // 2,
+                    start_x + i * (button_width + button_spacing) - rect.width() + button_width,
+                    (rect.height() - button_height) // 2 - rect.height() + button_height
                 )
                 
-                if button_rect.contains(event.pos()) and enabled:
-                    self.button_clicked.emit(index.row(), action_type)
-                    return True
+                # Qt6 correctness: use QMouseEvent.position().toPoint()
+                if isinstance(event, QMouseEvent):
+                    pos = event.position().toPoint()
+                    if button_rect.contains(pos) and enabled:
+                        self.button_clicked.emit(index.row(), action_type)
+                        return True
         
-        elif event.type() == event.Type.MouseMove:
+        elif event.type() == QEvent.Type.MouseMove:
             # Update hover state
             self.hovered_row = index.row()
             
@@ -462,21 +474,24 @@ class ActionsDelegate(QStyledItemDelegate):
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
-            start_x = option.rect.left() + (option.rect.width() - total_width) // 2
+            start_x = rect.left() + (rect.width() - total_width) // 2
             
             # Check which button is hovered
             self.hovered_button = -1
             for i, (_, enabled) in enumerate(buttons):
-                button_rect = option.rect.adjusted(
+                button_rect = rect.adjusted(
                     start_x + i * (button_width + button_spacing),
-                    (option.rect.height() - button_height) // 2,
-                    start_x + i * (button_width + button_spacing) - option.rect.width() + button_width,
-                    (option.rect.height() - button_height) // 2 - option.rect.height() + button_height
+                    (rect.height() - button_height) // 2,
+                    start_x + i * (button_width + button_spacing) - rect.width() + button_width,
+                    (rect.height() - button_height) // 2 - rect.height() + button_height
                 )
                 
-                if button_rect.contains(event.pos()) and enabled:
-                    self.hovered_button = i
-                    break
+                # Qt6 correctness: use QMouseEvent.position().toPoint()
+                if isinstance(event, QMouseEvent):
+                    pos = event.position().toPoint()
+                    if button_rect.contains(pos) and enabled:
+                        self.hovered_button = i
+                        break
             
             # Trigger repaint
             model.dataChanged.emit(index, index)
@@ -1035,7 +1050,9 @@ class OpTab(QWidget):
         
         try:
             # Submit job via supervisor API
-            job_id = submit_job(params)
+            response = submit_job(params)
+            # Extract job_id from response dict (API returns {"ok": True, "job_id": "..."})
+            job_id = response.get("job_id") if isinstance(response, dict) else response
             self.status_label.setText(f"Job submitted: {job_id[:8]}...")
             self.log_signal.emit(f"Submitted job {job_id} for strategy {strategy_id}")
             

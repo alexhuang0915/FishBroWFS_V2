@@ -9,8 +9,8 @@ from typing import Any, Dict, Optional
 import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
-from src.contracts.supervisor.run_compile import RunCompilePayload
-from src.control.paths import get_outputs_root
+from contracts.supervisor.run_compile import RunCompilePayload
+from control.paths import get_outputs_root
 
 logger = logging.getLogger(__name__)
 

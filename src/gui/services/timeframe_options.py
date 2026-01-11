@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List, Tuple
 
-from src.config.registry.timeframes import load_timeframes, TimeframeRegistry
+from config.registry.timeframes import load_timeframes, TimeframeRegistry
 
 
 @lru_cache(maxsize=1)

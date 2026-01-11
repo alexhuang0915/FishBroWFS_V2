@@ -1,25 +1,25 @@
-
-"""FastAPI endpoints for B5-C Mission Control (Thin Proxy to Supervisor)."""
-
 from __future__ import annotations
-
+import json
+import logging
+import subprocess
+import sys
 import os
 import mimetypes
 import hashlib
 from contextlib import asynccontextmanager
-from datetime import datetime
-from pathlib import Path
-from typing import Any, Optional
-
-from fastapi import FastAPI, HTTPException, APIRouter
+from datetime import datetime, timezone # timezone imported here
+import traceback
+from fastapi import FastAPI, HTTPException, APIRouter, Request # Request imported here
 from pydantic import BaseModel
-
 from collections import deque
+from urllib.parse import unquote
+from dataclasses import fields
+from typing import Any, Optional, Dict # Added Any, Optional, Dict imports
+from pathlib import Path # Added Path import
 
 # Supervisor imports
 from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job
 from control.supervisor.models import JobSpec as SupervisorJobSpec, JobType, normalize_job_type
-
 
 # Phase 14: Batch execution & governance
 from control.artifacts import (
@@ -118,9 +118,10 @@ from control.portfolio.api_v1 import router as portfolio_router
 from control.supervisor import list_jobs as list_supervisor_jobs
 
 # Phase 12: Registry cache
-_DATASET_INDEX: DatasetIndex | None = None
-_STRATEGY_REGISTRY: StrategyRegistryResponse | None = None
+_DATASET_INDEX: Any | None = None
+_STRATEGY_REGISTRY: Any | None = None
 _INSTRUMENTS_CONFIG: Any | None = None  # InstrumentsConfig from portfolio.instruments
+_TIMEFRAME_REGISTRY: Any | None = None  # TimeframeRegistry from config.registry.timeframes
 
 
 def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
@@ -146,10 +147,6 @@ def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
 
 def _load_dataset_index_from_file() -> DatasetIndex:
     """Private implementation: load dataset index from file (fail fast)."""
-    import json
-    from pathlib import Path
-    from datetime import datetime, timezone
-
     index_path = Path("outputs/datasets/datasets_index.json")
     if not index_path.exists():
         # Return empty dataset index (headless-safe)
@@ -166,9 +163,6 @@ def _load_dataset_index_from_file() -> DatasetIndex:
 
 def _load_instruments_config_from_file() -> Any:
     """Private implementation: load instruments config from file (fail fast)."""
-    import json
-    from pathlib import Path
-
     config_path = Path("configs/portfolio/instruments.yaml")
     if not config_path.exists():
         raise RuntimeError(
@@ -286,15 +280,55 @@ def load_strategy_registry() -> StrategyRegistryResponse:
     return registry
 
 
+def _load_timeframe_registry_from_file() -> Any:
+    """Private implementation: load timeframe registry from file (fail fast)."""
+    from config.registry.timeframes import load_timeframes
+    return load_timeframes()
+
+
+def _get_timeframe_registry() -> Any:
+    """Return cached timeframe registry, loading if necessary."""
+    global _TIMEFRAME_REGISTRY
+    if _TIMEFRAME_REGISTRY is None:
+        _TIMEFRAME_REGISTRY = _load_timeframe_registry_from_file()
+    return _TIMEFRAME_REGISTRY
+
+
+def _reload_timeframe_registry() -> Any:
+    """Force reload timeframe registry from file and update cache."""
+    global _TIMEFRAME_REGISTRY
+    _TIMEFRAME_REGISTRY = _load_timeframe_registry_from_file()
+    return _TIMEFRAME_REGISTRY
+
+
+def load_timeframe_registry() -> Any:
+    """Load timeframe registry. Supports monkeypatching."""
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_timeframe_registry")
+
+    # If monkeypatched, call patched function
+    if current is not _LOAD_TIMEFRAME_REGISTRY_ORIGINAL:
+        return current()
+
+    # If cache is available, return it
+    if _TIMEFRAME_REGISTRY is not None:
+        return _TIMEFRAME_REGISTRY
+
+    # Fallback for CLI/unit-test paths (may touch filesystem)
+    return _load_timeframe_registry_from_file()
+
+
 # Original function references for monkeypatch detection (must be after function definitions)
 _LOAD_DATASET_INDEX_ORIGINAL = load_dataset_index
 _LOAD_STRATEGY_REGISTRY_ORIGINAL = load_strategy_registry
 _LOAD_INSTRUMENTS_CONFIG_ORIGINAL = load_instruments_config
+_LOAD_TIMEFRAME_REGISTRY_ORIGINAL = load_timeframe_registry
 
 
 def _try_prime_registries() -> None:
     """Prime cache on startup (per‑load tolerance)."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY
     # Try each load independently; if one fails, set its cache to None but continue.
     try:
         _DATASET_INDEX = load_dataset_index()
@@ -308,18 +342,24 @@ def _try_prime_registries() -> None:
         _INSTRUMENTS_CONFIG = load_instruments_config()
     except Exception:
         _INSTRUMENTS_CONFIG = None
+    try:
+        _TIMEFRAME_REGISTRY = load_timeframe_registry()
+    except Exception:
+        _TIMEFRAME_REGISTRY = None
 
 
 def _prime_registries_with_feedback() -> dict[str, Any]:
     """Prime registries and return detailed feedback."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY
     result = {
         "dataset_loaded": False,
         "strategy_loaded": False,
         "instruments_loaded": False,
+        "timeframe_loaded": False,
         "dataset_error": None,
         "strategy_error": None,
         "instruments_error": None,
+        "timeframe_error": None,
     }
     
     # Try dataset
@@ -346,7 +386,15 @@ def _prime_registries_with_feedback() -> dict[str, Any]:
         _INSTRUMENTS_CONFIG = None
         result["instruments_error"] = str(e)
     
-    result["success"] = result["dataset_loaded"] and result["strategy_loaded"] and result["instruments_loaded"]
+    # Try timeframe
+    try:
+        _TIMEFRAME_REGISTRY = load_timeframe_registry()
+        result["timeframe_loaded"] = True
+    except Exception as e:
+        _TIMEFRAME_REGISTRY = None
+        result["timeframe_error"] = str(e)
+    
+    result["success"] = result["dataset_loaded"] and result["strategy_loaded"] and result["instruments_loaded"] and result["timeframe_loaded"]
     return result
 
 
@@ -365,10 +413,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="B5-C Mission Control API", lifespan=lifespan)
 
 # Middleware to reject path traversal attempts before Starlette normalizes them
-from fastapi import Request, Response
-from urllib.parse import unquote
-import sys
-
 @app.middleware("http")
 async def reject_path_traversal_middleware(request: Request, call_next):
     """
@@ -579,6 +623,31 @@ async def registry_strategies() -> list[str]:
     return strategy_ids
 
 
+@api_v1.get("/registry/timeframes")
+async def registry_timeframes() -> list[str]:
+    """
+    Return list of timeframe display names (simple strings).
+    
+    Contract:
+    - Returns simple array of strings, e.g., ["15m", "30m", "60m", "120m", "240m"]
+    - If timeframe registry not loaded, returns 503.
+    - Must not access filesystem during request handling.
+    """
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_timeframe_registry")
+
+    # Enforce no filesystem access during request handling
+    if _TIMEFRAME_REGISTRY is None and current is _LOAD_TIMEFRAME_REGISTRY_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Timeframe registry not preloaded")
+
+    registry = load_timeframe_registry()
+    # registry is a TimeframeRegistry object with get_display_names() method
+    # Return sorted display names for consistency
+    display_names = registry.get_display_names()
+    return sorted(display_names)
+
+
 class ReadinessResponse(BaseModel):
     """Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}."""
     season: str
@@ -649,6 +718,38 @@ class JobListResponse(BaseModel):
     score: Optional[float] = None
 
 
+def _coerce_str(v: Any) -> str:
+    if v is None:
+        return ""
+    return str(v)
+
+
+def _expand_display_fields_from_params_override(params: dict, metadata: dict) -> tuple[str, str, str, str, str]:
+    """Extract display fields from params and params_override with priority."""
+    # First, get top-level values
+    instrument = _coerce_str(params.get("instrument") or params.get("symbol", ""))
+    timeframe = _coerce_str(params.get("timeframe", ""))
+    run_mode = _coerce_str(params.get("run_mode", ""))
+    season = _coerce_str(metadata.get("season", ""))
+    dataset = _coerce_str(params.get("dataset", ""))
+    
+    # Check params_override if top-level fields are empty
+    params_override = params.get("params_override")
+    if isinstance(params_override, dict):
+        if not instrument:
+            instrument = _coerce_str(params_override.get("instrument"))
+        if not timeframe:
+            timeframe = _coerce_str(params_override.get("timeframe"))
+        if not run_mode:
+            run_mode = _coerce_str(params_override.get("run_mode"))
+        if not season:
+            season = _coerce_str(params_override.get("season"))
+        if not dataset:
+            dataset = _coerce_str(params_override.get("dataset"))
+    
+    return instrument, timeframe, run_mode, season, dataset
+
+
 def _supervisor_job_to_response(job: Any) -> JobListResponse:
     """Convert a supervisor JobRow to a JobListResponse."""
     # job is a JobRow from supervisor
@@ -657,7 +758,6 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
     created_at = job.created_at
     
     # Parse spec_json to extract params
-    import json
     spec = {}
     try:
         spec = json.loads(job.spec_json)
@@ -667,12 +767,9 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
     params = spec.get("params", {})
     metadata = spec.get("metadata", {})
     
-    # Extract fields
+    # Extract fields with params_override expansion
     strategy_name = params.get("strategy_id", "")
-    instrument = params.get("instrument") or params.get("symbol", "")
-    timeframe = params.get("timeframe", "")
-    run_mode = params.get("run_mode", "")
-    season = metadata.get("season", "")
+    instrument, timeframe, run_mode, season, dataset = _expand_display_fields_from_params_override(params, metadata)
     
     # Determine finished_at (supervisor doesn't track finished_at directly)
     finished_at = None
@@ -683,7 +780,7 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
     duration_seconds = None
     if created_at and finished_at:
         try:
-            from datetime import datetime
+            from datetime import datetime, timezone
             created_dt = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
             finished_dt = datetime.fromisoformat(finished_at.replace('Z', '+00:00'))
             duration_seconds = (finished_dt - created_dt).total_seconds()
@@ -832,6 +929,57 @@ def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
     return artifacts
 
 
+def _build_run_research_v2_params(req: dict) -> dict:
+    """
+    Build supervisor params for RUN_RESEARCH_V2 job from UI request.
+    
+    Maps UI fields (instrument/timeframe/season/run_mode/dataset) into
+    RunResearchPayload contract with extras packed into params_override.
+    
+    Defaults:
+    - profile_name: "default" if not provided
+    - start_date: "" if not provided (will cause validation error)
+    - end_date: "" if not provided (will cause validation error)
+    """
+    strategy_id = req.get("strategy_id")
+    if not strategy_id:
+        raise ValueError("strategy_id is required")
+    if not isinstance(strategy_id, str):
+        raise ValueError("strategy_id must be a string")
+
+    profile_name = req.get("profile_name") or "default"
+    if not isinstance(profile_name, str):
+        raise ValueError("profile_name must be a string")
+    
+    start_date = req.get("start_date")
+    if not start_date or not isinstance(start_date, str) or start_date.strip() == "":
+        raise ValueError("start_date is required and must be a non-empty string")
+    
+    end_date = req.get("end_date")
+    if not end_date or not isinstance(end_date, str) or end_date.strip() == "":
+        raise ValueError("end_date is required and must be a non-empty string")
+
+    override = req.get("params_override") or {}
+    if not isinstance(override, dict):
+        override = {"_raw_params_override": override}
+
+    # Pack UI keys into params_override (these are the keys Desktop UI currently sends)
+    for k in ("instrument", "timeframe", "season", "run_mode", "dataset"):
+        if k in req and req[k] is not None:
+            # Validate that UI fields are strings (optional but good for consistency)
+            if not isinstance(req[k], str):
+                raise ValueError(f"{k} must be a string")
+            override[k] = req[k]
+
+    return {
+        "strategy_id": strategy_id,
+        "profile_name": profile_name,
+        "start_date": start_date,
+        "end_date": end_date,
+        "params_override": override,
+    }
+
+
 def _validate_artifact_filename_or_403(filename: str) -> str:
     """
     Validate artifact filename; raise HTTP 403 if invalid (path traversal, slashes, etc.).
@@ -905,6 +1053,8 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     run_mode = payload.get("run_mode", "").lower()
     season = payload.get("season")
     dataset = payload.get("dataset")
+    start_date = payload.get("start_date")
+    end_date = payload.get("end_date")
     
     # Validate required fields
     if not all([strategy_id, instrument, timeframe, season]):
@@ -925,16 +1075,39 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         job_type = JobType.RUN_RESEARCH_V2.value  # Default
     
-    # Build supervisor params
-    params = {
-        "strategy_id": strategy_id,
-        "instrument": instrument,
-        "timeframe": timeframe,
-        "run_mode": run_mode,
-    }
-    
-    if dataset:
-        params["dataset"] = dataset
+    # Build supervisor params based on job_type
+    if job_type == JobType.RUN_RESEARCH_V2.value:
+        # For RUN_RESEARCH_V2, build params using the proper contract
+        # Include all UI fields in the request dict for mapping
+        request_dict = {
+            "strategy_id": strategy_id,
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "run_mode": run_mode,
+            "season": season,
+        }
+        if dataset:
+            request_dict["dataset"] = dataset
+        if start_date is not None:
+            request_dict["start_date"] = start_date
+        if end_date is not None:
+            request_dict["end_date"] = end_date
+        
+        try:
+            params = _build_run_research_v2_params(request_dict)
+        except (TypeError, ValueError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid run_research payload: {e}") from e
+    else:
+        # For other job types, keep existing params structure
+        params = {
+            "strategy_id": strategy_id,
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "run_mode": run_mode,
+        }
+        
+        if dataset:
+            params["dataset"] = dataset
     
     # Build metadata
     metadata = {
@@ -947,20 +1120,17 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         job_id = supervisor_submit(job_type, params, metadata)
         return {"ok": True, "job_id": job_id}
+    except (TypeError, ValueError) as e:
+        # Convert mapping errors into HTTP 422
+        raise HTTPException(status_code=422, detail=f"Invalid run_research payload: {e}") from e
     except Exception as e:
+        # Catch other unexpected errors during submission
         raise HTTPException(status_code=500, detail=f"Failed to submit job to supervisor: {e}")
-
-
 
 
 # -----------------------------------------------------------------------------
 # Phase A: Artifact endpoints
 # -----------------------------------------------------------------------------
-
-
-
-
-
 
 
 @api_v1.get("/jobs/{job_id}/reveal_evidence_path", response_model=RevealEvidencePathResponse)
@@ -985,11 +1155,7 @@ async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
     )
 
 
-
-
 # Worker management removed - supervisor handles its own workers
-
-
 
 
 # Phase 14: Batch execution & governance endpoints
@@ -2019,5 +2185,3 @@ app.include_router(api_v1)
 
 # Register portfolio API router (Phase D)
 app.include_router(portfolio_router)
-
-

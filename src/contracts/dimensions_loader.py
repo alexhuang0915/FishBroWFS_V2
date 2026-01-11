@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .dimensions import DimensionRegistry, InstrumentDimension, SessionSpec, canonical_json
-from src.config.profiles import ProfileConfig, load_profile
+from config.profiles import ProfileConfig, load_profile
 
 
 def default_registry_path() -> Path:

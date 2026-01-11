@@ -69,7 +69,7 @@ class BuildDataHandler(BaseJobHandler):
     
     def _execute_via_function(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute BUILD_DATA using the legacy Python function."""
-        from src.control.prepare_orchestration import prepare_with_data2_enforcement
+        from control.prepare_orchestration import prepare_with_data2_enforcement
         
         dataset_id = params["dataset_id"]
         timeframe_min = params.get("timeframe_min", 60)

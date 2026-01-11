@@ -28,11 +28,11 @@ import random
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Mapping
 import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
-from src.contracts.research_wfs.result_schema import (
+from contracts.research_wfs.result_schema import (
     ResearchWFSResult,
     MetaSection as Meta,
     ConfigSection as Config,
@@ -50,12 +50,31 @@ from src.contracts.research_wfs.result_schema import (
     TimeRange,
     WindowRule,
 )
-from src.wfs.evaluation import evaluate, RawMetrics
-from src.wfs.stitching import stitch_equity_series
-from src.wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
-from src.core.determinism import stable_seed_from_intent
+from wfs.evaluation import evaluate, RawMetrics
+from wfs.stitching import stitch_equity_series
+from wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
+from core.determinism import stable_seed_from_intent
 
 logger = logging.getLogger(__name__)
+
+
+def _as_model_input(obj: Any) -> Any:
+    """Convert object to Pydantic model input (dict)."""
+    # Pydantic v2 models
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    # Pydantic v1 models
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    # Dataclasses
+    if hasattr(obj, "__dataclass_fields__"):
+        import dataclasses
+        return dataclasses.asdict(obj)
+    # Plain mappings
+    if isinstance(obj, Mapping):
+        return dict(obj)
+    # Fallback (last resort)
+    return obj
 
 
 class RunResearchWFSHandler(BaseJobHandler):
@@ -195,13 +214,16 @@ class RunResearchWFSHandler(BaseJobHandler):
                 summary=evaluation_result.summary
             )
             
+            # Convert windows to dicts for Pydantic compatibility
+            windows_in = [_as_model_input(w) for w in windows]
+            
             # Build final result
             result = ResearchWFSResult(
                 version="1.0",
                 meta=meta,
                 config=config,
                 estimate=estimate,
-                windows=windows,
+                windows=windows_in,
                 series=series,
                 metrics=metrics,
                 verdict=verdict
@@ -224,9 +246,13 @@ class RunResearchWFSHandler(BaseJobHandler):
             logger.error(f"Failed to execute WFS research: {e}")
             logger.error(traceback.format_exc())
             
-            # Write error to artifacts
-            error_path = Path(context.artifacts_dir) / "error.txt"
-            error_path.write_text(f"{e}\n\n{traceback.format_exc()}")
+            # Write error to artifacts (robust)
+            try:
+                error_path = Path(context.artifacts_dir) / "error.txt"
+                error_path.parent.mkdir(parents=True, exist_ok=True)
+                error_path.write_text(f"{e}\n\n{traceback.format_exc()}")
+            except Exception as write_err:
+                logger.error(f"Failed to write error artifact: {write_err}")
             
             raise  # Re-raise to mark job as FAILED
     

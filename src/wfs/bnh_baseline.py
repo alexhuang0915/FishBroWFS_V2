@@ -27,7 +27,7 @@ from datetime import datetime
 import numpy as np
 from dataclasses import dataclass
 
-from src.wfs.stitching import EquityPoint, StitchDiagnostic, stitch_equity_series
+from wfs.stitching import EquityPoint, StitchDiagnostic, stitch_equity_series
 
 
 @dataclass

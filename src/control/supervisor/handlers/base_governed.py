@@ -28,7 +28,7 @@ from ..evidence import (
 )
 from ..admission import AdmissionController
 from ..policies.post_flight import QualityGate
-from src.contracts.supervisor.evidence_schemas import (
+from contracts.supervisor.evidence_schemas import (
     PolicyCheckBundle,
     RuntimeMetrics,
 )
@@ -122,7 +122,7 @@ class BaseGovernedHandler(BaseJobHandler):
                     existing = json.load(f)
                     # Extract pre-flight checks
                     for check_data in existing.get("pre_flight_checks", []):
-                        from src.contracts.supervisor.evidence_schemas import PolicyCheck
+                        from contracts.supervisor.evidence_schemas import PolicyCheck
                         policy_bundle.pre_flight_checks.append(
                             PolicyCheck(**check_data)
                         )
@@ -197,7 +197,7 @@ class BaseGovernedHandler(BaseJobHandler):
                 with open(pre_flight_file, 'r') as f:
                     existing = json.load(f)
                     for check_data in existing.get("pre_flight_checks", []):
-                        from src.contracts.supervisor.evidence_schemas import PolicyCheck
+                        from contracts.supervisor.evidence_schemas import PolicyCheck
                         policy_bundle.pre_flight_checks.append(
                             PolicyCheck(**check_data)
                         )

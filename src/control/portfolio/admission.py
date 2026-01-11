@@ -12,12 +12,12 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timezone
 
-from src.portfolio.governance.params import load_governance_params
-from src.portfolio.models.governance_models import GovernanceParams
-from src.control.portfolio.evidence_reader import RunEvidenceReader
-from src.control.portfolio.policies.correlation import CorrelationGate, CorrelationGateResult
-from src.control.portfolio.policies.risk_budget import RiskBudgetGate, RiskBudgetResult
-from src.contracts.portfolio.admission_schemas import (
+from portfolio.governance.params import load_governance_params
+from portfolio.models.governance_models import GovernanceParams
+from control.portfolio.evidence_reader import RunEvidenceReader
+from control.portfolio.policies.correlation import CorrelationGate, CorrelationGateResult
+from control.portfolio.policies.risk_budget import RiskBudgetGate, RiskBudgetResult
+from contracts.portfolio.admission_schemas import (
     AdmissionDecision,
     AdmissionVerdict,
     ADMISSION_DECISION_FILE,

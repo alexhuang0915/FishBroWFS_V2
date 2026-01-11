@@ -9,8 +9,8 @@ from typing import Dict, List, Tuple, Optional, Any
 import pandas as pd
 import numpy as np
 
-from src.control.paths import get_outputs_root
-from src.contracts.supervisor.evidence_schemas import PolicyCheckBundle
+from control.paths import get_outputs_root
+from contracts.supervisor.evidence_schemas import PolicyCheckBundle
 
 
 class RunEvidenceReader:
@@ -51,7 +51,7 @@ class RunEvidenceReader:
         # Note: PolicyCheckBundle uses dataclasses.asdict for serialization
         # We need to reconstruct the nested objects.
         from dataclasses import asdict
-        from src.contracts.supervisor.evidence_schemas import PolicyCheck
+        from contracts.supervisor.evidence_schemas import PolicyCheck
         
         pre_flight = [
             PolicyCheck(**check_data) for check_data in data.get("pre_flight_checks", [])

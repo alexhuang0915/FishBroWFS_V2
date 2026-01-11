@@ -19,7 +19,7 @@ from pathlib import Path
 # Ensure src is in path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from src.control.api import app
+from control.api import app
 
 
 def main() -> None:

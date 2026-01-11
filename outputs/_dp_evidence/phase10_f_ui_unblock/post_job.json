@@ -1,0 +1,7 @@
+{
+  "strategy_id": "S1",
+  "instrument": "CME.MNQ",
+  "timeframe": "60m",
+  "run_mode": "research",
+  "season": "2026Q1"
+}

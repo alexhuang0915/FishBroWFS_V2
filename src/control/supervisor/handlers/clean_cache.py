@@ -60,7 +60,7 @@ class CleanCacheHandler(BaseJobHandler):
         
         # Import here to avoid circular imports
         try:
-            from src.gui.desktop.services.cleanup_service import (
+            from gui.desktop.services.cleanup_service import (
                 CleanupService, CleanupScope
             )
         except ImportError as e:
@@ -221,7 +221,7 @@ class CleanCacheHandler(BaseJobHandler):
         """Clean cache for a specific market."""
         # Try to use CleanupService if available
         try:
-            from src.gui.desktop.services.cleanup_service import (
+            from gui.desktop.services.cleanup_service import (
                 CleanupService, CleanupScope
             )
             
@@ -293,7 +293,7 @@ class CleanCacheHandler(BaseJobHandler):
         if not season:
             # Try to get current season
             try:
-                from src.gui.desktop.services.cleanup_service import CleanupService
+                from gui.desktop.services.cleanup_service import CleanupService
                 service = CleanupService()
                 season = service._get_current_season()
             except:

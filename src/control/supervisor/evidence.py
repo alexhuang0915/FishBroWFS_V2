@@ -11,7 +11,7 @@ from dataclasses import asdict
 import tempfile
 import shutil
 
-from src.contracts.supervisor.evidence_schemas import (
+from contracts.supervisor.evidence_schemas import (
     PolicyCheckBundle,
     FingerprintBundle,
     RuntimeMetrics,

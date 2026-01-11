@@ -9,14 +9,14 @@ from typing import Any, Dict, Optional, Set
 import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
-from src.contracts.supervisor.build_portfolio import BuildPortfolioPayload
-from src.control.paths import get_outputs_root
-from src.portfolio.governance.params import load_governance_params
-from src.control.portfolio.evidence_reader import RunEvidenceReader
-from src.control.portfolio.admission import PortfolioAdmissionController
-from src.portfolio.research_bridge import load_research_index, read_decisions_log, build_portfolio_from_research
-from src.portfolio.writer import write_portfolio_artifacts
-from src.contracts.portfolio.admission_schemas import AdmissionDecision
+from contracts.supervisor.build_portfolio import BuildPortfolioPayload
+from control.paths import get_outputs_root
+from portfolio.governance.params import load_governance_params
+from control.portfolio.evidence_reader import RunEvidenceReader
+from control.portfolio.admission import PortfolioAdmissionController
+from portfolio.research_bridge import load_research_index, read_decisions_log, build_portfolio_from_research
+from portfolio.writer import write_portfolio_artifacts
+from contracts.portfolio.admission_schemas import AdmissionDecision
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ class BuildPortfolioHandler(BaseJobHandler):
         
         # Apply overrides if provided
         if payload.governance_params_overrides:
-            from src.portfolio.models.governance_models import GovernanceParams
+            from portfolio.models.governance_models import GovernanceParams
             # Create a copy of params with overrides applied
             params_dict = params.model_dump()
             params_dict.update(payload.governance_params_overrides)

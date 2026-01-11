@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Dict, Any, List
 from dataclasses import asdict
 
-from src.contracts.supervisor.evidence_schemas import PolicyCheck, now_iso
+from contracts.supervisor.evidence_schemas import PolicyCheck, now_iso
 
 
 class QualityGate:

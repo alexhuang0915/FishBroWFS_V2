@@ -43,24 +43,20 @@ class Supervisor:
             
             # Build bootstrap command
             cmd = [
-                sys.executable, "-m", "src.control.supervisor.bootstrap",
+                sys.executable, "-m", "control.supervisor.bootstrap",
                 "--db", str(self.db_path),
                 "--job-id", job_id,
                 "--artifacts-root", str(self.artifacts_root)
             ]
             
             try:
-                # Set PYTHONPATH to include src directory
-                env = os.environ.copy()
-                env["PYTHONPATH"] = "src"
-                
                 # Start process with new process group for clean kill
                 proc = subprocess.Popen(
                     cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     start_new_session=True,
-                    env=env
+                    env=os.environ.copy()
                 )
                 self.children[proc.pid] = proc
                 return proc.pid

@@ -30,12 +30,12 @@ import statistics
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..job_handler import BaseJobHandler, JobContext
-from src.contracts.research_wfs.result_schema import (
+from contracts.research_wfs.result_schema import (
     ResearchWFSResult,
     validate_result_json,
     EquityPoint,
 )
-from src.contracts.portfolio.admission_schemas import (
+from contracts.portfolio.admission_schemas import (
     AdmissionDecision,
     AdmissionVerdict,
 )

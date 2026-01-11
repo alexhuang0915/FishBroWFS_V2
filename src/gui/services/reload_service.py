@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from src.config.registry.strategy_catalog import load_strategy_catalog  # pylint: disable=no-name-in-module
-from src.config import ConfigError
+from config.registry.strategy_catalog import load_strategy_catalog  # pylint: disable=no-name-in-module
+from config import ConfigError
 from .timeframe_options import get_timeframe_id_label_pairs, get_timeframe_registry
 
 @dataclass

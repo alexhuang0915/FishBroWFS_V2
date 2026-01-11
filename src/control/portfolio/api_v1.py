@@ -22,7 +22,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, validator
 
-from src.control.supervisor import submit as supervisor_submit
+from control.supervisor import submit as supervisor_submit
 
 
 # -----------------------------------------------------------------------------

@@ -17,18 +17,18 @@ from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal, Slot, QSize, QRect
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot, QSize, QRect  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QPushButton, QTableWidget, QTableWidgetItem,
     QGroupBox, QScrollArea, QSizePolicy, QComboBox,
     QButtonGroup, QToolButton, QFileDialog, QMessageBox,
     QStackedWidget, QFrame, QSplitter
 )
-from PySide6.QtGui import (
+from PySide6.QtGui import (  # type: ignore
     QPainter, QPixmap, QDesktopServices, QColor, QFont, QPen, QBrush
 )
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QUrl  # type: ignore
 
 from ...widgets.metric_cards import MetricCard, MetricRow
 from ...widgets.charts.line_chart import LineChartWidget
@@ -60,9 +60,32 @@ class StrategyReportWidget(QWidget):
             report_data: The StrategyReportV1 payload
         """
         super().__init__()
-        self.job_id = job_id
-        self.report_data = report_data
+        self.job_id: str = job_id
+        self.report_data: Dict[str, Any] = report_data
         self.metric_cards: List[MetricCard] = []
+
+        # UI Widgets
+        self.export_json_btn: QPushButton
+        self.export_png_btn: QPushButton
+        self.jump_evidence_btn: QPushButton
+        self.metrics_row: MetricRow
+        self.toggle_group: QButtonGroup
+        self.equity_btn: QToolButton
+        self.drawdown_btn: QToolButton
+        self.both_btn: QToolButton
+        self.equity_chart: LineChartWidget
+        self.sharpe_combo: QComboBox
+        self.sharpe_chart_stack: QStackedWidget
+        self.sharpe_chart: LineChartWidget
+        self.sharpe_placeholder: QLabel
+        self.monthly_heatmap: MonthlyHeatmapWidget
+        self.histogram: HistogramWidget
+        self.trade_table: QTableWidget
+
+        # Data properties
+        self.equity_series: List[Tuple[Any, Any]] = []
+        self.drawdown_series: List[Tuple[Any, Any]] = []
+        self.sharpe_data: Dict[str, Any] = {}
         
         self.setup_ui()
         self.populate_data()
@@ -83,7 +106,7 @@ class StrategyReportWidget(QWidget):
         self.setup_metrics_row(main_layout)
         
         # Create splitter for charts and tables
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         
         # Top section: Charts
         top_widget = QWidget()
@@ -359,7 +382,7 @@ class StrategyReportWidget(QWidget):
         
         # Placeholder for missing data
         self.sharpe_placeholder = QLabel("Rolling Sharpe: Not Available")
-        self.sharpe_placeholder.setAlignment(Qt.AlignCenter)
+        self.sharpe_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.sharpe_placeholder.setStyleSheet("color: #9A9A9A; font-size: 14px; padding: 40px;")
         
         self.sharpe_chart_stack.addWidget(self.sharpe_chart)
@@ -772,7 +795,7 @@ class StrategyReportWidget(QWidget):
             for i, (name, value, unit) in enumerate(metric_defs):
                 # Metric name
                 name_item = QTableWidgetItem(name)
-                name_item.setFlags(name_item.flags() & ~Qt.ItemIsEditable)
+                name_item.setFlags(name_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
                 self.trade_table.setItem(i, 0, name_item)
                 
                 # Value
@@ -791,8 +814,8 @@ class StrategyReportWidget(QWidget):
                         display_value = str(value)
                 
                 value_item = QTableWidgetItem(display_value)
-                value_item.setFlags(value_item.flags() & ~Qt.ItemIsEditable)
-                value_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                value_item.setFlags(value_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                value_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.trade_table.setItem(i, 1, value_item)
             
             self.trade_table.resizeColumnsToContents()
@@ -886,7 +909,7 @@ class StrategyReportWidget(QWidget):
             pixmap.fill(QColor("#1E1E1E"))
             
             painter = QPainter(pixmap)
-            painter.setRenderHint(QPainter.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
             
             # Draw charts
             y_offset = margin
@@ -894,7 +917,7 @@ class StrategyReportWidget(QWidget):
             for title, widget in charts:
                 # Draw title
                 painter.setPen(QColor("#E6E6E6"))
-                painter.setFont(QFont("Arial", 12, QFont.Bold))
+                painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
                 painter.drawText(20, y_offset + 20, title)
                 y_offset += title_height
                 
@@ -906,8 +929,8 @@ class StrategyReportWidget(QWidget):
                     widget_pixmap = widget_pixmap.scaled(
                         1160, 
                         widget_pixmap.height(),
-                        Qt.KeepAspectRatio,
-                        Qt.SmoothTransformation
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
                     )
                 
                 # Draw widget

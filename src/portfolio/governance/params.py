@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Optional
 
-from src.config.portfolio import load_portfolio_config, PortfolioConfig
+from config.portfolio import load_portfolio_config, PortfolioConfig
 from ..models.governance_models import GovernanceParams
 
 

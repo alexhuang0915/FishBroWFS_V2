@@ -8,9 +8,9 @@ import logging
 from typing import List, Tuple, Optional, Dict, Any
 import math
 
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
-from PySide6.QtGui import (
+from PySide6.QtCore import Qt, QRectF, QSize, Signal  # type: ignore
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy  # type: ignore
+from PySide6.QtGui import (  # type: ignore
     QPainter, QPen, QBrush, QColor, QFont,
     QFontMetrics, QLinearGradient
 )
@@ -71,7 +71,7 @@ class HeatmapWidget(QWidget):
         
         # Title
         self.title_label = QLabel(self.title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #E6E6E6;")
         layout.addWidget(self.title_label)
         
@@ -190,7 +190,7 @@ class HeatmapWidget(QWidget):
             # Draw placeholder
             painter.setPen(QColor("#9A9A9A"))
             painter.setFont(QFont("Arial", 12))
-            painter.drawText(self.rect(), Qt.AlignCenter, "No data available")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No data available")
             return
         
         available_width = width - 2 * self.margin
@@ -281,7 +281,7 @@ class HeatmapWidget(QWidget):
         # Draw text
         painter.setPen(text_color)
         painter.setFont(QFont("Arial", 8))
-        painter.drawText(cell_rect, Qt.AlignCenter, label)
+        painter.drawText(cell_rect, Qt.AlignmentFlag.AlignCenter, label)
         
         painter.restore()
     
@@ -326,7 +326,7 @@ class HeatmapWidget(QWidget):
                     self.margin - 10,
                     20
                 )
-                painter.drawText(label_rect, Qt.AlignRight | Qt.AlignVCenter, label)
+                painter.drawText(label_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
         
         # Column labels (top side)
         for j in range(n_cols):
@@ -344,7 +344,7 @@ class HeatmapWidget(QWidget):
                     100,
                     20
                 )
-                painter.drawText(label_rect, Qt.AlignCenter, label)
+                painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
     
     def _draw_legend(self, painter: QPainter, width: int, height: int):
         """Draw color gradient legend."""
@@ -377,8 +377,8 @@ class HeatmapWidget(QWidget):
         min_rect = QRectF(legend_x - 30, legend_y, 30, legend_height)
         max_rect = QRectF(legend_x + legend_width, legend_y, 30, legend_height)
         
-        painter.drawText(min_rect, Qt.AlignRight | Qt.AlignVCenter, min_label)
-        painter.drawText(max_rect, Qt.AlignLeft | Qt.AlignVCenter, max_label)
+        painter.drawText(min_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, min_label)
+        painter.drawText(max_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, max_label)
     
     def mouseMoveEvent(self, event):
         """Handle mouse move for cell highlighting."""

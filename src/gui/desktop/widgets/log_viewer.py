@@ -5,12 +5,12 @@ Log Viewer Dialog for displaying stdout tail from supervisor jobs.
 import logging
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QDialog, QVBoxLayout, QHBoxLayout, QPushButton,
     QPlainTextEdit, QLabel, QSizePolicy, QSpacerItem
 )
-from PySide6.QtGui import QFont, QTextCursor, QKeySequence, QShortcut
+from PySide6.QtGui import QFont, QTextCursor, QKeySequence, QShortcut  # type: ignore
 
 from ...services.supervisor_client import get_stdout_tail, SupervisorClientError
 
@@ -31,6 +31,17 @@ class LogViewerDialog(QDialog):
     # Signal emitted when dialog is closed
     closed = Signal()
     
+    # Type annotations for dynamically assigned attributes
+    job_id: str
+    title: str
+    job_label: QLabel
+    status_label: QLabel
+    log_text: QPlainTextEdit
+    refresh_btn: QPushButton
+    copy_btn: QPushButton
+    clear_btn: QPushButton
+    close_btn: QPushButton
+    
     def __init__(
         self,
         job_id: str,
@@ -38,8 +49,10 @@ class LogViewerDialog(QDialog):
         parent=None
     ):
         super().__init__(parent)
-        self.job_id = job_id
-        self.title = title or f"Logs - Job {job_id}"
+        self.setProperty('job_id', job_id)
+        setattr(self, 'job_id', job_id)
+        self.setProperty('title', title or f"Logs - Job {job_id}")
+        setattr(self, 'title', title or f"Logs - Job {job_id}")
         
         self.setup_ui()
         self.setup_connections()
@@ -57,21 +70,27 @@ class LogViewerDialog(QDialog):
         # Header with job info
         header_layout = QHBoxLayout()
         
-        self.job_label = QLabel(f"Job ID: {self.job_id}")
+        job_label = QLabel(f"Job ID: {self.job_id}")
+        self.setProperty('job_label', job_label)
+        setattr(self, 'job_label', job_label)
         self.job_label.setStyleSheet("font-weight: bold; color: #3A8DFF;")
         header_layout.addWidget(self.job_label)
         
-        header_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        header_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         
         # Status label
-        self.status_label = QLabel("Ready")
+        status_label = QLabel("Ready")
+        self.setProperty('status_label', status_label)
+        setattr(self, 'status_label', status_label)
         self.status_label.setStyleSheet("color: #9A9A9A; font-size: 11px;")
         header_layout.addWidget(self.status_label)
         
         main_layout.addLayout(header_layout)
         
         # Log text area
-        self.log_text = QPlainTextEdit()
+        log_text = QPlainTextEdit()
+        self.setProperty('log_text', log_text)
+        setattr(self, 'log_text', log_text)
         self.log_text.setReadOnly(True)
         self.log_text.setFont(QFont("Monospace", 10))
         self.log_text.setStyleSheet("""
@@ -91,27 +110,35 @@ class LogViewerDialog(QDialog):
         button_layout = QHBoxLayout()
         
         # Refresh button
-        self.refresh_btn = QPushButton("🔄 Refresh")
+        refresh_btn = QPushButton("🔄 Refresh")
+        self.setProperty('refresh_btn', refresh_btn)
+        setattr(self, 'refresh_btn', refresh_btn)
         self.refresh_btn.setToolTip("Fetch latest logs from supervisor")
         self.refresh_btn.setMinimumWidth(100)
         button_layout.addWidget(self.refresh_btn)
         
         # Copy button
-        self.copy_btn = QPushButton("📋 Copy")
+        copy_btn = QPushButton("📋 Copy")
+        self.setProperty('copy_btn', copy_btn)
+        setattr(self, 'copy_btn', copy_btn)
         self.copy_btn.setToolTip("Copy logs to clipboard")
         self.copy_btn.setMinimumWidth(100)
         button_layout.addWidget(self.copy_btn)
         
         # Clear button (local only)
-        self.clear_btn = QPushButton("🗑️ Clear View")
+        clear_btn = QPushButton("🗑️ Clear View")
+        self.setProperty('clear_btn', clear_btn)
+        setattr(self, 'clear_btn', clear_btn)
         self.clear_btn.setToolTip("Clear displayed logs (does not affect supervisor)")
         self.clear_btn.setMinimumWidth(100)
         button_layout.addWidget(self.clear_btn)
         
-        button_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        button_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         
         # Close button
-        self.close_btn = QPushButton("Close")
+        close_btn = QPushButton("Close")
+        self.setProperty('close_btn', close_btn)
+        setattr(self, 'close_btn', close_btn)
         self.close_btn.setMinimumWidth(100)
         button_layout.addWidget(self.close_btn)
         
@@ -125,10 +152,10 @@ class LogViewerDialog(QDialog):
         self.close_btn.clicked.connect(self.accept)
         
         # Add keyboard shortcuts
-        QShortcut(QKeySequence.Refresh, self).activated.connect(self.refresh_logs)
-        QShortcut(QKeySequence.Copy, self).activated.connect(self.copy_to_clipboard)
+        QShortcut(QKeySequence.Refresh, self).activated.connect(self.refresh_logs)  # type: ignore
+        QShortcut(QKeySequence.Copy, self).activated.connect(self.copy_to_clipboard)  # type: ignore
         QShortcut(QKeySequence("Ctrl+L"), self).activated.connect(self.clear_display)
-        QShortcut(QKeySequence.Close, self).activated.connect(self.accept)
+        QShortcut(QKeySequence.Close, self).activated.connect(self.accept)  # type: ignore
     
     @Slot()
     def refresh_logs(self):
@@ -145,7 +172,7 @@ class LogViewerDialog(QDialog):
             
             # Scroll to bottom
             cursor = self.log_text.textCursor()
-            cursor.movePosition(QTextCursor.End)
+            cursor.movePosition(QTextCursor.End)  # type: ignore
             self.log_text.setTextCursor(cursor)
             
             self.status_label.setText(f"Loaded {len(logs.splitlines())} lines")
@@ -170,7 +197,7 @@ class LogViewerDialog(QDialog):
         """Copy current logs to clipboard."""
         logs = self.log_text.toPlainText()
         if logs:
-            from PySide6.QtWidgets import QApplication
+            from PySide6.QtWidgets import QApplication  # type: ignore
             QApplication.clipboard().setText(logs)
             self.status_label.setText("Copied to clipboard")
     

@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -50,8 +50,7 @@ class InstrumentSpec(BaseModel):
     tick_size: Optional[float] = Field(None, description="Minimum price increment")
     tick_value: Optional[float] = Field(None, description="Value per tick")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class InstrumentRegistry(BaseModel):

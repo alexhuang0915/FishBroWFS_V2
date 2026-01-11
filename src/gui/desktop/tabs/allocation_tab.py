@@ -8,15 +8,15 @@ import logging
 import time
 from typing import Optional, List, Dict, Any
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QPushButton, QTableView, QSplitter,
     QGroupBox, QHeaderView, QMessageBox, QDoubleSpinBox,
     QLineEdit, QComboBox, QCheckBox, QScrollArea,
     QApplication, QSizePolicy, QSpacerItem
 )
-from PySide6.QtGui import QFont, QColor
+from PySide6.QtGui import QFont, QColor  # type: ignore
 
 from ..widgets.metric_cards import MetricCard, MetricRow
 from ..widgets.charts.heatmap import HeatmapWidget
@@ -50,7 +50,7 @@ class AllocationTab(QWidget):
         main_layout.setSpacing(8)
         
         # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setStyleSheet("""
             QSplitter::handle {
                 background-color: #555555;
@@ -101,7 +101,7 @@ class AllocationTab(QWidget):
         form_layout = QFormLayout(form_widget)
         form_layout.setContentsMargins(12, 12, 12, 12)
         form_layout.setSpacing(10)
-        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Season
         self.season_input = QLineEdit()
@@ -162,7 +162,7 @@ class AllocationTab(QWidget):
         form_layout.addRow(checkbox_buttons_layout)
         
         # Add stretch to push button to bottom
-        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # BUILD PORTFOLIO button (enabled when strategies selected)
         self.build_button = QPushButton("BUILD PORTFOLIO")
@@ -267,7 +267,7 @@ class AllocationTab(QWidget):
         
         # Initial placeholder
         self.portfolio_placeholder = QLabel("No portfolio report loaded.\nEnter a portfolio ID and click 'Load Report'.")
-        self.portfolio_placeholder.setAlignment(Qt.AlignCenter)
+        self.portfolio_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.portfolio_placeholder.setStyleSheet("color: #9e9e9e; font-size: 14px; padding: 40px;")
         self.portfolio_display_area.setWidget(self.portfolio_placeholder)
         
@@ -390,10 +390,10 @@ class AllocationTab(QWidget):
                     f"All {failed_count} selected strategies have FAILED or REJECTED status.\n\n"
                     "Building a portfolio with only failed candidates is unlikely to succeed.\n"
                     "Do you want to continue anyway?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No
                 )
-                if reply == QMessageBox.No:
+                if reply == QMessageBox.StandardButton.No:
                     self.status_label.setText("Portfolio build cancelled (all candidates failed)")
                     return
         
@@ -435,11 +435,11 @@ class AllocationTab(QWidget):
                 self,
                 "Governance Parameter Warnings",
                 warning_msg,
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
             )
             
-            if reply == QMessageBox.No:
+            if reply == QMessageBox.StandardButton.No:
                 self.status_label.setText("Portfolio build cancelled (parameter warnings)")
                 return
         

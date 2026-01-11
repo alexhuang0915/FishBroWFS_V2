@@ -17,18 +17,18 @@ from unittest.mock import patch
 
 import pytest
 
-from contracts.dimensions import (
+from src.contracts.dimensions import (
     SessionSpec,
     InstrumentDimension,
     DimensionRegistry,
     canonical_json,
 )
-from contracts.dimensions_loader import (
+from src.contracts.dimensions_loader import (
     load_dimension_registry,
     write_dimension_registry,
     default_registry_path,
 )
-from core.dimensions import (
+from src.core.dimensions import (
     get_dimension_for_dataset,
     clear_dimension_cache,
 )
@@ -237,7 +237,7 @@ def test_get_dimension_for_dataset():
         by_symbol={"CME.MNQ": dim},
     )
     
-    with patch("core.dimensions._get_cached_registry") as mock_get:
+    with patch("src.core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 查詢存在的 dataset_id
@@ -274,7 +274,7 @@ def test_get_dimension_for_dataset_cache():
     )
     
     # 使用 return_value 而不是 side_effect，因為 @lru_cache 會快取返回值
-    with patch("core.dimensions._get_cached_registry") as mock_get:
+    with patch("src.core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 第一次呼叫
@@ -297,15 +297,15 @@ def test_get_dimension_for_dataset_cache():
 
 def test_no_streamlit_imports():
     """確保沒有引入 streamlit"""
-    import contracts.dimensions
-    import contracts.dimensions_loader
-    import core.dimensions
+    import src.contracts.dimensions as dimensions
+    import src.contracts.dimensions_loader
+    import src.core.dimensions
     
     # 檢查模組中是否有 streamlit
     for module in [
-        contracts.dimensions,
-        contracts.dimensions_loader,
-        core.dimensions,
+        dimensions,
+        src.contracts.dimensions_loader,
+        src.core.dimensions,
     ]:
         source = module.__file__
         if source and source.endswith(".py"):

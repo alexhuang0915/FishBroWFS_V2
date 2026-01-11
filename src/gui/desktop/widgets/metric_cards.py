@@ -5,12 +5,12 @@ Provides MetricCard and MetricRow for displaying key metrics in a professional d
 """
 
 from typing import Optional, List, Tuple
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, QSize  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QFrame, QSizePolicy
 )
-from PySide6.QtGui import QFont, QPalette, QColor
+from PySide6.QtGui import QFont, QPalette, QColor  # type: ignore
 
 
 class MetricCard(QFrame):
@@ -49,22 +49,22 @@ class MetricCard(QFrame):
         
         # Title label (small, muted)
         self.title_label = QLabel(self.title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.title_label)
         
         # Value label (large, bold)
         self.value_label = QLabel(self.value)
-        self.value_label.setAlignment(Qt.AlignCenter)
+        self.value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.value_label)
         
         # Subtitle label (small, optional)
         if self.subtitle:
             self.subtitle_label = QLabel(self.subtitle)
-            self.subtitle_label.setAlignment(Qt.AlignCenter)
+            self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(self.subtitle_label)
         
         # Set size policy
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
     
     def apply_styling(self):
         """Apply professional styling to the card."""
@@ -150,7 +150,7 @@ class MetricCard(QFrame):
         elif new_subtitle:
             # Create subtitle label if it doesn't exist
             self.subtitle_label = QLabel(new_subtitle)
-            self.subtitle_label.setAlignment(Qt.AlignCenter)
+            self.subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.subtitle_label.setStyleSheet("""
                 QLabel {
                     color: #9A9A9A;

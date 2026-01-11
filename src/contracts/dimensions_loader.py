@@ -6,7 +6,7 @@ import yaml
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from contracts.dimensions import DimensionRegistry, InstrumentDimension, SessionSpec, canonical_json
+from .dimensions import DimensionRegistry, InstrumentDimension, SessionSpec, canonical_json
 from src.config.profiles import ProfileConfig, load_profile
 
 

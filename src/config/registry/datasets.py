@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -62,8 +62,7 @@ class DatasetSpec(BaseModel):
     size_mb: Optional[float] = Field(None, description="Approximate size in MB")
     checksum: Optional[str] = Field(None, description="Data checksum for validation")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
     
     @field_validator('uri')
     @classmethod

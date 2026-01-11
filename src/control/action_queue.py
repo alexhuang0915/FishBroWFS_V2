@@ -74,7 +74,8 @@ class ActionQueue:
             # Add to queue
             self.queue.append(intent)
             self.intent_by_id[intent.intent_id] = intent
-            self.seen_idempotency_keys.add(intent.idempotency_key)
+            if intent.idempotency_key is not None:
+                self.seen_idempotency_keys.add(intent.idempotency_key)
             self.metrics["submitted"] += 1
             
             # Create completion future

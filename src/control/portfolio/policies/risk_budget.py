@@ -31,6 +31,41 @@ class RiskBudgetResult:
     per_run_risk: Dict[str, float]  # run_id -> risk contribution
     steps: List[RiskBudgetStep]  # rejection steps (empty if within budget)
 
+    def write_evidence(self, output_dir: Path) -> None:
+        """Write risk budget gate evidence files."""
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # risk_budget_snapshot.json
+        snapshot = {
+            "budget_max": self.budget_max,
+            "total_risk": self.total_risk,
+            "per_run_risk": {rid: float(val) for rid, val in self.per_run_risk.items()},
+            "steps": [
+                {
+                    "iteration": s.iteration,
+                    "rejected_run_id": s.rejected_run_id,
+                    "reason": s.reason,
+                    "portfolio_risk_before": s.portfolio_risk_before,
+                    "portfolio_risk_after": s.portfolio_risk_after,
+                    "per_run_risk": {rid: float(val) for rid, val in s.per_run_risk.items()}
+                }
+                for s in self.steps
+            ]
+        }
+        snapshot_path = output_dir / "risk_budget_snapshot.json"
+        with open(snapshot_path, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, indent=2, sort_keys=True)
+        
+        # admitted_run_ids.json (overwrites correlation gate's file)
+        admitted_path = output_dir / "admitted_run_ids.json"
+        with open(admitted_path, "w", encoding="utf-8") as f:
+            json.dump(self.admitted_run_ids, f, indent=2)
+        
+        # rejected_run_ids.json (append?)
+        rejected_path = output_dir / "rejected_run_ids.json"
+        with open(rejected_path, "w", encoding="utf-8") as f:
+            json.dump(self.rejected_run_ids, f, indent=2)
+
 
 class RiskBudgetGate:
     """Gate that ensures portfolio total risk does not exceed budget."""
@@ -133,38 +168,3 @@ class RiskBudgetGate:
             per_run_risk=per_run_risk,
             steps=steps
         )
-    
-    def write_evidence(self, output_dir: Path) -> None:
-        """Write risk budget gate evidence files."""
-        output_dir.mkdir(parents=True, exist_ok=True)
-        
-        # risk_budget_snapshot.json
-        snapshot = {
-            "budget_max": self.budget_max,
-            "total_risk": self.total_risk,
-            "per_run_risk": {rid: float(val) for rid, val in self.per_run_risk.items()},
-            "steps": [
-                {
-                    "iteration": s.iteration,
-                    "rejected_run_id": s.rejected_run_id,
-                    "reason": s.reason,
-                    "portfolio_risk_before": s.portfolio_risk_before,
-                    "portfolio_risk_after": s.portfolio_risk_after,
-                    "per_run_risk": {rid: float(val) for rid, val in s.per_run_risk.items()}
-                }
-                for s in self.steps
-            ]
-        }
-        snapshot_path = output_dir / "risk_budget_snapshot.json"
-        with open(snapshot_path, "w", encoding="utf-8") as f:
-            json.dump(snapshot, f, indent=2, sort_keys=True)
-        
-        # admitted_run_ids.json (overwrites correlation gate's file)
-        admitted_path = output_dir / "admitted_run_ids.json"
-        with open(admitted_path, "w", encoding="utf-8") as f:
-            json.dump(self.admitted_run_ids, f, indent=2)
-        
-        # rejected_run_ids.json (append?)
-        rejected_path = output_dir / "rejected_run_ids.json"
-        with open(rejected_path, "w", encoding="utf-8") as f:
-            json.dump(self.rejected_run_ids, f, indent=2)

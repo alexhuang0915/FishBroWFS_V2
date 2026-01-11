@@ -6,10 +6,13 @@ Defines FeatureSpec with window metadata and causality contract.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Callable, Any, Literal
+from typing import Dict, List, Optional, Callable, Any, Literal, TYPE_CHECKING
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import numpy as np
 from config.registry.timeframes import load_timeframes
+
+if TYPE_CHECKING:
+    from contracts.features import FeatureSpec as ContractFeatureSpec
 
 
 class FeatureSpec(BaseModel):
@@ -33,9 +36,8 @@ class FeatureSpec(BaseModel):
         window_honest: Whether the window specification is honest (no lookahead)
         causality_verified: Whether this feature has passed causality verification
         verification_timestamp: When causality verification was performed
-        deprecated: Whether this feature is deprecated (should not be used in new strategies)
-        notes: Optional notes about the feature (e.g., deprecation reason, usage guidance)
-        canonical_name: For deprecated aliases, the canonical feature name to use instead
+        notes: Optional notes about the feature (e.g., usage guidance)
+        canonical_name: For aliases, the canonical feature name to use instead
     """
     name: str
     timeframe_min: int
@@ -50,7 +52,6 @@ class FeatureSpec(BaseModel):
     window_honest: bool = Field(default=True)
     causality_verified: bool = Field(default=False)
     verification_timestamp: Optional[float] = Field(default=None)
-    deprecated: bool = Field(default=False)
     notes: Optional[str] = Field(default=None)
     canonical_name: Optional[str] = Field(default=None)
     
@@ -84,7 +85,7 @@ class FeatureSpec(BaseModel):
         self.causality_verified = False
         self.verification_timestamp = None
     
-    def to_contract_spec(self) -> 'FeatureSpec':
+    def to_contract_spec(self) -> 'ContractFeatureSpec':
         """
         Convert to the contract FeatureSpec (without extra fields).
         
@@ -114,12 +115,13 @@ class FeatureSpec(BaseModel):
         Create a causality-aware FeatureSpec from a contract FeatureSpec.
         
         Args:
-            contract_spec: The contract FeatureSpec to convert
+            contract_spec: The contract FeatureSpec to convert (can be from contracts.features)
             compute_func: Optional compute function reference
         
         Returns:
             A new FeatureSpec with causality fields
         """
+        # Handle both FeatureSpec types (from contracts or from this module)
         return cls(
             name=contract_spec.name,
             timeframe_min=contract_spec.timeframe_min,
@@ -134,7 +136,6 @@ class FeatureSpec(BaseModel):
             window_honest=True,  # Assume honest until verified
             causality_verified=False,
             verification_timestamp=None,
-            deprecated=False,
             notes=None,
             canonical_name=None
         )

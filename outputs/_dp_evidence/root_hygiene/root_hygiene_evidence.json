@@ -11,6 +11,7 @@
     "SNAPSHOT_CLEAN.jsonl",
     "main.py",
     "pyproject.toml",
+    "pyrightconfig.json",
     "pytest.ini",
     "requirements.txt"
   ],
@@ -59,6 +60,7 @@
     "outputs",
     "plans",
     "pyproject.toml",
+    "pyrightconfig.json",
     "pytest.ini",
     "requirements.txt",
     "scripts",
@@ -66,5 +68,5 @@
     "tests"
   ],
   "violations": [],
-  "timestamp": "2026-01-10T18:23:45.446496"
+  "timestamp": "2026-01-11T20:12:05.156416"
 }

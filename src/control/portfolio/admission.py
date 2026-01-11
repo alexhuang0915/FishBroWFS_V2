@@ -42,7 +42,8 @@ class PortfolioAdmissionController:
     ):
         self.params = params
         self.evidence_reader = evidence_reader
-        self.season = season
+        self.season: str  # type annotation for Pylance
+        setattr(self, 'season', season)
     
     @classmethod
     def from_defaults(cls, season: str = "current") -> "PortfolioAdmissionController":

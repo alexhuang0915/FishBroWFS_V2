@@ -41,6 +41,8 @@ class DatasetCatalog:
         """Get dataset index (loads if not already loaded)."""
         if self._index is None:
             self.load_index()
+        # After load_index, _index should be non-None
+        assert self._index is not None
         return self._index
     
     def list_datasets(self) -> List[DatasetRecord]:

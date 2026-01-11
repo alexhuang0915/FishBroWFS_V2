@@ -9,8 +9,8 @@ import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractItemModel, QSortFilterProxyModel
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractItemModel, QSortFilterProxyModel  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
     QLabel, QPushButton, QTableView, QTreeView, QSplitter,
     QGroupBox, QScrollArea, QHeaderView, QSizePolicy,
@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QApplication, QMessageBox, QStackedWidget,
     QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
-from PySide6.QtGui import QFont, QColor, QAction, QDesktopServices
+from PySide6.QtGui import QFont, QColor, QAction, QDesktopServices  # type: ignore
 
 from ..widgets.metric_cards import MetricCard, MetricRow
 from ..widgets.report_host import ReportHostWidget
@@ -220,16 +220,16 @@ class ReportExplorerModel(QAbstractItemModel):
     def columnCount(self, parent=QModelIndex()):
         return 1
     
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
         
         item = index.internalPointer()
         
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             return item.get('name', '')
         
-        elif role == Qt.ForegroundRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             item_type = item.get('type', '')
             status = item.get('status', '').upper()
             
@@ -245,7 +245,7 @@ class ReportExplorerModel(QAbstractItemModel):
             elif item_type == 'portfolio':
                 return QColor("#F5A623")  # Orange for portfolios
         
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.FontRole:
             item_type = item.get('type', '')
             if item_type == 'category':
                 font = QFont()
@@ -286,7 +286,7 @@ class AuditTab(QWidget):
         main_layout.setSpacing(8)
         
         # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setStyleSheet("""
             QSplitter::handle {
                 background-color: #555555;
@@ -914,7 +914,7 @@ class AuditTab(QWidget):
     
     def show_logs_dialog(self, job_id: str):
         """Show logs dialog for a job."""
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton  # type: ignore
         
         dialog = QDialog(self)
         dialog.setWindowTitle(f"Logs for Job {job_id[:8]}")

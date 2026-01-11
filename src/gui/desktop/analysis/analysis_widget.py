@@ -14,13 +14,13 @@ from typing import Optional, Dict, Any
 
 import pandas as pd
 import numpy as np
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
-from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure  # type: ignore
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas  # type: ignore
+from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar  # type: ignore
+import matplotlib.pyplot as plt  # type: ignore
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QLabel,
     QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout,
     QScrollArea, QFrame, QSizePolicy, QSplitter
@@ -67,7 +67,7 @@ class AnalysisWidget(QWidget):
         
         # Tab widget - compact
         self.tab_widget = QTabWidget()
-        self.tab_widget.setTabPosition(QTabWidget.North)
+        self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setStyleSheet("""
             QTabWidget::pane {
                 border: none;
@@ -240,13 +240,13 @@ class AnalysisWidget(QWidget):
         # Title
         title_label = QLabel(title)
         title_label.setStyleSheet("color: #9A9A9A; font-size: 10px; font-weight: bold;")
-        title_label.setAlignment(Qt.AlignCenter)
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(title_label)
         
         # Value
         value_label = QLabel("—")
         value_label.setStyleSheet(f"color: {color}; font-size: 14px; font-weight: bold;")
-        value_label.setAlignment(Qt.AlignCenter)
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(value_label)
         
         # Store reference
@@ -354,7 +354,7 @@ class AnalysisWidget(QWidget):
         main_layout = QVBoxLayout(tab)
         
         # Create vertical splitter for table (top) and stats (bottom)
-        splitter = QSplitter(Qt.Vertical)
+        splitter = QSplitter(Qt.Orientation.Vertical)
         
         # Top: Trade History table
         table_group = QGroupBox("Trade History")
@@ -368,7 +368,7 @@ class AnalysisWidget(QWidget):
         ])
         self.trades_table.setSortingEnabled(True)
         self.trades_table.setAlternatingRowColors(True)
-        self.trades_table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.trades_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         
         # Apply dark theme styling
         self.trades_table.setStyleSheet("""

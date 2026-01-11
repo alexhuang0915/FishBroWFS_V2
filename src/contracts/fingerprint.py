@@ -14,7 +14,7 @@ from typing import Dict
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from contracts.dimensions import canonical_json
+from .dimensions import canonical_json
 
 
 class FingerprintIndex(BaseModel):
@@ -170,7 +170,7 @@ class FingerprintIndex(BaseModel):
         
         # 直接計算 hash，避免建立暫存實例觸發驗證
         import hashlib
-        from contracts.dimensions import canonical_json
+        from .dimensions import canonical_json
         
         json_str = canonical_json(data)
         index_sha256 = hashlib.sha256(json_str.encode("utf-8")).hexdigest()

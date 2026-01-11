@@ -103,6 +103,9 @@ def test_window_honesty_affects_max_lookback():
     for spec in registry.specs:
         if spec.name == "dishonest_20":
             spec.window_honest = False
+        elif spec.name == "honest_5":
+            spec.mark_causality_verified()
+            spec.window_honest = True
     
     # Max lookback should only consider honest windows
     max_lookback = registry.max_lookback_for_tf(15)
@@ -147,6 +150,9 @@ def test_specs_for_tf_excludes_dishonest():
         if spec.name == "dishonest":
             spec.window_honest = False
             spec.causality_verified = False
+        elif spec.name == "honest":
+            spec.mark_causality_verified()
+            spec.window_honest = True
     
     # Get specs for timeframe
     specs = registry.specs_for_tf(15)

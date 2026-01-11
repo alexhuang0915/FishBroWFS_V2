@@ -8,9 +8,9 @@ import logging
 from typing import List, Tuple, Optional, Dict, Any
 import math
 
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
-from PySide6.QtGui import (
+from PySide6.QtCore import Qt, QRectF, QSize, Signal  # type: ignore
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy  # type: ignore
+from PySide6.QtGui import (  # type: ignore
     QPainter, QPen, QBrush, QColor, QFont,
     QFontMetrics, QLinearGradient
 )
@@ -71,7 +71,7 @@ class HistogramWidget(QWidget):
         
         # Title
         self.title_label = QLabel(self.title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #E6E6E6;")
         layout.addWidget(self.title_label)
         
@@ -177,7 +177,7 @@ class HistogramWidget(QWidget):
             # Draw placeholder
             painter.setPen(QColor("#9A9A9A"))
             painter.setFont(QFont("Arial", 12))
-            painter.drawText(self.rect(), Qt.AlignCenter, "No data available")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No data available")
             return
         
         available_width = width - 2 * self.margin
@@ -280,7 +280,7 @@ class HistogramWidget(QWidget):
             bar_rect.width(),
             15
         )
-        painter.drawText(text_rect, Qt.AlignCenter, label)
+        painter.drawText(text_rect, Qt.AlignmentFlag.AlignCenter, label)
         
         painter.restore()
     
@@ -301,7 +301,7 @@ class HistogramWidget(QWidget):
                 y = self.margin + available_height + 15
                 
                 label_rect = QRectF(x - 40, y, 80, 20)
-                painter.drawText(label_rect, Qt.AlignCenter, label)
+                painter.drawText(label_rect, Qt.AlignmentFlag.AlignCenter, label)
     
     def _draw_axis_labels(self, painter: QPainter, available_width: float, available_height: float):
         """Draw axis labels."""
@@ -316,7 +316,7 @@ class HistogramWidget(QWidget):
                 available_width,
                 20
             )
-            painter.drawText(x_label_rect, Qt.AlignCenter, self.x_label)
+            painter.drawText(x_label_rect, Qt.AlignmentFlag.AlignCenter, self.x_label)
         
         # Y-axis label
         if self.y_label:
@@ -330,7 +330,7 @@ class HistogramWidget(QWidget):
             )
             painter.translate(y_label_rect.center())
             painter.rotate(-90)
-            painter.drawText(QRectF(-100, -10, 200, 20), Qt.AlignCenter, self.y_label)
+            painter.drawText(QRectF(-100, -10, 200, 20), Qt.AlignmentFlag.AlignCenter, self.y_label)
             painter.restore()
     
     def mouseMoveEvent(self, event):
@@ -363,14 +363,14 @@ class HistogramWidget(QWidget):
             
             # Show tooltip
             tooltip_text = f"Bin: [{bin_start:.3f}, {bin_end:.3f})\nCount: {count}\nPercentage: {percentage:.1f}%"
-            from PySide6.QtWidgets import QToolTip
+            from PySide6.QtWidgets import QToolTip  # type: ignore
             QToolTip.showText(event.globalPosition().toPoint(), tooltip_text, self)
             
             # Emit signal
             self.bar_hovered.emit(bar_idx, bin_start, bin_end, count)
         else:
             self.hovered_bar = None
-            from PySide6.QtWidgets import QToolTip
+            from PySide6.QtWidgets import QToolTip  # type: ignore
             QToolTip.hideText()
         
         self.update()
@@ -404,7 +404,7 @@ class HistogramWidget(QWidget):
     
     def leaveEvent(self, event):
         """Hide tooltip when mouse leaves widget."""
-        from PySide6.QtWidgets import QToolTip
+        from PySide6.QtWidgets import QToolTip  # type: ignore
         QToolTip.hideText()
         self.hovered_bar = None
         self.update()

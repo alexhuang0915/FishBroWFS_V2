@@ -108,23 +108,6 @@ def seed_default_registry(reg: FeatureRegistry) -> None:
                 div0_policy="DIV0_RET_NAN",
                 family="percentile",
             )
-            # Legacy name for backward compatibility with S1 strategy (deprecated)
-            reg.register_feature(
-                name=f"vx_percentile_{w}",
-                timeframe_min=tf,
-                lookback_bars=w,
-                params={"window": w},
-                compute_func=lambda c, w=w: vx_percentile(c, w),
-                skip_verification=True,
-                window=w,
-                min_warmup_bars=compute_min_warmup_bars("percentile", w),
-                dtype="float64",
-                div0_policy="DIV0_RET_NAN",
-                family="percentile",
-                deprecated=True,
-                canonical_name=f"percentile_{w}",
-                notes="Legacy name, use percentile_{w} instead"
-            )
 
         # RSI
         for w in (7, 14, 21):

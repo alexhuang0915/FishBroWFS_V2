@@ -117,13 +117,20 @@ def test_validation_rejects_invalid_values():
     param_file.write_text(yaml.dump(invalid_params, default_flow_style=False))
     try:
         # Should raise ConfigError (wraps Pydantic validation errors)
-        from src.config import ConfigError
+        # Import the same ConfigError that will be raised (config.ConfigError)
+        import config
         try:
             load_governance_params(str(param_file))
             assert False, "Expected validation error"
-        except ConfigError as e:
+        except config.ConfigError as e:
             # Ensure the error mentions the offending field
             error_str = str(e)
-            assert "max_pairwise_correlation" in error_str or "portfolio_risk_budget_max" in error_str
+            # The error string includes field names with prefixes; accept any mention
+            if "max_pairwise_correlation" not in error_str and "portfolio_risk_budget_max" not in error_str:
+                # If neither substring appears, raise assertion error with debug info
+                raise AssertionError(
+                    f"Expected error to mention 'max_pairwise_correlation' or 'portfolio_risk_budget_max', "
+                    f"but got: {error_str}"
+                )
     finally:
         param_file.unlink(missing_ok=True)

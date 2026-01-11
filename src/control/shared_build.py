@@ -128,7 +128,7 @@ def build_shared(
     
     # 如果未提供 tfs，從 registry 載入預設值
     if tfs is None:
-        from src.config.registry.timeframes import load_timeframes
+        from config.registry.timeframes import load_timeframes
         timeframe_registry = load_timeframes()
         tfs = timeframe_registry.allowed_timeframes
     
@@ -476,7 +476,7 @@ def _build_bars_cache(
     
     # 如果未提供 tfs，從 registry 載入預設值
     if tfs is None:
-        from src.config.registry.timeframes import load_timeframes
+        from config.registry.timeframes import load_timeframes
         timeframe_registry = load_timeframes()
         tfs = timeframe_registry.allowed_timeframes
     
@@ -644,7 +644,7 @@ def _build_features_cache(
     """
     # 如果未提供 tfs，從 registry 載入預設值
     if tfs is None:
-        from src.config.registry.timeframes import load_timeframes
+        from config.registry.timeframes import load_timeframes
         timeframe_registry = load_timeframes()
         tfs = timeframe_registry.allowed_timeframes
     

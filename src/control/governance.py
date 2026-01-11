@@ -141,7 +141,7 @@ class BatchGovernanceStore:
 
         # Apply changes
         if (season is not None) and (not existing.frozen):
-            existing.season = season
+            setattr(existing, 'season', season)
 
         if tags is not None:
             merged = set(existing.tags)
@@ -207,5 +207,3 @@ class BatchGovernanceStore:
                 continue
             results.append(meta)
         return results
-
-

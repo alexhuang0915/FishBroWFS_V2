@@ -6,11 +6,17 @@ Phase 9: Generate canonical_results.json and research_index.json.
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
 import argparse
 import json
 import os
 import shutil
-from pathlib import Path
+
+from research.registry import build_research_index
+from research.__main__ import generate_canonical_results
+from core.season_state import check_season_not_frozen
 
 
 def parse_args() -> argparse.Namespace:
@@ -59,15 +65,6 @@ def generate_for_season(outputs_root: Path, season: str, verbose: bool) -> Path:
     """
     Write canonical_results.json + research_index.json into outputs/seasons/<season>/research/ and return research_dir.
     """
-    # Add src to path (must be done before imports)
-    sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-    
-    try:
-        from research.registry import build_research_index
-        from research.__main__ import generate_canonical_results
-    except ImportError as e:
-        raise ImportError(f"Failed to import research modules: {e}")
-    
     research_dir = outputs_root / "seasons" / season / "research"
     if verbose:
         print(f"Research directory: {research_dir}")
@@ -88,8 +85,6 @@ def main() -> int:
     # Phase 5: Check season freeze state before any action
     if args.season:
         try:
-            sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-            from core.season_state import check_season_not_frozen
             check_season_not_frozen(args.season, action="generate_research")
         except ImportError:
             # If season_state module is not available, skip check (backward compatibility)
@@ -117,12 +112,6 @@ def main() -> int:
         return 0
     
     try:
-        # Add src to path (must be done before imports)
-        sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-        
-        from research.registry import build_research_index
-        from research.__main__ import generate_canonical_results
-        
         # Generate canonical results
         print(f"Generating canonical_results.json...")
         generate_canonical_results(args.outputs_root, research_dir)

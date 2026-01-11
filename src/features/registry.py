@@ -58,7 +58,6 @@ class FeatureRegistry(BaseModel):
         dtype: Literal["float64"] = "float64",
         div0_policy: Literal["DIV0_RET_NAN"] = "DIV0_RET_NAN",
         family: Optional[str] = None,
-        deprecated: bool = False,
         notes: Optional[str] = None,
         canonical_name: Optional[str] = None
     ) -> FeatureSpec:
@@ -77,9 +76,8 @@ class FeatureRegistry(BaseModel):
             dtype: Output data type (must be "float64")
             div0_policy: Division‑by‑zero policy (must be "DIV0_RET_NAN")
             family: Feature family (optional)
-            deprecated: Whether this feature is deprecated (default False)
-            notes: Optional notes about the feature (e.g., deprecation reason)
-            canonical_name: For deprecated aliases, the canonical feature name to use instead
+            notes: Optional notes about the feature (e.g., usage guidance)
+            canonical_name: For aliases, the canonical feature name to use instead
         
         Returns:
             Registered FeatureSpec
@@ -87,25 +85,15 @@ class FeatureRegistry(BaseModel):
         Raises:
             LookaheadDetectedError: If lookahead detected during verification
             WindowDishonestyError: If window specification is dishonest
-            ValueError: If feature with same name/timeframe already exists and not deprecated
+            ValueError: If feature with same name/timeframe already exists
         """
         with self.lock:
-            # Check for duplicates (allow deprecated aliases)
+            # Check for duplicates
             for spec in self.specs:
                 if spec.name == name and spec.timeframe_min == timeframe_min:
-                    # If either existing or new spec is deprecated, allow duplicate
-                    # with a warning
-                    if spec.deprecated or deprecated:
-                        warnings.warn(
-                            f"Feature '{name}' (timeframe {timeframe_min}min) already registered "
-                            f"as {'deprecated' if spec.deprecated else 'non-deprecated'}. "
-                            f"Registering duplicate as {'deprecated' if deprecated else 'non-deprecated'}.",
-                            UserWarning
-                        )
-                    else:
-                        raise ValueError(
-                            f"Feature '{name}' already registered for timeframe {timeframe_min}min"
-                        )
+                    raise ValueError(
+                        f"Feature '{name}' already registered for timeframe {timeframe_min}min"
+                    )
             
             # Create feature spec
             feature_spec = FeatureSpec(
@@ -122,7 +110,6 @@ class FeatureRegistry(BaseModel):
                 window_honest=True,  # Assume honest until verified
                 causality_verified=False,
                 verification_timestamp=None,
-                deprecated=deprecated,
                 notes=notes,
                 canonical_name=canonical_name
             )
@@ -157,13 +144,17 @@ class FeatureRegistry(BaseModel):
                         f"Feature '{name}' verification failed with error: {e}"
                     ) from e
             elif skip_verification:
-                # Mark as verified but with warning
-                feature_spec.causality_verified = True
-                feature_spec.verification_timestamp = None  # No actual verification
-                warnings.warn(
-                    f"Feature '{name}' registered without causality verification. "
-                    f"This is dangerous and may lead to lookahead bias.",
-                    UserWarning
+                # Verification skipped - feature is registered but verification status is unknown
+                # Mark as unverified (non-promotable) to enforce safety gate
+                feature_spec.causality_verified = False
+                feature_spec.verification_timestamp = None
+                # Track skipped verification in reports
+                self.verification_reports[name] = CausalityReport(
+                    feature_name=name,
+                    passed=False,  # Marked as failed because verification was skipped
+                    lookahead_detected=False,
+                    window_honest=True,  # Assume honest
+                    error_message="Causality verification was skipped - feature is non-promotable (safety gate)"
                 )
             
             # Add to registry
@@ -198,7 +189,6 @@ class FeatureRegistry(BaseModel):
             dtype=feature_spec.dtype,
             div0_policy=feature_spec.div0_policy,
             family=feature_spec.family,
-            deprecated=feature_spec.deprecated,
             notes=feature_spec.notes,
             canonical_name=feature_spec.canonical_name
         )
@@ -221,7 +211,8 @@ class FeatureRegistry(BaseModel):
             Registered FeatureSpec
         """
         # Convert to causality-aware FeatureSpec
-        feature_spec = FeatureSpec.from_contract_spec(contract_spec, compute_func)
+        # Type ignore: ContractFeatureSpec has same attributes as FeatureSpec
+        feature_spec = FeatureSpec.from_contract_spec(contract_spec, compute_func)  # type: ignore
         return self.register_feature_spec(feature_spec, skip_verification)
     
     def verify_all_registered(self, reverify: bool = False) -> Dict[str, CausalityReport]:
@@ -309,32 +300,28 @@ class FeatureRegistry(BaseModel):
             self.specs.clear()
             self.verification_reports.clear()
     
-    def to_contract_registry(self, include_deprecated: bool = False) -> ContractFeatureRegistry:
+    def to_contract_registry(self) -> ContractFeatureRegistry:
         """
         Convert to contract FeatureRegistry (without causality fields).
         
-        Args:
-            include_deprecated: Whether to include deprecated features (default False)
-        
         Returns:
-            Contract FeatureRegistry with only verified features (and optionally deprecated)
+            Contract FeatureRegistry with only verified features
         """
         # Only include features that have passed causality verification
         verified_specs = [
             spec.to_contract_spec()
             for spec in self.specs
-            if spec.causality_verified and (include_deprecated or not spec.deprecated)
+            if spec.causality_verified
         ]
         
         return ContractFeatureRegistry(specs=verified_specs)
     
-    def specs_for_tf(self, tf_min: int, include_deprecated: bool = True) -> List[FeatureSpec]:
+    def specs_for_tf(self, tf_min: int) -> List[FeatureSpec]:
         """
         Get all feature specs for a given timeframe.
         
         Args:
             tf_min: Timeframe in minutes
-            include_deprecated: Whether to include deprecated features (default True)
         
         Returns:
             List of FeatureSpecs for the timeframe (only verified features if enabled)
@@ -348,10 +335,6 @@ class FeatureRegistry(BaseModel):
         else:
             # Return all features
             filtered = [spec for spec in self.specs if spec.timeframe_min == tf_min]
-        
-        # Filter out deprecated features if requested
-        if not include_deprecated:
-            filtered = [spec for spec in filtered if not spec.deprecated]
         
         # Sort by name for deterministic ordering
         return sorted(filtered, key=lambda s: s.name)

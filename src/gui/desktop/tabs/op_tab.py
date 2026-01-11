@@ -5,29 +5,36 @@ Implements Launch Pad + Job Tracker with actions wired to Supervisor API.
 Layout: QSplitter horizontal with Launch Pad (left) and Job Tracker (right).
 """
 
+# pylint: disable=no-name-in-module,c-extension-no-member
+
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
-import time
-
-from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer, QModelIndex, QAbstractTableModel, QUrl, QSize
+from PySide6.QtCore import (
+    Qt, Signal, QTimer, QModelIndex, QAbstractTableModel, QAbstractItemModel,
+    QUrl, QSize, QPersistentModelIndex, QEvent
+)  # pylint: disable=no-name-in-module
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QLabel, QComboBox, QPushButton, QTableView, QSplitter,
-    QGroupBox, QScrollArea, QHeaderView, QSizePolicy,
-    QStyledItemDelegate, QStyleOptionViewItem, QStyle,
-    QApplication, QMessageBox, QSpacerItem, QLineEdit
-)
-from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QAction, QPen, QDesktopServices
+    QGroupBox, QScrollArea, QSizePolicy,
+    QStyledItemDelegate, QStyleOptionViewItem,
+    QMessageBox, QSpacerItem, QLineEdit
+)  # pylint: disable=no-name-in-module
+from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices  # pylint: disable=no-name-in-module
 
-from ..widgets.log_viewer import LogViewerDialog
-from ...services.supervisor_client import (
-    get_client, SupervisorClientError,
+from src.gui.desktop.widgets.log_viewer import LogViewerDialog
+from src.gui.desktop.services.supervisor_client import (
+    SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
-    get_jobs, get_job, get_artifacts, get_strategy_report_v1,
-    get_stdout_tail, get_reveal_evidence_path, submit_job
+    get_jobs, get_artifacts, get_strategy_report_v1,
+    get_reveal_evidence_path, submit_job
 )
-from src.config import load_timeframes
+from src.gui.services.timeframe_options import (
+    get_timeframe_ids,
+    get_default_timeframe,
+    get_timeframe_registry
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +90,7 @@ class JobsTableModel(QAbstractTableModel):
             )
             
         except SupervisorClientError as e:
-            logger.error(f"Failed to refresh jobs: {e}")
+            logger.error("Failed to refresh jobs: %s", e)
     
     def set_jobs(self, jobs: List[Dict[str, Any]]):
         """Set jobs data and update table."""
@@ -168,13 +175,13 @@ class JobsTableModel(QAbstractTableModel):
                 values.add(str(val))
         return sorted(list(values))
     
-    def rowCount(self, parent=QModelIndex()):
+    def rowCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         return len(self.filtered_jobs)
     
-    def columnCount(self, parent=QModelIndex()):
+    def columnCount(self, parent: QModelIndex | QPersistentModelIndex = QModelIndex()) -> int:
         return len(self.headers)
     
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex | QPersistentModelIndex, role: int = int(Qt.ItemDataRole.DisplayRole)):
         if not index.isValid():
             return None
         
@@ -186,7 +193,7 @@ class JobsTableModel(QAbstractTableModel):
         
         job = self.filtered_jobs[row]
         
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:  # Job ID
                 job_id = job.get("job_id", "")
                 return job_id[:8] + "..." if len(job_id) > 8 else job_id
@@ -244,17 +251,17 @@ class JobsTableModel(QAbstractTableModel):
                         return finished
                 return "—"
         
-        elif role == Qt.TextAlignmentRole:
+        elif role == Qt.ItemDataRole.TextAlignmentRole:
             if col in [9, 10]:  # Timestamps
-                return Qt.AlignLeft | Qt.AlignTop
+                return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
             elif col == 11:  # Actions column
-                return Qt.AlignCenter
+                return Qt.AlignmentFlag.AlignCenter
             elif col in [7, 8]:  # Duration, Score
-                return Qt.AlignRight | Qt.AlignVCenter
+                return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             else:
-                return Qt.AlignLeft | Qt.AlignVCenter
+                return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         
-        elif role == Qt.ForegroundRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             if col == 6:  # Status column
                 status = job.get("status", "")
                 # Phase E.1 color coding: amber for RUNNING, green for SUCCEEDED, red for FAILED/REJECTED
@@ -277,7 +284,7 @@ class JobsTableModel(QAbstractTableModel):
                         return QColor("#F44336")  # red for negative
                 return None
         
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.FontRole:
             if col == 6:  # Status column
                 font = QFont()
                 font.setBold(True)
@@ -285,8 +292,8 @@ class JobsTableModel(QAbstractTableModel):
         
         return None
     
-    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+    def headerData(self, section: int, orientation: Qt.Orientation, role: int = int(Qt.ItemDataRole.DisplayRole)):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             if section < len(self.headers):
                 return self.headers[section]
         return None
@@ -308,7 +315,7 @@ class ActionsDelegate(QStyledItemDelegate):
         self.hovered_row = -1
         self.hovered_button = -1
     
-    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex):
+    def paint(self, painter: QPainter, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex):
         """Paint action buttons."""
         # Draw default background
         super().paint(painter, option, index)
@@ -375,11 +382,11 @@ class ActionsDelegate(QStyledItemDelegate):
             # Draw text
             painter.setPen(text_color)
             painter.setFont(QFont("Arial", 9))
-            painter.drawText(button_rect, Qt.AlignCenter, text)
+            painter.drawText(button_rect, Qt.AlignmentFlag.AlignCenter, text)
         
         painter.restore()
     
-    def editorEvent(self, event, model, option, index):
+    def editorEvent(self, event: QEvent, model: QAbstractItemModel, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> bool:
         """Handle mouse events on buttons."""
         if event.type() == event.Type.MouseButtonPress:
             # Get job data
@@ -477,7 +484,7 @@ class ActionsDelegate(QStyledItemDelegate):
         
         return False
     
-    def sizeHint(self, option, index):
+    def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         """Provide size hint for the actions column."""
         return QSize(340, 32)  # Wider for 4 buttons
 
@@ -508,7 +515,7 @@ class OpTab(QWidget):
         main_layout.setSpacing(8)
         
         # Create main splitter
-        main_splitter = QSplitter(Qt.Horizontal)
+        main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setStyleSheet("""
             QSplitter::handle {
                 background-color: #555555;
@@ -559,7 +566,7 @@ class OpTab(QWidget):
         form_layout = QFormLayout(form_widget)
         form_layout.setContentsMargins(12, 12, 12, 12)
         form_layout.setSpacing(10)
-        form_layout.setLabelAlignment(Qt.AlignRight)
+        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         # Strategy family combobox
         self.strategy_cb = QComboBox()
@@ -579,13 +586,19 @@ class OpTab(QWidget):
         # Timeframe combobox
         self.timeframe_cb = QComboBox()
         try:
-            timeframe_registry = load_timeframes()
-            self.timeframe_cb.addItems(timeframe_registry.get_display_names())
-            self.timeframe_cb.setCurrentText(timeframe_registry.get_display_name(timeframe_registry.default))
+            self.timeframe_cb.addItems(get_timeframe_ids())
+            self.timeframe_cb.setCurrentText(get_default_timeframe())
         except Exception as e:
-            logger.error(f"Failed to load timeframes from registry: {e}")
-            self.timeframe_cb.addItems(["15m", "30m", "60m", "120m", "240m", "1D"])
-            self.timeframe_cb.setCurrentText("60m")
+            logger.error("Failed to load timeframes from registry: %s", e)
+            # Fallback to registry directly (should not happen if registry is valid)
+            try:
+                registry = get_timeframe_registry()
+                self.timeframe_cb.addItems(registry.get_display_names())
+                self.timeframe_cb.setCurrentText(registry.get_display_name(registry.default))
+            except Exception as e2:
+                logger.error("Fallback also failed: %s", e2)
+                # Last resort: empty combobox
+                self.timeframe_cb.addItems([])
         self.timeframe_cb.setToolTip("Select timeframe")
         form_layout.addRow("Timeframe:", self.timeframe_cb)
         
@@ -602,7 +615,7 @@ class OpTab(QWidget):
         form_layout.addRow("Season:", self.season_cb)
         
         # Add stretch to push button to bottom
-        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Minimum, QSizePolicy.Expanding))
+        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
         
         # RUN STRATEGY button (big)
         self.run_button = QPushButton("RUN STRATEGY")
@@ -719,8 +732,8 @@ class OpTab(QWidget):
         self.jobs_table = QTableView()
         self.jobs_table.setModel(self.jobs_model)
         self.jobs_table.setItemDelegateForColumn(11, self.actions_delegate)
-        self.jobs_table.setSelectionBehavior(QTableView.SelectRows)
-        self.jobs_table.setSelectionMode(QTableView.SingleSelection)
+        self.jobs_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.jobs_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.jobs_table.setAlternatingRowColors(True)
         self.jobs_table.setStyleSheet("""
             QTableView {
@@ -1007,11 +1020,11 @@ class OpTab(QWidget):
                     f"Season: {season}\n"
                     f"Mode: {run_mode}\n\n"
                     "Run again anyway?",
-                    QMessageBox.Yes | QMessageBox.No,
-                    QMessageBox.No  # Default to No (Cancel)
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No  # Default to No (Cancel)
                 )
                 
-                if reply == QMessageBox.No:
+                if reply == QMessageBox.StandardButton.No:
                     self.status_label.setText("Job submission cancelled (duplicate warning)")
                     self.log_signal.emit("Job submission cancelled due to duplicate warning")
                     return
@@ -1055,7 +1068,7 @@ class OpTab(QWidget):
     def view_logs(self, job_id: str):
         """Open log viewer dialog for a job."""
         try:
-            dialog = LogViewerDialog(job_id, self)
+            dialog = LogViewerDialog(job_id=job_id, parent=self)
             dialog.exec()
         except Exception as e:
             QMessageBox.critical(self, "Log Viewer Error", f"Failed to open logs: {e}")
@@ -1064,7 +1077,8 @@ class OpTab(QWidget):
     def open_evidence(self, job_id: str):
         """Open evidence folder for a job."""
         try:
-            path = get_reveal_evidence_path(job_id)
+            path_data = get_reveal_evidence_path(job_id)
+            path = path_data.get("path") if isinstance(path_data, dict) else None
             if path:
                 QDesktopServices.openUrl(QUrl.fromLocalFile(path))
                 self.log_signal.emit(f"Opened evidence folder: {path}")
@@ -1103,7 +1117,7 @@ class OpTab(QWidget):
             explanation = self._extract_failure_explanation(artifacts)
             
             # Show explanation dialog
-            from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel
+            from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel  # type: ignore
             dialog = QDialog(self)
             dialog.setWindowTitle(f"Failure Explanation - {job_id[:8]}...")
             dialog.setMinimumSize(500, 400)

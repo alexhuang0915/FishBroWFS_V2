@@ -17,13 +17,13 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 def load_yaml(path: Path) -> dict:
     """Load YAML file with proper error handling."""
-    from src.config import load_yaml as _load_yaml
+    from . import load_yaml as _load_yaml
     return _load_yaml(path)
 
 
 def compute_yaml_sha256(path: Path) -> str:
     """Compute SHA256 hash of YAML file."""
-    from src.config import compute_yaml_sha256 as _compute_yaml_sha256
+    from . import compute_yaml_sha256 as _compute_yaml_sha256
     return _compute_yaml_sha256(path)
 
 
@@ -42,8 +42,7 @@ class BucketSlot(BaseModel):
     slots: int = Field(1, ge=0, description="Number of slots")
     weight_limit: Optional[float] = Field(None, ge=0.0, le=1.0, description="Maximum weight per slot")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class CorrelationPolicy(BaseModel):
@@ -56,8 +55,7 @@ class CorrelationPolicy(BaseModel):
     rolling_days: int = Field(30, ge=1, description="Rolling window in days")
     min_samples: int = Field(20, ge=1, description="Minimum samples for correlation")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class DrawdownPolicy(BaseModel):
@@ -67,8 +65,7 @@ class DrawdownPolicy(BaseModel):
     dd_absolute_cap: float = Field(0.35, ge=0.0, le=1.0, description="Absolute drawdown cap")
     dd_k_multiplier: float = Field(1.0, ge=0.0, description="Drawdown K-factor multiplier")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class RiskBudgetPolicy(BaseModel):
@@ -80,22 +77,20 @@ class RiskBudgetPolicy(BaseModel):
     w_max: float = Field(0.35, ge=0.0, le=1.0, description="Maximum weight per strategy")
     w_min: float = Field(0.0, ge=0.0, le=1.0, description="Minimum weight per strategy")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class BreakerPolicy(BaseModel):
     """Circuit breaker policy configuration."""
     
     exposure_reduction_on_breaker: float = Field(
-        0.5, 
-        ge=0.0, 
-        le=1.0, 
+        0.5,
+        ge=0.0,
+        le=1.0,
         description="Exposure reduction factor when breaker triggers"
     )
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class PortfolioConfig(BaseModel):
@@ -118,19 +113,38 @@ class PortfolioConfig(BaseModel):
     
     # Policies
     correlation_policy: CorrelationPolicy = Field(
-        default_factory=CorrelationPolicy,
+        default_factory=lambda: CorrelationPolicy(
+            method="pearson",
+            member_hard_limit=0.8,
+            portfolio_hard_limit=0.7,
+            max_pairwise_correlation=0.6,
+            rolling_days=30,
+            min_samples=20
+        ),
         description="Correlation policy"
     )
     drawdown_policy: DrawdownPolicy = Field(
-        default_factory=DrawdownPolicy,
+        default_factory=lambda: DrawdownPolicy(
+            portfolio_dd_cap=0.2,
+            dd_absolute_cap=0.35,
+            dd_k_multiplier=1.0
+        ),
         description="Drawdown policy"
     )
     risk_budget_policy: RiskBudgetPolicy = Field(
-        default_factory=RiskBudgetPolicy,
+        default_factory=lambda: RiskBudgetPolicy(
+            portfolio_risk_budget_max=1.0,
+            portfolio_vol_target=0.1,
+            vol_floor=0.02,
+            w_max=0.35,
+            w_min=0.0
+        ),
         description="Risk budget policy"
     )
     breaker_policy: BreakerPolicy = Field(
-        default_factory=BreakerPolicy,
+        default_factory=lambda: BreakerPolicy(
+            exposure_reduction_on_breaker=0.5
+        ),
         description="Circuit breaker policy"
     )
     
@@ -240,7 +254,7 @@ def load_portfolio_config(filename: str = "governance.yaml", path: Optional[Path
         ConfigError: If loading or validation fails
     """
     if path is None:
-        from src.config import get_portfolio_path
+        from . import get_portfolio_path
         path = get_portfolio_path(filename)
     
     # Compute SHA256 hash of original YAML
@@ -252,6 +266,6 @@ def load_portfolio_config(filename: str = "governance.yaml", path: Optional[Path
         portfolio = PortfolioConfig(**data, sha256=sha256_hash)
         return portfolio
     except Exception as e:
-        from src.config import ConfigError
+        from . import ConfigError
         raise ConfigError(f"Failed to validate portfolio config at {path}: {e}")
 

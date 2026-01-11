@@ -9,9 +9,9 @@ from typing import List, Tuple, Optional, Dict, Any
 from datetime import datetime
 import math
 
-from PySide6.QtCore import Qt, QRectF, QSize, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QToolTip
-from PySide6.QtGui import (
+from PySide6.QtCore import Qt, QRectF, QSize, Signal  # type: ignore
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy, QToolTip  # type: ignore
+from PySide6.QtGui import (  # type: ignore
     QPainter, QPen, QBrush, QColor, QFont,
     QFontMetrics, QLinearGradient
 )
@@ -74,7 +74,7 @@ class MonthlyHeatmapWidget(QWidget):
         
         # Title
         self.title_label = QLabel(self.title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #E6E6E6;")
         layout.addWidget(self.title_label)
         
@@ -182,7 +182,7 @@ class MonthlyHeatmapWidget(QWidget):
             # Draw placeholder
             painter.setPen(QColor("#9A9A9A"))
             painter.setFont(QFont("Arial", 12))
-            painter.drawText(self.rect(), Qt.AlignCenter, "No monthly data available")
+            painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No monthly data available")
             return
         
         # Calculate cell size based on available space
@@ -205,7 +205,7 @@ class MonthlyHeatmapWidget(QWidget):
             y = self.margin - 10
             
             month_rect = QRectF(x, y, cell_width, 20)
-            painter.drawText(month_rect, Qt.AlignCenter, month)
+            painter.drawText(month_rect, Qt.AlignmentFlag.AlignCenter, month)
         
         # Draw year labels (left)
         painter.setFont(QFont("Arial", 10))
@@ -215,7 +215,7 @@ class MonthlyHeatmapWidget(QWidget):
             y = self.margin + i * (cell_height + self.cell_padding) + cell_height / 2
             
             year_rect = QRectF(x, y - 10, 60, 20)
-            painter.drawText(year_rect, Qt.AlignRight | Qt.AlignVCenter, year)
+            painter.drawText(year_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, year)
         
         # Draw heatmap cells
         for i, year in enumerate(self.years):
@@ -293,7 +293,7 @@ class MonthlyHeatmapWidget(QWidget):
         # Draw text
         painter.setPen(text_color)
         painter.setFont(QFont("Arial", 8))
-        painter.drawText(cell_rect, Qt.AlignCenter, label)
+        painter.drawText(cell_rect, Qt.AlignmentFlag.AlignCenter, label)
         
         painter.restore()
     
@@ -346,9 +346,9 @@ class MonthlyHeatmapWidget(QWidget):
         zero_rect = QRectF(legend_x + legend_width / 2 - 15, legend_y + legend_height + 2, 30, 15)
         pos_rect = QRectF(legend_x + legend_width, legend_y, 30, legend_height)
         
-        painter.drawText(neg_rect, Qt.AlignRight | Qt.AlignVCenter, "-20%")
-        painter.drawText(zero_rect, Qt.AlignCenter, "0%")
-        painter.drawText(pos_rect, Qt.AlignLeft | Qt.AlignVCenter, "+20%")
+        painter.drawText(neg_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, "-20%")
+        painter.drawText(zero_rect, Qt.AlignmentFlag.AlignCenter, "0%")
+        painter.drawText(pos_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "+20%")
     
     def mouseMoveEvent(self, event):
         """Handle mouse move for cell highlighting and tooltips."""

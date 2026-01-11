@@ -10,8 +10,8 @@ import logging
 from pathlib import Path
 from typing import Optional, List
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QDialog, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QComboBox, QCheckBox, QGroupBox,
     QListWidget, QListWidgetItem, QTextEdit, QTabWidget,
@@ -355,7 +355,7 @@ class CleanupDialog(QDialog):
         if not demo_enabled:
             label = QLabel("Demo cleanup is only available when FISHBRO_DESKTOP_DEMO=1 is set.")
             label.setStyleSheet("color: #A8A8A8; font-size: 12px;")
-            label.setAlignment(Qt.AlignCenter)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             layout.addWidget(label)
         else:
             # Season selection

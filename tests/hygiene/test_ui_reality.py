@@ -46,8 +46,29 @@ def parse_ast_for_patterns(file_path: Path):
         # Look for hardcoded lists that might be dropdown values
         if isinstance(node, ast.List):
             # Check if list contains typical timeframe values
-            if all(isinstance(el, ast.Num) for el in node.elts):
-                values = [el.n for el in node.elts]
+            # Use ast.Constant for Python 3.14 compatibility
+            values = []
+            for el in node.elts:
+                # Try ast.Constant first (Python 3.8+)
+                if hasattr(ast, 'Constant'):
+                    if isinstance(el, ast.Constant) and isinstance(el.value, (int, float)):
+                        values.append(el.value)
+                        continue
+                # Fallback for older Python without triggering deprecation warnings
+                # Check for ast.Num without using isinstance which triggers warning
+                try:
+                    # Access the attribute directly to avoid isinstance check
+                    if el.__class__.__name__ == 'Num':
+                        values.append(el.n)
+                        continue
+                except AttributeError:
+                    pass
+                
+                # Not a numeric constant, break
+                values = None
+                break
+            
+            if values is not None:
                 # Common timeframe patterns
                 if set(values) == {15, 30, 60, 120, 240}:
                     patterns.append(("hardcoded_timeframes", node.lineno))

@@ -19,7 +19,7 @@ from contracts.strategy_features import (
     load_requirements_from_json,
     load_requirements_from_yaml,
 )
-from src.config.strategies import load_strategy
+from config.strategies import load_strategy
 from control.build_context import BuildContext
 from control.feature_resolver import (
     resolve_features,

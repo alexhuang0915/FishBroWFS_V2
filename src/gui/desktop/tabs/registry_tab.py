@@ -7,14 +7,14 @@ Searchable table of registry strategies from Supervisor API.
 import logging
 from typing import Optional, List, Dict, Any
 
-from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractTableModel, QSortFilterProxyModel
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot, QModelIndex, QAbstractTableModel, QSortFilterProxyModel  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QTableView, QLineEdit,
     QGroupBox, QHeaderView, QMessageBox, QComboBox,
     QApplication
 )
-from PySide6.QtGui import QFont, QColor, QAction
+from PySide6.QtGui import QFont, QColor, QAction  # type: ignore
 
 from ...services.supervisor_client import (
     get_registry_strategies, SupervisorClientError
@@ -76,7 +76,7 @@ class RegistryTableModel(QAbstractTableModel):
     def columnCount(self, parent=QModelIndex()):
         return len(self.headers)
     
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex, role=Qt.ItemDataRole.DisplayRole):
         if not index.isValid():
             return None
         
@@ -88,7 +88,7 @@ class RegistryTableModel(QAbstractTableModel):
         
         strategy = self.strategies[row]
         
-        if role == Qt.DisplayRole:
+        if role == Qt.ItemDataRole.DisplayRole:
             if col == 0:  # Strategy ID
                 return strategy.get('id', '')
             elif col == 1:  # Name
@@ -100,7 +100,7 @@ class RegistryTableModel(QAbstractTableModel):
             elif col == 4:  # Type
                 return strategy.get('type', 'unknown')
         
-        elif role == Qt.ForegroundRole:
+        elif role == Qt.ItemDataRole.ForegroundRole:
             if col == 2:  # Verification column
                 verification = strategy.get('verification', '').lower()
                 if verification == 'verified':
@@ -112,13 +112,13 @@ class RegistryTableModel(QAbstractTableModel):
                 else:
                     return QColor("#9A9A9A")
         
-        elif role == Qt.FontRole:
+        elif role == Qt.ItemDataRole.FontRole:
             if col == 0:  # Strategy ID column
                 font = QFont()
                 font.setBold(True)
                 return font
         
-        elif role == Qt.ToolTipRole:
+        elif role == Qt.ItemDataRole.ToolTipRole:
             if col == 3:  # File Path
                 file_path = strategy.get('file_path', '')
                 if file_path:
@@ -126,8 +126,8 @@ class RegistryTableModel(QAbstractTableModel):
         
         return None
     
-    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.DisplayRole):
-        if orientation == Qt.Horizontal and role == Qt.DisplayRole:
+    def headerData(self, section: int, orientation: Qt.Orientation, role=Qt.ItemDataRole.DisplayRole):
+        if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
             if section < len(self.headers):
                 return self.headers[section]
         return None
@@ -144,7 +144,7 @@ class RegistryTab(QWidget):
         self.registry_model = RegistryTableModel()
         self.filter_proxy = QSortFilterProxyModel()
         self.filter_proxy.setSourceModel(self.registry_model)
-        self.filter_proxy.setFilterCaseSensitivity(Qt.CaseInsensitive)
+        self.filter_proxy.setFilterCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
         
         self.setup_ui()
         self.setup_connections()
@@ -290,8 +290,8 @@ class RegistryTab(QWidget):
         
         self.registry_table = QTableView()
         self.registry_table.setModel(self.filter_proxy)
-        self.registry_table.setSelectionBehavior(QTableView.SelectRows)
-        self.registry_table.setSelectionMode(QTableView.SingleSelection)
+        self.registry_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self.registry_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.registry_table.setAlternatingRowColors(True)
         self.registry_table.setSortingEnabled(True)
         self.registry_table.setStyleSheet("""

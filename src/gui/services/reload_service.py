@@ -3,13 +3,20 @@
 Reload service for file signatures, system snapshots, and UI dropdowns.
 """
 
+# pylint: disable=no-name-in-module,c-extension-no-member
+
+import logging
+logger = logging.getLogger(__name__)
+
 import hashlib
 from datetime import datetime, timezone
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from src.config import load_timeframes, load_strategy_catalog, ConfigError
+from src.config.registry.strategy_catalog import load_strategy_catalog  # pylint: disable=no-name-in-module
+from src.config import ConfigError
+from .timeframe_options import get_timeframe_id_label_pairs, get_timeframe_registry
 
 @dataclass
 class SystemSnapshot:
@@ -71,11 +78,18 @@ def get_available_timeframes() -> List[Tuple[int, str]]:
     Returns a list of (value, display_name) tuples.
     """
     try:
-        registry = load_timeframes()
-        return registry.get_timeframe_choices()
-    except ConfigError:
-        # Fallback to a default if config is missing, but UI should show an error.
-        return [(60, "1h")]
+        # Use the SSOT provider but convert back to int values for compatibility
+        pairs = get_timeframe_id_label_pairs()
+        # Convert string keys back to int for backward compatibility
+        return [(int(value), display) for value, display in pairs]
+    except Exception:
+        # Fallback to registry directly
+        try:
+            registry = get_timeframe_registry()
+            return registry.get_timeframe_choices()
+        except Exception:
+            logger.warning("All timeframe fallbacks failed, returning empty list")
+            return []
 
 def get_available_strategies() -> List[Tuple[str, str]]:
     """

@@ -8,7 +8,7 @@ import sys
 import time
 from pathlib import Path
 
-from control.worker import worker_loop
+from gui.desktop.worker import worker_loop
 
 
 def atomic_write_text(path: Path, text: str) -> None:

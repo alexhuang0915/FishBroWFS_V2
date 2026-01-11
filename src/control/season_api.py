@@ -168,7 +168,7 @@ class SeasonStore:
 
     def rebuild_index(self, artifacts_root: Path, season: str) -> dict[str, Any]:
         """
-        Scan artifacts_root/*/metadata.json to collect batches where metadata.season == season.
+        Rebuild the season index from artifacts root.
         Then attach hashes for index.json and summary.json (if present).
         Deterministic: sort by batch_id.
         """

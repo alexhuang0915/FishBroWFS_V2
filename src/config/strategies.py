@@ -109,8 +109,7 @@ class ParameterSchema(BaseModel):
         
         return v
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class FeatureSpec(BaseModel):
@@ -123,8 +122,7 @@ class FeatureSpec(BaseModel):
     required: bool = Field(True, description="Whether feature is required")
     params: Optional[Dict[str, Any]] = Field(None, description="Feature parameters")
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class DeterminismConfig(BaseModel):
@@ -135,8 +133,7 @@ class DeterminismConfig(BaseModel):
         description="Default random seed (used when job.seed is not provided)"
     )
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
 
 
 class StrategyConfig(BaseModel):
@@ -146,8 +143,7 @@ class StrategyConfig(BaseModel):
     strategy_id: str = Field(..., description="Strategy identifier")
     
     # Determinism configuration
-    determinism: DeterminismConfig = Field(
-        default_factory=DeterminismConfig,
+    determinism: DeterminismConfig = Field(default_factory=lambda: DeterminismConfig(),  # type: ignore
         description="Determinism configuration"
     )
     

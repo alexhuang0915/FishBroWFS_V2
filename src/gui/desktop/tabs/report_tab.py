@@ -11,8 +11,8 @@ import logging
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QTextEdit, QGroupBox,
     QFrame, QScrollArea, QSizePolicy, QTableWidget,
@@ -64,7 +64,7 @@ class ReportTab(QWidget):
         
         # Left panel: Artifact Checklist (40%)
         left_panel = QWidget()
-        left_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        left_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
         
@@ -109,7 +109,7 @@ class ReportTab(QWidget):
         
         # Right panel: Details (60%)
         right_panel = QWidget()
-        right_panel.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
         

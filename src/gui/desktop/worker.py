@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QObject, Signal  # type: ignore
 
 from control.research_service import run_research_job, preflight_bars_source
 from strategy.registry import load_builtin_strategies
@@ -29,12 +29,12 @@ class BacktestWorker(QObject):
     
     def __init__(self, strategy: str, primary_market: str, timeframe: int, context_feeds: Optional[list] = None):
         super().__init__()
-        self.strategy = strategy
-        self.primary_market = primary_market  # Maps to dataset_id
-        self.timeframe = timeframe
-        self.context_feeds = context_feeds or []
+        self.setProperty('strategy', strategy)
+        self.setProperty('primary_market', primary_market  # Maps to dataset_id)
+        self.setProperty('timeframe', timeframe)
+        self.setProperty('context_feeds', context_feeds or [])
         self.job_id: Optional[str] = None
-        self._stop_requested = False
+        self.setProperty('_stop_requested', False)
     
     def run(self):
         """Main execution method to be run in a QThread."""
@@ -147,7 +147,7 @@ class BacktestWorker(QObject):
     
     def stop(self):
         """Request stop of the worker."""
-        self._stop_requested = True
+        self.setProperty('_stop_requested', True)
 
 
 class BuildWorker(QObject):
@@ -162,13 +162,13 @@ class BuildWorker(QObject):
     def __init__(self, dataset: str, txt_path: Path, build_bars: bool, build_features: bool,
                  mode: str = "FULL", context_feeds: Optional[list] = None):
         super().__init__()
-        self.dataset = dataset
-        self.txt_path = txt_path
-        self.build_bars = build_bars
-        self.build_features = build_features
-        self.mode = mode
-        self.context_feeds = context_feeds or []
-        self._stop_requested = False
+        self.setProperty('dataset', dataset)
+        self.setProperty('txt_path', txt_path)
+        self.setProperty('build_bars', build_bars)
+        self.setProperty('build_features', build_features)
+        self.setProperty('mode', mode)
+        self.setProperty('context_feeds', context_feeds or [])
+        self.setProperty('_stop_requested', False)
     
     def run(self):
         """Main execution method to be run in a QThread."""
@@ -192,7 +192,7 @@ class BuildWorker(QObject):
             self.progress_signal.emit(10)
             
             # Load allowed timeframes from registry
-            from src.config.registry.timeframes import load_timeframes
+            from config.registry.timeframes import load_timeframes
             timeframe_registry = load_timeframes()
             allowed_timeframes = timeframe_registry.allowed_timeframes
             
@@ -246,7 +246,7 @@ class BuildWorker(QObject):
     
     def stop(self):
         """Request stop of the worker."""
-        self._stop_requested = True
+        self.setProperty('_stop_requested', True)
 
 
 class ArtifactWorker(QObject):
@@ -260,11 +260,11 @@ class ArtifactWorker(QObject):
     
     def __init__(self, strategy: str, dataset: str, season: str, research_result: dict):
         super().__init__()
-        self.strategy = strategy
-        self.dataset = dataset
-        self.season = season
-        self.research_result = research_result
-        self._stop_requested = False
+        self.setProperty('strategy', strategy)
+        self.setProperty('dataset', dataset)
+        self.setProperty('season', season)
+        self.setProperty('research_result', research_result)
+        self.setProperty('_stop_requested', False)
     
     def run(self):
         """Main execution method to be run in a QThread."""
@@ -380,4 +380,4 @@ class ArtifactWorker(QObject):
     
     def stop(self):
         """Request stop of the worker."""
-        self._stop_requested = True
+        self.setProperty('_stop_requested', True)

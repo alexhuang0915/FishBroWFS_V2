@@ -5,8 +5,8 @@ Provides helper functions to apply consistent styling for enabled/disabled state
 across all desktop UI widgets.
 """
 
-from PySide6.QtWidgets import QWidget, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QTextEdit
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QWidget, QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit, QTextEdit  # type: ignore
+from PySide6.QtCore import Qt  # type: ignore
 
 
 def apply_enabled(widget: QWidget) -> None:

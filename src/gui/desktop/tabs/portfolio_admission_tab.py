@@ -7,8 +7,8 @@ from typing import Optional, List, Dict, Any
 
 import pandas as pd
 import numpy as np
-from PySide6.QtCore import Qt, Signal, Slot, QTimer
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot, QTimer  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QSplitter,
     QGroupBox, QMessageBox, QSpinBox,
@@ -51,7 +51,7 @@ class PortfolioAdmissionTab(QWidget):
         main_layout.addWidget(title)
         
         # Main splitter
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel
         left_widget = QWidget()
@@ -72,10 +72,14 @@ class PortfolioAdmissionTab(QWidget):
         gates_group = QGroupBox("Admission Gates")
         gates_layout = QGridLayout()
         
-        self.gate1_status = QLabel("PENDING"); self.gate1_status.setStyleSheet("color: #FFC107;")
-        self.gate2_status = QLabel("PENDING"); self.gate2_status.setStyleSheet("color: #FFC107;")
-        self.gate3_status = QLabel("PENDING"); self.gate3_status.setStyleSheet("color: #FFC107;")
-        self.verdict_status = QLabel("PENDING"); self.verdict_status.setStyleSheet("color: #FFC107; font-weight: bold;")
+        self.gate1_status = QLabel("PENDING")
+        self.gate1_status.setStyleSheet("color: #FFC107;")
+        self.gate2_status = QLabel("PENDING")
+        self.gate2_status.setStyleSheet("color: #FFC107;")
+        self.gate3_status = QLabel("PENDING")
+        self.gate3_status.setStyleSheet("color: #FFC107;")
+        self.verdict_status = QLabel("PENDING")
+        self.verdict_status.setStyleSheet("color: #FFC107; font-weight: bold;")
         
         gates_layout.addWidget(QLabel("Gate 1 (Correlation):"), 0, 0)
         gates_layout.addWidget(self.gate1_status, 0, 1)
@@ -196,7 +200,7 @@ class PortfolioAdmissionTab(QWidget):
         
         message = QLabel("No Phase4-A jobs available.\n\n"
                         "Run research jobs first to generate candidate strategies.")
-        message.setAlignment(Qt.AlignCenter)
+        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message.setStyleSheet("color: #9e9e9e; font-style: italic; padding: 20px;")
         self.job_list_layout.addWidget(message)
         self.job_list_layout.addStretch()
@@ -209,7 +213,7 @@ class PortfolioAdmissionTab(QWidget):
                 item.widget().deleteLater()
         
         message = QLabel(f"Error loading jobs:\n{error_text}")
-        message.setAlignment(Qt.AlignCenter)
+        message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message.setStyleSheet("color: #F44336; padding: 20px;")
         self.job_list_layout.addWidget(message)
         self.job_list_layout.addStretch()
@@ -226,7 +230,7 @@ class PortfolioAdmissionTab(QWidget):
             layout = QHBoxLayout(row)
             
             checkbox = QCheckBox()
-            checkbox.job_id = job["job_id"]
+            checkbox.setProperty('job_id', job["job_id"])
             checkbox.toggled.connect(self.on_job_selection_changed)
             layout.addWidget(checkbox)
             
@@ -241,7 +245,7 @@ class PortfolioAdmissionTab(QWidget):
             spin.setRange(1, 100)
             spin.setValue(1)
             spin.setEnabled(False)
-            spin.job_id = job["job_id"]
+            spin.setProperty('job_id', job["job_id"])
             spin.valueChanged.connect(self.on_lots_changed)
             layout.addWidget(spin)
             
@@ -251,8 +255,8 @@ class PortfolioAdmissionTab(QWidget):
     
     def on_job_selection_changed(self, checked):
         checkbox = self.sender()
-        job_id = getattr(checkbox, 'job_id', None)
-        if not job_id:
+        job_id = checkbox.property('job_id')
+        if job_id is None:
             return
         
         if checked:
@@ -264,7 +268,7 @@ class PortfolioAdmissionTab(QWidget):
         parent = checkbox.parent()
         if parent:
             for child in parent.children():
-                if isinstance(child, QSpinBox) and getattr(child, 'job_id', None) == job_id:
+                if isinstance(child, QSpinBox) and child.property('job_id') == job_id:
                     child.setEnabled(checked)
                     break
         
@@ -273,8 +277,8 @@ class PortfolioAdmissionTab(QWidget):
     
     def on_lots_changed(self, value):
         spinbox = self.sender()
-        job_id = getattr(spinbox, 'job_id', None)
-        if job_id:
+        job_id = spinbox.property('job_id')
+        if job_id is not None:
             self.selected_jobs[job_id] = value
             self.debounce_timer.start()
     

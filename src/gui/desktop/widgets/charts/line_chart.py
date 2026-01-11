@@ -9,9 +9,9 @@ from typing import List, Tuple, Optional, Union, Dict, Any
 from datetime import datetime
 import math
 
-from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy
-from PySide6.QtGui import (
+from PySide6.QtCore import Qt, QRectF, QPointF, QSize, Signal  # type: ignore
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSizePolicy  # type: ignore
+from PySide6.QtGui import (  # type: ignore
     QPainter, QPen, QBrush, QColor, QFont,
     QPainterPath, QLinearGradient, QFontMetrics
 )
@@ -80,7 +80,7 @@ class LineChartWidget(QWidget):
         
         # Title
         self.title_label = QLabel(self.title)
-        self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setStyleSheet("font-weight: bold; font-size: 14px; color: #E6E6E6;")
         layout.addWidget(self.title_label)
         
@@ -281,7 +281,7 @@ class LineChartWidget(QWidget):
                 chart_rect.width(),
                 20
             )
-            painter.drawText(x_label_rect, Qt.AlignCenter, self.x_label)
+            painter.drawText(x_label_rect, Qt.AlignmentFlag.AlignCenter, self.x_label)
         
         # Y-axis label
         if self.y_label:
@@ -297,7 +297,7 @@ class LineChartWidget(QWidget):
             painter.rotate(-90)
             painter.drawText(QRectF(-y_label_rect.height()/2, -y_label_rect.width()/2,
                                   y_label_rect.height(), y_label_rect.width()),
-                           Qt.AlignCenter, self.y_label)
+                           Qt.AlignmentFlag.AlignCenter, self.y_label)
             painter.restore()
         
         # Draw tick labels if we have bounds
@@ -316,7 +316,7 @@ class LineChartWidget(QWidget):
                     label = str(value)
                 
                 tick_rect = QRectF(x - 25, chart_rect.bottom() + 5, 50, 15)
-                painter.drawText(tick_rect, Qt.AlignCenter, label)
+                painter.drawText(tick_rect, Qt.AlignmentFlag.AlignCenter, label)
             
             # Y-axis ticks
             for i in range(6):
@@ -330,7 +330,7 @@ class LineChartWidget(QWidget):
                     label = str(value)
                 
                 tick_rect = QRectF(chart_rect.left() - 45, y - 7, 40, 15)
-                painter.drawText(tick_rect, Qt.AlignRight | Qt.AlignVCenter, label)
+                painter.drawText(tick_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, label)
     
     def _draw_series(self, painter: QPainter, chart_rect: QRectF, series: Dict[str, Any]):
         """Draw a single data series."""
@@ -391,7 +391,7 @@ class LineChartWidget(QWidget):
             
             # Draw series name
             text_rect = QRectF(legend_x + 15, legend_y + i * 20, 135, 15)
-            painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter, name)
+            painter.drawText(text_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, name)
     
     def _map_x_to_chart(self, x: float, chart_rect: QRectF) -> float:
         """Map data x-coordinate to chart coordinate."""

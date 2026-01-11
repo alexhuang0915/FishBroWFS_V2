@@ -20,10 +20,10 @@ class JobContext:
       - write artifacts only under ctx.artifacts_dir
     """
     def __init__(self, job_id: str, db: Any, artifacts_dir: str, writer: Optional[CanonicalArtifactWriter] = None):
-        self.job_id = job_id
-        self._db = db
-        self.artifacts_dir = artifacts_dir
-        self._writer = writer
+        self.job_id: str = job_id
+        self._db: Any = db
+        self.artifacts_dir: str = artifacts_dir
+        self._writer: Optional[CanonicalArtifactWriter] = writer
 
     def heartbeat(self, progress: float | None = None, phase: str | None = None) -> None:
         self._db.update_heartbeat(self.job_id, progress=progress, phase=phase)

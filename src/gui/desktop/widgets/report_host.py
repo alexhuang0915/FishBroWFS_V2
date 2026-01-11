@@ -9,8 +9,8 @@ import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QLabel, QPushButton, QFrame, QSizePolicy, QSpacerItem
 )
@@ -79,7 +79,7 @@ class ReportHostWidget(QWidget):
         """)
         title_layout.addWidget(self.report_type_label)
         
-        title_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        title_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         
         # Report ID label
         self.report_id_label = QLabel("")
@@ -101,7 +101,7 @@ class ReportHostWidget(QWidget):
         self.metadata_label.setStyleSheet("color: #9A9A9A; font-size: 11px;")
         metadata_layout.addWidget(self.metadata_label)
         
-        metadata_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
+        metadata_layout.addSpacerItem(QSpacerItem(20, 0, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
         
         # Timestamp label
         self.timestamp_label = QLabel("")
@@ -127,7 +127,7 @@ class ReportHostWidget(QWidget):
         """Create placeholder widgets for different report types."""
         # Strategy report placeholder
         strategy_placeholder = QLabel("Strategy Report Viewer\n\nLoad a strategy report to see metrics and charts.")
-        strategy_placeholder.setAlignment(Qt.AlignCenter)
+        strategy_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         strategy_placeholder.setStyleSheet("""
             QLabel {
                 color: #9A9A9A;
@@ -139,7 +139,7 @@ class ReportHostWidget(QWidget):
         
         # Portfolio report placeholder
         portfolio_placeholder = QLabel("Portfolio Report Viewer\n\nLoad a portfolio report to see correlation heatmaps and allocations.")
-        portfolio_placeholder.setAlignment(Qt.AlignCenter)
+        portfolio_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         portfolio_placeholder.setStyleSheet("""
             QLabel {
                 color: #9A9A9A;
@@ -151,7 +151,7 @@ class ReportHostWidget(QWidget):
         
         # Empty state
         empty_placeholder = QLabel("No Report Loaded\n\nUse show_strategy_report() or show_portfolio_report() to load a report.")
-        empty_placeholder.setAlignment(Qt.AlignCenter)
+        empty_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
         empty_placeholder.setStyleSheet("""
             QLabel {
                 color: #666666;
@@ -371,7 +371,7 @@ class ReportHostWidget(QWidget):
     def _show_error(self, error_message: str):
         """Show error message in the widget."""
         error_widget = QLabel(f"Error: {error_message}")
-        error_widget.setAlignment(Qt.AlignCenter)
+        error_widget.setAlignment(Qt.AlignmentFlag.AlignCenter)
         error_widget.setStyleSheet("""
             QLabel {
                 color: #F44336;

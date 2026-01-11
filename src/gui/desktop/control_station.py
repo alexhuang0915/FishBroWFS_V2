@@ -9,12 +9,12 @@ import time
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot, QThread, QTimer  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
     QLabel, QPushButton, QStatusBar, QMessageBox
 )
-from PySide6.QtGui import QFont, QFontDatabase
+from PySide6.QtGui import QFont, QFontDatabase  # type: ignore
 
 from .tabs.op_tab import OpTab
 from .tabs.report_tab import ReportTab
@@ -58,7 +58,7 @@ def _apply_initial_geometry(window, target_w: int = 1920, target_h: int = 1080):
     """
     if _is_wayland():
         # Wayland: use resize only, clamp to available geometry
-        from PySide6.QtWidgets import QApplication
+        from PySide6.QtWidgets import QApplication  # type: ignore
         screen = QApplication.primaryScreen()
         if screen:
             available = screen.availableGeometry()
@@ -134,7 +134,7 @@ class ControlStation(QMainWindow):
         
         # Tab widget - compact, dense
         self.tab_widget = QTabWidget()
-        self.tab_widget.setTabPosition(QTabWidget.North)
+        self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setMovable(False)
         
         # Create tabs
@@ -245,7 +245,7 @@ class ControlStation(QMainWindow):
                 self,
                 "Port Conflict",
                 error_msg,
-                QMessageBox.Ok
+                QMessageBox.StandardButton.Ok
             )
             logger.error(f"Port 8000 occupied by non-fishbro process: {self.supervisor_details}")
         
@@ -260,7 +260,7 @@ class ControlStation(QMainWindow):
                 self,
                 "Supervisor Error",
                 error_msg,
-                QMessageBox.Ok
+                QMessageBox.StandardButton.Ok
             )
             logger.error(f"Supervisor startup error: {self.supervisor_details}")
         

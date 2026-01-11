@@ -121,6 +121,8 @@ down:
 # GATES
 # -----------------------------
 check:
+	@echo "==> Running hardening tests (QTGUARD)..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/hardening/
 	@echo "==> Running product tests (mark expr: $(PYTEST_MARK_EXPR_PRODUCT))..."
 	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "$(PYTEST_MARK_EXPR_PRODUCT)"
 

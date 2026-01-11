@@ -94,7 +94,7 @@ from control.data_snapshot import create_snapshot, compute_snapshot_id, normaliz
 from control.dataset_registry_mutation import register_snapshot_as_dataset
 
 # Phase A: Registry endpoints
-from portfolio.instruments import load_instruments_config
+# from portfolio.instruments import load_instruments_config  # type: ignore - unused, imported locally in _load_instruments_config_from_file
 
 # Phase A: Data readiness helpers
 from control.bars_store import bars_dir, resampled_bars_path
@@ -164,7 +164,7 @@ def _load_dataset_index_from_file() -> DatasetIndex:
     return DatasetIndex.model_validate(data)
 
 
-def _load_instruments_config_from_file() -> dict[str, Any]:
+def _load_instruments_config_from_file() -> Any:
     """Private implementation: load instruments config from file (fail fast)."""
     import json
     from pathlib import Path
@@ -177,12 +177,12 @@ def _load_instruments_config_from_file() -> dict[str, Any]:
         )
 
     # Use portfolio.instruments.load_instruments_config to parse YAML
-    from portfolio.instruments import load_instruments_config
+    from portfolio.instruments import load_instruments_config  # type: ignore
     config = load_instruments_config(config_path)
     return config
 
 
-def _get_instruments_config() -> dict[str, Any]:
+def _get_instruments_config() -> Any:
     """Return cached instruments config, loading if necessary."""
     global _INSTRUMENTS_CONFIG
     if _INSTRUMENTS_CONFIG is None:
@@ -190,14 +190,14 @@ def _get_instruments_config() -> dict[str, Any]:
     return _INSTRUMENTS_CONFIG
 
 
-def _reload_instruments_config() -> dict[str, Any]:
+def _reload_instruments_config() -> Any:
     """Force reload instruments config from file and update cache."""
     global _INSTRUMENTS_CONFIG
     _INSTRUMENTS_CONFIG = _load_instruments_config_from_file()
     return _INSTRUMENTS_CONFIG
 
 
-def load_instruments_config() -> dict[str, Any]:
+def load_instruments_config() -> Any:
     """Load instruments config. Supports monkeypatching."""
     import sys
     module = sys.modules[__name__]
@@ -606,10 +606,10 @@ async def readiness_check(season: str, dataset_id: str, timeframe: str) -> Readi
     outputs_root = Path("outputs")
     # Build paths using the imported helpers
     bars_path = resampled_bars_path(outputs_root, season, dataset_id, timeframe)
-    features_path = features_path(outputs_root, season, dataset_id, timeframe)
+    features_file_path = features_path(outputs_root, season, dataset_id, timeframe)
     
     bars_ready = bars_path.exists()
-    features_ready = features_path.exists()
+    features_ready = features_file_path.exists()
     
     return ReadinessResponse(
         season=season,
@@ -618,7 +618,7 @@ async def readiness_check(season: str, dataset_id: str, timeframe: str) -> Readi
         bars_ready=bars_ready,
         features_ready=features_ready,
         bars_path=str(bars_path) if bars_ready else None,
-        features_path=str(features_path) if features_ready else None,
+        features_path=str(features_file_path) if features_ready else None,
         error=None,
     )
 

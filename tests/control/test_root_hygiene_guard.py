@@ -28,6 +28,7 @@ def test_root_hygiene_no_forbidden_files():
         '.pre-commit-config.yaml',
         'FishBroWFS_UI.bat',  # Sole human entrypoint. Approved by constitution.
         '.rooignore',  # AI context guard for API cost control
+        'pyrightconfig.json',  # Pyright configuration for type checking
     }
     
     allowed_dirs = {

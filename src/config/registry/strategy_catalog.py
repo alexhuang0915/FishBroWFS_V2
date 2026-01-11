@@ -9,7 +9,7 @@ from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 def get_registry_path(filename: str) -> Path:
@@ -72,8 +72,7 @@ class StrategyCatalogEntry(BaseModel):
         description="List of timeframes this strategy supports"
     )
     
-    class Config:
-        frozen = True
+    model_config = ConfigDict(frozen=True)
     
     @field_validator('config_file')
     @classmethod

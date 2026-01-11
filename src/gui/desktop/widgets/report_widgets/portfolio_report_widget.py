@@ -6,14 +6,14 @@ import json
 import logging
 from typing import Dict, Any, Optional, List, Tuple
 
-from PySide6.QtCore import Qt, Signal, Slot
-from PySide6.QtWidgets import (
+from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
+from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, 
     QTableWidget, QTableWidgetItem, QGroupBox, QScrollArea,
     QFileDialog, QMessageBox, QStackedWidget, QSplitter,
     QAbstractItemView
 )
-from PySide6.QtGui import QPixmap, QDesktopServices, QColor
+from PySide6.QtGui import QPixmap, QDesktopServices, QColor  # type: ignore
 
 from ...widgets.metric_cards import MetricCard, MetricRow
 from ...widgets.charts.heatmap import HeatmapWidget
@@ -53,7 +53,7 @@ class PortfolioReportWidget(QWidget):
         main_layout.addWidget(self.metrics_row)
         
         # Splitter
-        splitter = QSplitter(Qt.Horizontal)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel
         left_widget = QWidget()

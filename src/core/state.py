@@ -159,10 +159,10 @@ class SystemState(BaseModel):
     snapshot_timestamp: datetime = Field(default_factory=datetime.now)
     
     # System metrics
-    metrics: SystemMetrics = Field(default_factory=SystemMetrics)
+    metrics: SystemMetrics = Field(default_factory=lambda: SystemMetrics())
     
     # Intent queue status
-    intent_queue: IntentQueueStatus = Field(default_factory=IntentQueueStatus)
+    intent_queue: IntentQueueStatus = Field(default_factory=lambda: IntentQueueStatus())
     
     # Collections
     seasons: Dict[str, SeasonInfo] = Field(default_factory=dict)

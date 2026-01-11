@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: FishBroWFS_V2
+Version: 0.1.0
+Summary: Speed-first backtesting engine
+Requires-Python: >=3.10
+Requires-Dist: numpy
+Requires-Dist: PySide6
+Requires-Dist: requests

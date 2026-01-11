@@ -24,7 +24,8 @@ class CanonicalArtifactWriter:
     """Writes canonical job artifacts and captures stdout/stderr."""
     
     def __init__(self, job_id: str, spec: JobSpec, artifacts_dir: Path):
-        self.job_id = job_id
+        self.job_id: str  # type annotation for Pylance
+        setattr(self, 'job_id', job_id)
         self.spec = spec
         self.artifacts_dir = artifacts_dir
         self._stdout_capture: Optional[TextIO] = None

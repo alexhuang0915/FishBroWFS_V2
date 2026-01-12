@@ -489,6 +489,10 @@ async def identity() -> dict[str, Any]:
     ident = get_service_identity(service_name="control_api", db_path=None)
     return ident
 
+@api_v1.get("/readiness")
+async def readiness() -> dict[str, str]:
+    """Readiness endpoint for UI gates."""
+    return {"status": "ok"}
 
 @api_v1.get("/meta/datasets", response_model=DatasetIndex)
 async def meta_datasets() -> DatasetIndex:

@@ -6,100 +6,66 @@ on:
   pull_request:
     branches: [ main, master, develop ]
   workflow_dispatch:
-    inputs:
-      skip_tests:
-        description: 'Skip core contract tests'
-        required: false
-        default: false
-        type: boolean
-      no_regenerate:
-        description: 'Skip snapshot regeneration'
-        required: false
-        default: false
-        type: boolean
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  no-fog-gate:
-    name: No-Fog Gate (Core Contracts + Snapshot)
+  gate:
+    name: Gate (make check)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    
+
     strategy:
+      fail-fast: false
       matrix:
-        # 移除 3.8 (不支援 Pandas 2.1+), 改用 3.10 與效能更強的 3.11
         python-version: ["3.10", "3.11"]
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-    
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
-    
-      - name: Install System Dependencies
+
+      - name: Install system deps
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential python3-dev
-    
-      - name: Install dependencies (Headless Optimized)
+
+      - name: Install Python deps (headless)
+        shell: bash
         run: |
+          set -euo pipefail
           python -m pip install --upgrade pip
-          
-          # 1. 強制過濾 PySide6 以避免 CI 無頭環境安裝錯誤 (Phase X 解耦後 CI 不需 GUI)
-          if [ -f "requirements.txt" ]; then
-            grep -v "PySide6" requirements.txt > requirements_ci.txt
-            pip install -r requirements_ci.txt
+
+          if [[ -f "requirements.txt" ]]; then
+            awk '
+              BEGIN{IGNORECASE=1}
+              $0 ~ /^pyside6([-=<>&].*)?$/ {next}
+              $0 ~ /^pyside6-essentials([-=<>&].*)?$/ {next}
+              $0 ~ /^pyside6-addons([-=<>&].*)?$/ {next}
+              $0 ~ /^shiboken6([-=<>&].*)?$/ {next}
+              {print}
+            ' requirements.txt > requirements_ci.txt
+
+            python -m pip install -r requirements_ci.txt
           fi
-          
-          # 2. 確保測試核心工具到位
-          pip install pytest pytest-timeout pytest-asyncio
-    
-      - name: Cache snapshot directory
-        uses: actions/cache@v4
-        with:
-          path: SYSTEM_FULL_SNAPSHOT
-          key: ${{ runner.os }}-snapshot-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-snapshot-
-    
-      - name: Run No-Fog Gate
-        id: no_fog_gate
-        run: |
-          chmod +x scripts/no_fog/no_fog_gate.sh
-          
-          ARGS=""
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            if [[ "${{ github.event.inputs.skip_tests }}" == "true" ]]; then
-              ARGS="$ARGS --skip-tests"
-            fi
-            if [[ "${{ github.event.inputs.no_regenerate }}" == "true" ]]; then
-              ARGS="$ARGS --no-regenerate"
-            fi
-          fi
-          
-          # 執行 Gate 並設定 300 秒超時保護
-          timeout 300 bash scripts/no_fog/no_fog_gate.sh $ARGS --timeout 30
+
+          python -m pip install pytest pytest-timeout pytest-asyncio
+
+      - name: Run make check
         env:
           PYTHONPATH: src
-    
-      - name: Upload snapshot artifacts (on failure)
-        if: failure() && steps.no_fog_gate.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: system-full-snapshot-${{ matrix.python-version }}-${{ github.sha }}
-          path: SYSTEM_FULL_SNAPSHOT/
-          retention-days: 7
-    
-      - name: Upload test logs (on failure)
+          PYTHONUNBUFFERED: "1"
+        run: |
+          make check
+
+      - name: Upload logs (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:

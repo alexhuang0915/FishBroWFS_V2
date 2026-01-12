@@ -126,6 +126,10 @@ check:
 	@echo "==> Running product tests (mark expr: $(PYTEST_MARK_EXPR_PRODUCT))..."
 	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "$(PYTEST_MARK_EXPR_PRODUCT)"
 
+api-snapshot:
+	@mkdir -p tests/policy/api_contract
+	@$(PYTHON) -c "import json; from pathlib import Path; from control.api import app; out = Path('tests/policy/api_contract/openapi.json'); out.write_text(json.dumps(app.openapi(), indent=2, sort_keys=True), encoding='utf-8'); print(f'[api-snapshot] wrote: {out} ({out.stat().st_size} bytes)')"
+
 acceptance:
 	@echo "==> Running final acceptance..."
 	$(ENV) bash scripts/acceptance/run_final_acceptance.sh

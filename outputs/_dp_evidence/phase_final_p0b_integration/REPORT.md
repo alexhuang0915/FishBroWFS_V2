@@ -53,3 +53,8 @@ Successfully turned `src/contracts/api.py` into the effective single source of t
 
 ## Remaining Known Issues
 None. The SSOT migration is complete and validated.
+
+## Deployment
+- Commit hash: `5290efe135c310a5461b83033fbbc5921a18e005`
+- Push timestamp: 2026-01-12T07:46:25Z
+- Confirmation: Successfully pushed to `origin/main` (5f6cc7a..5290efe)

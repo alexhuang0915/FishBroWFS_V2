@@ -99,7 +99,7 @@ def is_fishbro_process(cmdline: str) -> bool:
         "control.api",
         "main.py",
         "uvicorn control.api:app",
-        "control.worker_main",
+        "control.supervisor.supervisor",
         "start_dashboard.py",
         "scripts/start_dashboard.py",
     ]
@@ -189,11 +189,15 @@ def spawn_backend() -> subprocess.Popen:
 
 
 def spawn_worker() -> subprocess.Popen:
-    """Start worker daemon."""
-    jobs_db = REPO_ROOT / "outputs" / "jobs.db"
+    """Start supervisor daemon."""
+    jobs_db = REPO_ROOT / "outputs" / "jobs_v2.db"
+    max_workers = int(os.environ.get("FISHBRO_SUPERVISOR_MAX_WORKERS", "1"))
+    tick_interval = float(os.environ.get("FISHBRO_SUPERVISOR_TICK_INTERVAL", "0.5"))
     cmd = [
-        sys.executable, "-m", "control.worker_main",
-        str(jobs_db)
+        sys.executable, "-m", "control.supervisor.supervisor",
+        "--db", str(jobs_db),
+        "--max-workers", str(max_workers),
+        "--tick-interval", str(tick_interval),
     ]
     env = os.environ.copy()
     env.update({
@@ -210,7 +214,7 @@ def spawn_worker() -> subprocess.Popen:
             start_new_session=True
         )
     
-    print(f"Worker started (PID: {proc.pid}, log: {WORKER_LOG})")
+    print(f"Supervisor started (PID: {proc.pid}, log: {WORKER_LOG})")
     return proc
 
 

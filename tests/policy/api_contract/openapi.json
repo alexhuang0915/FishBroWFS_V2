@@ -3775,6 +3775,29 @@
         ]
       }
     },
+    "/api/v1/readiness": {
+      "get": {
+        "description": "Readiness endpoint for UI gates.",
+        "operationId": "readiness_api_v1_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Readiness Api V1 Readiness Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness"
+      }
+    },
     "/api/v1/readiness/{season}/{dataset_id}/{timeframe}": {
       "get": {
         "description": "Check if bars and features are ready for a given season, dataset, and timeframe.\n\nContract:\n- Returns readiness status without performing any writes.\n- If bars/features files exist, returns paths (relative to outputs root).\n- If missing, returns false with optional error.\n- Must not construct filesystem paths in UI; UI must call this endpoint.",

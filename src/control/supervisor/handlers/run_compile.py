@@ -11,6 +11,7 @@ import traceback
 from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.run_compile import RunCompilePayload
 from control.paths import get_outputs_root
+from control.artifacts import write_json_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +97,9 @@ class RunCompileHandler(BaseJobHandler):
                     "note": "Placeholder season manifest created for test execution",
                     "artifacts": []
                 }
-                with open(manifest_path, "w") as f:
-                    json.dump(manifest_content, f, indent=2)
+                
+                # Write manifest
+                write_json_atomic(manifest_path, manifest_content)
                 logger.info(f"Created test season manifest at: {manifest_path}")
             else:
                 raise ValueError(f"Season manifest not found: {manifest_path}")
@@ -108,8 +110,7 @@ class RunCompileHandler(BaseJobHandler):
         
         # Write payload to compile directory
         payload_path = compile_dir / "payload.json"
-        with open(payload_path, "w") as f:
-            json.dump(params, f, indent=2)
+        write_json_atomic(payload_path, params)
         
         # Update heartbeat with progress
         context.heartbeat(progress=0.1, phase="validating_inputs")
@@ -162,8 +163,7 @@ class RunCompileHandler(BaseJobHandler):
                 "compiled_artifacts": [],
                 "execution_time_ms": 0
             }
-            with open(test_output_path, "w") as f:
-                json.dump(test_output_content, f, indent=2)
+            write_json_atomic(test_output_path, test_output_content)
             
             # Create stdout/stderr placeholders
             stdout_path = Path(context.artifacts_dir) / "compile_stdout.txt"
@@ -300,8 +300,7 @@ class RunCompileHandler(BaseJobHandler):
         }
         
         manifest_path_out = compile_dir / "manifest.json"
-        with open(manifest_path_out, "w") as f:
-            json.dump(manifest, f, indent=2, sort_keys=True)
+        write_json_atomic(manifest_path_out, manifest)
         
         logger.info(f"Generated manifest at {manifest_path_out}")
 

@@ -30,6 +30,7 @@ import statistics
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..job_handler import BaseJobHandler, JobContext
+from control.artifacts import write_json_atomic
 from contracts.research_wfs.result_schema import (
     ResearchWFSResult,
     validate_result_json,
@@ -877,18 +878,15 @@ def _write_artifacts(
     
     # 1. Write portfolio_config.json
     config_path = artifacts_dir / "portfolio_config.json"
-    with open(config_path, "w", encoding="utf-8") as f:
-        json.dump(portfolio_config.model_dump(), f, indent=2, ensure_ascii=False)
+    write_json_atomic(config_path, portfolio_config.model_dump())
     
     # 2. Write admission_report.json
     report_path = artifacts_dir / "admission_report.json"
-    with open(report_path, "w", encoding="utf-8") as f:
-        json.dump(admission_report.model_dump(), f, indent=2, ensure_ascii=False)
+    write_json_atomic(report_path, admission_report.model_dump())
     
     # 3. Write admission_decision.json (using the schema from contracts)
     decision_path = artifacts_dir / "admission_decision.json"
-    with open(decision_path, "w", encoding="utf-8") as f:
-        json.dump(admission_decision.model_dump(), f, indent=2, ensure_ascii=False)
+    write_json_atomic(decision_path, admission_decision.model_dump())
     
     # 4. Write summary.txt
     summary_path = artifacts_dir / "summary.txt"

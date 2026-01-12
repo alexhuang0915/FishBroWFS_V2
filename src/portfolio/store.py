@@ -84,7 +84,7 @@ class PortfolioStore:
         """
         Atomically write the current PortfolioManager state to disk.
 
-        Uses a temporary file + os.replace for atomicity.
+        Uses a temporary file + fsync + os.replace for crash safety.
         """
         strategies_data = {
             sid: self._dump_record(rec) for sid, rec in manager.strategies.items()
@@ -100,8 +100,11 @@ class PortfolioStore:
         }
 
         tmp = self.current_state_path.with_suffix(".json.tmp")
+        # Write with fsync for crash safety
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
         os.replace(tmp, self.current_state_path)
 
         if self.audit:
@@ -161,8 +164,11 @@ class PortfolioStore:
             "portfolio_returns": self._dump_returns(manager.portfolio_returns),
         }
 
+        # Write with fsync for crash safety
         with open(path, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=2, ensure_ascii=False)
+            f.flush()
+            os.fsync(f.fileno())
 
         if self.audit:
             from portfolio.audit import make_snapshot_event

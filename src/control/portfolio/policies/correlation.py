@@ -5,10 +5,18 @@ Deterministic: input order does not affect output.
 Tie‑break: lower score rejected; if equal score, lexicographically larger run_id rejected.
 """
 import numpy as np
+import logging
 from typing import Dict, List, Tuple, Optional, Set
 from dataclasses import dataclass
 import json
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+# Resource guardrails for correlation computation
+MAX_CANDIDATES = 1000  # Maximum number of candidates to process
+MAX_RETURN_SERIES_LENGTH = 10_000  # Maximum length of return series per candidate
+MAX_CORRELATION_PAIRS = 500_000  # Maximum number of pairwise correlations to compute
 
 
 @dataclass
@@ -78,6 +86,43 @@ class CorrelationGate:
         self.max_pairwise_correlation = max_pairwise_correlation
         self.min_overlap_days = min_overlap_days
     
+    def _apply_guardrails(
+        self,
+        candidate_run_ids: List[str],
+        returns_series: Dict[str, Tuple[List[str], List[float]]]
+    ) -> None:
+        """Apply resource guardrails before correlation computation."""
+        # Check candidate count
+        candidate_count = len(candidate_run_ids)
+        if candidate_count > MAX_CANDIDATES:
+            raise ValueError(
+                f"Too many candidates: {candidate_count} exceeds maximum of {MAX_CANDIDATES}. "
+                f"Consider pre-filtering or increasing MAX_CANDIDATES."
+            )
+        
+        # Check return series lengths
+        for run_id, (dates, returns) in returns_series.items():
+            series_length = len(returns)
+            if series_length > MAX_RETURN_SERIES_LENGTH:
+                raise ValueError(
+                    f"Return series for {run_id} too long: {series_length} exceeds "
+                    f"maximum of {MAX_RETURN_SERIES_LENGTH}. Consider downsampling."
+                )
+        
+        # Check pairwise correlation count (n choose 2)
+        n = candidate_count
+        pairwise_count = n * (n - 1) // 2
+        if pairwise_count > MAX_CORRELATION_PAIRS:
+            raise ValueError(
+                f"Too many pairwise correlations: {pairwise_count} exceeds "
+                f"maximum of {MAX_CORRELATION_PAIRS}. Consider reducing candidate count."
+            )
+        
+        logger.info(
+            f"Correlation guardrails passed: candidates={candidate_count}, "
+            f"pairwise_pairs={pairwise_count}"
+        )
+    
     def evaluate(
         self,
         candidate_run_ids: List[str],
@@ -97,6 +142,9 @@ class CorrelationGate:
         Returns:
             CorrelationGateResult with admitted/rejected lists and evidence.
         """
+        # Apply guardrails before computation
+        self._apply_guardrails(candidate_run_ids, returns_series)
+        
         # 1. Deterministic ordering
         sorted_candidates = sorted(candidate_run_ids)
         

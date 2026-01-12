@@ -3,13 +3,24 @@ Supervisor client for GUI services.
 
 Implements HTTP client for the versioned API v1 endpoints.
 All endpoints are under /api/v1/... except /health.
+
+Resiliency features:
+- Connect timeout: 3 seconds
+- Read timeout: 30 seconds
+- Retry for 429 (rate limiting) and 5xx (server errors)
+- Exponential backoff with jitter
+- Error classification (network vs validation vs server)
 """
 
 import json
 import logging
-from typing import Any, Optional, List, Dict
+import time
+import random
+from typing import Any, Optional, List, Dict, Tuple, Union
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from gui.desktop.config import SUPERVISOR_BASE_URL
 
@@ -18,22 +29,41 @@ logger = logging.getLogger(__name__)
 
 class SupervisorClientError(Exception):
     """Custom exception for supervisor client errors."""
-    def __init__(self, status_code: Optional[int] = None, message: str = ""):
+    def __init__(self, status_code: Optional[int] = None, message: str = "", error_type: str = "unknown"):
         self.status_code = status_code
         self.message = message
-        super().__init__(f"SupervisorClientError: {status_code} - {message}")
+        self.error_type = error_type  # "network", "validation", "server", "rate_limit"
+        super().__init__(f"SupervisorClientError[{error_type}]: {status_code} - {message}")
 
 
 class SupervisorClient:
-    """HTTP client for supervisor API v1."""
+    """HTTP client for supervisor API v1 with resiliency."""
 
     def __init__(self, base_url: str = SUPERVISOR_BASE_URL):
         self.base_url = base_url.rstrip('/')
+        
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=3,  # Maximum number of retries
+            backoff_factor=1.0,  # Exponential backoff: 1s, 2s, 4s
+            status_forcelist=[429, 500, 502, 503, 504],  # Retry on rate limit and server errors
+            allowed_methods=["GET", "POST"],  # Only retry safe methods
+            raise_on_status=False  # Don't raise exception on status codes
+        )
+        
+        # Create session with adapter
         self.session = requests.Session()
-        self.session.timeout = 5.0
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+        
+        # Timeout configuration
+        self.connect_timeout = 3.0  # Connection timeout in seconds
+        self.read_timeout = 30.0    # Read timeout in seconds
+        self.session.timeout = (self.connect_timeout, self.read_timeout)
 
     def _get(self, path: str) -> Any:
-        """GET request and parse JSON."""
+        """GET request and parse JSON with error classification."""
         url = f"{self.base_url}{path}"
         try:
             response = self.session.get(url)
@@ -41,14 +71,19 @@ class SupervisorClient:
             return response.json()
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response else None
-            logger.error(f"GET {url} failed with status {status_code}: {e}")
-            raise SupervisorClientError(status_code, str(e))
+            error_type = self._classify_error(status_code)
+            error_message = self._extract_error_message(e)
+            logger.error(f"GET {url} failed with status {status_code} ({error_type}): {error_message}")
+            raise SupervisorClientError(status_code, error_message, error_type)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            logger.error(f"GET {url} network error: {e}")
+            raise SupervisorClientError(message=f"Network error: {e}", error_type="network")
         except requests.RequestException as e:
             logger.error(f"GET {url} failed: {e}")
-            raise SupervisorClientError(message=str(e))
+            raise SupervisorClientError(message=str(e), error_type="unknown")
 
     def _post(self, path: str, payload: dict) -> Any:
-        """POST request with JSON payload."""
+        """POST request with JSON payload with error classification."""
         url = f"{self.base_url}{path}"
         try:
             response = self.session.post(url, json=payload)
@@ -56,11 +91,68 @@ class SupervisorClient:
             return response.json()
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response else None
-            logger.error(f"POST {url} failed with status {status_code}: {e}")
-            raise SupervisorClientError(status_code, str(e))
+            error_type = self._classify_error(status_code)
+            error_message = self._extract_error_message(e)
+            logger.error(f"POST {url} failed with status {status_code} ({error_type}): {error_message}")
+            raise SupervisorClientError(status_code, error_message, error_type)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            logger.error(f"POST {url} network error: {e}")
+            raise SupervisorClientError(message=f"Network error: {e}", error_type="network")
         except requests.RequestException as e:
             logger.error(f"POST {url} failed: {e}")
-            raise SupervisorClientError(message=str(e))
+            raise SupervisorClientError(message=str(e), error_type="unknown")
+
+    def _classify_error(self, status_code: Optional[int]) -> str:
+        """Classify HTTP error for better UI messaging."""
+        if status_code is None:
+            return "network"
+        elif status_code == 429:
+            return "rate_limit"
+        elif 400 <= status_code < 500:
+            return "validation"
+        elif 500 <= status_code < 600:
+            return "server"
+        else:
+            return "unknown"
+
+    def _extract_error_message(self, http_error: requests.exceptions.HTTPError) -> str:
+        """Extract detailed error message from HTTPError response."""
+        try:
+            response = http_error.response
+            if response is None:
+                return str(http_error)
+            
+            # Try to parse JSON error response
+            content_type = response.headers.get('content-type', '')
+            if 'application/json' in content_type:
+                error_data = response.json()
+                # Handle Pydantic validation errors (422)
+                if response.status_code == 422 and 'detail' in error_data:
+                    details = error_data['detail']
+                    if isinstance(details, list) and len(details) > 0:
+                        # Extract field errors
+                        field_errors = []
+                        for detail in details:
+                            loc = detail.get('loc', [])
+                            msg = detail.get('msg', '')
+                            field = loc[-1] if len(loc) > 1 else str(loc)
+                            field_errors.append(f"{field}: {msg}")
+                        return f"Validation error: {', '.join(field_errors)}"
+                    elif isinstance(details, str):
+                        return details
+                
+                # Handle other JSON error formats
+                if 'message' in error_data:
+                    return error_data['message']
+                elif 'error' in error_data:
+                    return error_data['error']
+                elif 'detail' in error_data:
+                    return str(error_data['detail'])
+            
+            # Fall back to response text
+            return response.text[:500] or str(http_error)
+        except Exception:
+            return str(http_error)
 
     def health(self) -> dict:
         """Check supervisor health."""
@@ -95,7 +187,7 @@ class SupervisorClient:
         return self._get(f"/api/v1/jobs/{job_id}/artifacts")
 
     def get_artifact_file(self, job_id: str, filename: str) -> bytes:
-        """Download artifact file content."""
+        """Download artifact file content with error classification."""
         url = f"{self.base_url}/api/v1/jobs/{job_id}/artifacts/{filename}"
         try:
             response = self.session.get(url)
@@ -103,11 +195,16 @@ class SupervisorClient:
             return response.content
         except requests.exceptions.HTTPError as e:
             status_code = e.response.status_code if e.response else None
-            logger.error(f"GET {url} failed with status {status_code}: {e}")
-            raise SupervisorClientError(status_code, str(e))
+            error_type = self._classify_error(status_code)
+            error_message = self._extract_error_message(e)
+            logger.error(f"GET {url} failed with status {status_code} ({error_type}): {error_message}")
+            raise SupervisorClientError(status_code, error_message, error_type)
+        except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+            logger.error(f"GET {url} network error: {e}")
+            raise SupervisorClientError(message=f"Network error: {e}", error_type="network")
         except requests.RequestException as e:
             logger.error(f"GET {url} failed: {e}")
-            raise SupervisorClientError(message=str(e))
+            raise SupervisorClientError(message=str(e), error_type="unknown")
 
     def get_stdout_tail(self, job_id: str, n: int = 200) -> str:
         """Return stdout tail lines as string."""

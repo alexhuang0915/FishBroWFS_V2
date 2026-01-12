@@ -2,9 +2,17 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+import logging
 from typing import Iterable, List, Tuple
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
+
+# Performance guardrails for engine
+MAX_BARS = 1_000_000  # Maximum number of bars to process
+MAX_INTENTS = 100_000  # Maximum number of intents to process
+MAX_FILLS_PER_BAR = 10  # Maximum fills per bar (sanity check)
 
 # Engine JIT matcher kernel contract:
 # - Complexity target: O(B + I + A), where:
@@ -235,11 +243,30 @@ def simulate(
       - If numba is unavailable OR NUMBA_DISABLE_JIT=1, fall back to Python reference.
     """
     global JIT_PATH_USED_LAST, JIT_KERNEL_SIGNATURES_LAST
-
+    
+    # Apply performance guardrails
+    n_bars = len(bars.open)
+    if n_bars > MAX_BARS:
+        raise ValueError(
+            f"Too many bars: {n_bars} exceeds maximum of {MAX_BARS}. "
+            f"Consider splitting the simulation or increasing MAX_BARS."
+        )
+    
+    # Count intents (need to convert to list for counting)
+    intents_list = list(intents) if not isinstance(intents, list) else intents
+    n_intents = len(intents_list)
+    if n_intents > MAX_INTENTS:
+        raise ValueError(
+            f"Too many intents: {n_intents} exceeds maximum of {MAX_INTENTS}. "
+            f"Consider reducing intent count or increasing MAX_INTENTS."
+        )
+    
+    logger.info(f"Engine simulation guardrails passed: bars={n_bars}, intents={n_intents}")
+    
     if nb is None:
         JIT_PATH_USED_LAST = False
         JIT_KERNEL_SIGNATURES_LAST = None
-        return simulate_py(bars, intents, initial_pos)
+        return simulate_py(bars, intents_list, initial_pos)
 
     # If numba is disabled, keep behavior stable.
     # Numba respects NUMBA_DISABLE_JIT; but we short-circuit to be safe.
@@ -338,6 +365,23 @@ def simulate_arrays(
     )
     
     global JIT_PATH_USED_LAST, JIT_KERNEL_SIGNATURES_LAST
+    
+    # Apply performance guardrails
+    n_bars = len(bars.open)
+    if n_bars > MAX_BARS:
+        raise ValueError(
+            f"Too many bars: {n_bars} exceeds maximum of {MAX_BARS}. "
+            f"Consider splitting the simulation or increasing MAX_BARS."
+        )
+    
+    n_intents = len(order_id)
+    if n_intents > MAX_INTENTS:
+        raise ValueError(
+            f"Too many intents: {n_intents} exceeds maximum of {MAX_INTENTS}. "
+            f"Consider reducing intent count or increasing MAX_INTENTS."
+        )
+    
+    logger.info(f"Engine simulation guardrails passed: bars={n_bars}, intents={n_intents}")
 
     # Normalize/ensure arrays are numpy with the expected dtypes (cold path).
     oid = np.asarray(order_id, dtype=INDEX_DTYPE)

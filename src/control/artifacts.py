@@ -104,6 +104,41 @@ def write_json_atomic(path: Path, data: dict) -> None:
         raise
 
 
+def write_text_atomic(path: Path, text: str) -> None:
+    """Atomically write text to file.
+    
+    Writes to a temporary file in the same directory, then renames to target.
+    Ensures no partial writes are visible.
+    
+    Args:
+        path: Target file path.
+        text: Text content to write.
+    
+    Raises:
+        OSError: If file cannot be written.
+    """
+    # Ensure parent directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Write to temporary file
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        dir=path.parent,
+        prefix=f".{path.name}.tmp.",
+        delete=False,
+    ) as f:
+        f.write(text)
+        tmp_path = Path(f.name)
+    
+    # Atomic rename (POSIX guarantees atomicity)
+    try:
+        tmp_path.replace(path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
+
+
 def compute_job_artifacts_root(artifacts_root: Path, batch_id: str, job_id: str) -> Path:
     """Compute job artifacts root directory.
     

@@ -118,12 +118,13 @@ def _get_portfolios_root() -> Path:
 def _validate_artifact_filename_or_403(filename: str) -> str:
     """Validate artifact filename, raising HTTPException(403) if invalid.
     
-    Rules:
-    - filename must not be None or empty
-    - filename must not be "." or ".."
-    - filename must not contain "/" or "\\"
-    - filename must not contain ".."
-    - filename must be a basename (no directory components)
+    Policy: Allow relative paths with "/" but enforce strict containment.
+    - Empty filename → 403
+    - "." or ".." → 403
+    - Contains ".." → 403 (path traversal)
+    - Absolute path (starts with "/") → 403
+    - Path components must not be empty
+    - Trailing slash (filename ends with "/") → 403 (ambiguous)
     
     Returns the original filename if valid.
     """
@@ -133,16 +134,24 @@ def _validate_artifact_filename_or_403(filename: str) -> str:
     if filename in (".", ".."):
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
     
-    if "/" in filename or "\\" in filename:
-        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
-    
     if ".." in filename:
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
     
-    # Ensure it's a basename (no path components)
-    from pathlib import Path
-    if filename != Path(filename).name:
+    if filename.startswith("/"):
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Reject trailing slash (e.g., "file.txt/")
+    if filename.endswith("/"):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Check path components
+    from pathlib import Path
+    path = Path(filename)
+    for part in path.parts:
+        if not part or part.strip() == "":
+            raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+        if part in (".", ".."):
+            raise HTTPException(status_code=403, detail="Invalid artifact filename.")
     
     return filename
 

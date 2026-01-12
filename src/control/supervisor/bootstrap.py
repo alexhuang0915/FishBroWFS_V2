@@ -11,12 +11,33 @@ import sys
 import time
 import signal
 import threading
+import traceback
 from pathlib import Path
 from typing import Optional
 
 from .db import SupervisorDB, get_default_db_path
 from .job_handler import get_handler, execute_job, validate_job_spec
 from .models import JobSpec, now_iso
+from control.artifacts import write_text_atomic, write_json_atomic
+
+
+def _write_bootstrap_error_artifact(artifacts_dir: Path, error_type: str, error_msg: str, detail: str) -> None:
+    """Write error artifact for bootstrap failures."""
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Write error.txt
+    error_path = artifacts_dir / "error.txt"
+    write_text_atomic(error_path, f"{error_type}: {error_msg}\n\n{detail}")
+    
+    # Write error.json
+    error_json_path = artifacts_dir / "error.json"
+    write_json_atomic(error_json_path, {
+        "error_type": error_type,
+        "error": error_msg,
+        "detail": detail,
+        "timestamp": now_iso(),
+        "phase": "bootstrap"
+    })
 
 
 def heartbeat_worker(db: SupervisorDB, job_id: str, interval: float = 2.0):
@@ -67,7 +88,11 @@ def main() -> int:
         spec_dict = json.loads(job_row.spec_json)
         spec = JobSpec(**spec_dict)
     except Exception as e:
-        db.mark_failed(args.job_id, f"invalid_spec_json: {e}")
+        error_msg = f"invalid_spec_json: {e}"
+        print(f"ERROR: {error_msg}", file=sys.stderr)
+        # Write error artifacts before marking failed
+        _write_bootstrap_error_artifact(artifacts_dir, "spec_parse_error", error_msg, str(e))
+        db.mark_failed(args.job_id, error_msg)
         return 1
     
     # Check handler exists
@@ -75,6 +100,8 @@ def main() -> int:
     if handler is None:
         error_msg = f"unknown_job_type: {spec.job_type}"
         print(f"ERROR: {error_msg}", file=sys.stderr)
+        # Write error artifacts before marking failed
+        _write_bootstrap_error_artifact(artifacts_dir, "unknown_handler", error_msg, "")
         db.mark_failed(args.job_id, error_msg)
         return 1
     
@@ -84,6 +111,8 @@ def main() -> int:
     except Exception as e:
         error_msg = f"validation_error: {e}"
         print(f"ERROR: {error_msg}", file=sys.stderr)
+        # Write error artifacts before marking failed
+        _write_bootstrap_error_artifact(artifacts_dir, "validation_error", error_msg, str(e))
         db.mark_failed(args.job_id, error_msg)
         return 1
     
@@ -113,7 +142,11 @@ def main() -> int:
         db.mark_aborted(args.job_id, "worker_interrupted")
         return 130  # SIGINT exit code
     except Exception as e:
-        db.mark_failed(args.job_id, f"execution_error: {e}")
+        error_msg = f"execution_error: {e}"
+        error_traceback = traceback.format_exc()
+        # Write error artifacts
+        _write_bootstrap_error_artifact(artifacts_dir, "execution_error", error_msg, error_traceback)
+        db.mark_failed(args.job_id, error_msg)
         return 1
     finally:
         db.mark_worker_exited(worker_id)

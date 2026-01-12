@@ -62,6 +62,7 @@ def test_no_hardcoded_outputs_paths():
         "src/portfolio/candidate_export.py",  # Exports root
         "src/portfolio/governance/governance_logging.py",  # Governance root
         "src/gui/desktop/services/cleanup_service.py",  # Cleanup allowlist
+        "src/control/cleanup_service.py",  # Headless cleanup allowlist
         "src/gui/desktop/widgets/cleanup_dialog.py",  # UI path display
         "src/gui/services/runtime_context.py",  # Manifest/snapshot paths
         "src/core/policy_engine.py",  # LIVE_TOKEN_PATH

@@ -50,14 +50,31 @@ class Supervisor:
             ]
             
             try:
-                # Start process with new process group for clean kill
-                proc = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    start_new_session=True,
-                    env=os.environ.copy()
-                )
+                from .models import get_job_artifact_dir
+                job_artifacts_dir = get_job_artifact_dir(self.artifacts_root, job_id)
+                job_artifacts_dir.mkdir(parents=True, exist_ok=True)
+
+                stdout_path = job_artifacts_dir / "worker_stdout.txt"
+                stderr_path = job_artifacts_dir / "worker_stderr.txt"
+
+                stdout_f = None
+                stderr_f = None
+                try:
+                    stdout_f = open(stdout_path, "ab", buffering=0)
+                    stderr_f = open(stderr_path, "ab", buffering=0)
+
+                    proc = subprocess.Popen(
+                        cmd,
+                        stdout=stdout_f,
+                        stderr=stderr_f,
+                        start_new_session=True,
+                        env=os.environ.copy()
+                    )
+                finally:
+                    if stdout_f is not None:
+                        stdout_f.close()
+                    if stderr_f is not None:
+                        stderr_f.close()
                 self.children[proc.pid] = proc
                 return proc.pid
             except Exception as e:
@@ -73,15 +90,6 @@ class Supervisor:
                 if retcode is not None:
                     # Process has exited
                     to_remove.append(pid)
-                    # Read any remaining output
-                    try:
-                        stdout, stderr = proc.communicate(timeout=0.1)
-                        if stdout:
-                            print(f"Worker {pid} stdout: {stdout.decode()[:200]}")
-                        if stderr:
-                            print(f"Worker {pid} stderr: {stderr.decode()[:200]}")
-                    except Exception:
-                        pass
             
             for pid in to_remove:
                 del self.children[pid]

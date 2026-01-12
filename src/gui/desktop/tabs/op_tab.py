@@ -622,6 +622,21 @@ class OpTab(QWidget):
         self.run_mode_cb.addItems(["Backtest", "Research", "Optimize", "WFS"])
         self.run_mode_cb.setToolTip("Select run mode")
         form_layout.addRow("Mode:", self.run_mode_cb)
+
+        self.start_date_edit = QLineEdit()
+        self.start_date_edit.setPlaceholderText("YYYY-MM-DD")
+        self.start_date_edit.setToolTip("Required for Backtest/Research")
+        form_layout.addRow("Start Date:", self.start_date_edit)
+
+        self.end_date_edit = QLineEdit()
+        self.end_date_edit.setPlaceholderText("YYYY-MM-DD")
+        self.end_date_edit.setToolTip("Required for Backtest/Research")
+        form_layout.addRow("End Date:", self.end_date_edit)
+
+        self.research_run_id_edit = QLineEdit()
+        self.research_run_id_edit.setPlaceholderText("Job ID (from a prior Research run)")
+        self.research_run_id_edit.setToolTip("Required for Optimize")
+        form_layout.addRow("Research Run ID:", self.research_run_id_edit)
         
         # Season/context combobox
         self.season_cb = QComboBox()
@@ -817,6 +832,9 @@ class OpTab(QWidget):
         
         # Connect RUN button
         self.run_button.clicked.connect(self.run_strategy)
+
+        self.run_mode_cb.currentTextChanged.connect(self._apply_mode_field_visibility)
+        self._apply_mode_field_visibility(self.run_mode_cb.currentText())
         
         # Connect model refresh signal to update status and filter dropdowns
         self.jobs_model.dataChanged.connect(self.update_refresh_status)
@@ -975,6 +993,43 @@ class OpTab(QWidget):
         timeframe = self.timeframe_cb.currentText()
         run_mode = self.run_mode_cb.currentText().lower()
         season = self.season_cb.currentText()
+
+        start_date = self.start_date_edit.text().strip()
+        end_date = self.end_date_edit.text().strip()
+        research_run_id = self.research_run_id_edit.text().strip()
+
+        if run_mode in {"backtest", "research"}:
+            missing = []
+            if not start_date:
+                missing.append("Start Date")
+            if not end_date:
+                missing.append("End Date")
+            if missing:
+                QMessageBox.warning(
+                    self,
+                    "Missing Required Fields",
+                    "Required fields missing: " + ", ".join(missing),
+                )
+                self.status_label.setText("Job submission blocked (missing required fields)")
+                return
+
+        if run_mode == "optimize" and not research_run_id:
+            QMessageBox.warning(
+                self,
+                "Missing Required Fields",
+                "Optimize requires Research Run ID (job_id of a prior Research run).",
+            )
+            self.status_label.setText("Job submission blocked (missing research_run_id)")
+            return
+
+        if run_mode == "wfs":
+            QMessageBox.information(
+                self,
+                "Not Supported",
+                "WFS submission is blocked until UI supports start_season/end_season.",
+            )
+            self.status_label.setText("Job submission blocked (WFS not supported in UI)")
+            return
         
         # Prepare job parameters
         params = {
@@ -987,6 +1042,13 @@ class OpTab(QWidget):
         
         if dataset:
             params["dataset"] = dataset
+
+        if run_mode in {"backtest", "research"}:
+            params["start_date"] = start_date
+            params["end_date"] = end_date
+
+        if run_mode == "optimize":
+            params["research_run_id"] = research_run_id
         
         # Guardrail A: Duplicate job warning
         try:
@@ -1015,20 +1077,21 @@ class OpTab(QWidget):
                     job_timeframe_str == timeframe and
                     job_season == season and
                     job_run_mode == run_mode and
-                    job_status == "SUCCEEDED"):
+                    job_status in ["QUEUED", "RUNNING", "SUCCEEDED"]):
                     
                     duplicate_job = job
                     break
             
             if duplicate_job:
                 duplicate_job_id = duplicate_job.get("job_id", "")
+                duplicate_job_status = duplicate_job.get("status", "UNKNOWN")
                 short_id = duplicate_job_id[:8] + "..." if len(duplicate_job_id) > 8 else duplicate_job_id
                 
                 # Show confirmation dialog
                 reply = QMessageBox.question(
                     self,
                     "Duplicate Job Warning",
-                    f"A similar job succeeded recently (job_id={short_id}).\n\n"
+                    f"A similar job is already {duplicate_job_status.lower()} (job_id={short_id}).\n\n"
                     f"Strategy: {strategy_id}\n"
                     f"Instrument: {instrument}\n"
                     f"Timeframe: {timeframe}\n"
@@ -1117,8 +1180,23 @@ class OpTab(QWidget):
             else:
                 QMessageBox.information(self, "No Report", "No strategy report available for this job.")
         except SupervisorClientError as e:
-            QMessageBox.critical(self, "Report Error", f"Failed to fetch report: {e}")
-            logger.error(f"Failed to fetch report for job {job_id}: {e}")
+            QMessageBox.critical(self, "Report Error", f"Failed to open report: {e}")
+            logger.error(f"Failed to open report for job {job_id}: {e}")
+
+    def _apply_mode_field_visibility(self, mode_text: str) -> None:
+        mode = (mode_text or "").strip().lower()
+        needs_dates = mode in {"backtest", "research"}
+        needs_research_run_id = mode == "optimize"
+
+        self.start_date_edit.setEnabled(needs_dates)
+        self.end_date_edit.setEnabled(needs_dates)
+        self.research_run_id_edit.setEnabled(needs_research_run_id)
+
+        if not needs_dates:
+            self.start_date_edit.setText("")
+            self.end_date_edit.setText("")
+        if not needs_research_run_id:
+            self.research_run_id_edit.setText("")
 
     def explain_failure(self, job_id: str):
         """Explain failure for a failed/rejected job."""

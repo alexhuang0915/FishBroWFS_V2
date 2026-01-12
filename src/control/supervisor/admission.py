@@ -6,6 +6,7 @@ import json
 from typing import Dict, Any, List, Optional
 from dataclasses import asdict
 from datetime import datetime
+from pathlib import Path
 
 from .db import SupervisorDB
 from .models import JobSpec, JobStatus
@@ -15,6 +16,7 @@ from contracts.supervisor.evidence_schemas import (
     stable_params_hash,
     now_iso,
 )
+from control.rejection_artifact import create_policy_rejection, write_rejection_artifact
 
 
 class AdmissionController:
@@ -208,6 +210,20 @@ def submit_with_admission(
         manifest_path = job_evidence_dir / "manifest.json"
         with open(manifest_path, 'w') as f:
             json.dump(manifest, f, indent=2)
+        
+        # Write standardized rejection artifact
+        failed_policies = [check.policy_name for check in bundle.pre_flight_checks if not check.passed]
+        rejection_artifact = create_policy_rejection(
+            policy_name="pre_flight_policies",
+            failure_message=f"Failed pre-flight policies: {', '.join(failed_policies)}",
+            job_id=job_id,
+            additional_context={
+                "failed_policies": failed_policies,
+                "policy_check_bundle": asdict(bundle)
+            }
+        )
+        rejection_path = job_evidence_dir / "rejection.json"
+        rejection_artifact.write(rejection_path)
         
         return job_id, JobStatus.REJECTED, bundle
     else:

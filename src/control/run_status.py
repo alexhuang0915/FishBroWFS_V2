@@ -37,6 +37,7 @@ def get_default_status() -> Dict[str, Any]:
     """Return default IDLE status."""
     now = datetime.now(timezone.utc).isoformat()
     return {
+        "schema_version": "1.0",
         "run_id": "",
         "state": "IDLE",
         "progress": 0,
@@ -125,6 +126,7 @@ def write_status(
         }
     
     payload = {
+        "schema_version": "1.0",
         "run_id": run_id,
         "state": state,
         "progress": progress,

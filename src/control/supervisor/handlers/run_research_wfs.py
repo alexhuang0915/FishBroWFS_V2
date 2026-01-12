@@ -58,6 +58,13 @@ from core.determinism import stable_seed_from_intent
 logger = logging.getLogger(__name__)
 
 
+# Resource guardrails for WFS research
+MAX_WINDOWS = 20  # Maximum number of rolling windows
+MAX_PARAM_SEARCH_SPACE = 10_000  # Maximum parameter combinations per window
+MAX_TOTAL_EXECUTION_TIME_SEC = 7200  # 2 hours maximum execution time
+HEARTBEAT_INTERVAL_SEC = 30  # Send heartbeat every 30 seconds during heavy compute
+
+
 def _as_model_input(obj: Any) -> Any:
     """Convert object to Pydantic model input (dict)."""
     # Pydantic v2 models
@@ -96,6 +103,44 @@ class RunResearchWFSHandler(BaseJobHandler):
         if not (isinstance(end_season, str) and len(end_season) == 6 and end_season[4] == 'Q'):
             raise ValueError(f"Invalid end_season format: {end_season}. Expected format: YYYYQ#")
     
+    def _apply_guardrails(self, start_season: str, end_season: str, strategy_id: str, context: JobContext) -> None:
+        """Apply resource guardrails before heavy computation."""
+        # Calculate window count
+        start_year = int(start_season[:4])
+        start_q = int(start_season[5])
+        end_year = int(end_season[:4])
+        end_q = int(end_season[5])
+        
+        window_count = ((end_year - start_year) * 4) + (end_q - start_q) + 1
+        
+        # Check window count limit
+        if window_count > MAX_WINDOWS:
+            raise ValueError(
+                f"Too many windows: {window_count} exceeds maximum of {MAX_WINDOWS}. "
+                f"Consider reducing date range or increasing window size."
+            )
+        
+        # TODO: In real implementation, query strategy registry for parameter count
+        # For now, use placeholder
+        param_count = 100  # Placeholder
+        
+        # Check parameter search space
+        estimated_param_combinations = param_count * window_count
+        if estimated_param_combinations > MAX_PARAM_SEARCH_SPACE:
+            raise ValueError(
+                f"Parameter search space too large: {estimated_param_combinations} combinations "
+                f"exceeds limit of {MAX_PARAM_SEARCH_SPACE}. "
+                f"Consider reducing parameter count or window count."
+            )
+        
+        logger.info(
+            f"Guardrails passed: windows={window_count}, "
+            f"estimated_param_combinations={estimated_param_combinations}"
+        )
+        
+        # Send heartbeat to indicate guardrails passed
+        context.heartbeat(progress=0.15, phase="guardrails_passed")
+    
     def execute(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute RUN_RESEARCH_WFS job."""
         # Check for abort before starting
@@ -127,6 +172,9 @@ class RunResearchWFSHandler(BaseJobHandler):
             dataset = params.get("dataset", "None")
             run_mode = params.get("run_mode", "wfs")
             workers = params.get("workers", 1)
+            
+            # Apply guardrails before heavy computation
+            self._apply_guardrails(start_season, end_season, strategy_id, context)
             
             # Compute estimate BEFORE running windows
             context.heartbeat(progress=0.2, phase="computing_estimate")
@@ -162,8 +210,9 @@ class RunResearchWFSHandler(BaseJobHandler):
                 }  # type: ignore
             )
             
-            # Execute WFS research
+            # Execute WFS research with timeout monitoring
             context.heartbeat(progress=0.3, phase="executing_windows")
+            start_time = time.time()
             windows, is_equity_by_season, oos_equity_by_season, bnh_equity_by_season = self._execute_wfs_windows(
                 strategy_id=strategy_id,
                 instrument=instrument,
@@ -173,6 +222,11 @@ class RunResearchWFSHandler(BaseJobHandler):
                 end_season=end_season,
                 context=context
             )
+            
+            # Check execution time
+            elapsed = time.time() - start_time
+            if elapsed > MAX_TOTAL_EXECUTION_TIME_SEC:
+                logger.warning(f"WFS execution took {elapsed:.1f}s, exceeding soft limit of {MAX_TOTAL_EXECUTION_TIME_SEC}s")
             
             # Aggregate metrics
             context.heartbeat(progress=0.7, phase="aggregating_metrics")

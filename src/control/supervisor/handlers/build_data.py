@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
 from ..job_handler import BaseJobHandler, JobContext
+from control.artifacts import write_json_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -94,7 +95,7 @@ class BuildDataHandler(BaseJobHandler):
             
             # Write result to artifacts
             result_path = Path(context.artifacts_dir) / "build_data_result.json"
-            result_path.write_text(json.dumps(result, indent=2))
+            write_json_atomic(result_path, result)
             
             # Extract produced paths from result
             produced_paths = []

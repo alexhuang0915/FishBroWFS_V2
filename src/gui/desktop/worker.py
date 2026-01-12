@@ -30,7 +30,7 @@ class BacktestWorker(QObject):
     def __init__(self, strategy: str, primary_market: str, timeframe: int, context_feeds: Optional[list] = None):
         super().__init__()
         self.setProperty('strategy', strategy)
-        self.setProperty('primary_market', primary_market  # Maps to dataset_id)
+        self.setProperty('primary_market', primary_market)  # Maps to dataset_id
         self.setProperty('timeframe', timeframe)
         self.setProperty('context_feeds', context_feeds or [])
         self.job_id: Optional[str] = None

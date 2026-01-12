@@ -49,11 +49,11 @@ class EvidenceBrowserDialog(QDialog):
         
         # Header with job info
         header_layout = QHBoxLayout()
-self.setProperty('job_label', QLabel(f"Job: {self.job_id}"))
+        self.job_label = QLabel(f"Job: {self.job_id}")
         self.job_label.setStyleSheet("font-weight: bold; color: #E6E6E6;")
         header_layout.addWidget(self.job_label)
         
-self.setProperty('evidence_root_label', QLabel(""))
+        self.evidence_root_label = QLabel("")
         self.evidence_root_label.setStyleSheet("color: #9e9e9e; font-size: 10px;")
         header_layout.addStretch()
         header_layout.addWidget(self.evidence_root_label)
@@ -64,7 +64,7 @@ self.setProperty('evidence_root_label', QLabel(""))
         splitter = QSplitter(Qt.Orientation.Horizontal)
         
         # Left panel: tree view
-self.setProperty('tree', QTreeWidget())
+        self.tree = QTreeWidget()
         self.tree.setHeaderLabels(["Evidence Files", "Size", "Type"])
         self.tree.setColumnWidth(0, 300)
         self.tree.setColumnWidth(1, 80)
@@ -89,7 +89,7 @@ self.setProperty('tree', QTreeWidget())
         self.tree.customContextMenuRequested.connect(self.show_context_menu)
         
         # Right panel: preview / details
-self.setProperty('preview_text', QTextEdit())
+        self.preview_text = QTextEdit()
         self.preview_text.setReadOnly(True)
         self.preview_text.setPlaceholderText("Select a file to preview its content...")
         self.preview_text.setStyleSheet("""
@@ -111,21 +111,21 @@ self.setProperty('preview_text', QTextEdit())
         # Button bar
         button_layout = QHBoxLayout()
         
-self.setProperty('open_file_btn', QPushButton("Open File"))
+        self.open_file_btn = QPushButton("Open File")
         self.open_file_btn.setToolTip("Open selected file with default application")
         self.open_file_btn.clicked.connect(self.open_selected_file)
         self.open_file_btn.setEnabled(False)
         
-self.setProperty('open_folder_btn', QPushButton("Open Folder"))
+        self.open_folder_btn = QPushButton("Open Folder")
         self.open_folder_btn.setToolTip("Open evidence root folder in file explorer")
         self.open_folder_btn.clicked.connect(self.open_evidence_folder)
         
-self.setProperty('copy_path_btn', QPushButton("Copy Path"))
+        self.copy_path_btn = QPushButton("Copy Path")
         self.copy_path_btn.setToolTip("Copy file path to clipboard")
         self.copy_path_btn.clicked.connect(self.copy_selected_path)
         self.copy_path_btn.setEnabled(False)
         
-self.setProperty('refresh_btn', QPushButton("Refresh"))
+        self.refresh_btn = QPushButton("Refresh")
         self.refresh_btn.setToolTip("Reload evidence files")
         self.refresh_btn.clicked.connect(self.load_evidence)
         
@@ -147,7 +147,7 @@ self.setProperty('refresh_btn', QPushButton("Refresh"))
     def load_evidence(self):
         """Load evidence files and populate the tree."""
         self.tree.clear()
-self.setProperty('evidence_files', list_evidence_files(self.job_id))
+        self.evidence_files = list_evidence_files(self.job_id)
         
         # Update root label
         root = get_evidence_root(self.job_id)

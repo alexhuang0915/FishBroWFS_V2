@@ -7,8 +7,16 @@ TopK selection, summary metrics, and deterministic ordering.
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
+
+# Resource guardrails for batch aggregation
+MAX_BATCH_JOBS = 100_000  # Maximum number of jobs to process in a single batch
+MAX_TOP_K = 1000          # Maximum top_k value
+MAX_MANIFEST_SIZE_MB = 10  # Maximum manifest file size in MB
 
 
 def compute_batch_summary(index_or_jobs: dict | list, *, top_k: int = 20) -> dict:
@@ -39,6 +47,10 @@ def compute_batch_summary(index_or_jobs: dict | list, *, top_k: int = 20) -> dic
     import statistics
     from control.artifacts import canonical_json_bytes, sha256_bytes
     
+    # Apply guardrails
+    if top_k > MAX_TOP_K:
+        raise ValueError(f"top_k={top_k} exceeds maximum allowed value of {MAX_TOP_K}")
+    
     # Normalize input to jobs list
     if isinstance(index_or_jobs, dict):
         jobs = index_or_jobs.get("jobs", [])
@@ -48,6 +60,15 @@ def compute_batch_summary(index_or_jobs: dict | list, *, top_k: int = 20) -> dic
         batch_id = "unknown"
     
     total = len(jobs)
+    
+    # Check batch size guardrail
+    if total > MAX_BATCH_JOBS:
+        raise ValueError(
+            f"Batch size {total} exceeds maximum allowed jobs {MAX_BATCH_JOBS}. "
+            f"Consider splitting the batch or increasing MAX_BATCH_JOBS."
+        )
+    
+    logger.info(f"Processing batch with {total} jobs, top_k={top_k}")
     
     # Determine which jobs have a score field
     scored_jobs = []
@@ -117,10 +138,19 @@ def load_job_manifest(artifacts_root: Path, job_entry: dict) -> dict:
     Raises:
         FileNotFoundError: If manifest file does not exist.
         json.JSONDecodeError: If manifest is malformed.
+        ValueError: If manifest file exceeds size limit.
     """
     manifest_path = artifacts_root / job_entry["manifest_path"]
     if not manifest_path.exists():
         raise FileNotFoundError(f"Job manifest not found: {manifest_path}")
+    
+    # Check file size guardrail
+    file_size_mb = manifest_path.stat().st_size / (1024 * 1024)
+    if file_size_mb > MAX_MANIFEST_SIZE_MB:
+        raise ValueError(
+            f"Manifest file {manifest_path} size {file_size_mb:.2f}MB "
+            f"exceeds limit of {MAX_MANIFEST_SIZE_MB}MB"
+        )
     
     return json.loads(manifest_path.read_text(encoding="utf-8"))
 

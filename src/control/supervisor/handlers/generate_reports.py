@@ -3,11 +3,17 @@ import json
 import logging
 import subprocess
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 from ..job_handler import BaseJobHandler, JobContext
+from control.artifacts import write_json_atomic
 
 logger = logging.getLogger(__name__)
+
+# Performance guardrails for report generation
+MAX_REPORT_EXECUTION_TIME_SEC = 300  # 5 minutes maximum for report generation
+MAX_REPORT_OUTPUT_SIZE_MB = 100  # Maximum output file size in MB
 
 
 class GenerateReportsHandler(BaseJobHandler):
@@ -81,14 +87,37 @@ class GenerateReportsHandler(BaseJobHandler):
                 # Send heartbeat before starting
                 context.heartbeat(progress=0.0, phase="starting_cli")
                 
-                # Run subprocess
+                # Apply guardrails: check outputs_root size before execution
+                base_path = Path(outputs_root)
+                if base_path.exists():
+                    # Simple check: count files in outputs directory (approximate)
+                    file_count = sum(1 for _ in base_path.rglob("*") if _.is_file())
+                    if file_count > 10000:  # Arbitrary large number
+                        logger.warning(f"Large outputs directory: {file_count} files")
+                
+                # Run subprocess with timeout
+                start_time = time.time()
                 process = subprocess.run(
                     cmd,
                     stdout=stdout_file,
                     stderr=stderr_file,
                     text=True,
-                    cwd=Path.cwd()
+                    cwd=Path.cwd(),
+                    timeout=MAX_REPORT_EXECUTION_TIME_SEC
                 )
+                elapsed = time.time() - start_time
+                logger.info(f"CLI execution completed in {elapsed:.1f}s")
+                
+                # Check output file sizes
+                if stdout_path.exists():
+                    stdout_size_mb = stdout_path.stat().st_size / (1024 * 1024)
+                    if stdout_size_mb > MAX_REPORT_OUTPUT_SIZE_MB:
+                        logger.warning(f"Stdout file size {stdout_size_mb:.2f}MB exceeds limit {MAX_REPORT_OUTPUT_SIZE_MB}MB")
+                
+                if stderr_path.exists():
+                    stderr_size_mb = stderr_path.stat().st_size / (1024 * 1024)
+                    if stderr_size_mb > MAX_REPORT_OUTPUT_SIZE_MB:
+                        logger.warning(f"Stderr file size {stderr_size_mb:.2f}MB exceeds limit {MAX_REPORT_OUTPUT_SIZE_MB}MB")
             
             # Check result
             if process.returncode == 0:
@@ -127,6 +156,24 @@ class GenerateReportsHandler(BaseJobHandler):
                     "error": error_message
                 }
                 
+        except subprocess.TimeoutExpired:
+            logger.error(f"CLI command timed out after {MAX_REPORT_EXECUTION_TIME_SEC} seconds")
+            # Write timeout error to stderr file
+            stderr_path.write_text(f"Command timed out after {MAX_REPORT_EXECUTION_TIME_SEC} seconds\nCommand: {' '.join(cmd)}")
+            
+            return {
+                "ok": False,
+                "job_type": "GENERATE_REPORTS",
+                "outputs_root": outputs_root,
+                "season": season,
+                "strict": strict,
+                "legacy_invocation": " ".join(cmd),
+                "stdout_path": str(stdout_path) if stdout_path.exists() else None,
+                "stderr_path": str(stderr_path),
+                "report_paths": [],
+                "error": f"Command timed out after {MAX_REPORT_EXECUTION_TIME_SEC} seconds",
+                "timeout": True
+            }
         except Exception as e:
             logger.error(f"Failed to execute CLI command: {e}")
             # Write error to stderr file
@@ -139,7 +186,7 @@ class GenerateReportsHandler(BaseJobHandler):
                 "season": season,
                 "strict": strict,
                 "legacy_invocation": " ".join(cmd),
-                "stdout_path": None,
+                "stdout_path": str(stdout_path) if stdout_path.exists() else None,
                 "stderr_path": str(stderr_path),
                 "report_paths": [],
                 "error": str(e)
@@ -254,7 +301,7 @@ class GenerateReportsHandler(BaseJobHandler):
                 "research_index_path": str(index_path) if index_path else None,
                 "report_paths": report_paths
             }
-            summary_path.write_text(json.dumps(summary, indent=2))
+            write_json_atomic(summary_path, summary)
             
             return {
                 "ok": True,

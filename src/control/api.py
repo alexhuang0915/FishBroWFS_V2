@@ -20,6 +20,7 @@ from pathlib import Path # Added Path import
 # Supervisor imports
 from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job
 from control.supervisor.models import JobSpec as SupervisorJobSpec, JobType, normalize_job_type
+from control.supervisor.db import DuplicateJobError
 
 # Phase 14: Batch execution & governance
 from control.artifacts import (
@@ -980,23 +981,112 @@ def _build_run_research_v2_params(req: dict) -> dict:
     }
 
 
+def _build_run_plateau_v2_params(req: dict) -> dict:
+    research_run_id = req.get("research_run_id")
+    if not research_run_id or not isinstance(research_run_id, str) or research_run_id.strip() == "":
+        raise ValueError("research_run_id is required and must be a non-empty string")
+
+    params: dict[str, Any] = {"research_run_id": research_run_id}
+
+    k_neighbors = req.get("k_neighbors")
+    if k_neighbors is not None:
+        if not isinstance(k_neighbors, int):
+            raise ValueError("k_neighbors must be an integer")
+        params["k_neighbors"] = k_neighbors
+
+    score_threshold_rel = req.get("score_threshold_rel")
+    if score_threshold_rel is not None:
+        if not isinstance(score_threshold_rel, (int, float)):
+            raise ValueError("score_threshold_rel must be a number")
+        params["score_threshold_rel"] = float(score_threshold_rel)
+
+    return params
+
+
+def _build_run_research_wfs_params(req: dict) -> dict:
+    strategy_id = req.get("strategy_id")
+    instrument = req.get("instrument")
+    timeframe = req.get("timeframe")
+    start_season = req.get("start_season")
+    end_season = req.get("end_season")
+
+    missing = []
+    for key, val in (
+        ("strategy_id", strategy_id),
+        ("instrument", instrument),
+        ("timeframe", timeframe),
+        ("start_season", start_season),
+        ("end_season", end_season),
+    ):
+        if not val:
+            missing.append(key)
+    if missing:
+        raise ValueError(f"Missing required fields for wfs: {', '.join(missing)}")
+
+    for key, val in (
+        ("strategy_id", strategy_id),
+        ("instrument", instrument),
+        ("timeframe", timeframe),
+        ("start_season", start_season),
+        ("end_season", end_season),
+    ):
+        if not isinstance(val, str):
+            raise ValueError(f"{key} must be a string")
+
+    params: dict[str, Any] = {
+        "strategy_id": strategy_id,
+        "instrument": instrument,
+        "timeframe": timeframe,
+        "start_season": start_season,
+        "end_season": end_season,
+    }
+    if "dataset" in req and req["dataset"] is not None:
+        if not isinstance(req["dataset"], str):
+            raise ValueError("dataset must be a string")
+        params["dataset"] = req["dataset"]
+    if "workers" in req and req["workers"] is not None:
+        if not isinstance(req["workers"], int):
+            raise ValueError("workers must be an integer")
+        params["workers"] = req["workers"]
+    params["run_mode"] = "wfs"
+    return params
+
+
 def _validate_artifact_filename_or_403(filename: str) -> str:
     """
-    Validate artifact filename; raise HTTP 403 if invalid (path traversal, slashes, etc.).
+    Validate artifact filename; raise HTTP 403 if invalid (path traversal).
     Returns the original filename if valid.
+    
+    Policy: Allow relative paths with "/" but enforce strict containment.
+    - Empty filename → 403
+    - "." or ".." → 403
+    - Contains ".." → 403 (path traversal)
+    - Absolute path (starts with "/") → 403
+    - Path components must not be empty
+    - Trailing slash (filename ends with "/") → 403 (ambiguous)
     """
     if filename is None or filename.strip() == "":
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
     if filename in (".", ".."):
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
-    if "/" in filename or "\\" in filename:
-        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
     if ".." in filename:
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
-    # Ensure it's a basename (no directory components)
-    from pathlib import Path
-    if filename != Path(filename).name:
+    if filename.startswith("/"):
         raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Reject trailing slash (e.g., "file.txt/")
+    if filename.endswith("/"):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
+    # Check path components
+    from pathlib import Path
+    path = Path(filename)
+    for part in path.parts:
+        if not part or part.strip() == "":
+            raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+        if part in (".", ".."):
+            raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    
     return filename
 
 
@@ -1046,22 +1136,17 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
         "dataset": "..."  # optional
     }
     """
-    # Extract params from payload
     strategy_id = payload.get("strategy_id")
+    run_mode = str(payload.get("run_mode", "")).lower()
+
     instrument = payload.get("instrument")
     timeframe = payload.get("timeframe")
-    run_mode = payload.get("run_mode", "").lower()
     season = payload.get("season")
     dataset = payload.get("dataset")
+
     start_date = payload.get("start_date")
     end_date = payload.get("end_date")
-    
-    # Validate required fields
-    if not all([strategy_id, instrument, timeframe, season]):
-        raise HTTPException(
-            status_code=422,
-            detail="Missing required fields: strategy_id, instrument, timeframe, season"
-        )
+    research_run_id = payload.get("research_run_id")
     
     # Map run_mode to canonical supervisor job_type
     if run_mode == "research":
@@ -1077,26 +1162,40 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     
     # Build supervisor params based on job_type
     if job_type == JobType.RUN_RESEARCH_V2.value:
-        # For RUN_RESEARCH_V2, build params using the proper contract
-        # Include all UI fields in the request dict for mapping
+        if not all([strategy_id, instrument, timeframe, season]):
+            raise HTTPException(
+                status_code=422,
+                detail="Missing required fields for research/backtest: strategy_id, instrument, timeframe, season",
+            )
+
         request_dict = {
             "strategy_id": strategy_id,
             "instrument": instrument,
             "timeframe": timeframe,
             "run_mode": run_mode,
             "season": season,
+            "start_date": start_date,
+            "end_date": end_date,
         }
         if dataset:
             request_dict["dataset"] = dataset
-        if start_date is not None:
-            request_dict["start_date"] = start_date
-        if end_date is not None:
-            request_dict["end_date"] = end_date
         
         try:
             params = _build_run_research_v2_params(request_dict)
         except (TypeError, ValueError) as e:
             raise HTTPException(status_code=422, detail=f"Invalid run_research payload: {e}") from e
+    elif job_type == JobType.RUN_PLATEAU_V2.value:
+        request_dict = {"research_run_id": research_run_id}
+        try:
+            params = _build_run_plateau_v2_params(request_dict)
+        except (TypeError, ValueError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid run_plateau payload: {e}") from e
+    elif job_type == JobType.RUN_RESEARCH_WFS.value:
+        request_dict = dict(payload)
+        try:
+            params = _build_run_research_wfs_params(request_dict)
+        except (TypeError, ValueError) as e:
+            raise HTTPException(status_code=422, detail=f"Invalid run_research_wfs payload: {e}") from e
     else:
         # For other job types, keep existing params structure
         params = {
@@ -1120,6 +1219,13 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     try:
         job_id = supervisor_submit(job_type, params, metadata)
         return {"ok": True, "job_id": job_id}
+    except DuplicateJobError as e:
+        # Return 409 Conflict with existing job_id
+        raise HTTPException(
+            status_code=409,
+            detail=f"Duplicate job detected: {e.message}",
+            headers={"X-Existing-Job-Id": e.existing_job_id}
+        )
     except (TypeError, ValueError) as e:
         # Convert mapping errors into HTTP 422
         raise HTTPException(status_code=422, detail=f"Invalid run_research payload: {e}") from e

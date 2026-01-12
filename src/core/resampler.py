@@ -8,6 +8,7 @@ Resampler 核心
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta, date
@@ -17,6 +18,13 @@ import pandas as pd
 
 from core.dimensions import get_dimension_for_dataset
 from contracts.dimensions import SessionSpec as ContractSessionSpec
+
+logger = logging.getLogger(__name__)
+
+# Performance guardrails for resampling
+MAX_INPUT_BARS = 10_000_000  # Maximum number of input bars to resample
+MAX_OUTPUT_BARS = 1_000_000  # Maximum number of output bars after resampling
+MAX_SESSION_HOURS = 24  # Maximum session length in hours (sanity check)
 
 
 @dataclass(frozen=True)
@@ -300,6 +308,32 @@ def resample_ohlcv(
     n = len(ts)
     if not (len(o) == len(h) == len(l) == len(c) == len(v) == n):
         raise ValueError("所有輸入陣列長度必須一致")
+    
+    # 性能防護欄檢查
+    if n > MAX_INPUT_BARS:
+        raise ValueError(
+            f"輸入 bars 數量過多: {n} 超過最大限制 {MAX_INPUT_BARS}。"
+            f"請考慮分批處理或增加 MAX_INPUT_BARS。"
+        )
+    
+    # 檢查 timeframe 合理性
+    if tf_min <= 0 or tf_min > 1440:  # 1440 minutes = 24 hours
+        raise ValueError(f"無效的 timeframe: {tf_min} 分鐘。必須在 1 到 1440 之間。")
+    
+    # 檢查 session 長度合理性
+    open_total = session.open_hour * 60 + session.open_minute
+    close_total = session.close_hour * 60 + session.close_minute
+    if session.is_overnight():
+        session_length_hours = (24 * 60 - open_total + close_total) / 60
+    else:
+        session_length_hours = (close_total - open_total) / 60
+    
+    if session_length_hours > MAX_SESSION_HOURS:
+        raise ValueError(
+            f"交易時段過長: {session_length_hours:.1f} 小時超過最大限制 {MAX_SESSION_HOURS} 小時。"
+        )
+    
+    logger.info(f"Resampler 防護欄檢查通過: 輸入 bars={n}, timeframe={tf_min} 分鐘, 時段長度={session_length_hours:.1f} 小時")
     
     if n == 0:
         return {

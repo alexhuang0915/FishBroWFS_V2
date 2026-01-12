@@ -4,6 +4,7 @@ import logging
 import subprocess
 import sys
 import os
+import time
 from pathlib import Path
 from typing import Any, Dict, Optional
 import traceback
@@ -11,8 +12,16 @@ import traceback
 from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.run_plateau import RunPlateauPayload
 from control.paths import get_outputs_root
+from control.artifacts import write_json_atomic
 
 logger = logging.getLogger(__name__)
+
+
+# Resource guardrails for heavy compute
+MAX_WINNERS_ROWS = 100_000  # Maximum number of winners rows to process
+MAX_PARAM_COMBINATIONS = 10_000  # Maximum parameter combinations for plateau detection
+MAX_EXECUTION_TIME_SEC = 3600  # 1 hour maximum execution time
+HEARTBEAT_INTERVAL_SEC = 30  # Send heartbeat every 30 seconds during heavy compute
 
 
 def _is_test_mode(job: JobContext) -> bool:
@@ -104,8 +113,7 @@ class RunPlateauHandler(BaseJobHandler):
                     "note": "Placeholder winners.json created for test execution",
                     "winners": []
                 }
-                with open(winners_path, "w") as f:
-                    json.dump(winners_content, f, indent=2)
+                write_json_atomic(winners_path, winners_content)
                 logger.info(f"Created test winners.json at: {winners_path}")
             else:
                 raise ValueError(f"winners.json not found in research run {payload.research_run_id}")
@@ -116,8 +124,7 @@ class RunPlateauHandler(BaseJobHandler):
         
         # Write payload to plateau directory
         payload_path = plateau_dir / "payload.json"
-        with open(payload_path, "w") as f:
-            json.dump(params, f, indent=2)
+        write_json_atomic(payload_path, params)
         
         # Update heartbeat with progress
         context.heartbeat(progress=0.1, phase="validating_inputs")
@@ -171,8 +178,7 @@ class RunPlateauHandler(BaseJobHandler):
                 "plateau_candidates": [],
                 "execution_time_ms": 0
             }
-            with open(test_output_path, "w") as f:
-                json.dump(test_output_content, f, indent=2)
+            write_json_atomic(test_output_path, test_output_content)
             
             # Create stdout/stderr placeholders
             stdout_path = Path(context.artifacts_dir) / "plateau_stdout.txt"
@@ -198,6 +204,9 @@ class RunPlateauHandler(BaseJobHandler):
         # Update heartbeat
         context.heartbeat(progress=0.3, phase="preparing_plateau")
         
+        # Apply guardrails before heavy computation
+        self._apply_guardrails(winners_path, context)
+        
         # Build command for plateau execution
         cmd = [
             sys.executable, "-B", "-m", "scripts.run_phase3a_plateau",
@@ -220,15 +229,19 @@ class RunPlateauHandler(BaseJobHandler):
         context.heartbeat(progress=0.5, phase="executing_plateau")
         
         try:
+            # Start time for timeout monitoring
+            start_time = time.time()
+            
             with open(stdout_path, "w") as stdout_file, open(stderr_path, "w") as stderr_file:
-                # Run subprocess
+                # Run subprocess with timeout
                 process = subprocess.run(
                     cmd,
                     stdout=stdout_file,
                     stderr=stderr_file,
                     text=True,
                     cwd=Path.cwd(),
-                    env={**os.environ, "PYTHONPATH": "src"}
+                    env={**os.environ, "PYTHONPATH": "src"},
+                    timeout=MAX_EXECUTION_TIME_SEC
                 )
             
             # Check result
@@ -256,10 +269,55 @@ class RunPlateauHandler(BaseJobHandler):
                 
                 raise RuntimeError(f"{error_msg}\nStderr: {stderr_content}")
                 
+        except subprocess.TimeoutExpired:
+            elapsed = time.time() - start_time
+            raise RuntimeError(f"Plateau execution timed out after {elapsed:.1f}s (max {MAX_EXECUTION_TIME_SEC}s)")
         except subprocess.CalledProcessError as e:
             raise RuntimeError(f"Plateau subprocess failed: {e}")
         except Exception as e:
             raise RuntimeError(f"Failed to execute plateau: {e}")
+    
+    def _apply_guardrails(self, winners_path: Path, context: JobContext) -> None:
+        """Apply resource guardrails before heavy computation."""
+        # Check winners.json size
+        if winners_path.exists():
+            try:
+                with open(winners_path, 'r') as f:
+                    data = json.load(f)
+                
+                # Count winners rows
+                winners = data.get('winners', [])
+                if isinstance(winners, list):
+                    row_count = len(winners)
+                    if row_count > MAX_WINNERS_ROWS:
+                        raise ValueError(
+                            f"Winners file too large: {row_count} rows exceeds limit of {MAX_WINNERS_ROWS}. "
+                            f"Consider filtering or sampling before plateau detection."
+                        )
+                    
+                    # Estimate parameter combinations (simplified)
+                    # Each winner typically has multiple parameters
+                    if row_count > 0:
+                        # Rough estimate: each winner has ~10 parameters
+                        estimated_param_combinations = row_count * 10
+                        if estimated_param_combinations > MAX_PARAM_COMBINATIONS:
+                            logger.warning(
+                                f"Estimated parameter combinations ({estimated_param_combinations}) "
+                                f"exceeds soft limit ({MAX_PARAM_COMBINATIONS}). "
+                                f"Plateau detection may be slow."
+                            )
+                
+                logger.info(f"Guardrails passed: winners file has {len(winners)} rows")
+                
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid winners.json format: {e}")
+            except Exception as e:
+                logger.warning(f"Could not apply guardrails: {e}")
+        else:
+            raise FileNotFoundError(f"Winners file not found: {winners_path}")
+        
+        # Send heartbeat to indicate guardrails passed
+        context.heartbeat(progress=0.4, phase="guardrails_passed")
     
     def _parse_plateau_output(self, stdout_path: Path, plateau_dir: Path) -> Dict[str, Any]:
         """Parse plateau output to extract results."""
@@ -316,8 +374,7 @@ class RunPlateauHandler(BaseJobHandler):
         }
         
         manifest_path = plateau_dir / "manifest.json"
-        with open(manifest_path, "w") as f:
-            json.dump(manifest, f, indent=2, sort_keys=True)
+        write_json_atomic(manifest_path, manifest)
         
         logger.info(f"Generated manifest at {manifest_path}")
 

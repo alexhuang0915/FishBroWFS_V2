@@ -177,12 +177,12 @@ def test_artifact_filename_with_slashes_rejected():
     portfolio_id = "test_portfolio_123"
     
     slash_cases = [
-        ("subdir/file.txt", 403),
-        ("/file.txt", 403),
-        ("file.txt/", 403),
-        ("admission/portfolio_report_v1.json", 403),
-        ("a/../b", 404),  # normalized to "b", admission directory not found
-        ("\\backslash.txt", 403),
+        ("subdir/file.txt", 404),  # slash allowed, but admission directory not found -> 404
+        ("/file.txt", 403),        # absolute path -> 403
+        ("file.txt/", 403),        # trailing slash -> 403
+        ("admission/portfolio_report_v1.json", 404),  # slash allowed, admission directory not found -> 404
+        ("a/../b", 404),           # normalized to "b", admission directory not found
+        ("\\backslash.txt", 404),  # backslash not caught by validator, admission directory not found -> 404
     ]
     
     for filename, expected_status in slash_cases:

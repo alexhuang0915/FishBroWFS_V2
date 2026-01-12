@@ -11,6 +11,7 @@ import traceback
 from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.build_portfolio import BuildPortfolioPayload
 from control.paths import get_outputs_root
+from control.artifacts import write_json_atomic
 from portfolio.governance.params import load_governance_params
 from control.portfolio.evidence_reader import RunEvidenceReader
 from control.portfolio.admission import PortfolioAdmissionController
@@ -59,8 +60,7 @@ class BuildPortfolioHandler(BaseJobHandler):
         
         # Write payload to portfolio directory
         payload_path = portfolio_dir / "payload.json"
-        with open(payload_path, "w") as f:
-            json.dump(params, f, indent=2)
+        write_json_atomic(payload_path, params)
         
         # Update heartbeat with progress
         context.heartbeat(progress=0.1, phase="validating_inputs")
@@ -302,8 +302,7 @@ class BuildPortfolioHandler(BaseJobHandler):
         }
         
         manifest_path = portfolio_dir / "manifest.json"
-        with open(manifest_path, "w") as f:
-            json.dump(manifest, f, indent=2, sort_keys=True)
+        write_json_atomic(manifest_path, manifest)
         
         logger.info(f"Generated manifest at {manifest_path}")
 

@@ -7,14 +7,10 @@ import os
 from pathlib import Path
 from urllib.parse import urlencode
 
+from .paths import get_outputs_root
+
 # Default outputs root (can be overridden via environment)
 DEFAULT_OUTPUTS_ROOT = "outputs"
-
-
-def get_outputs_root() -> Path:
-    """Get outputs root from environment or default."""
-    outputs_root_str = os.getenv("FISHBRO_OUTPUTS_ROOT", DEFAULT_OUTPUTS_ROOT)
-    return Path(outputs_root_str)
 
 
 def make_report_link(*, season: str, run_id: str) -> str:

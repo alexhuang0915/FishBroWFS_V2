@@ -73,6 +73,9 @@ def validate_job_spec(spec: JobSpec) -> None:
 
 def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict[str, Any]:
     """Execute a job using its handler."""
+    import traceback
+    from control.artifacts import write_text_atomic
+    
     handler = get_handler(spec.job_type)
     if handler is None:
         raise ValueError(f"No handler registered for job_type: {spec.job_type}")
@@ -91,8 +94,27 @@ def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict
         with writer:
             result = handler.execute(spec.params, context)
     except Exception as e:
+        # Write detailed error artifacts
+        error_traceback = traceback.format_exc()
+        error_msg = str(e)
+        
+        # Write error.txt with full traceback
+        error_path = artifacts_path / "error.txt"
+        write_text_atomic(error_path, f"{error_msg}\n\n{error_traceback}")
+        
+        # Write error.json with structured error info
+        error_json_path = artifacts_path / "error.json"
+        from control.artifacts import write_json_atomic
+        write_json_atomic(error_json_path, {
+            "job_id": job_id,
+            "error": error_msg,
+            "error_type": type(e).__name__,
+            "timestamp": writer.spec.created_at if hasattr(writer.spec, 'created_at') else "",
+            "has_traceback": True
+        })
+        
         # Write state with FAILED
-        writer.write_state(JobStatus.FAILED, error=str(e))
+        writer.write_state(JobStatus.FAILED, error=error_msg)
         raise
     
     # Write state with SUCCEEDED and result

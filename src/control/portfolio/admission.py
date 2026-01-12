@@ -29,6 +29,7 @@ from contracts.portfolio.admission_schemas import (
     REJECTED_RUN_IDS_FILE,
     EVIDENCE_FILES,
 )
+from control.rejection_artifact import create_governance_rejection
 
 
 class PortfolioAdmissionController:
@@ -235,5 +236,23 @@ class PortfolioAdmissionController:
         rejected_path = admission_dir / REJECTED_RUN_IDS_FILE
         with open(rejected_path, "w", encoding="utf-8") as f:
             json.dump(decision.rejected_run_ids, f, indent=2)
+        
+        # Write standardized rejection artifact if portfolio is rejected
+        if decision.verdict == AdmissionVerdict.REJECTED:
+            rejection_reason = f"Portfolio {portfolio_id} rejected: {len(decision.rejected_run_ids)} runs failed admission gates"
+            rejection_artifact = create_governance_rejection(
+                governance_rule="portfolio_admission",
+                reason=rejection_reason,
+                affected_ids=decision.rejected_run_ids,
+                metrics={
+                    "total_candidates": len(candidate_run_ids),
+                    "admitted_count": len(decision.admitted_run_ids),
+                    "rejected_count": len(decision.rejected_run_ids),
+                    "correlation_violations": len(corr_result.violations) if corr_result.violations else 0,
+                    "risk_budget_steps": len(risk_result.steps) if risk_result.steps else 0
+                }
+            )
+            rejection_path = admission_dir / "rejection.json"
+            rejection_artifact.write(rejection_path)
         
         return decision

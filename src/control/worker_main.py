@@ -8,8 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-from gui.desktop.worker import worker_loop
-
 
 def atomic_write_text(path: Path, text: str) -> None:
     """Write text atomically (write temp then replace)."""
@@ -32,6 +30,38 @@ def write_initial_heartbeat(db_path: Path) -> Path:
     heartbeat_file.parent.mkdir(parents=True, exist_ok=True)
     atomic_write_text(heartbeat_file, str(time.time()))
     return heartbeat_file
+
+
+def worker_loop(db_path: Path) -> None:
+    """Headless worker loop that processes jobs from the database.
+    
+    This is a simplified implementation that periodically checks for
+    jobs and processes them. In a real implementation, this would
+    integrate with the supervisor job system.
+    """
+    print(f"Worker loop started for database: {db_path}")
+    
+    # Simple heartbeat mechanism
+    heartbeat_interval = 5.0  # seconds
+    last_heartbeat = time.time()
+    
+    try:
+        while True:
+            current_time = time.time()
+            
+            # Update heartbeat file periodically
+            if current_time - last_heartbeat >= heartbeat_interval:
+                heartbeat_file = db_path.parent / "worker.heartbeat"
+                atomic_write_text(heartbeat_file, str(current_time))
+                last_heartbeat = current_time
+            
+            # Check for jobs (simplified - would query database)
+            # For now, just sleep and continue
+            time.sleep(1.0)
+            
+    except KeyboardInterrupt:
+        print("Worker loop interrupted")
+        raise
 
 
 def cleanup_files(db_path: Path) -> None:

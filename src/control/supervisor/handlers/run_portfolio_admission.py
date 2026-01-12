@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
+from control.artifacts import write_json_atomic
 from contracts.research_wfs.result_schema import (
     ResearchWFSResult,
     validate_result_json,
@@ -1082,18 +1083,15 @@ class RunPortfolioAdmissionHandler(BaseJobHandler):
         
         # 1. Write portfolio_config.json (v1.0)
         config_path = artifacts_dir / "portfolio_config.json"
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(portfolio_config, f, indent=2, ensure_ascii=False)
+        write_json_atomic(config_path, portfolio_config)
         
         # 2. Write admission_decision.json (legacy, kept for compatibility)
         decision_path = artifacts_dir / "admission_decision.json"
-        with open(decision_path, "w", encoding="utf-8") as f:
-            json.dump(admission_decision.model_dump(), f, indent=2, ensure_ascii=False)
+        write_json_atomic(decision_path, admission_decision.model_dump())
         
         # 3. Write correlation_analysis.json (legacy, kept for compatibility)
         correlation_path = artifacts_dir / "correlation_analysis.json"
-        with open(correlation_path, "w", encoding="utf-8") as f:
-            json.dump(correlation_result, f, indent=2, ensure_ascii=False)
+        write_json_atomic(correlation_path, correlation_result)
         
         # 4. Write enhanced analytics as separate files (optional, for debugging)
         # According to Phase 4-B spec, we may embed them inside admission_report.json
@@ -1101,18 +1099,15 @@ class RunPortfolioAdmissionHandler(BaseJobHandler):
         if enhanced_analytics:
             # Write budget_alerts.json (optional)
             budget_alerts_path = artifacts_dir / "budget_alerts.json"
-            with open(budget_alerts_path, "w", encoding="utf-8") as f:
-                json.dump(enhanced_analytics.get("budget_alerts", {}), f, indent=2, ensure_ascii=False)
+            write_json_atomic(budget_alerts_path, enhanced_analytics.get("budget_alerts", {}))
             
             # Write marginal_contribution.json (optional)
             marginal_path = artifacts_dir / "marginal_contribution.json"
-            with open(marginal_path, "w", encoding="utf-8") as f:
-                json.dump(enhanced_analytics.get("marginal_contribution", {}), f, indent=2, ensure_ascii=False)
+            write_json_atomic(marginal_path, enhanced_analytics.get("marginal_contribution", {}))
             
             # Write money_sense_mdd.json (optional)
             mdd_path = artifacts_dir / "money_sense_mdd.json"
-            with open(mdd_path, "w", encoding="utf-8") as f:
-                json.dump(enhanced_analytics.get("money_sense_mdd", {}), f, indent=2, ensure_ascii=False)
+            write_json_atomic(mdd_path, enhanced_analytics.get("money_sense_mdd", {}))
         
         # 5. Write comprehensive admission_report.json (v1.0 FINAL) - REQUIRED
         admission_report = self._build_admission_report(
@@ -1122,8 +1117,7 @@ class RunPortfolioAdmissionHandler(BaseJobHandler):
             enhanced_analytics=enhanced_analytics
         )
         report_path = artifacts_dir / "admission_report.json"
-        with open(report_path, "w", encoding="utf-8") as f:
-            json.dump(admission_report, f, indent=2, ensure_ascii=False)
+        write_json_atomic(report_path, admission_report)
         
         # 6. Write summary.txt with enhanced information
         summary_path = artifacts_dir / "summary.txt"

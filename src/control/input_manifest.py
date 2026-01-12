@@ -18,7 +18,7 @@ from typing import Dict, Any, List, Optional
 import hashlib
 
 from control.dataset_descriptor import get_descriptor
-from gui.services.reload_service import compute_file_signature, get_system_snapshot
+from control.utils import compute_file_signature, get_system_snapshot
 
 
 @dataclass

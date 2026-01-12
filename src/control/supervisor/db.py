@@ -9,6 +9,18 @@ from .models import (
 )
 
 
+class DuplicateJobError(Exception):
+    """Raised when a duplicate job (same job_type and params_hash) is submitted."""
+    def __init__(self, job_type: str, params_hash: str, existing_job_id: Optional[str] = None):
+        self.job_type = job_type
+        self.params_hash = params_hash
+        self.existing_job_id = existing_job_id
+        message = f"Duplicate job detected: job_type={job_type}, params_hash={params_hash[:16]}..."
+        if existing_job_id:
+            message += f" (existing job_id: {existing_job_id})"
+        super().__init__(message)
+
+
 def get_default_db_path(outputs_root: Optional[Path] = None) -> Path:
     """Return default DB path under outputs/jobs_v2.db."""
     if outputs_root is None:
@@ -129,6 +141,16 @@ class SupervisorDB:
                     ) VALUES (?, ?, ?, ?, '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
                 """, (job_id, spec.job_type, spec_json, state, now, now, params_hash))
                 conn.commit()
+            except sqlite3.IntegrityError as e:
+                conn.rollback()
+                # Check if it's a duplicate job error (unique index violation)
+                if "idx_jobs_type_params_hash_unique" in str(e):
+                    # Find the existing job_id
+                    existing_job_id = self._find_existing_job_id(spec.job_type, params_hash)
+                    raise DuplicateJobError(spec.job_type, params_hash, existing_job_id)
+                else:
+                    # Re-raise other integrity errors (e.g., primary key conflict)
+                    raise
             except Exception:
                 conn.rollback()
                 raise
@@ -191,6 +213,19 @@ class SupervisorDB:
             except Exception:
                 conn.rollback()
                 raise
+    
+    def _find_existing_job_id(self, job_type: str, params_hash: str) -> Optional[str]:
+        """Find existing job_id for duplicate job_type and params_hash."""
+        with self._connect() as conn:
+            cursor = conn.execute("""
+                SELECT job_id FROM jobs
+                WHERE job_type = ? AND params_hash = ?
+                AND state IN ('QUEUED', 'RUNNING', 'SUCCEEDED')
+                ORDER BY created_at DESC
+                LIMIT 1
+            """, (job_type, params_hash))
+            row = cursor.fetchone()
+            return row["job_id"] if row else None
     
     def get_job_row(self, job_id: str) -> Optional[JobRow]:
         """Get job row by ID."""

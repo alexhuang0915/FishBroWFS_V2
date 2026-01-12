@@ -4,6 +4,8 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, Optional
 from ..job_handler import BaseJobHandler, JobContext
+from control.artifacts import write_json_atomic
+from control.cleanup_service import HeadlessCleanupService, CleanupScope
 
 logger = logging.getLogger(__name__)
 
@@ -58,15 +60,8 @@ class CleanCacheHandler(BaseJobHandler):
                 "deleted_count": 0
             }
         
-        # Import here to avoid circular imports
-        try:
-            from gui.desktop.services.cleanup_service import (
-                CleanupService, CleanupScope
-            )
-        except ImportError as e:
-            logger.error(f"Failed to import CleanupService: {e}")
-            # Fallback to simple file deletion logic
-            return self._execute_fallback(params, context, dry_run)
+        # Use headless cleanup service
+        service = HeadlessCleanupService()
         
         # Map scope to cleanup parameters
         if scope == "all":
@@ -82,7 +77,7 @@ class CleanCacheHandler(BaseJobHandler):
                 raise ValueError("dataset_id is required for scope='dataset'")
             # Map dataset_id to market (simplified)
             market = self._dataset_to_market(dataset_id)
-            return self._clean_market_cache(context, market, season, dry_run)
+            return self._clean_market_cache(context, market, season, dry_run, service)
         else:
             raise ValueError(f"Unknown scope: {scope}")
     
@@ -217,73 +212,61 @@ class CleanCacheHandler(BaseJobHandler):
             "message": f"Deleted {deleted} cache items for season {season}"
         }
     
-    def _clean_market_cache(self, context: JobContext, market: str, season: Optional[str], dry_run: bool) -> Dict[str, Any]:
-        """Clean cache for a specific market."""
-        # Try to use CleanupService if available
-        try:
-            from gui.desktop.services.cleanup_service import (
-                CleanupService, CleanupScope
-            )
+    def _clean_market_cache(self, context: JobContext, market: str, season: Optional[str], dry_run: bool, service: HeadlessCleanupService) -> Dict[str, Any]:
+        """Clean cache for a specific market using headless cleanup service."""
+        # Determine season
+        if not season:
+            season = service._get_current_season()
+        
+        # Build criteria
+        criteria = {
+            "season": season,
+            "market": market,
+            "cache_type": "both"
+        }
+        
+        # Build plan
+        plan = service.build_delete_plan(CleanupScope.CACHE, criteria)
+        
+        if dry_run:
+            # Write plan to artifacts for inspection
+            plan_json = json.dumps(plan.to_dict(), indent=2)
+            plan_path = Path(context.artifacts_dir) / "clean_cache_plan.json"
+            plan_path.write_text(plan_json)
             
-            service = CleanupService()
-            
-            # Determine season
-            if not season:
-                season = service._get_current_season()
-            
-            # Build criteria
-            criteria = {
-                "season": season,
-                "market": market,
-                "cache_type": "both"
+            return {
+                "ok": True,
+                "job_type": "CLEAN_CACHE",
+                "dry_run": dry_run,
+                "legacy_invocation": f"HeadlessCleanupService.cleanup_cache(market={market}, season={season})",
+                "stdout_path": str(plan_path),
+                "stderr_path": None,
+                "deleted_count": len(plan.items),
+                "message": f"Dry run: would delete {len(plan.items)} cache items for market {market}, season {season}"
             }
+        else:
+            # Execute soft delete
+            success, message = service.execute_soft_delete(plan)
             
-            # Build plan
-            plan = service.build_delete_plan(CleanupScope.CACHE, criteria)
+            # Write result to artifacts
+            result_path = Path(context.artifacts_dir) / "clean_cache_result.json"
+            result_data = {
+                "success": success,
+                "message": message,
+                "plan": plan.to_dict() if plan else None
+            }
+            write_json_atomic(result_path, result_data)
             
-            if dry_run:
-                # Write plan to artifacts for inspection
-                plan_json = json.dumps(plan.to_dict(), indent=2)
-                plan_path = Path(context.artifacts_dir) / "clean_cache_plan.json"
-                plan_path.write_text(plan_json)
-                
-                return {
-                    "ok": True,
-                    "job_type": "CLEAN_CACHE",
-                    "dry_run": dry_run,
-                    "legacy_invocation": f"CleanupService.cleanup_cache(market={market}, season={season})",
-                    "stdout_path": str(plan_path),
-                    "stderr_path": None,
-                    "deleted_count": len(plan.items),
-                    "message": f"Dry run: would delete {len(plan.items)} cache items for market {market}, season {season}"
-                }
-            else:
-                # Execute soft delete
-                success, message = service.execute_soft_delete(plan)
-                
-                # Write result to artifacts
-                result_path = Path(context.artifacts_dir) / "clean_cache_result.json"
-                result_data = {
-                    "success": success,
-                    "message": message,
-                    "plan": plan.to_dict() if plan else None
-                }
-                result_path.write_text(json.dumps(result_data, indent=2))
-                
-                return {
-                    "ok": success,
-                    "job_type": "CLEAN_CACHE",
-                    "dry_run": dry_run,
-                    "legacy_invocation": f"CleanupService.cleanup_cache(market={market}, season={season})",
-                    "stdout_path": str(result_path),
-                    "stderr_path": None,
-                    "deleted_count": len(plan.items) if plan else 0,
-                    "message": message
-                }
-                
-        except ImportError:
-            # Fallback implementation
-            return self._clean_market_cache_fallback(context, market, season, dry_run)
+            return {
+                "ok": success,
+                "job_type": "CLEAN_CACHE",
+                "dry_run": dry_run,
+                "legacy_invocation": f"HeadlessCleanupService.cleanup_cache(market={market}, season={season})",
+                "stdout_path": str(result_path),
+                "stderr_path": None,
+                "deleted_count": len(plan.items) if plan else 0,
+                "message": message
+            }
     
     def _clean_market_cache_fallback(self, context: JobContext, market: str, season: Optional[str], dry_run: bool) -> Dict[str, Any]:
         """Fallback implementation for market cache cleaning."""
@@ -291,13 +274,7 @@ class CleanCacheHandler(BaseJobHandler):
         
         # Determine season
         if not season:
-            # Try to get current season
-            try:
-                from gui.desktop.services.cleanup_service import CleanupService
-                service = CleanupService()
-                season = service._get_current_season()
-            except:
-                season = "2026Q1"  # Default
+            season = "2026Q1"  # Default
         
         market_dir = outputs_root / "seasons" / season / "shared" / market
         
@@ -375,22 +352,6 @@ class CleanCacheHandler(BaseJobHandler):
             # Default to first part of dataset_id
             return dataset_id.split("_")[0] if "_" in dataset_id else dataset_id
     
-    def _execute_fallback(self, params: Dict[str, Any], context: JobContext, dry_run: bool) -> Dict[str, Any]:
-        """Fallback execution when CleanupService is not available."""
-        scope = params["scope"]
-        
-        if scope == "all":
-            return self._clean_all_caches(context, dry_run)
-        elif scope == "season":
-            season = params.get("season", "2026Q1")
-            return self._clean_season_cache(context, season, dry_run)
-        elif scope == "dataset":
-            dataset_id = params.get("dataset_id", "")
-            market = self._dataset_to_market(dataset_id)
-            season = params.get("season", "2026Q1")
-            return self._clean_market_cache_fallback(context, market, season, dry_run)
-        else:
-            raise ValueError(f"Unknown scope: {scope}")
 
 
 # Register handler

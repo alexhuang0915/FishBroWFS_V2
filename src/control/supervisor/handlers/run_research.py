@@ -12,6 +12,7 @@ from dataclasses import fields
 from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.run_research import RunResearchPayload
 from control.paths import get_outputs_root
+from control.artifacts import write_json_atomic
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +75,7 @@ class RunResearchHandler(BaseJobHandler):
         
         # Write payload to run directory
         payload_path = run_dir / "payload.json"
-        with open(payload_path, "w") as f:
-            json.dump({"raw_params": params, "normalized_params": normalized}, f, indent=2)
+        write_json_atomic(payload_path, {"raw_params": params, "normalized_params": normalized})
         
         # Update heartbeat with progress
         context.heartbeat(progress=0.1, phase="validating_inputs")
@@ -229,8 +229,7 @@ class RunResearchHandler(BaseJobHandler):
         }
         
         manifest_path = run_dir / "manifest.json"
-        with open(manifest_path, "w") as f:
-            json.dump(manifest, f, indent=2, sort_keys=True)
+        write_json_atomic(manifest_path, manifest)
         
         logger.info(f"Generated manifest at {manifest_path}")
 

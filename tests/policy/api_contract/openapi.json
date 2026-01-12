@@ -193,12 +193,10 @@
           },
           "metrics": {
             "additionalProperties": true,
-            "default": {},
             "title": "Metrics",
             "type": "object"
           },
           "topk": {
-            "default": [],
             "items": {
               "additionalProperties": true,
               "type": "object"

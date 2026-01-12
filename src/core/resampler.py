@@ -35,6 +35,26 @@ class SessionSpecTaipei:
     breaks: List[Tuple[str, str]]  # 休市時段列表，每個時段為 (start, end)
     tz: str = "Asia/Taipei"
     
+    def __post_init__(self):
+        # 預先計算小時、分鐘、總分鐘數，避免重複計算
+        # 由於 dataclass frozen=True，必須使用 object.__setattr__
+        open_hour = int(self.open_hhmm.split(":")[0])
+        open_minute = int(self.open_hhmm.split(":")[1])
+        close_hour_raw = int(self.close_hhmm.split(":")[0])
+        close_minute = int(self.close_hhmm.split(":")[1])
+        close_hour = 0 if close_hour_raw == 24 else close_hour_raw
+        
+        object.__setattr__(self, '_open_hour', open_hour)
+        object.__setattr__(self, '_open_minute', open_minute)
+        object.__setattr__(self, '_close_hour', close_hour)
+        object.__setattr__(self, '_close_minute', close_minute)
+        
+        open_total = open_hour * 60 + open_minute
+        close_total = close_hour * 60 + close_minute
+        object.__setattr__(self, '_open_total', open_total)
+        object.__setattr__(self, '_close_total', close_total)
+        object.__setattr__(self, '_is_overnight', close_total < open_total)
+    
     @classmethod
     def from_contract(cls, spec: ContractSessionSpec) -> SessionSpecTaipei:
         """從 contracts SessionSpec 轉換"""
@@ -48,31 +68,26 @@ class SessionSpecTaipei:
     @property
     def open_hour(self) -> int:
         """開盤小時"""
-        return int(self.open_hhmm.split(":")[0])
+        return self._open_hour
     
     @property
     def open_minute(self) -> int:
         """開盤分鐘"""
-        return int(self.open_hhmm.split(":")[1])
+        return self._open_minute
     
     @property
     def close_hour(self) -> int:
         """收盤小時（處理 24:00 為 0）"""
-        hour = int(self.close_hhmm.split(":")[0])
-        if hour == 24:
-            return 0
-        return hour
+        return self._close_hour
     
     @property
     def close_minute(self) -> int:
         """收盤分鐘"""
-        return int(self.close_hhmm.split(":")[1])
+        return self._close_minute
     
     def is_overnight(self) -> bool:
         """是否為隔夜時段（收盤時間小於開盤時間）"""
-        open_total = self.open_hour * 60 + self.open_minute
-        close_total = self.close_hour * 60 + self.close_minute
-        return close_total < open_total
+        return self._is_overnight
     
     def session_start_for_date(self, d: date) -> datetime:
         """

@@ -65,13 +65,6 @@ from control.season_compare_batches import (
 # Phase 15.3: Season freeze package / export pack
 from control.season_export import export_season_package, get_exports_root
 
-# Phase GUI.1: GUI payload contracts
-from contracts.gui import (
-    SubmitBatchPayload,
-    FreezeSeasonPayload,
-    ExportSeasonPayload,
-    CompareRequestPayload,
-)
 
 # Phase 16: Export pack replay mode
 from control.season_export_replay import (
@@ -87,12 +80,26 @@ from strategy.registry import StrategyRegistryResponse
 
 # Phase A: Service Identity
 from core.service_identity import get_service_identity
+from core.paths import get_outputs_root
 
 # Phase 16.5: Real Data Snapshot Integration
 from contracts.data.snapshot_payloads import SnapshotCreatePayload
 from contracts.data.snapshot_models import SnapshotMetadata
 from control.data_snapshot import create_snapshot, compute_snapshot_id, normalize_bars
 from control.dataset_registry_mutation import register_snapshot_as_dataset
+
+# API payload contracts (SSOT)
+from contracts.api import (
+    ReadinessResponse,
+    SubmitJobRequest,
+    JobListResponse,
+    ArtifactIndexResponse,
+    RevealEvidencePathResponse,
+    BatchStatusResponse,
+    BatchSummaryResponse,
+    BatchMetadataUpdate,
+    SeasonMetadataUpdate,
+)
 
 # Phase A: Registry endpoints
 # from portfolio.instruments import load_instruments_config  # type: ignore - unused, imported locally in _load_instruments_config_from_file
@@ -649,16 +656,6 @@ async def registry_timeframes() -> list[str]:
     return sorted(display_names)
 
 
-class ReadinessResponse(BaseModel):
-    """Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}."""
-    season: str
-    dataset_id: str
-    timeframe: str
-    bars_ready: bool
-    features_ready: bool
-    bars_path: Optional[str] = None
-    features_path: Optional[str] = None
-    error: Optional[str] = None
 
 
 @api_v1.get("/readiness/{season}/{dataset_id}/{timeframe}", response_model=ReadinessResponse)
@@ -693,30 +690,8 @@ async def readiness_check(season: str, dataset_id: str, timeframe: str) -> Readi
     )
 
 
-class SubmitJobRequest(BaseModel):
-    # Accept GUI params directly
-    strategy_id: str
-    instrument: str
-    timeframe: str
-    run_mode: str
-    season: str
-    dataset: Optional[str] = None
 
 
-class JobListResponse(BaseModel):
-    """Response for GET /api/v1/jobs."""
-    job_id: str
-    type: str = "strategy"  # default type
-    status: str
-    created_at: str
-    finished_at: Optional[str] = None
-    strategy_name: Optional[str] = None
-    instrument: Optional[str] = None
-    timeframe: Optional[str] = None
-    run_mode: Optional[str] = None
-    season: Optional[str] = None
-    duration_seconds: Optional[float] = None
-    score: Optional[float] = None
 
 
 def _coerce_str(v: Any) -> str:
@@ -1108,17 +1083,8 @@ def _get_stdout_tail_link(job_id: str) -> Optional[str]:
     return None
 
 
-class ArtifactIndexResponse(BaseModel):
-    """Response for GET /api/v1/jobs/{job_id}/artifacts."""
-    job_id: str
-    links: dict[str, Optional[str]]
-    files: list[dict[str, Any]]
 
 
-class RevealEvidencePathResponse(BaseModel):
-    """Response for GET /api/v1/jobs/{job_id}/reveal_evidence_path."""
-    approved: bool
-    path: str
 
 
 @api_v1.post("/jobs")
@@ -1266,35 +1232,12 @@ async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
 
 # Phase 14: Batch execution & governance endpoints
 
-class BatchStatusResponse(BaseModel):
-    """Response for batch status."""
-    batch_id: str
-    state: str  # PENDING, RUNNING, DONE, FAILED, PARTIAL_FAILED
-    jobs_total: int = 0
-    jobs_done: int = 0
-    jobs_failed: int = 0
 
 
-class BatchSummaryResponse(BaseModel):
-    """Response for batch summary."""
-    batch_id: str
-    topk: list[dict[str, Any]] = []
-    metrics: dict[str, Any] = {}
 
 
-class BatchMetadataUpdate(BaseModel):
-    """Request for updating batch metadata."""
-    season: Optional[str] = None
-    tags: Optional[list[str]] = None
-    note: Optional[str] = None
-    frozen: Optional[bool] = None
 
 
-class SeasonMetadataUpdate(BaseModel):
-    """Request for updating season metadata."""
-    tags: Optional[list[str]] = None
-    note: Optional[str] = None
-    frozen: Optional[bool] = None
 
 
 # Helper to get artifacts root
@@ -1894,16 +1837,6 @@ from portfolio.plan_quality import compute_quality_from_plan_dir
 from portfolio.plan_quality_writer import write_plan_quality_files
 
 
-# Helper to get outputs root (where portfolio/plans/ will be written)
-def _get_outputs_root() -> Path:
-    """
-    Return outputs root directory.
-    Environment override:
-      - FISHBRO_OUTPUTS_ROOT (default: outputs)
-    """
-    return Path(os.environ.get("FISHBRO_OUTPUTS_ROOT", "outputs"))
-
-
 @api_v1.post("/portfolio/plans", response_model=PortfolioPlan)
 async def create_portfolio_plan(payload: PlanCreatePayload) -> PortfolioPlan:
     """
@@ -1918,7 +1851,7 @@ async def create_portfolio_plan(payload: PlanCreatePayload) -> PortfolioPlan:
     - Returns full plan (including weights, summary, constraints report)
     """
     exports_root = get_exports_root()
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
 
     try:
         plan = build_portfolio_plan_from_export(
@@ -1968,7 +1901,7 @@ async def list_portfolio_plans() -> dict[str, Any]:
             ]
         }
     """
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
     plans_dir = outputs_root / "portfolio" / "plans"
     if not plans_dir.exists():
         return {"plans": []}
@@ -2002,7 +1935,7 @@ async def get_portfolio_plan(plan_id: str) -> dict[str, Any]:
     Returns:
         Full portfolio_plan.json content (including universe, weights, summaries).
     """
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
     plan_dir = outputs_root / "portfolio" / "plans" / plan_id
     plan_path = plan_dir / "portfolio_plan.json"
     if not plan_path.exists():
@@ -2030,7 +1963,7 @@ async def get_plan_quality(plan_id: str) -> PlanQualityReport:
     - Deterministic: same plan → same quality report
     - Returns PlanQualityReport with grade (GREEN/YELLOW/RED) and reasons
     """
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
     plan_dir = outputs_root / "portfolio" / "plans" / plan_id
     if not plan_dir.exists():
         raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
@@ -2060,7 +1993,7 @@ async def write_plan_quality(plan_id: str) -> PlanQualityReport:
     - Idempotent: identical content → no mtime change
     - Returns PlanQualityReport (same as GET endpoint)
     """
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
     plan_dir = outputs_root / "portfolio" / "plans" / plan_id
     if not plan_dir.exists():
         raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")

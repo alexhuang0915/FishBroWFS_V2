@@ -1,0 +1,93 @@
+"""
+API payload contracts (SSOT for GUI ↔ Control communication).
+
+These models define the request/response shapes for the Mission Control API v1.
+They are imported by both control/api.py and GUI components (if needed).
+"""
+
+from __future__ import annotations
+
+from typing import Optional, Any
+from pydantic import BaseModel, Field
+
+
+class ReadinessResponse(BaseModel):
+    """Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}."""
+    season: str
+    dataset_id: str
+    timeframe: str
+    bars_ready: bool
+    features_ready: bool
+    bars_path: Optional[str] = None
+    features_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+class SubmitJobRequest(BaseModel):
+    # Accept GUI params directly
+    strategy_id: str
+    instrument: str
+    timeframe: str
+    run_mode: str
+    season: str
+    dataset: Optional[str] = None
+
+
+class JobListResponse(BaseModel):
+    """Response for GET /api/v1/jobs."""
+    job_id: str
+    type: str = "strategy"  # default type
+    status: str
+    created_at: str
+    finished_at: Optional[str] = None
+    strategy_name: Optional[str] = None
+    instrument: Optional[str] = None
+    timeframe: Optional[str] = None
+    run_mode: Optional[str] = None
+    season: Optional[str] = None
+    duration_seconds: Optional[float] = None
+    score: Optional[float] = None
+
+
+class ArtifactIndexResponse(BaseModel):
+    """Response for GET /api/v1/jobs/{job_id}/artifacts."""
+    job_id: str
+    links: dict[str, Optional[str]]
+    files: list[dict[str, Any]]
+
+
+class RevealEvidencePathResponse(BaseModel):
+    """Response for GET /api/v1/jobs/{job_id}/reveal_evidence_path."""
+    approved: bool
+    path: str
+
+
+class BatchStatusResponse(BaseModel):
+    """Response for batch status."""
+    batch_id: str
+    state: str  # PENDING, RUNNING, DONE, FAILED, PARTIAL_FAILED
+    jobs_total: int = 0
+    jobs_done: int = 0
+    jobs_failed: int = 0
+
+
+class BatchSummaryResponse(BaseModel):
+    """Response for batch summary."""
+    batch_id: str
+    topk: list[dict[str, Any]] = Field(default_factory=list)
+    metrics: dict[str, Any] = Field(default_factory=dict)
+
+
+class BatchMetadataUpdate(BaseModel):
+    """Request for updating batch metadata."""
+    season: Optional[str] = None
+    tags: Optional[list[str]] = None
+    note: Optional[str] = None
+    frozen: Optional[bool] = None
+
+
+class SeasonMetadataUpdate(BaseModel):
+    """Request for updating season metadata."""
+    tags: Optional[list[str]] = None
+    note: Optional[str] = None
+    frozen: Optional[bool] = None

@@ -6,13 +6,7 @@ import sys
 from pathlib import Path
 
 from contracts.portfolio.plan_models import PortfolioPlan
-
-
-# Helper function to get outputs root
-def _get_outputs_root() -> Path:
-    """Get outputs root from environment or default."""
-    import os
-    return Path(os.environ.get("FISHBRO_OUTPUTS_ROOT", "outputs"))
+from core.paths import get_outputs_root
 
 
 def load_portfolio_plan(plan_dir: Path) -> PortfolioPlan:
@@ -49,7 +43,7 @@ def main():
     args = parser.parse_args()
     
     # Locate plan directory
-    outputs_root = _get_outputs_root()
+    outputs_root = get_outputs_root()
     plan_dir = outputs_root / "portfolio" / "plans" / args.plan_id
     
     if not plan_dir.exists():

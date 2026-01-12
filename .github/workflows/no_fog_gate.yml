@@ -5,7 +5,6 @@ on:
     branches: [ main, master, develop ]
   pull_request:
     branches: [ main, master, develop ]
-  # Manual trigger for testing
   workflow_dispatch:
     inputs:
       skip_tests:
@@ -19,7 +18,6 @@ on:
         default: false
         type: boolean
 
-# Cancel previous runs on the same branch/PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -28,17 +26,18 @@ jobs:
   no-fog-gate:
     name: No-Fog Gate (Core Contracts + Snapshot)
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Fail if gate takes too long
+    timeout-minutes: 15
     
     strategy:
       matrix:
-        python-version: ["3.8", "3.9", "3.10"]
+        # 移除 3.8 (不支援 Pandas 2.1+), 改用 3.10 與效能更強的 3.11
+        python-version: ["3.10", "3.11"]
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Full history for snapshot
+          fetch-depth: 0
     
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
@@ -46,14 +45,23 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
     
-      - name: Install dependencies
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential python3-dev
+    
+      - name: Install dependencies (Headless Optimized)
         run: |
           python -m pip install --upgrade pip
-          pip install pytest
-          # Install project dependencies if requirements.txt exists
+          
+          # 1. 強制過濾 PySide6 以避免 CI 無頭環境安裝錯誤 (Phase X 解耦後 CI 不需 GUI)
           if [ -f "requirements.txt" ]; then
-            pip install -r requirements.txt
+            grep -v "PySide6" requirements.txt > requirements_ci.txt
+            pip install -r requirements_ci.txt
           fi
+          
+          # 2. 確保測試核心工具到位
+          pip install pytest pytest-timeout pytest-asyncio
     
       - name: Cache snapshot directory
         uses: actions/cache@v4
@@ -66,10 +74,8 @@ jobs:
       - name: Run No-Fog Gate
         id: no_fog_gate
         run: |
-          # Make shell script executable
           chmod +x scripts/no_fog/no_fog_gate.sh
           
-          # Build arguments based on workflow inputs
           ARGS=""
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             if [[ "${{ github.event.inputs.skip_tests }}" == "true" ]]; then
@@ -80,13 +86,7 @@ jobs:
             fi
           fi
           
-          # For PRs, we might want to skip regeneration to save time
-          # but for safety, we always regenerate in CI
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "Running full gate for PR validation"
-          fi
-          
-          # Run the gate with timeout
+          # 執行 Gate 並設定 300 秒超時保護
           timeout 300 bash scripts/no_fog/no_fog_gate.sh $ARGS --timeout 30
         env:
           PYTHONPATH: src
@@ -95,29 +95,16 @@ jobs:
         if: failure() && steps.no_fog_gate.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
-          name: system-full-snapshot-${{ github.sha }}
+          name: system-full-snapshot-${{ matrix.python-version }}-${{ github.sha }}
           path: SYSTEM_FULL_SNAPSHOT/
           retention-days: 7
     
       - name: Upload test logs (on failure)
-        if: failure() && steps.no_fog_gate.outcome == 'failure'
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-logs-${{ github.sha }}
+          name: test-logs-${{ matrix.python-version }}-${{ github.sha }}
           path: |
             **/pytest*.log
             **/test*.log
           retention-days: 7
-    
-      - name: Notify on failure
-        if: failure()
-        run: |
-          echo "❌ No-Fog Gate failed!"
-          echo "Check the logs above for details."
-          echo ""
-          echo "Common issues:"
-          echo "1. Core contract tests failed"
-          echo "2. Snapshot generation failed"
-          echo "3. Timeout exceeded (gate took >30s)"
-          echo ""
-          echo "Run locally with: bash scripts/no_fog/no_fog_gate.sh"

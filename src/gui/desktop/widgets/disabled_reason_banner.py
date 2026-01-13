@@ -33,7 +33,7 @@ class DisabledReasonBanner(QWidget):
         super().__init__(parent)
         self.current_title = ""
         self.current_missing: Dict[str, str] = {}
-        self.current_actions: List[Tuple[str, str]] = []
+        self.current_actions: List[Tuple[str, str]] = list()
         
         self.setup_ui()
         self.hide()  # Hidden by default when no missing prerequisites
@@ -178,5 +178,5 @@ class DisabledReasonBanner(QWidget):
     
     def clear(self):
         """Clear banner and hide."""
-        self.update_banner("", {}, [])
+        self.update_banner("", {}, list())
         self.hide()

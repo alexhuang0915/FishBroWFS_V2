@@ -86,7 +86,7 @@ def get_runtime_context() -> RuntimeContext:
 
 
 def probe_local_ipv4_addrs() -> List[str]:
-    addrs: List[str] = []
+    addrs: List[str] = list()
 
     if psutil is not None:
         try:
@@ -290,7 +290,7 @@ def write_runtime_context(
     path = Path(out_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     
-    lines = []
+    lines = list()
     
     # Header
     lines.append("# Runtime Context")

@@ -92,7 +92,7 @@ class CleanupService:
         """Scan runs directory for matching runs."""
         runs_dir = self.outputs_root / "seasons" / season / "runs"
         if not runs_dir.exists():
-            return []
+            return list()
         
         # Determine cutoff time based on time_range
         now = datetime.now()
@@ -105,7 +105,7 @@ class CleanupService:
         else:  # ALL
             cutoff = datetime.min
         
-        matching_runs = []
+        matching_runs = list()
         for run_dir in runs_dir.iterdir():
             if not run_dir.is_dir():
                 continue
@@ -151,11 +151,11 @@ class CleanupService:
     
     def _scan_published(self, season: str, artifact_ids: List[str]) -> List[Path]:
         """Scan for published artifacts."""
-        artifacts = []
+        artifacts = list()
         # Look in runs directories
         runs_dir = self.outputs_root / "seasons" / season / "runs"
         if not runs_dir.exists():
-            return []
+            return list()
         
         for run_dir in runs_dir.iterdir():
             if not run_dir.is_dir():
@@ -175,11 +175,11 @@ class CleanupService:
     
     def _scan_cache(self, season: str, market: str, cache_type: str) -> List[Path]:
         """Scan cache directories."""
-        cache_items = []
+        cache_items = list()
         base_dir = self.outputs_root / "seasons" / season / "shared"
         
         if not base_dir.exists():
-            return []
+            return list()
         
         # Bars cache
         if cache_type in ["bars", "both"]:
@@ -201,11 +201,11 @@ class CleanupService:
     
     def _scan_demo(self, season: str) -> List[Path]:
         """Scan demo data."""
-        demo_items = []
+        demo_items = list()
         # Look for runs with demo tag
         runs_dir = self.outputs_root / "seasons" / season / "runs"
         if not runs_dir.exists():
-            return []
+            return list()
         
         for run_dir in runs_dir.iterdir():
             if not run_dir.is_dir():
@@ -216,7 +216,7 @@ class CleanupService:
             if manifest.exists():
                 try:
                     data = json.loads(manifest.read_text())
-                    if data.get("tags") and "demo" in data.get("tags", []):
+                    if data.get("tags") and "demo" in data.get("tags", list()):
                         demo_items.append(run_dir)
                 except:
                     pass
@@ -226,7 +226,7 @@ class CleanupService:
     def _scan_trash(self, time_range: TimeRange) -> List[Path]:
         """Scan trash directory."""
         if not self.trash_dir.exists():
-            return []
+            return list()
         
         # Determine cutoff time
         now = datetime.now()
@@ -239,7 +239,7 @@ class CleanupService:
         else:  # ALL
             cutoff = datetime.min
         
-        trash_items = []
+        trash_items = list()
         for item in self.trash_dir.iterdir():
             if item.is_dir():
                 mtime = datetime.fromtimestamp(item.stat().st_mtime)
@@ -271,7 +271,7 @@ class CleanupService:
         Returns:
             DeletePlan object with items to delete
         """
-        items = []
+        items = list()
         
         if scope == CleanupScope.RUNS:
             season = criteria.get("season", self._get_current_season())
@@ -282,7 +282,7 @@ class CleanupService:
         
         elif scope == CleanupScope.PUBLISHED:
             season = criteria.get("season", self._get_current_season())
-            artifact_ids = criteria.get("artifact_ids", [])
+            artifact_ids = criteria.get("artifact_ids", list())
             items = self._scan_published(season, artifact_ids)
         
         elif scope == CleanupScope.CACHE:
@@ -342,7 +342,7 @@ class CleanupService:
         trash_dir.mkdir(parents=True, exist_ok=True)
         
         moved_count = 0
-        errors = []
+        errors = list()
         
         for item_str in plan.items:
             item = Path(item_str)
@@ -395,7 +395,7 @@ class CleanupService:
             return True, "No items to delete"
         
         deleted_count = 0
-        errors = []
+        errors = list()
         
         for item_str in plan.items:
             item = Path(item_str)

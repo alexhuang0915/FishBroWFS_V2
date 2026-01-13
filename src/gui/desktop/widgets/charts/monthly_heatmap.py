@@ -43,7 +43,7 @@ class MonthlyHeatmapWidget(QWidget):
         
         # Data storage
         self.monthly_data: Dict[str, Dict[str, float]] = {}  # year -> month -> value
-        self.years: List[str] = []
+        self.years: List[str] = list()
         self.months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                       "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
         
@@ -156,7 +156,7 @@ class MonthlyHeatmapWidget(QWidget):
     def clear_data(self):
         """Clear all data from the heatmap."""
         self.monthly_data = {}
-        self.years = []
+        self.years = list()
         self.hovered_cell = None
         self.update()
     

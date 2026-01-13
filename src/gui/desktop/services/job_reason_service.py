@@ -108,7 +108,7 @@ class JobReasonService:
         Returns:
             List of FailureReason objects, sorted by severity (critical first).
         """
-        reasons = []
+        reasons = list()
         
         # 1. Policy check failures
         policy_reasons = JobReasonService._extract_from_policy_check(artifacts)
@@ -135,7 +135,7 @@ class JobReasonService:
     @staticmethod
     def _extract_from_policy_check(artifacts: Dict[str, Any]) -> List[FailureReason]:
         """Extract reasons from policy_check.json artifact."""
-        reasons = []
+        reasons = list()
         policy_check = artifacts.get("policy_check")
         if not policy_check or not isinstance(policy_check, dict):
             return reasons
@@ -144,7 +144,7 @@ class JobReasonService:
         if status != "FAILED":
             return reasons
         
-        gates = policy_check.get("gates", [])
+        gates = policy_check.get("gates", list())
         for gate in gates:
             gate_name = gate.get("name", "")
             gate_status = gate.get("status", "")
@@ -181,7 +181,7 @@ class JobReasonService:
     @staticmethod
     def _extract_from_runtime_metrics(artifacts: Dict[str, Any]) -> List[FailureReason]:
         """Extract reasons from runtime_metrics.json artifact."""
-        reasons = []
+        reasons = list()
         runtime_metrics = artifacts.get("runtime_metrics")
         if not runtime_metrics or not isinstance(runtime_metrics, dict):
             return reasons
@@ -255,7 +255,7 @@ class JobReasonService:
     def _extract_from_manifest(artifacts: Dict[str, Any]) -> List[FailureReason]:
         """Extract reasons from manifest.json artifact (if present)."""
         # Currently not implemented; manifest failures are rare.
-        return []
+        return list()
     
     @staticmethod
     def _generic_failure_reason(artifacts: Dict[str, Any]) -> FailureReason:
@@ -275,7 +275,7 @@ class JobReasonService:
         if not reasons:
             return "No failure reasons identified."
         
-        lines = []
+        lines = list()
         for i, reason in enumerate(reasons, 1):
             lines.append(f"{i}. {reason.summary} ({reason.severity.upper()})")
             lines.append(f"   Reason: {reason.detailed_reason}")

@@ -32,7 +32,7 @@ class BacktestWorker(QObject):
         self.setProperty('strategy', strategy)
         self.setProperty('primary_market', primary_market)  # Maps to dataset_id
         self.setProperty('timeframe', timeframe)
-        self.setProperty('context_feeds', context_feeds or [])
+        self.setProperty('context_feeds', context_feeds or list())
         self.job_id: Optional[str] = None
         self.setProperty('_stop_requested', False)
     
@@ -167,7 +167,7 @@ class BuildWorker(QObject):
         self.setProperty('build_bars', build_bars)
         self.setProperty('build_features', build_features)
         self.setProperty('mode', mode)
-        self.setProperty('context_feeds', context_feeds or [])
+        self.setProperty('context_feeds', context_feeds or list())
         self.setProperty('_stop_requested', False)
     
     def run(self):

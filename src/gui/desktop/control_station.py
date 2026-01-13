@@ -231,7 +231,7 @@ class ControlStation(QMainWindow):
             # Show blocking error for port occupied by non-fishbro process
             pid = self.supervisor_details.get("pid")
             process_name = self.supervisor_details.get("process_name", "unknown")
-            cmdline = self.supervisor_details.get("cmdline", [])
+            cmdline = self.supervisor_details.get("cmdline", list())
             
             error_msg = (
                 f"Port 8000 is occupied by another process.\n\n"

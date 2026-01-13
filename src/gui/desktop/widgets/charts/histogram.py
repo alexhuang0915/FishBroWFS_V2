@@ -45,9 +45,9 @@ class HistogramWidget(QWidget):
         self.y_label = y_label
         
         # Data storage
-        self.bin_edges: List[float] = []
-        self.bin_counts: List[float] = []
-        self.bin_labels: List[str] = []
+        self.bin_edges: List[float] = list()
+        self.bin_counts: List[float] = list()
+        self.bin_labels: List[str] = list()
         
         # Display settings
         self.margin = 60
@@ -100,7 +100,7 @@ class HistogramWidget(QWidget):
         
         # Generate bin labels if not provided
         if bin_labels is None:
-            self.bin_labels = []
+            self.bin_labels = list()
             for i in range(len(bin_counts)):
                 start = bin_edges[i]
                 end = bin_edges[i + 1]
@@ -140,7 +140,7 @@ class HistogramWidget(QWidget):
         bin_edges = [data_min + i * bin_width for i in range(n_bins + 1)]
         
         # Count values in bins
-        bin_counts = [0] * n_bins
+        bin_counts = list((0,)) * n_bins
         for value in values:
             if data_min <= value <= data_max:
                 bin_idx = min(int((value - data_min) / bin_width), n_bins - 1)
@@ -150,9 +150,9 @@ class HistogramWidget(QWidget):
     
     def clear_data(self):
         """Clear all data from the histogram."""
-        self.bin_edges = []
-        self.bin_counts = []
-        self.bin_labels = []
+        self.bin_edges = list()
+        self.bin_counts = list()
+        self.bin_labels = list()
         self.hovered_bar = None
         self.update()
     

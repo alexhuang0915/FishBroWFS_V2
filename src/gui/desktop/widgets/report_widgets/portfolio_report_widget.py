@@ -267,18 +267,18 @@ class PortfolioReportWidget(QWidget):
         try:
             admission_summary = self.report_data.get('admission_summary', {})
             correlation = self.report_data.get('correlation', {})
-            matrix = correlation.get('matrix', [])
-            labels = correlation.get('labels', [])
+            matrix = correlation.get('matrix', list())
+            labels = correlation.get('labels', list())
             
             risk_used = admission_summary.get('total_risk', 0.0)
             risk_budget = self.report_data.get('parameters', {}).get('portfolio_risk_budget_max', 0.0)
-            admitted_count = len(admission_summary.get('admitted', []))
-            rejected_count = len(admission_summary.get('rejected', []))
+            admitted_count = len(admission_summary.get('admitted', list()))
+            rejected_count = len(admission_summary.get('rejected', list()))
             
             # Compute correlation metrics
             avg_corr = correlation.get('average_pairwise_correlation')
             if avg_corr is None and matrix and len(matrix) > 0:
-                off_diag_values = []
+                off_diag_values = list()
                 n = len(matrix)
                 for i in range(n):
                     for j in range(i + 1, n):
@@ -358,8 +358,8 @@ class PortfolioReportWidget(QWidget):
     def populate_heatmap(self):
         try:
             correlation = self.report_data.get('correlation', {})
-            matrix = correlation.get('matrix', [])
-            labels = correlation.get('labels', [])
+            matrix = correlation.get('matrix', list())
+            labels = correlation.get('labels', list())
             
             if matrix and labels:
                 self.heatmap.set_data(matrix, labels)
@@ -378,17 +378,17 @@ class PortfolioReportWidget(QWidget):
                     item.widget().deleteLater()
             
             admission_summary = self.report_data.get('admission_summary', {})
-            steps = admission_summary.get('steps', [])
+            steps = admission_summary.get('steps', list())
             
             if not steps:
                 self.add_timeline_step("Precondition Gate", "PASS", 
-                                     f"Admitted: {len(admission_summary.get('admitted', []))}, "
-                                     f"Rejected: {len(admission_summary.get('rejected', []))}")
+                                     f"Admitted: {len(admission_summary.get('admitted', list()))}, "
+                                     f"Rejected: {len(admission_summary.get('rejected', list()))}")
                 
                 correlation = self.report_data.get('correlation', {})
                 if correlation.get('matrix'):
                     self.add_timeline_step("Correlation Gate", "PASS", 
-                                         f"Matrix {len(correlation.get('matrix', []))}×{len(correlation.get('matrix', []))}")
+                                         f"Matrix {len(correlation.get('matrix', list()))}×{len(correlation.get('matrix', list()))}")
                 
                 risk_budget = self.report_data.get('parameters', {}).get('portfolio_risk_budget_max')
                 if risk_budget:
@@ -459,8 +459,8 @@ class PortfolioReportWidget(QWidget):
         """Populate admitted and rejected strategy tables."""
         try:
             admission_summary = self.report_data.get('admission_summary', {})
-            admitted = admission_summary.get('admitted', [])
-            rejected = admission_summary.get('rejected', [])
+            admitted = admission_summary.get('admitted', list())
+            rejected = admission_summary.get('rejected', list())
             
             # Clear tables
             self.admitted_table.setRowCount(0)
@@ -654,7 +654,7 @@ class PortfolioReportWidget(QWidget):
             
             # Look for admission evidence path
             admission_path = None
-            for artifact in artifacts.get('artifacts', []):
+            for artifact in artifacts.get('artifacts', list()):
                 if artifact.get('type') == 'admission_evidence':
                     admission_path = artifact.get('path')
                     break

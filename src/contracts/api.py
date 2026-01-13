@@ -47,6 +47,7 @@ class JobListResponse(BaseModel):
     season: Optional[str] = None
     duration_seconds: Optional[float] = None
     score: Optional[float] = None
+    error_details: Optional[dict] = None
 
 
 class ArtifactIndexResponse(BaseModel):

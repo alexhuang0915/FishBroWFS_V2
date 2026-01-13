@@ -92,7 +92,14 @@ def main() -> int:
         print(f"ERROR: {error_msg}", file=sys.stderr)
         # Write error artifacts before marking failed
         _write_bootstrap_error_artifact(artifacts_dir, "spec_parse_error", error_msg, str(e))
-        db.mark_failed(args.job_id, error_msg)
+        error_details = {
+            "type": "SpecParseError",
+            "msg": error_msg,
+            "timestamp": now_iso(),
+            "phase": "bootstrap",
+            "detail": str(e)
+        }
+        db.mark_failed(args.job_id, error_msg, error_details=error_details)
         return 1
     
     # Check handler exists
@@ -102,7 +109,13 @@ def main() -> int:
         print(f"ERROR: {error_msg}", file=sys.stderr)
         # Write error artifacts before marking failed
         _write_bootstrap_error_artifact(artifacts_dir, "unknown_handler", error_msg, "")
-        db.mark_failed(args.job_id, error_msg)
+        error_details = {
+            "type": "UnknownHandler",
+            "msg": error_msg,
+            "timestamp": now_iso(),
+            "phase": "bootstrap"
+        }
+        db.mark_failed(args.job_id, error_msg, error_details=error_details)
         return 1
     
     # Validate params
@@ -113,7 +126,14 @@ def main() -> int:
         print(f"ERROR: {error_msg}", file=sys.stderr)
         # Write error artifacts before marking failed
         _write_bootstrap_error_artifact(artifacts_dir, "validation_error", error_msg, str(e))
-        db.mark_failed(args.job_id, error_msg)
+        error_details = {
+            "type": "ValidationError",
+            "msg": error_msg,
+            "timestamp": now_iso(),
+            "phase": "bootstrap",
+            "detail": str(e)
+        }
+        db.mark_failed(args.job_id, error_msg, error_details=error_details)
         return 1
     
     # Register this worker
@@ -134,19 +154,41 @@ def main() -> int:
         result = execute_job(args.job_id, spec, db, str(artifacts_dir))
         # Check if result indicates abort
         if isinstance(result, dict) and result.get("aborted") is True:
-            db.mark_aborted(args.job_id, "user_abort")
+            error_details = {
+                "type": "AbortRequested",
+                "msg": "user_abort",
+                "timestamp": now_iso(),
+                "phase": "bootstrap"
+            }
+            db.mark_aborted(args.job_id, "user_abort", error_details=error_details)
         else:
             db.mark_succeeded(args.job_id, result)
         return 0
     except KeyboardInterrupt:
-        db.mark_aborted(args.job_id, "worker_interrupted")
+        error_details = {
+            "type": "AbortRequested",
+            "msg": "worker_interrupted",
+            "timestamp": now_iso(),
+            "phase": "bootstrap"
+        }
+        db.mark_aborted(args.job_id, "worker_interrupted", error_details=error_details)
         return 130  # SIGINT exit code
     except Exception as e:
         error_msg = f"execution_error: {e}"
         error_traceback = traceback.format_exc()
         # Write error artifacts
         _write_bootstrap_error_artifact(artifacts_dir, "execution_error", error_msg, error_traceback)
-        db.mark_failed(args.job_id, error_msg)
+        # Truncate traceback to 16k chars to avoid excessive DB size
+        if len(error_traceback) > 16000:
+            error_traceback = error_traceback[:16000] + "... [truncated]"
+        error_details = {
+            "type": "ExecutionError",
+            "msg": error_msg,
+            "timestamp": now_iso(),
+            "phase": "bootstrap",
+            "traceback": error_traceback
+        }
+        db.mark_failed(args.job_id, error_msg, error_details=error_details)
         return 1
     finally:
         db.mark_worker_exited(worker_id)

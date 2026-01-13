@@ -139,7 +139,7 @@ class AllocationTab(QWidget):
         self.strategy_whitelist_label = QLabel("Select strategies to include:")
         form_layout.addRow(self.strategy_whitelist_label)
         
-        self.strategy_checkboxes = []
+        self.strategy_checkboxes = list()
         strategy_checkbox_layout = QVBoxLayout()
         
         # Will be populated dynamically
@@ -341,7 +341,7 @@ class AllocationTab(QWidget):
     
     def get_selected_strategies(self) -> List[str]:
         """Get list of selected strategy IDs."""
-        selected = []
+        selected = list()
         for checkbox in self.strategy_checkboxes:
             if checkbox.isChecked():
                 # Extract strategy ID from tooltip
@@ -414,7 +414,7 @@ class AllocationTab(QWidget):
         risk_budget = float(self.risk_budget_spin.value())
         
         # Guardrail C: Correlation/risk override sanity
-        warnings = []
+        warnings = list()
         
         if corr_threshold < 0.1 or corr_threshold > 0.99:
             warnings.append(f"Correlation threshold ({corr_threshold}) is extreme (<0.1 or >0.99)")
@@ -560,7 +560,7 @@ class AllocationTab(QWidget):
         try:
             artifacts = get_job_artifacts(job_id)
             # Look for portfolio_id.json or other pointer files
-            files = artifacts.get("files", [])
+            files = artifacts.get("files", list())
             for file_info in files:
                 filename = file_info.get("filename", "")
                 if filename == "portfolio_id.json":

@@ -131,9 +131,9 @@ class SupervisorClient:
                     details = error_data['detail']
                     if isinstance(details, list) and len(details) > 0:
                         # Extract field errors
-                        field_errors = []
+                        field_errors = list()
                         for detail in details:
-                            loc = detail.get('loc', [])
+                            loc = detail.get('loc', list())
                             msg = detail.get('msg', '')
                             field = loc[-1] if len(loc) > 1 else str(loc)
                             field_errors.append(f"{field}: {msg}")
@@ -181,6 +181,10 @@ class SupervisorClient:
     def submit_job(self, payload: dict) -> dict:
         """Submit a job."""
         return self._post("/api/v1/jobs", payload)
+
+    def abort_job(self, job_id: str) -> dict:
+        """Request abort of a job (QUEUED or RUNNING)."""
+        return self._post(f"/api/v1/jobs/{job_id}/abort", {})
 
     def get_artifacts(self, job_id: str) -> dict:
         """Return artifact index for a job."""
@@ -322,6 +326,11 @@ def submit_job(payload: dict) -> dict:
     return _client.submit_job(payload)
 
 
+def abort_job(job_id: str) -> dict:
+    """Request abort of a job (QUEUED or RUNNING)."""
+    return _client.abort_job(job_id)
+
+
 def get_artifacts(job_id: str) -> dict:
     """Return artifact index for a job."""
     return _client.get_artifacts(job_id)
@@ -410,6 +419,7 @@ __all__ = [
     "get_jobs",
     "get_job",
     "submit_job",
+    "abort_job",
     "get_artifacts",
     "get_artifact_file",
     "get_stdout_tail",

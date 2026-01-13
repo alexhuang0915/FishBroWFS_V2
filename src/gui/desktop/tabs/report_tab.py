@@ -390,7 +390,7 @@ class ReportTab(QWidget):
                     df = pd.read_parquet(file_path)
                     
                     # Create preview with basic info
-                    preview_lines = []
+                    preview_lines = list()
                     preview_lines.append(f"File: {file_name}")
                     preview_lines.append(f"Shape: {df.shape[0]} rows × {df.shape[1]} columns")
                     preview_lines.append(f"Columns: {', '.join(df.columns.tolist())}")

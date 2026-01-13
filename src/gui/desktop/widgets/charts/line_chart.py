@@ -47,7 +47,7 @@ class LineChartWidget(QWidget):
         self.y_label = y_label
         
         # Data storage
-        self.series: List[Dict[str, Any]] = []
+        self.series: List[Dict[str, Any]] = list()
         self.x_min: Optional[float] = None
         self.x_max: Optional[float] = None
         self.y_min: Optional[float] = None
@@ -139,7 +139,7 @@ class LineChartWidget(QWidget):
             color: Optional color for this series
         """
         # Convert timestamps to numeric values (seconds since epoch)
-        numeric_data = []
+        numeric_data = list()
         for timestamp, value in data:
             if isinstance(timestamp, datetime):
                 x = timestamp.timestamp()

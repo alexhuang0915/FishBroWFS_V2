@@ -324,11 +324,11 @@ class ReportHostWidget(QWidget):
         self.metric_row.clear_cards()
         
         # Extract key metrics
-        admitted_count = len(report_data.get("admitted_strategies", []))
-        rejected_count = len(report_data.get("rejected_strategies", []))
+        admitted_count = len(report_data.get("admitted_strategies", list()))
+        rejected_count = len(report_data.get("rejected_strategies", list()))
         
         correlation = report_data.get("correlation", {})
-        violations = correlation.get("violations", [])
+        violations = correlation.get("violations", list())
         violation_count = len(violations)
         
         # Create metric cards

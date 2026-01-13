@@ -34,7 +34,7 @@ class EvidenceBrowserDialog(QDialog):
     def __init__(self, job_id: str, parent=None):
         super().__init__(parent)
         self.setProperty('job_id', job_id)
-        self.evidence_files: List[EvidenceFile] = []
+        self.evidence_files: List[EvidenceFile] = list()
         self.setup_ui()
         self.load_evidence()
     
@@ -164,7 +164,7 @@ class EvidenceBrowserDialog(QDialog):
         # Group by category
         categories = {}
         for file in self.evidence_files:
-            categories.setdefault(file.category, []).append(file)
+            categories.setdefault(file.category, list()).append(file)
         
         # Create category items
         category_order = ["manifest", "metrics", "policy", "report", "log", "other"]

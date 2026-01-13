@@ -477,6 +477,18 @@
             ],
             "title": "Duration Seconds"
           },
+          "error_details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Details"
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -3254,6 +3266,48 @@
           }
         },
         "summary": "Get Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/abort": {
+      "post": {
+        "description": "Request abort of a job (QUEUED or RUNNING).\nSets abort_requested flag; supervisor will handle killing and transition.",
+        "operationId": "abort_job_endpoint_api_v1_jobs__job_id__abort_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Abort Job Endpoint Api V1 Jobs  Job Id  Abort Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Abort Job Endpoint"
       }
     },
     "/api/v1/jobs/{job_id}/reveal_evidence_path": {

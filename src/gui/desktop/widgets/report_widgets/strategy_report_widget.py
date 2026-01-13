@@ -62,7 +62,7 @@ class StrategyReportWidget(QWidget):
         super().__init__()
         self.job_id: str = job_id
         self.report_data: Dict[str, Any] = report_data
-        self.metric_cards: List[MetricCard] = []
+        self.metric_cards: List[MetricCard] = list()
 
         # UI Widgets
         self.export_json_btn: QPushButton
@@ -83,8 +83,8 @@ class StrategyReportWidget(QWidget):
         self.trade_table: QTableWidget
 
         # Data properties
-        self.equity_series: List[Tuple[Any, Any]] = []
-        self.drawdown_series: List[Tuple[Any, Any]] = []
+        self.equity_series: List[Tuple[Any, Any]] = list()
+        self.drawdown_series: List[Tuple[Any, Any]] = list()
         self.sharpe_data: Dict[str, Any] = {}
         
         self.setup_ui()
@@ -550,7 +550,7 @@ class StrategyReportWidget(QWidget):
                 ("Win Rate", metrics.get('win_rate'), "percentage", None),
             ]
             
-            cards = []
+            cards = list()
             for name, value, unit, _ in metric_defs:
                 if value is None:
                     display_value = "—"
@@ -598,12 +598,12 @@ class StrategyReportWidget(QWidget):
         """Populate equity and drawdown series."""
         try:
             series = self.report_data.get('series', {})
-            equity_data = series.get('equity_curve', [])
-            drawdown_data = series.get('drawdown_curve', [])
+            equity_data = series.get('equity_curve', list())
+            drawdown_data = series.get('drawdown_curve', list())
             
             # Convert to chart format
-            equity_points = []
-            drawdown_points = []
+            equity_points = list()
+            drawdown_points = list()
             
             for point in equity_data:
                 if 'timestamp' in point and 'value' in point:
@@ -698,7 +698,7 @@ class StrategyReportWidget(QWidget):
                 self.sharpe_chart_stack.setCurrentWidget(self.sharpe_chart)
                 self.sharpe_combo.setEnabled(False)
                 # Convert to points
-                points = []
+                points = list()
                 for i, value in enumerate(rolling_sharpe):
                     points.append((i, value))
                 self.sharpe_chart.set_series({"Sharpe": points})
@@ -729,7 +729,7 @@ class StrategyReportWidget(QWidget):
                         break
             
             if window_data:
-                points = []
+                points = list()
                 for i, value in enumerate(window_data):
                     points.append((i, value))
                 self.sharpe_chart.set_series({"Sharpe": points})
@@ -760,8 +760,8 @@ class StrategyReportWidget(QWidget):
             
             if return_dist:
                 # Expect format: {"bins": [...], "counts": [...]}
-                bins = return_dist.get('bins', [])
-                counts = return_dist.get('counts', [])
+                bins = return_dist.get('bins', list())
+                counts = return_dist.get('counts', list())
                 
                 if bins and counts:
                     self.histogram.set_data(bins, counts)
@@ -869,7 +869,7 @@ class StrategyReportWidget(QWidget):
                 return
             
             # Collect chart widgets
-            charts = []
+            charts = list()
             
             # Equity/Drawdown chart
             if hasattr(self, 'equity_chart'):

@@ -42,9 +42,9 @@ class HeatmapWidget(QWidget):
         self.title = title
         
         # Data storage
-        self.matrix: List[List[float]] = []
-        self.row_labels: List[str] = []
-        self.col_labels: List[str] = []
+        self.matrix: List[List[float]] = list()
+        self.row_labels: List[str] = list()
+        self.col_labels: List[str] = list()
         self.value_min: float = 0.0
         self.value_max: float = 1.0
         
@@ -161,9 +161,9 @@ class HeatmapWidget(QWidget):
     
     def clear_data(self):
         """Clear all data from the heatmap."""
-        self.matrix = []
-        self.row_labels = []
-        self.col_labels = []
+        self.matrix = list()
+        self.row_labels = list()
+        self.col_labels = list()
         self.hovered_cell = None
         self.update()
     

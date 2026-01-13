@@ -514,7 +514,7 @@ class CleanupDialog(QDialog):
         time_range = time_range_map.get(time_range_str, TimeRange.LAST_7_DAYS)
         
         # Build criteria - map UI checkboxes to run_types
-        run_types = []
+        run_types = list()
         if self.runs_completed_cb.isChecked():
             run_types.append("completed")
         if self.runs_failed_cb.isChecked():

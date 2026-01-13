@@ -95,9 +95,9 @@ class EvidenceLocator:
         """List all evidence files for a job, categorized."""
         root = EvidenceLocator.get_evidence_root(job_id)
         if not root:
-            return []
+            return list()
         
-        evidence_files = []
+        evidence_files = list()
         
         # Walk the evidence directory recursively
         for dirpath, dirnames, filenames in os.walk(root):
@@ -190,7 +190,7 @@ class EvidenceLocator:
         # Group by category
         categories = {}
         for file in files:
-            categories.setdefault(file.category, []).append({
+            categories.setdefault(file.category, list()).append({
                 "relative_path": file.relative_path,
                 "display_name": file.display_name,
                 "description": file.description,

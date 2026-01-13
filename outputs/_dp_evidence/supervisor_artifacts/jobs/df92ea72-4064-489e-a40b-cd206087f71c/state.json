@@ -1,0 +1,1 @@
+{"error":"Failed to execute plateau: Plateau CLI failed with return code 1\nStderr: /usr/bin/python3: No module named scripts.run_phase3a_plateau\n","job_id":"df92ea72-4064-489e-a40b-cd206087f71c","phase":null,"progress":null,"status":"FAILED","timestamp":"2026-01-12T13:05:40.530993+00:00"}

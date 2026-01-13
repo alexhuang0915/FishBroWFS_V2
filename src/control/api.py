@@ -18,7 +18,7 @@ from typing import Any, Optional, Dict # Added Any, Optional, Dict imports
 from pathlib import Path # Added Path import
 
 # Supervisor imports
-from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job
+from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job, request_abort as supervisor_request_abort
 from control.supervisor.models import JobSpec as SupervisorJobSpec, JobType, normalize_job_type
 from control.supervisor.db import DuplicateJobError
 
@@ -779,6 +779,26 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
     # Score extraction (from report artifacts) - placeholder for now
     score = None
     
+    # Parse error_details JSON string into dict
+    error_details = None
+    if job.error_details:
+        try:
+            error_details = json.loads(job.error_details)
+            # Ensure it's a dict (should be)
+            if not isinstance(error_details, dict):
+                error_details = {"type": "MalformedErrorDetails", "msg": f"Expected dict, got {type(error_details).__name__}", "raw": str(job.error_details)[:200]}
+        except json.JSONDecodeError:
+            # Invalid JSON, produce fallback
+            raw = job.error_details
+            truncated = raw[:200] + ("..." if len(raw) > 200 else "")
+            error_details = {
+                "type": "MalformedErrorDetails",
+                "msg": "Invalid JSON in error_details column",
+                "raw": truncated,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "phase": "api"
+            }
+    
     return JobListResponse(
         job_id=job_id,
         type="strategy",
@@ -792,6 +812,7 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
         season=season,
         duration_seconds=duration_seconds,
         score=score,
+        error_details=error_details,
     )
 
 
@@ -810,6 +831,19 @@ async def get_job_endpoint(job_id: str) -> JobListResponse:
         if job is None:
             raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
         return _supervisor_job_to_response(job)
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@api_v1.post("/jobs/{job_id}/abort")
+async def abort_job_endpoint(job_id: str) -> dict[str, Any]:
+    """
+    Request abort of a job (QUEUED or RUNNING).
+    Sets abort_requested flag; supervisor will handle killing and transition.
+    """
+    try:
+        supervisor_request_abort(job_id)
+        return {"ok": True, "job_id": job_id}
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

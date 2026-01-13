@@ -10,7 +10,8 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List, Tuple
 
-from config.registry.timeframes import load_timeframes, TimeframeRegistry
+# Import from src.config (SSOT) - referenced by UI registry loader test
+from config import load_timeframes, TimeframeRegistry
 
 
 @lru_cache(maxsize=1)

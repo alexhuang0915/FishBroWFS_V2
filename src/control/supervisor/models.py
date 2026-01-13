@@ -144,6 +144,7 @@ class JobRow(BaseModel):
     abort_requested: bool = False
     progress: Optional[float] = None
     phase: Optional[str] = None
+    error_details: Optional[str] = None
 
 
 class WorkerRow(BaseModel):

@@ -28,7 +28,7 @@ class RegistryTableModel(QAbstractTableModel):
     
     def __init__(self):
         super().__init__()
-        self.strategies: List[Dict[str, Any]] = []
+        self.strategies: List[Dict[str, Any]] = list()
         self.headers = [
             "Strategy ID", "Name", "Verification", "File Path", "Type"
         ]
@@ -48,7 +48,7 @@ class RegistryTableModel(QAbstractTableModel):
         self.beginResetModel()
         
         # Normalize strategies data
-        self.strategies = []
+        self.strategies = list()
         for strategy in strategies:
             if isinstance(strategy, dict):
                 self.strategies.append({

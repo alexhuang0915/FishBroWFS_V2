@@ -33,7 +33,7 @@ def _normalize_jobs(resp: Any) -> list[dict[str, Any]]:
         jobs = resp.get("jobs")
         if isinstance(jobs, list):
             return [j for j in jobs if isinstance(j, dict)]
-    return []
+    return list()
 
 
 class _MetricCardProto(Protocol):
@@ -177,7 +177,7 @@ class PortfolioAdmissionTab(QWidget):
             jobs = _normalize_jobs(jobs_response)
             # Filter jobs by job_type
             filtered_jobs = [j for j in jobs if j.get("job_type") == "RUN_RESEARCH_WFS"]
-            real_jobs = []
+            real_jobs = list()
             for job in filtered_jobs:
                 # Extract strategy_id from job spec
                 strategy_id = "Unknown"

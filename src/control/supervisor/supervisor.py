@@ -133,12 +133,113 @@ class Supervisor:
         
         for job in stale:
             print(f"WARNING: Job {job.job_id} has stale heartbeat, marking ORPHANED")
-            self.db.mark_orphaned(job.job_id, "heartbeat_timeout")
+            error_details = {
+                "type": "HeartbeatTimeout",
+                "msg": "heartbeat_timeout",
+                "timestamp": now_iso(),
+                "phase": "supervisor"
+            }
+            if job.worker_pid:
+                error_details["pid"] = job.worker_pid
+            self.db.mark_orphaned(job.job_id, "heartbeat_timeout", error_details=error_details)
             
             # Kill associated worker if any
             if job.worker_pid:
                 print(f"Killing stale worker {job.worker_pid} for job {job.job_id}")
                 self.kill_worker(job.worker_pid, force=True)
+
+    def handle_abort_requests(self) -> None:
+        """Handle jobs with abort_requested flag."""
+        from .models import JobStatus
+        # Fetch QUEUED and RUNNING jobs with abort_requested = 1
+        with self.db._connect() as conn:
+            cursor = conn.execute("""
+                SELECT * FROM jobs
+                WHERE abort_requested = 1
+                AND state IN (?, ?)
+            """, (JobStatus.QUEUED, JobStatus.RUNNING))
+            rows = cursor.fetchall()
+        
+        for row in rows:
+            job = self.db.get_job_row(row["job_id"])  # convert to JobRow
+            if job is None:
+                continue
+            if job.state == JobStatus.QUEUED:
+                # Directly transition to ABORTED
+                error_details = {
+                    "type": "AbortRequested",
+                    "msg": "user_abort",
+                    "timestamp": now_iso(),
+                    "phase": "supervisor"
+                }
+                self.db.mark_aborted(job.job_id, "user_abort", error_details=error_details)
+                print(f"Aborted QUEUED job {job.job_id}")
+            elif job.state == JobStatus.RUNNING:
+                # Kill worker process
+                pid = job.worker_pid
+                process_missing = False
+                if pid is not None:
+                    print(f"Aborting RUNNING job {job.job_id}, killing worker {pid}")
+                    # Check if process already dead before attempting kill
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        process_missing = True
+                    
+                    if not process_missing:
+                        # Send SIGTERM to process group
+                        try:
+                            os.killpg(pid, signal.SIGTERM)
+                        except ProcessLookupError:
+                            # Process died between check and kill
+                            process_missing = True
+                        except Exception:
+                            # Fallback to os.kill
+                            try:
+                                os.kill(pid, signal.SIGTERM)
+                            except ProcessLookupError:
+                                process_missing = True
+                        
+                        # Wait up to 5 seconds for termination
+                        waited = 0
+                        while waited < 5 and not process_missing:
+                            try:
+                                os.kill(pid, 0)  # check if process exists
+                            except ProcessLookupError:
+                                # process dead
+                                break
+                            time.sleep(0.1)
+                            waited += 0.1
+                        
+                        # If still alive, SIGKILL
+                        if not process_missing:
+                            try:
+                                os.killpg(pid, signal.SIGKILL)
+                            except ProcessLookupError:
+                                process_missing = True
+                            except Exception:
+                                try:
+                                    os.kill(pid, signal.SIGKILL)
+                                except ProcessLookupError:
+                                    process_missing = True
+                    
+                    # Remove from children dict if present
+                    if pid in self.children:
+                        del self.children[pid]
+                
+                # Mark job as ABORTED with error_details including PID
+                error_details = {
+                    "type": "AbortRequested",
+                    "msg": "user_abort",
+                    "timestamp": now_iso(),
+                    "phase": "supervisor"
+                }
+                if pid is not None:
+                    error_details["pid"] = pid
+                if process_missing:
+                    error_details["process_missing"] = True
+                self.db.mark_aborted(job.job_id, "user_abort", error_details=error_details)
+                print(f"Aborted RUNNING job {job.job_id}")
     
     def tick(self) -> None:
         """Perform one supervisor tick."""
@@ -148,7 +249,10 @@ class Supervisor:
         # 2. Handle stale jobs
         self.handle_stale_jobs()
         
-        # 3. Spawn workers for queued jobs
+        # 3. Handle abort requests
+        self.handle_abort_requests()
+        
+        # 4. Spawn workers for queued jobs
         available_slots = self.max_workers - len(self.children)
         for _ in range(available_slots):
             job_id = self.db.fetch_next_queued_job()

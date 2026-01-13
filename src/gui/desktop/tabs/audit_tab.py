@@ -44,11 +44,11 @@ class ReportExplorerModel(QAbstractItemModel):
             'name': 'Reports',
             'type': 'root',
             'children': [
-                {'name': 'Strategy Runs', 'type': 'category', 'children': []},
-                {'name': 'Portfolios', 'type': 'category', 'children': []}
+                {'name': 'Strategy Runs', 'type': 'category', 'children': list()},
+                {'name': 'Portfolios', 'type': 'category', 'children': list()}
             ]
         }
-        self.all_items = []  # Flat list of all items for filtering
+        self.all_items = list()  # Flat list of all items for filtering
         self.filter_text = ""
         self.filter_type = "all"  # "jobs", "portfolios", "all"
     
@@ -59,13 +59,13 @@ class ReportExplorerModel(QAbstractItemModel):
             summary = get_outputs_summary()
             
             # Clear existing data
-            self.all_items = []
+            self.all_items = list()
             
             # Process jobs
             jobs_category = self.root_item['children'][0]
-            jobs_category['children'] = []
+            jobs_category['children'] = list()
             
-            for job in summary.get('jobs', {}).get('recent', []):
+            for job in summary.get('jobs', {}).get('recent', list()):
                 # Create human-readable label
                 status = job.get('status', 'UNKNOWN')
                 strategy_name = job.get('strategy_name', 'Unknown')
@@ -96,9 +96,9 @@ class ReportExplorerModel(QAbstractItemModel):
             
             # Process portfolios
             portfolios_category = self.root_item['children'][1]
-            portfolios_category['children'] = []
+            portfolios_category['children'] = list()
             
-            for portfolio in summary.get('portfolios', {}).get('recent', []):
+            for portfolio in summary.get('portfolios', {}).get('recent', list()):
                 # Create human-readable label
                 portfolio_id = portfolio.get('portfolio_id', 'Unknown')
                 season = portfolio.get('season', 'Unknown')
@@ -144,8 +144,8 @@ class ReportExplorerModel(QAbstractItemModel):
         portfolios_category = self.root_item['children'][1]
         
         # Reset categories
-        jobs_category['children'] = []
-        portfolios_category['children'] = []
+        jobs_category['children'] = list()
+        portfolios_category['children'] = list()
         
         # Apply filters to all items
         for item in self.all_items:
@@ -215,7 +215,7 @@ class ReportExplorerModel(QAbstractItemModel):
         else:
             parent_item = parent.internalPointer()
         
-        return len(parent_item.get('children', []))
+        return len(parent_item.get('children', list()))
     
     def columnCount(self, parent=QModelIndex()):
         return 1

@@ -65,7 +65,8 @@ class SupervisorDB:
                         abort_requested INTEGER DEFAULT 0,
                         progress REAL NULL,
                         phase TEXT NULL,
-                        params_hash TEXT DEFAULT ''
+                        params_hash TEXT DEFAULT '',
+                        error_details TEXT DEFAULT NULL
                     )
                 """)
                 
@@ -74,6 +75,9 @@ class SupervisorDB:
                 columns = [row[1] for row in cursor.fetchall()]
                 if "params_hash" not in columns:
                     conn.execute("ALTER TABLE jobs ADD COLUMN params_hash TEXT DEFAULT ''")
+                # Add error_details column if it doesn't exist
+                if "error_details" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN error_details TEXT DEFAULT NULL")
                 
                 # workers table
                 conn.execute("""
@@ -137,8 +141,8 @@ class SupervisorDB:
                         job_id, job_type, spec_json, state, state_reason,
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
-                        abort_requested, progress, phase, params_hash
-                    ) VALUES (?, ?, ?, ?, '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
+                        abort_requested, progress, phase, params_hash, error_details
+                    ) VALUES (?, ?, ?, ?, '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?, NULL)
                 """, (job_id, spec.job_type, spec_json, state, now, now, params_hash))
                 conn.commit()
             except sqlite3.IntegrityError as e:
@@ -171,8 +175,8 @@ class SupervisorDB:
                         job_id, job_type, spec_json, state, state_reason,
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
-                        abort_requested, progress, phase, params_hash
-                    ) VALUES (?, ?, ?, ?, ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?)
+                        abort_requested, progress, phase, params_hash, error_details
+                    ) VALUES (?, ?, ?, ?, ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?, NULL)
                 """, (job_id, spec.job_type, spec_json, JobStatus.REJECTED, rejection_reason, now, now, params_hash))
                 conn.commit()
             except Exception:
@@ -295,8 +299,8 @@ class SupervisorDB:
                 conn.rollback()
                 raise
     
-    def mark_failed(self, job_id: str, reason: str) -> None:
-        """Mark job as FAILED with reason."""
+    def mark_failed(self, job_id: str, reason: str, *, error_details: dict | None = None) -> None:
+        """Mark job as FAILED with reason and optional structured error details."""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
@@ -311,11 +315,21 @@ class SupervisorDB:
                     JobStatus(current_state), JobStatus.FAILED
                 )
                 
+                # Prepare error_details JSON
+                if error_details is None:
+                    error_details = {
+                        "type": "ExecutionError",
+                        "msg": reason,
+                        "timestamp": now_iso(),
+                        "phase": "bootstrap"
+                    }
+                error_details_json = json.dumps(error_details)
+                
                 conn.execute("""
                     UPDATE jobs
-                    SET state = ?, updated_at = ?, state_reason = ?
+                    SET state = ?, updated_at = ?, state_reason = ?, error_details = ?
                     WHERE job_id = ? AND state IN (?, ?)
-                """, (JobStatus.FAILED, now_iso(), reason, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
+                """, (JobStatus.FAILED, now_iso(), reason, error_details_json, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 # Clear worker assignment if any
                 if row["worker_id"]:
                     conn.execute("""
@@ -328,13 +342,13 @@ class SupervisorDB:
                 conn.rollback()
                 raise
     
-    def mark_aborted(self, job_id: str, reason: str) -> None:
-        """Mark job as ABORTED with reason."""
+    def mark_aborted(self, job_id: str, reason: str, *, error_details: dict | None = None) -> None:
+        """Mark job as ABORTED with reason and optional structured error details."""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 # Get current state for validation
-                cursor = conn.execute("SELECT state, worker_id FROM jobs WHERE job_id = ?", (job_id,))
+                cursor = conn.execute("SELECT state, worker_id, worker_pid FROM jobs WHERE job_id = ?", (job_id,))
                 row = cursor.fetchone()
                 if row is None:
                     raise ValueError(f"Job {job_id} not found")
@@ -344,11 +358,24 @@ class SupervisorDB:
                     JobStatus(current_state), JobStatus.ABORTED
                 )
                 
+                # Prepare error_details JSON
+                if error_details is None:
+                    error_details = {
+                        "type": "AbortRequested",
+                        "msg": reason,
+                        "timestamp": now_iso(),
+                        "phase": "supervisor"
+                    }
+                # Include PID if available
+                if row["worker_pid"] is not None and "pid" not in error_details:
+                    error_details["pid"] = row["worker_pid"]
+                error_details_json = json.dumps(error_details)
+                
                 conn.execute("""
                     UPDATE jobs
-                    SET state = ?, updated_at = ?, state_reason = ?
+                    SET state = ?, updated_at = ?, state_reason = ?, error_details = ?
                     WHERE job_id = ? AND state IN (?, ?)
-                """, (JobStatus.ABORTED, now_iso(), reason, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
+                """, (JobStatus.ABORTED, now_iso(), reason, error_details_json, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
                 # Clear worker assignment if any
                 if row["worker_id"]:
                     conn.execute("""
@@ -361,13 +388,13 @@ class SupervisorDB:
                 conn.rollback()
                 raise
     
-    def mark_orphaned(self, job_id: str, reason: str) -> None:
-        """Mark job as ORPHANED with reason."""
+    def mark_orphaned(self, job_id: str, reason: str, *, error_details: dict | None = None) -> None:
+        """Mark job as ORPHANED with reason and optional structured error details."""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 # Get current state for validation
-                cursor = conn.execute("SELECT state FROM jobs WHERE job_id = ?", (job_id,))
+                cursor = conn.execute("SELECT state, worker_pid FROM jobs WHERE job_id = ?", (job_id,))
                 row = cursor.fetchone()
                 if row is None:
                     raise ValueError(f"Job {job_id} not found")
@@ -377,11 +404,24 @@ class SupervisorDB:
                     JobStatus(current_state), JobStatus.ORPHANED
                 )
                 
+                # Prepare error_details JSON
+                if error_details is None:
+                    error_details = {
+                        "type": "HeartbeatTimeout" if "heartbeat" in reason.lower() else "Orphaned",
+                        "msg": reason,
+                        "timestamp": now_iso(),
+                        "phase": "supervisor"
+                    }
+                # Include PID if available
+                if row["worker_pid"] is not None and "pid" not in error_details:
+                    error_details["pid"] = row["worker_pid"]
+                error_details_json = json.dumps(error_details)
+                
                 conn.execute("""
                     UPDATE jobs
-                    SET state = ?, updated_at = ?, state_reason = ?
+                    SET state = ?, updated_at = ?, state_reason = ?, error_details = ?
                     WHERE job_id = ? AND state = ?
-                """, (JobStatus.ORPHANED, now_iso(), reason, job_id, JobStatus.RUNNING))
+                """, (JobStatus.ORPHANED, now_iso(), reason, error_details_json, job_id, JobStatus.RUNNING))
                 conn.commit()
             except Exception:
                 conn.rollback()

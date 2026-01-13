@@ -22,8 +22,11 @@ from PySide6.QtWidgets import (
     QMessageBox, QSpacerItem, QLineEdit
 )  # pylint: disable=no-name-in-module
 from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices, QMouseEvent  # pylint: disable=no-name-in-module
+from PySide6.QtWidgets import QToolTip
 
+import json
 from gui.desktop.widgets.log_viewer import LogViewerDialog
+from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
 from gui.desktop.services.supervisor_client import (
     SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
@@ -35,6 +38,10 @@ from gui.services.timeframe_options import (
     get_default_timeframe,
     get_timeframe_registry
 )
+from gui.services.job_status_translator import translate_job_status
+from gui.services.control_actions_gate import is_control_actions_enabled, is_abort_allowed, get_abort_button_tooltip, get_abort_attribution_summary
+from gui.services.ui_action_evidence import write_abort_request_evidence, EvidenceWriteError, verify_evidence_write_possible
+from gui.desktop.services.supervisor_client import abort_job
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +55,8 @@ class JobsTableModel(QAbstractTableModel):
     
     def __init__(self):
         super().__init__()
-        self.all_jobs: List[Dict[str, Any]] = []  # All jobs from API
-        self.filtered_jobs: List[Dict[str, Any]] = []  # Jobs after filtering
+        self.all_jobs: List[Dict[str, Any]] = list()  # All jobs from API
+        self.filtered_jobs: List[Dict[str, Any]] = list()  # Jobs after filtering
         self.headers = [
             "Job ID", "Strategy", "Instrument", "Timeframe",
             "Run Mode", "Season", "Status", "Duration", "Score",
@@ -105,7 +112,7 @@ class JobsTableModel(QAbstractTableModel):
     
     def apply_filters(self):
         """Apply current filters to all_jobs and update filtered_jobs."""
-        self.filtered_jobs = []
+        self.filtered_jobs = list()
         for job in self.all_jobs:
             # Status filter
             if self.filter_status != "ALL":
@@ -294,6 +301,14 @@ class JobsTableModel(QAbstractTableModel):
                 font.setBold(True)
                 return font
         
+        elif role == Qt.ItemDataRole.ToolTipRole:
+            if col == 6:  # Status column
+                status = job.get("status", "")
+                error_details = job.get("error_details")
+                # Use translator to generate human-readable explanation
+                explanation = translate_job_status(status, error_details)
+                return explanation
+        
         return None
     
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = int(Qt.ItemDataRole.DisplayRole)):
@@ -339,11 +354,15 @@ class ActionsDelegate(QStyledItemDelegate):
         status = job.get("status", "")
         
         # Button definitions
+        # Check if abort is allowed for this job
+        abort_allowed = is_abort_allowed(status)
+        
         buttons = [
             ("logs", "View Logs", links.get("stdout_tail_url") is not None),
             ("evidence", "Open Evidence", job.get("status") not in ["PENDING", "CREATED"]),
             ("report", "Open Report", links.get("strategy_report_v1_url") is not None),
-            ("explain", "Explain Failure", status in ["FAILED", "REJECTED"])
+            ("explain", "Explain Failure", status in ["FAILED", "REJECTED", "ABORTED"]),
+            ("abort", "Abort", abort_allowed)
         ]
         
         # Calculate button positions
@@ -413,11 +432,13 @@ class ActionsDelegate(QStyledItemDelegate):
             status = job.get("status", "")
             
             # Button definitions
+            abort_allowed = is_abort_allowed(status)
             buttons = [
                 ("logs", links.get("stdout_tail_url") is not None),
                 ("evidence", job.get("status") not in ["PENDING", "CREATED"]),
                 ("report", links.get("strategy_report_v1_url") is not None),
-                ("explain", status in ["FAILED", "REJECTED"])
+                ("explain", status in ["FAILED", "REJECTED", "ABORTED"]),
+                ("abort", abort_allowed)
             ]
             
             # Calculate button positions
@@ -462,11 +483,13 @@ class ActionsDelegate(QStyledItemDelegate):
             status = job.get("status", "")
             
             # Button definitions
+            abort_allowed = is_abort_allowed(status)
             buttons = [
                 ("logs", links.get("stdout_tail_url") is not None),
                 ("evidence", job.get("status") not in ["PENDING", "CREATED"]),
                 ("report", links.get("strategy_report_v1_url") is not None),
-                ("explain", status in ["FAILED", "REJECTED"])
+                ("explain", status in ["FAILED", "REJECTED", "ABORTED"]),
+                ("abort", abort_allowed)
             ]
             
             # Calculate button positions
@@ -478,7 +501,8 @@ class ActionsDelegate(QStyledItemDelegate):
             
             # Check which button is hovered
             self.hovered_button = -1
-            for i, (_, enabled) in enumerate(buttons):
+            tooltip_text = ""
+            for i, (action_type, enabled) in enumerate(buttons):
                 button_rect = rect.adjusted(
                     start_x + i * (button_width + button_spacing),
                     (rect.height() - button_height) // 2,
@@ -491,6 +515,24 @@ class ActionsDelegate(QStyledItemDelegate):
                     pos = event.position().toPoint()
                     if button_rect.contains(pos) and enabled:
                         self.hovered_button = i
+                        
+                        # Generate tooltip for abort button
+                        if action_type == "abort":
+                            tooltip_text = get_abort_button_tooltip(is_enabled=True, job_status=status)
+                        elif action_type == "logs":
+                            tooltip_text = "View job logs (stdout/stderr)"
+                        elif action_type == "evidence":
+                            tooltip_text = "Open evidence directory for this job"
+                        elif action_type == "report":
+                            tooltip_text = "Open strategy report (HTML)"
+                        elif action_type == "explain":
+                            tooltip_text = "Explain job failure (error details)"
+                        
+                        # Show tooltip
+                        if tooltip_text:
+                            # Convert button_rect to global coordinates
+                            global_pos = event.globalPosition().toPoint()
+                            QToolTip.showText(global_pos, tooltip_text, self.parent())
                         break
             
             # Trigger repaint
@@ -501,7 +543,7 @@ class ActionsDelegate(QStyledItemDelegate):
     
     def sizeHint(self, option: QStyleOptionViewItem, index: QModelIndex | QPersistentModelIndex) -> QSize:
         """Provide size hint for the actions column."""
-        return QSize(340, 32)  # Wider for 4 buttons
+        return QSize(425, 32)  # Now 5 buttons (80px each + spacing)
 
 
 class OpTab(QWidget):
@@ -529,6 +571,52 @@ class OpTab(QWidget):
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
         
+        # Gate Summary panel
+        self.gate_summary_widget = GateSummaryWidget()
+        main_layout.addWidget(self.gate_summary_widget)
+        
+        # Control Actions Status Indicator (D1)
+        from gui.services.control_actions_gate import get_control_actions_indicator_text, get_control_actions_indicator_tooltip
+        primary_label, secondary_text = get_control_actions_indicator_text()
+        
+        self.control_actions_indicator = QGroupBox("Control Actions Status")
+        self.control_actions_indicator.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #5d4037;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 12px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        
+        indicator_layout = QVBoxLayout(self.control_actions_indicator)
+        indicator_layout.setContentsMargins(12, 12, 12, 12)
+        indicator_layout.setSpacing(4)
+        
+        self.control_actions_primary_label = QLabel(primary_label)
+        self.control_actions_primary_label.setStyleSheet("font-weight: bold; font-size: 13px;")
+        indicator_layout.addWidget(self.control_actions_primary_label)
+        
+        self.control_actions_secondary_label = QLabel(secondary_text)
+        self.control_actions_secondary_label.setStyleSheet("color: #9e9e9e; font-size: 11px;")
+        indicator_layout.addWidget(self.control_actions_secondary_label)
+        
+        # Set tooltip
+        tooltip_text = get_control_actions_indicator_tooltip()
+        self.control_actions_indicator.setToolTip(tooltip_text)
+        self.control_actions_primary_label.setToolTip(tooltip_text)
+        self.control_actions_secondary_label.setToolTip(tooltip_text)
+        
+        main_layout.addWidget(self.control_actions_indicator)
+
         # Create main splitter
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
         main_splitter.setStyleSheet("""
@@ -613,7 +701,7 @@ class OpTab(QWidget):
             except Exception as e2:
                 logger.error("Fallback also failed: %s", e2)
                 # Last resort: empty combobox
-                self.timeframe_cb.addItems([])
+                self.timeframe_cb.addItems(list())
         self.timeframe_cb.setToolTip("Select timeframe")
         form_layout.addRow("Timeframe:", self.timeframe_cb)
         
@@ -802,7 +890,7 @@ class OpTab(QWidget):
         self.jobs_table.setColumnWidth(8, 70)   # Score
         self.jobs_table.setColumnWidth(9, 120)  # Created
         self.jobs_table.setColumnWidth(10, 120) # Finished
-        self.jobs_table.setColumnWidth(11, 320) # Actions (wider for 4 buttons)
+        self.jobs_table.setColumnWidth(11, 425) # Actions (now 5 buttons)
         
         # Add table to tracker group
         tracker_layout = QVBoxLayout(tracker_group)
@@ -999,7 +1087,7 @@ class OpTab(QWidget):
         research_run_id = self.research_run_id_edit.text().strip()
 
         if run_mode in {"backtest", "research"}:
-            missing = []
+            missing = list()
             if not start_date:
                 missing.append("Start Date")
             if not end_date:
@@ -1143,7 +1231,9 @@ class OpTab(QWidget):
         elif action_type == "report":
             self.open_report(job_id)
         elif action_type == "explain":
-            self.explain_failure(job_id)
+            self.explain_failure(job_id, job)
+        elif action_type == "abort":
+            self.handle_abort_request(job_id, job, row)
     
     def view_logs(self, job_id: str):
         """Open log viewer dialog for a job."""
@@ -1198,8 +1288,8 @@ class OpTab(QWidget):
         if not needs_research_run_id:
             self.research_run_id_edit.setText("")
 
-    def explain_failure(self, job_id: str):
-        """Explain failure for a failed/rejected job."""
+    def explain_failure(self, job_id: str, job: Optional[Dict[str, Any]] = None):
+        """Explain failure for a failed/rejected/aborted job."""
         try:
             # Fetch artifacts
             artifacts = get_artifacts(job_id)
@@ -1210,6 +1300,40 @@ class OpTab(QWidget):
             
             # Extract failure explanation from policy_check.json and runtime_metrics.json
             explanation = self._extract_failure_explanation(artifacts)
+            
+            # Build header with semantic translation
+            status = job.get("status") if job else None
+            error_details = job.get("error_details") if job else None
+            semantic = translate_job_status(status, error_details)
+            
+            # Start with semantic summary
+            lines = [f"=== JOB STATUS ===",
+                     f"Status: {status or 'UNKNOWN'}",
+                     f"Explanation: {semantic}",
+                     ""]
+            
+            # Add abort attribution summary if job is ABORTED (D3)
+            if status == "ABORTED":
+                attribution = get_abort_attribution_summary(status, error_details)
+                if attribution:
+                    lines.append("=== ABORT ATTRIBUTION ===")
+                    lines.append(attribution)
+                    lines.append("")
+            
+            # Add original artifact explanation
+            lines.append(explanation)
+            
+            # If job has error_details, include them as pretty JSON
+            if error_details and isinstance(error_details, dict):
+                lines.append("\n=== ERROR DETAILS (JSON) ===")
+                try:
+                    pretty_json = json.dumps(error_details, indent=2, ensure_ascii=False)
+                    lines.append(pretty_json)
+                except Exception as e:
+                    lines.append(f"Failed to format JSON: {e}")
+                    lines.append(str(error_details))
+            
+            full_explanation = "\n".join(lines)
             
             # Show explanation dialog
             from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QLabel  # type: ignore
@@ -1222,7 +1346,7 @@ class OpTab(QWidget):
             
             text_edit = QTextEdit()
             text_edit.setReadOnly(True)
-            text_edit.setPlainText(explanation)
+            text_edit.setPlainText(full_explanation)
             text_edit.setStyleSheet("""
                 QTextEdit {
                     background-color: #1E1E1E;
@@ -1248,9 +1372,98 @@ class OpTab(QWidget):
                 f"Unexpected error: {e}")
             logger.error(f"Unexpected error explaining failure for job {job_id}: {e}")
 
+    def handle_abort_request(self, job_id: str, job: dict, row: int):
+        """Handle abort request for a job with confirmation dialog and safety gates."""
+        # Double-check that abort is allowed (should already be checked by button enabled state)
+        status = job.get("status", "")
+        if not is_abort_allowed(status):
+            QMessageBox.warning(
+                self,
+                "Abort Not Allowed",
+                f"Cannot abort job {job_id[:8]}... (status: {status}). "
+                "Only QUEUED or RUNNING jobs can be aborted, and control actions must be enabled."
+            )
+            return
+        
+        # Show confirmation dialog per Product Contract
+        reply = QMessageBox.question(
+            self,
+            "Abort job?",
+            f"Abort job {job_id[:8]}...?\n\n"
+            f"Status: {status}\n"
+            f"Strategy: {job.get('strategy_name', job.get('strategy_id', 'Unknown'))}\n"
+            f"Instrument: {job.get('instrument', 'N/A')}\n\n"
+            "This will request the supervisor to stop the job. "
+            "Any partial results will be preserved.",
+            QMessageBox.StandardButton.Cancel | QMessageBox.StandardButton.Ok,
+            QMessageBox.StandardButton.Cancel  # Default to Cancel (safe)
+        )
+        
+        if reply != QMessageBox.StandardButton.Ok:
+            # User cancelled
+            self.log_signal.emit(f"Abort cancelled for job {job_id}")
+            return
+        
+        # Disable the abort button immediately to prevent double-submit
+        # We'll trigger a repaint of the table row
+        index = self.jobs_model.index(row, 11)  # Actions column
+        self.jobs_table.viewport().update(index)
+        
+        # Show feedback
+        self.status_label.setText(f"Abort requested for {job_id[:8]}...")
+        self.log_signal.emit(f"Requesting abort for job {job_id}")
+        
+        try:
+            # Write audit evidence first (if this fails, abort should be blocked)
+            try:
+                evidence_path = write_abort_request_evidence(job_id, reason="user_requested")
+                self.log_signal.emit(f"Abort evidence written: {evidence_path}")
+            except EvidenceWriteError as e:
+                QMessageBox.critical(
+                    self,
+                    "Evidence Write Failed",
+                    f"Cannot write audit evidence: {e}\n\n"
+                    "Abort request blocked for safety. Please check outputs directory permissions."
+                )
+                self.log_signal.emit(f"Abort blocked - evidence write failed: {e}")
+                # Re-enable button by triggering repaint
+                self.jobs_table.viewport().update(index)
+                return
+            
+            # Call abort API
+            try:
+                response = abort_job(job_id)
+                self.log_signal.emit(f"Abort API called for job {job_id}: {response}")
+                self.status_label.setText(f"Abort requested for {job_id[:8]}... (waiting)")
+                
+                # Schedule a refresh after a short delay to update status
+                QTimer.singleShot(2000, self.jobs_model.refresh_data)
+                
+            except SupervisorClientError as e:
+                QMessageBox.critical(
+                    self,
+                    "Abort Request Failed",
+                    f"Failed to send abort request: {e}\n\n"
+                    "The job may have already finished or the supervisor may be unavailable."
+                )
+                self.log_signal.emit(f"Abort API failed for job {job_id}: {e}")
+                # Re-enable button by triggering repaint
+                self.jobs_table.viewport().update(index)
+                
+        except Exception as e:
+            # Catch any unexpected errors
+            logger.error(f"Unexpected error during abort for job {job_id}: {e}")
+            QMessageBox.critical(
+                self,
+                "Unexpected Error",
+                f"An unexpected error occurred: {e}"
+            )
+            # Re-enable button by triggering repaint
+            self.jobs_table.viewport().update(index)
+
     def _extract_failure_explanation(self, artifacts: dict) -> str:
         """Extract failure explanation from artifacts."""
-        lines = []
+        lines = list()
         
         # Check policy_check.json
         policy_check = artifacts.get("policy_check")
@@ -1260,7 +1473,7 @@ class OpTab(QWidget):
                 status = policy_check.get("status")
                 if status:
                     lines.append(f"Status: {status}")
-                gates = policy_check.get("gates", [])
+                gates = policy_check.get("gates", list())
                 for gate in gates:
                     gate_name = gate.get("name", "Unknown")
                     gate_status = gate.get("status", "UNKNOWN")

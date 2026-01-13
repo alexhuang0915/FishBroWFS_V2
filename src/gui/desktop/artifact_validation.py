@@ -45,7 +45,7 @@ def validate_artifact_dir(run_dir: Path) -> Dict[str, Any]:
         ("report.json", run_dir / "report.json"),
     ]
     
-    missing = []
+    missing = list()
     for name, path in required_files:
         if not path.exists():
             missing.append(name)
@@ -88,15 +88,15 @@ def validate_artifact_backward_compatible(artifact_path: str) -> Dict[str, Any]:
         found_files: List[str]
     """
     if not artifact_path:
-        return {"valid": False, "run_dir": "", "found_files": []}
+        return {"valid": False, "run_dir": "", "found_files": list()}
     
     path = Path(artifact_path)
     if not path.exists():
-        return {"valid": False, "run_dir": str(path), "found_files": []}
+        return {"valid": False, "run_dir": str(path), "found_files": list()}
     
     # HARD CONTRACT: MUST be artifact_*
     if not is_artifact_dir_name(path.name):
-        return {"valid": False, "run_dir": str(path), "found_files": []}
+        return {"valid": False, "run_dir": str(path), "found_files": list()}
     
     # Backward compatibility: only require manifest.json and metrics.json
     # (Phase 15.1 contract)
@@ -105,7 +105,7 @@ def validate_artifact_backward_compatible(artifact_path: str) -> Dict[str, Any]:
         ("metrics.json", path / "metrics.json"),
     ]
     
-    found_files = []
+    found_files = list()
     for name, filepath in required_files:
         if filepath.exists():
             found_files.append(name)

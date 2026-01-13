@@ -451,7 +451,7 @@ class AnalysisWidget(QWidget):
         splitter.setStretchFactor(1, 1)
         
         # Set initial sizes
-        splitter.setSizes([600, 150])
+        splitter.setSizes(list((600, 150)))
         
         main_layout.addWidget(splitter)
         

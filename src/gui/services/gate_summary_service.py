@@ -17,6 +17,7 @@ and optional drill‑down actions.
 
 import json
 import logging
+import requests
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -73,37 +74,55 @@ class GateSummaryService:
         Raises:
             SupervisorClientError: if any gate fails due to network or server error.
         """
-        gates = list()
         try:
-            gates.append(self._fetch_api_health())
-            gates.append(self._fetch_api_readiness())
-            gates.append(self._fetch_supervisor_db_ssot())
-            gates.append(self._fetch_worker_execution_reality())
-            gates.append(self._fetch_registry_surface())
-        except SupervisorClientError as e:
-            # If any gate fails due to network/server error, we treat as overall FAIL
-            logger.error(f"Gate fetch failed: {e}")
-            # Create a placeholder gate for the error
+            gates = list()
+            try:
+                gates.append(self._fetch_api_health())
+                gates.append(self._fetch_api_readiness())
+                gates.append(self._fetch_supervisor_db_ssot())
+                gates.append(self._fetch_worker_execution_reality())
+                gates.append(self._fetch_registry_surface())
+            except SupervisorClientError as e:
+                # If any gate fails due to network/server error, we treat as overall FAIL
+                logger.error(f"Gate fetch failed: {e}")
+                # Create a placeholder gate for the error
+                error_gate = GateResult(
+                    gate_id="fetch_error",
+                    gate_name="Gate Fetch Error",
+                    status=GateStatus.FAIL,
+                    message=f"Failed to fetch gates: {e.message}",
+                    details={"error_type": e.error_type, "status_code": e.status_code},
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+                gates = list((error_gate,)) + gates[:4]  # replace first gate? we'll keep partial results
+                # Continue to compute overall status
+
+            overall_status = self._compute_overall_status(gates)
+            overall_message = self._compute_overall_message(overall_status, gates)
+
+            return GateSummary(
+                gates=gates,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                overall_status=overall_status,
+                overall_message=overall_message,
+            )
+        except Exception as e:
+            # Catastrophic failure: return a safe fallback summary
+            logger.error(f"Gate summary fetch failed catastrophically: {e}", exc_info=True)
             error_gate = GateResult(
-                gate_id="fetch_error",
-                gate_name="Gate Fetch Error",
+                gate_id="catastrophic_failure",
+                gate_name="Gate Summary Service",
                 status=GateStatus.FAIL,
-                message=f"Failed to fetch gates: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                message=f"Failed to fetch gate summary: {e}",
+                details={"error_type": type(e).__name__, "traceback": str(e)},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
-            gates = list((error_gate,)) + gates[:4]  # replace first gate? we'll keep partial results
-            # Continue to compute overall status
-
-        overall_status = self._compute_overall_status(gates)
-        overall_message = self._compute_overall_message(overall_status, gates)
-
-        return GateSummary(
-            gates=gates,
-            timestamp=datetime.now(timezone.utc).isoformat(),
-            overall_status=overall_status,
-            overall_message=overall_message,
-        )
+            return GateSummary(
+                gates=[error_gate],
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                overall_status=GateStatus.FAIL,
+                overall_message="Gate summary service unavailable.",
+            )
 
     def _fetch_api_health(self) -> GateResult:
         """Gate 1: API Health."""
@@ -173,7 +192,6 @@ class GateSummaryService:
             # The supervisor client doesn't have a method for that.
             # We'll implement a simple HTTP call using the same session as the client.
             # We'll access self.client.session and make a GET.
-            import requests
             url = f"{self.client.base_url}/api/v1/readiness"
             response = self.client.session.get(url, timeout=self.timeout)
             response.raise_for_status()
@@ -317,7 +335,6 @@ class GateSummaryService:
             # The client has `get_registry_timeframes`? Actually there is `get_registry_timeframes`?
             # Let's examine the client again: there is `get_registry_timeframes`? I think not.
             # We'll need to add a method, but for now we'll call the endpoint directly.
-            import requests
             url = f"{self.client.base_url}/api/v1/registry/timeframes"
             response = self.client.session.get(url, timeout=self.timeout)
             response.raise_for_status()

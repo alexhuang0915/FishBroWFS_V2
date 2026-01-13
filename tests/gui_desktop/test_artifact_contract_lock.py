@@ -17,7 +17,7 @@ import time
 
 import pytest
 
-from src.gui.desktop.artifact_validation import (
+from gui.desktop.artifact_validation import (
     is_artifact_dir_name,
     validate_artifact_dir,
     find_latest_valid_artifact,

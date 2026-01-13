@@ -17,18 +17,18 @@ from unittest.mock import patch
 
 import pytest
 
-from src.contracts.dimensions import (
+from contracts.dimensions import (
     SessionSpec,
     InstrumentDimension,
     DimensionRegistry,
     canonical_json,
 )
-from src.contracts.dimensions_loader import (
+from contracts.dimensions_loader import (
     load_dimension_registry,
     write_dimension_registry,
     default_registry_path,
 )
-from src.core.dimensions import (
+from core.dimensions import (
     get_dimension_for_dataset,
     clear_dimension_cache,
 )
@@ -237,7 +237,7 @@ def test_get_dimension_for_dataset():
         by_symbol={"CME.MNQ": dim},
     )
     
-    with patch("src.core.dimensions._get_cached_registry") as mock_get:
+    with patch("core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 查詢存在的 dataset_id
@@ -274,7 +274,7 @@ def test_get_dimension_for_dataset_cache():
     )
     
     # 使用 return_value 而不是 side_effect，因為 @lru_cache 會快取返回值
-    with patch("src.core.dimensions._get_cached_registry") as mock_get:
+    with patch("core.dimensions._get_cached_registry") as mock_get:
         mock_get.return_value = mock_registry
         
         # 第一次呼叫

@@ -1,0 +1,22 @@
+Failed to execute portfolio build: 1 validation error for GovernanceParams
+portfolio_risk_budget_max
+  Value error, portfolio_risk_budget_max must be in (0, 1] [type=value_error, input_value=100000.0, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/build_portfolio.py", line 70, in execute
+    result = self._execute_portfolio(payload, context, outputs_root, portfolio_dir)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/build_portfolio.py", line 192, in _execute_portfolio
+    decision = self._run_admission_gate(payload, outputs_root, portfolio_dir)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/build_portfolio.py", line 134, in _run_admission_gate
+    params = GovernanceParams(**params_dict)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/.venv/lib/python3.12/site-packages/pydantic/main.py", line 250, in __init__
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+pydantic_core._pydantic_core.ValidationError: 1 validation error for GovernanceParams
+portfolio_risk_budget_max
+  Value error, portfolio_risk_budget_max must be in (0, 1] [type=value_error, input_value=100000.0, input_type=float]
+    For further information visit https://errors.pydantic.dev/2.12/v/value_error
+

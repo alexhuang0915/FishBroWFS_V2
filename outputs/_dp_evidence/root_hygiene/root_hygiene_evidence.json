@@ -51,9 +51,7 @@
     ".gitattributes",
     ".github",
     ".gitignore",
-    ".lsp_mcp.port",
     ".pre-commit-config.yaml",
-    ".roo",
     ".rooignore",
     ".vscode",
     "Makefile",
@@ -69,9 +67,6 @@
     "src",
     "tests"
   ],
-  "violations": [
-    "Unexpected file: .lsp_mcp.port",
-    "Unexpected directory: .roo"
-  ],
-  "timestamp": "2026-01-13T10:32:14.367088"
+  "violations": [],
+  "timestamp": "2026-01-13T23:34:43.166513"
 }

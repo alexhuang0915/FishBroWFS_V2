@@ -6,7 +6,7 @@ from pathlib import Path
 import tempfile
 import os
 
-from src.control.supervisor.db import SupervisorDB
+from control.supervisor.db import SupervisorDB
 
 
 def test_params_hash_index_exists():
@@ -60,12 +60,12 @@ def test_index_improves_query_performance():
         db = SupervisorDB(db_path)
         
         # Insert a test job
-        from src.control.supervisor.models import JobSpec, JobStatus
+        from control.supervisor.models import JobSpec, JobStatus
         spec = JobSpec(job_type="RUN_RESEARCH_V2", params={"test": "value"})
         
         # Use the new submit_job method with params_hash
         import json
-        from src.contracts.supervisor.evidence_schemas import stable_params_hash
+        from contracts.supervisor.evidence_schemas import stable_params_hash
         params_hash = stable_params_hash(spec.params)
         job_id = db.submit_job(spec, params_hash=params_hash, state=JobStatus.QUEUED)
         

@@ -6,7 +6,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from src.control.portfolio.evidence_reader import RunEvidenceReader
+from control.portfolio.evidence_reader import RunEvidenceReader
 
 
 def test_missing_policy_check_rejects(tmp_path):

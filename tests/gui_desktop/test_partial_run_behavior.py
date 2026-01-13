@@ -22,7 +22,7 @@ class TestPartialRunBehavior:
     def test_active_run_state_classification(self):
         """Test that RunStatus classification works correctly for partial runs."""
         # Import directly from src to avoid gui.desktop.__init__ issues
-        from src.gui.desktop.state.active_run_state import ActiveRunState, RunStatus
+        from gui.desktop.state.active_run_state import ActiveRunState, RunStatus
         
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)

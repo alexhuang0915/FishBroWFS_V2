@@ -11,7 +11,7 @@ from PySide6.QtCore import Qt
 import tempfile
 import os
 
-from src.gui.desktop.tabs.op_tab import OpTab
+from gui.desktop.tabs.op_tab import OpTab
 
 
 @pytest.fixture

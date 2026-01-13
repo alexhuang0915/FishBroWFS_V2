@@ -7,9 +7,9 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
+from control.supervisor.supervisor import Supervisor
 
 
 def test_build_data_handler_minimal_harmless(tmp_path: Path):
@@ -33,7 +33,7 @@ def test_build_data_handler_minimal_harmless(tmp_path: Path):
     }
     
     # Patch the import inside the handler method
-    with patch('src.control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
+    with patch('control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
         mock_prepare.return_value = mock_result
         
         # Create supervisor
@@ -76,7 +76,7 @@ def test_build_data_handler_minimal_harmless(tmp_path: Path):
 
 def test_build_data_handler_validation(tmp_path: Path):
     """Test BUILD_DATA parameter validation."""
-    from src.control.supervisor.handlers.build_data import BuildDataHandler
+    from control.supervisor.handlers.build_data import BuildDataHandler
     
     handler = BuildDataHandler()
     
@@ -125,7 +125,7 @@ def test_build_data_handler_abort_before_invoke(tmp_path: Path):
     artifacts_root = tmp_path / "artifacts"
     
     # Mock the function to avoid actual execution
-    with patch('src.control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
+    with patch('control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
         mock_prepare.return_value = {"ok": True}
         
         supervisor = Supervisor(
@@ -165,7 +165,7 @@ def test_build_data_handler_cli_fallback(tmp_path: Path):
     artifacts_root = tmp_path / "artifacts"
     
     # Mock ImportError for prepare_with_data2_enforcement by patching the import
-    with patch('src.control.prepare_orchestration.prepare_with_data2_enforcement', side_effect=ImportError("No module")):
+    with patch('control.prepare_orchestration.prepare_with_data2_enforcement', side_effect=ImportError("No module")):
         # Mock subprocess.run to avoid actual CLI execution
         mock_process = Mock()
         mock_process.returncode = 0
@@ -202,8 +202,8 @@ def test_build_data_handler_cli_fallback(tmp_path: Path):
 
 def test_build_data_handler_direct_execution(tmp_path: Path):
     """Test BUILD_DATA handler directly with mocked context."""
-    from src.control.supervisor.handlers.build_data import BuildDataHandler
-    from src.control.supervisor.job_handler import JobContext
+    from control.supervisor.handlers.build_data import BuildDataHandler
+    from control.supervisor.job_handler import JobContext
     
     handler = BuildDataHandler()
     
@@ -222,7 +222,7 @@ def test_build_data_handler_direct_execution(tmp_path: Path):
         "data2_reports": {"feed1": {"fingerprint_path": "/tmp/feed1.json"}}
     }
     
-    with patch('src.control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
+    with patch('control.prepare_orchestration.prepare_with_data2_enforcement') as mock_prepare:
         mock_prepare.return_value = mock_result
         
         # Execute handler

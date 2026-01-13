@@ -14,9 +14,9 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.control.supervisor import submit, get_job, list_jobs
-from src.control.supervisor.db import SupervisorDB, get_default_db_path
-from src.control.supervisor.models import JobSpec
+from control.supervisor import submit, get_job, list_jobs
+from control.supervisor.db import SupervisorDB, get_default_db_path
+from control.supervisor.models import JobSpec
 
 
 def test_submit_run_plateau_v2_job():
@@ -80,7 +80,7 @@ def test_run_plateau_v2_job_validation():
 
 def test_run_plateau_v2_handler_registered():
     """Test that RUN_PLATEAU_V2 handler is registered."""
-    from src.control.supervisor.job_handler import get_handler
+    from control.supervisor.job_handler import get_handler
     
     handler = get_handler("RUN_PLATEAU_V2")
     assert handler is not None
@@ -90,10 +90,10 @@ def test_run_plateau_v2_handler_registered():
     print("✓ RUN_PLATEAU_V2 handler is registered")
 
 
-@patch('src.control.supervisor.handlers.run_plateau.RunPlateauHandler._execute_plateau')
+@patch('control.supervisor.handlers.run_plateau.RunPlateauHandler._execute_plateau')
 def test_run_plateau_v2_job_execution(mock_execute):
     """Test RUN_PLATEAU_V2 job execution with mock."""
-    from src.control.supervisor.handlers.run_plateau import RunPlateauHandler
+    from control.supervisor.handlers.run_plateau import RunPlateauHandler
     
     # Mock successful execution
     mock_execute.return_value = {
@@ -135,8 +135,8 @@ def test_run_plateau_v2_job_execution(mock_execute):
 
 def test_run_plateau_v2_manifest_generation():
     """Test manifest generation for RUN_PLATEAU_V2 jobs."""
-    from src.control.supervisor.handlers.run_plateau import RunPlateauHandler
-    from src.contracts.supervisor.run_plateau import RunPlateauPayload
+    from control.supervisor.handlers.run_plateau import RunPlateauHandler
+    from contracts.supervisor.run_plateau import RunPlateauPayload
     
     handler = RunPlateauHandler()
     

@@ -91,6 +91,67 @@ class SupervisorDB:
                         FOREIGN KEY (current_job_id) REFERENCES jobs (job_id)
                     )
                 """)
+                
+                # seasons table (P2-A: Season SSOT)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS seasons (
+                        season_id TEXT PRIMARY KEY,
+                        label TEXT NOT NULL,
+                        note TEXT NOT NULL DEFAULT '',
+                        state TEXT NOT NULL,
+                        universe_fingerprint TEXT NOT NULL,
+                        timeframes_fingerprint TEXT NOT NULL,
+                        dataset_snapshot_id TEXT NOT NULL,
+                        engine_constitution_id TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        created_by TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                """)
+                
+                # season_jobs table (P2-A: Job attachment)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS season_jobs (
+                        season_id TEXT NOT NULL,
+                        job_id TEXT NOT NULL,
+                        attached_at TEXT NOT NULL,
+                        attached_by TEXT NOT NULL,
+                        attach_evidence_path TEXT NOT NULL,
+                        PRIMARY KEY (season_id, job_id),
+                        FOREIGN KEY (season_id) REFERENCES seasons (season_id) ON DELETE CASCADE,
+                        FOREIGN KEY (job_id) REFERENCES jobs (job_id) ON DELETE CASCADE
+                    )
+                """)
+                
+                # season_admissions table (P2-C: Admission decisions)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS season_admissions (
+                        season_id TEXT NOT NULL,
+                        job_id TEXT NOT NULL,
+                        candidate_key TEXT NOT NULL,
+                        decision TEXT NOT NULL,  -- ADMIT/REJECT/HOLD
+                        reason TEXT NOT NULL,
+                        decided_at TEXT NOT NULL,
+                        decided_by TEXT NOT NULL,
+                        evidence_path TEXT NOT NULL,
+                        PRIMARY KEY (season_id, job_id, candidate_key),
+                        FOREIGN KEY (season_id) REFERENCES seasons (season_id) ON DELETE CASCADE,
+                        FOREIGN KEY (job_id) REFERENCES jobs (job_id) ON DELETE CASCADE
+                    )
+                """)
+                
+                # season_exports table (P2-D: Export records)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS season_exports (
+                        season_id TEXT NOT NULL,
+                        artifact_path TEXT NOT NULL,
+                        exported_at TEXT NOT NULL,
+                        exported_by TEXT NOT NULL,
+                        PRIMARY KEY (season_id, artifact_path),
+                        FOREIGN KEY (season_id) REFERENCES seasons (season_id) ON DELETE CASCADE
+                    )
+                """)
+                
                 # indexes
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_state ON jobs(state)")
                 conn.execute("CREATE INDEX IF NOT EXISTS idx_jobs_worker ON jobs(worker_id)")
@@ -104,6 +165,14 @@ class SupervisorDB:
                     ON jobs(job_type, params_hash)
                     WHERE params_hash != '' AND state IN ('QUEUED', 'RUNNING', 'SUCCEEDED')
                 """)
+                
+                # Season indexes
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_seasons_state ON seasons(state)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_season_jobs_season ON season_jobs(season_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_season_jobs_job ON season_jobs(job_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_season_admissions_season ON season_admissions(season_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_season_admissions_job ON season_admissions(job_id)")
+                conn.execute("CREATE INDEX IF NOT EXISTS idx_season_exports_season ON season_exports(season_id)")
                 
                 # Repair invalid state records (quarantine)
                 valid_states = [

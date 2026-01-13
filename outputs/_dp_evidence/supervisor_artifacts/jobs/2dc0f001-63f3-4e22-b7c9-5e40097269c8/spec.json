@@ -1,0 +1,1 @@
+{"job_type":"RUN_PORTFOLIO_ADMISSION","metadata":{},"params":{"portfolio_config":{"correlation_threshold":0.7,"description":"Test portfolio for admission analysis","max_drawdown_limit_pct":20.0,"name":"Test Portfolio","target_volatility":0.15},"portfolio_id":"test_portfolio_123","result_paths":["/tmp/tmpvlwqaree/result_0.json","/tmp/tmpvlwqaree/result_1.json"]}}

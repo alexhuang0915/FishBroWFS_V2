@@ -14,14 +14,14 @@ from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
-from src.control.api import app
+from control.api import app
 
 
 def test_post_portfolios_build_minimal_payload():
     """POST /api/v1/portfolios/build with minimal payload returns 200 and job_id."""
     # Mock the supervisor submit to avoid actually running portfolio build
     # Patch at the source module
-    with patch('src.control.supervisor.submit') as mock_submit:
+    with patch('control.supervisor.submit') as mock_submit:
         mock_submit.return_value = "test_job_123"
         
         # Create TestClient after patching
@@ -79,7 +79,7 @@ def test_post_portfolios_build_empty_candidate_run_ids():
 
 def test_post_portfolios_build_without_governance_overrides():
     """POST /api/v1/portfolios/build without governance_params_overrides uses defaults."""
-    with patch('src.control.supervisor.submit') as mock_submit:
+    with patch('control.supervisor.submit') as mock_submit:
         mock_submit.return_value = "test_job_456"
         
         payload = {
@@ -115,7 +115,7 @@ def test_post_portfolios_build_invalid_correlation_threshold():
 
 def test_post_portfolios_build_creates_build_portfolio_v2_job():
     """POST /api/v1/portfolios/build creates a BUILD_PORTFOLIO_V2 job."""
-    from src.control.supervisor.models import JobSpec
+    from control.supervisor.models import JobSpec
     
     captured_args = None
     
@@ -124,7 +124,7 @@ def test_post_portfolios_build_creates_build_portfolio_v2_job():
         captured_args = (job_type, params, metadata)
         return "test_job_789"
     
-    with patch('src.control.supervisor.submit', side_effect=capture_submit):
+    with patch('control.supervisor.submit', side_effect=capture_submit):
         payload = {
             "season": "2026Q1",
             "timeframe": "60m",

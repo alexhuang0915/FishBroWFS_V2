@@ -5,7 +5,7 @@ import tempfile
 import json
 from pathlib import Path
 
-from src.control.supervisor.policies.post_flight import QualityGate
+from control.supervisor.policies.post_flight import QualityGate
 
 
 def test_manifest_present_check():

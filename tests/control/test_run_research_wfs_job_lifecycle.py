@@ -19,12 +19,12 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 from datetime import datetime, timezone
 
-from src.control.supervisor import submit, get_job
-from src.control.supervisor.db import SupervisorDB, get_default_db_path
-from src.control.supervisor.job_handler import get_handler
+from control.supervisor import submit, get_job
+from control.supervisor.db import SupervisorDB, get_default_db_path
+from control.supervisor.job_handler import get_handler
 
 # Import WFS modules
-from src.contracts.research_wfs.result_schema import (
+from contracts.research_wfs.result_schema import (
     ResearchWFSResult,
     MetaSection as Meta,
     ConfigSection as Config,
@@ -34,7 +34,7 @@ from src.contracts.research_wfs.result_schema import (
     MetricsSection as Metrics,
     VerdictSection as Verdict,
 )
-from src.wfs.evaluation import (
+from wfs.evaluation import (
     compute_hard_gates,
     compute_scores,
     compute_total,
@@ -42,8 +42,8 @@ from src.wfs.evaluation import (
     evaluate,
     EvaluationResult,
 )
-from src.wfs.stitching import stitch_equity_series
-from src.wfs.bnh_baseline import compute_bnh_equity_for_range
+from wfs.stitching import stitch_equity_series
+from wfs.bnh_baseline import compute_bnh_equity_for_range
 
 
 def test_submit_run_research_wfs_job():
@@ -430,7 +430,7 @@ def test_stitching_offsets():
 
 def test_bnh_required_present():
     """result.json includes stitched_bnh_equity and is non-empty for stub case."""
-    from src.wfs.bnh_baseline import PriceSeries, CostModel
+    from wfs.bnh_baseline import PriceSeries, CostModel
     
     # Create a simple price series
     timestamps = [
@@ -477,11 +477,11 @@ def test_bnh_required_present():
     print("✓ B&H baseline required present verification passed")
 
 
-@patch('src.control.supervisor.handlers.run_research_wfs.RunResearchWFSHandler._execute_wfs_windows')
+@patch('control.supervisor.handlers.run_research_wfs.RunResearchWFSHandler._execute_wfs_windows')
 def test_handler_smoke_stub_engine(mock_execute_windows):
     """Stub engine returns deterministic metrics/equity for 2 seasons."""
-    from src.control.supervisor.handlers.run_research_wfs import RunResearchWFSHandler
-    from src.contracts.research_wfs.result_schema import WindowResult, TimeRange
+    from control.supervisor.handlers.run_research_wfs import RunResearchWFSHandler
+    from contracts.research_wfs.result_schema import WindowResult, TimeRange
     
     # Create mock window results
     mock_window = WindowResult(

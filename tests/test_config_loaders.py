@@ -7,7 +7,7 @@ Verify that the new config loaders work correctly.
 import pytest
 from pathlib import Path
 
-from src.config import (
+from config import (
     # Registry loaders
     load_timeframes, TimeframeRegistry,
     load_instruments, InstrumentRegistry,
@@ -221,7 +221,7 @@ def test_config_error_handling():
         temp_path = Path(f.name)
     
     try:
-        from src.config import load_yaml
+        from config import load_yaml
         with pytest.raises(ConfigValidationError):
             load_yaml(temp_path)
     finally:

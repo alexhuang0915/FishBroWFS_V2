@@ -5,9 +5,9 @@ import tempfile
 import json
 from pathlib import Path
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
-from src.control.supervisor.admission import submit_with_admission
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
+from control.supervisor.admission import submit_with_admission
 
 
 def test_job_rejection_persists():

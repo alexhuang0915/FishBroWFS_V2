@@ -8,9 +8,9 @@ import signal
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
+from control.supervisor.supervisor import Supervisor
 
 
 def test_abort_request_flag(tmp_path: Path):
@@ -62,8 +62,8 @@ def test_abort_queued_job(tmp_path: Path):
 
 def test_abort_running_job_via_flag(tmp_path: Path):
     """Test that running job detects abort flag and stops."""
-    from src.control.supervisor.handlers.ping import PingHandler
-    from src.control.supervisor.job_handler import JobContext
+    from control.supervisor.handlers.ping import PingHandler
+    from control.supervisor.job_handler import JobContext
     
     handler = PingHandler()
     

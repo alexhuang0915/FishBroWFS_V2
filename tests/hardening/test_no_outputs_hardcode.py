@@ -39,6 +39,7 @@ def test_no_hardcoded_outputs_paths():
         "src/core/paths.py",
         "src/control/api.py",  # Has FISHBRO_* env var defaults
         "src/control/season_export.py",  # Has FISHBRO_EXPORTS_ROOT default
+        "src/control/season_export_candidates.py",  # Has FISHBRO_EXPORTS_ROOT default
         "src/control/dataset_registry_mutation.py",  # Has FISHBRO_DATASET_REGISTRY_ROOT default
         "src/control/season_api.py",  # Has FISHBRO_SEASON_INDEX_ROOT default
         "src/utils/write_scope.py",  # Has FISHBRO_EXPORTS_ROOT default

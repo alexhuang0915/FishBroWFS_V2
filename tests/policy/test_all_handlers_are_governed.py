@@ -40,7 +40,7 @@ def test_all_handlers_are_governed():
         
         # Check if it inherits from BaseGovernedHandler
         import src.control.supervisor.handlers.base_governed as base_governed_module
-        from src.control.supervisor.handlers.base_governed import BaseGovernedHandler
+        from control.supervisor.handlers.base_governed import BaseGovernedHandler
         
         if issubclass(handler_class, BaseGovernedHandler):
             print(f"✓ {handler_name} inherits from BaseGovernedHandler")
@@ -67,7 +67,7 @@ def test_all_handlers_are_governed():
 
 def test_handler_registration_integrity():
     """Test that all handlers are properly registered in HANDLER_REGISTRY."""
-    from src.control.supervisor.job_handler import HANDLER_REGISTRY
+    from control.supervisor.job_handler import HANDLER_REGISTRY
     
     # Get job types from HANDLER_REGISTRY
     registered_job_types = list(HANDLER_REGISTRY.keys())

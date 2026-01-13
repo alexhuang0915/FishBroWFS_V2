@@ -88,6 +88,45 @@ from contracts.data.snapshot_models import SnapshotMetadata
 from control.data_snapshot import create_snapshot, compute_snapshot_id, normalize_bars
 from control.dataset_registry_mutation import register_snapshot_as_dataset
 
+# P2-A: Season SSOT + Boundary Validator imports
+from contracts.season import (
+    SeasonCreateRequest,
+    SeasonCreateResponse,
+    SeasonListResponse,
+    SeasonDetailResponse,
+    SeasonAttachRequest,
+    SeasonAttachResponse,
+    SeasonFreezeResponse,
+    SeasonArchiveResponse,
+    BoundaryMismatchErrorPayload,
+)
+from control.seasons_repo import (
+    create_season,
+    list_seasons,
+    get_season,
+    freeze_season,
+    archive_season,
+    attach_job_to_season,
+    get_season_jobs,
+)
+from control.season_boundary_validator import SeasonBoundaryValidator, validate_and_attach_job
+from control.job_boundary_reader import extract_job_boundary
+from control.season_attach_evidence import write_attach_evidence
+
+# P2-B/C/D: Season Analysis, Admission Decisions, Export imports
+from contracts.season import (
+    SeasonAnalysisRequest,
+    SeasonAnalysisResponse,
+    SeasonAdmissionRequest,
+    SeasonAdmissionResponse,
+    SeasonExportCandidatesRequest,
+    SeasonExportCandidatesResponse,
+)
+from control.season_analysis import analyze_season
+from control.season_admission import create_admission_decisions as decide_season_admissions
+from control.season_export_candidates import export_season_candidates
+from control.season_p2_bcd_evidence import write_admission_evidence, write_export_evidence
+
 # API payload contracts (SSOT)
 from contracts.api import (
     ReadinessResponse,
@@ -1740,6 +1779,386 @@ async def export_season_compare_leaderboard(
         "per_group": res.per_group,
         "groups": res.groups,
     }
+
+
+# P2-A: Season SSOT + Boundary Validator endpoints
+
+@api_v1.post("/seasons/ssot/create", response_model=SeasonCreateResponse)
+async def create_season_ssot(payload: SeasonCreateRequest) -> SeasonCreateResponse:
+    """
+    Create a new Season SSOT entity with hard boundary validation.
+    
+    Contract:
+    - Creates a new season in the SSOT database (jobs_v2.db)
+    - Season ID must be unique (409 conflict if exists)
+    - Initial state: DRAFT
+    - Boundary fields are required and immutable after creation
+    - Returns SeasonCreateResponse with created season details
+    """
+    try:
+        # The create_season function expects a SeasonCreateRequest and actor
+        season = create_season(payload, actor="api")
+        # Convert SeasonRecord to dict for response model
+        return SeasonCreateResponse(season=season.model_dump())
+    except ValueError as e:
+        if "already exists" in str(e):
+            raise HTTPException(status_code=409, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to create season: {e}")
+
+
+@api_v1.get("/seasons/ssot", response_model=SeasonListResponse)
+async def list_seasons_ssot() -> SeasonListResponse:
+    """
+    List all Season SSOT entities.
+    
+    Contract:
+    - Returns all seasons sorted by created_at descending
+    - Includes summary information (not full details)
+    """
+    try:
+        seasons = list_seasons()
+        # Convert SeasonRecord objects to dictionaries
+        season_dicts = [season.model_dump() for season in seasons]
+        return SeasonListResponse(seasons=season_dicts)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list seasons: {e}")
+
+
+@api_v1.get("/seasons/ssot/{season_id}", response_model=SeasonDetailResponse)
+async def get_season_ssot(season_id: str) -> SeasonDetailResponse:
+    """
+    Get detailed information about a Season SSOT entity.
+    
+    Contract:
+    - Returns full season details including boundary and state
+    - Includes attached job IDs
+    - 404 if season not found
+    """
+    try:
+        season, job_ids = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        return SeasonDetailResponse(
+            season=season.model_dump(),
+            job_ids=job_ids,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get season: {e}")
+
+
+@api_v1.post("/seasons/ssot/{season_id}/attach", response_model=SeasonAttachResponse)
+async def attach_job_to_season_ssot(season_id: str, payload: SeasonAttachRequest) -> SeasonAttachResponse:
+    """
+    Attach a job to a Season SSOT with hard boundary validation.
+    
+    Contract:
+    - Validates job boundary matches season boundary (all 4 fields must match exactly)
+    - If mismatch: returns 422 with BoundaryMismatchErrorPayload
+    - If match: attaches job to season, writes evidence, returns success
+    - Season must be in DRAFT or OPEN state (403 if FROZEN/DECIDING/ARCHIVED)
+    - Job must exist in supervisor DB (404 if not found)
+    - Idempotent: if already attached, returns success (200)
+    """
+    try:
+        # Get season
+        season, _ = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        # Check season state - only OPEN seasons can accept attachments
+        if season.state != "OPEN":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot attach jobs to season in {season.state} state"
+            )
+        
+        # Extract job boundary from artifacts
+        job_boundary = extract_job_boundary(payload.job_id)
+        if job_boundary is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Job {payload.job_id} not found or missing boundary artifacts"
+            )
+        
+        # Validate boundary match using SeasonBoundaryValidator
+        is_valid, mismatches = SeasonBoundaryValidator.validate(season, job_boundary)
+        
+        if not is_valid:
+            # Write rejection evidence
+            write_attach_evidence(
+                season=season,
+                job_boundary=job_boundary,
+                job_id=payload.job_id,
+                actor=payload.actor,
+                is_accepted=False,
+                mismatches=mismatches,
+                error_message="Boundary mismatch",
+            )
+            
+            # Return 422 with detailed mismatch information
+            # Convert BoundaryMismatchItem objects to dictionaries for serialization
+            mismatches_dicts = [
+                {
+                    "field": m.field,
+                    "season_value": m.season_value,
+                    "job_value": m.job_value,
+                }
+                for m in mismatches
+            ]
+            raise HTTPException(
+                status_code=422,
+                detail=BoundaryMismatchErrorPayload(
+                    season_id=season_id,
+                    job_id=payload.job_id,
+                    mismatches=mismatches_dicts,
+                ).model_dump()
+            )
+        
+        # Boundary matches - attach job
+        try:
+            # Generate evidence path
+            from datetime import datetime
+            import hashlib
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            evidence_hash = hashlib.sha256(f"{season_id}_{payload.job_id}_{timestamp}".encode()).hexdigest()[:16]
+            evidence_path = f"outputs/_dp_evidence/season_attach/{season_id}_{payload.job_id}_{evidence_hash}.json"
+            
+            attach_job_to_season(
+                season_id=season_id,
+                job_id=payload.job_id,
+                actor=payload.actor,
+                attach_evidence_path=evidence_path,
+            )
+        except ValueError as e:
+            if "already attached" in str(e):
+                # Idempotent - already attached, return success
+                pass
+            else:
+                raise
+        
+        # Write acceptance evidence
+        write_attach_evidence(
+            season=season,
+            job_boundary=job_boundary,
+            job_id=payload.job_id,
+            actor=payload.actor,
+            is_accepted=True,
+            attach_response=SeasonAttachResponse(
+                season_id=season_id,
+                job_id=payload.job_id,
+                result="ACCEPTED",
+                mismatches=[],
+            ),
+        )
+        
+        return SeasonAttachResponse(
+            season_id=season_id,
+            job_id=payload.job_id,
+            result="ACCEPTED",
+            mismatches=[],
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to attach job: {e}")
+
+
+@api_v1.post("/seasons/ssot/{season_id}/freeze", response_model=SeasonFreezeResponse)
+async def freeze_season_ssot(season_id: str) -> SeasonFreezeResponse:
+    """
+    Freeze a Season SSOT (transition from OPEN to FROZEN).
+    
+    Contract:
+    - Only OPEN seasons can be frozen (403 if not OPEN)
+    - Frozen seasons cannot accept new job attachments
+    - Returns updated season state
+    """
+    try:
+        updated_season = freeze_season(season_id, actor="api")
+        if updated_season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        return SeasonFreezeResponse(
+            season_id=updated_season.season_id,
+            previous_state="OPEN",
+            new_state=updated_season.state,
+            updated_at=updated_season.updated_at,
+        )
+    except ValueError as e:
+        if "cannot transition" in str(e):
+            raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to freeze season: {e}")
+
+
+@api_v1.post("/seasons/ssot/{season_id}/archive", response_model=SeasonArchiveResponse)
+async def archive_season_ssot(season_id: str) -> SeasonArchiveResponse:
+    """
+    Archive a Season SSOT (transition from FROZEN/DECIDING to ARCHIVED).
+    
+    Contract:
+    - Only FROZEN or DECIDING seasons can be archived (403 if not)
+    - Archived seasons are read-only
+    - Returns updated season state
+    """
+    try:
+        # Get season first to know its current state
+        season, _ = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        previous_state = season.state
+        
+        # Archive the season
+        updated_season = archive_season(season_id, actor="api")
+        
+        return SeasonArchiveResponse(
+            season_id=updated_season.season_id,
+            previous_state=previous_state,  # State before archiving
+            new_state="ARCHIVED",
+            updated_at=updated_season.updated_at,
+        )
+    except ValueError as e:
+        if "cannot transition" in str(e):
+            raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to archive season: {e}")
+
+
+# P2-B/C/D: Season Analysis, Admission Decisions, Export endpoints
+
+@api_v1.post("/seasons/ssot/{season_id}/analyze", response_model=SeasonAnalysisResponse)
+async def analyze_season_ssot(season_id: str, payload: SeasonAnalysisRequest) -> SeasonAnalysisResponse:
+    """
+    P2-B: Season Analysis Aggregator (Hybrid BC Season Viewer).
+    
+    Contract:
+    - Season must be FROZEN (403 if not FROZEN)
+    - Reads attached job artifacts (winners.json) and aggregates candidate performance
+    - Returns aggregated analysis with candidate rankings and metrics
+    - Writes evidence to outputs/_dp_evidence/season_analysis/
+    """
+    try:
+        # Get season
+        season, _ = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        # Check season state - must be FROZEN for analysis
+        if season.state != "FROZEN":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot analyze season in {season.state} state (must be FROZEN)"
+            )
+        
+        # Analyze season
+        analysis = analyze_season(season_id, payload)
+        
+        return analysis
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to analyze season: {e}")
+
+
+@api_v1.post("/seasons/ssot/{season_id}/admit", response_model=SeasonAdmissionResponse)
+async def admit_season_candidates_ssot(season_id: str, payload: SeasonAdmissionRequest) -> SeasonAdmissionResponse:
+    """
+    P2-C: Season Admission Decisions.
+    
+    Contract:
+    - Season must be FROZEN (403 if not FROZEN)
+    - Validates candidate identities (candidate_id or rank:N format)
+    - Makes ADMIT/REJECT/HOLD decisions based on governance rules
+    - Writes decisions to season_admissions table with evidence
+    - Returns decision summary with counts
+    """
+    try:
+        # Get season
+        season, _ = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        # Check season state - must be FROZEN for admission decisions
+        if season.state != "FROZEN":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot make admission decisions for season in {season.state} state (must be FROZEN)"
+            )
+        
+        # Make admission decisions
+        decisions = decide_season_admissions(payload)
+        
+        # Write evidence
+        write_admission_evidence(
+            admission_response=decisions,
+            actor=payload.actor,
+        )
+        
+        return decisions
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to make admission decisions: {e}")
+
+
+@api_v1.post("/seasons/ssot/{season_id}/export_candidates", response_model=SeasonExportCandidatesResponse)
+async def export_season_candidates_ssot(season_id: str, payload: SeasonExportCandidatesRequest) -> SeasonExportCandidatesResponse:
+    """
+    P2-D: Export Portfolio Candidate Set.
+    
+    Contract:
+    - Season must be in DECIDING state (403 if not DECIDING)
+    - Reads admission decisions from season_admissions table
+    - Exports ADMITTED candidates as portfolio candidate set artifact
+    - Writes versioned artifact to outputs/portfolio/candidates/
+    - Returns export summary with artifact path and SHA256
+    """
+    try:
+        # Get season
+        season, _ = get_season(season_id)
+        if season is None:
+            raise HTTPException(status_code=404, detail=f"Season {season_id} not found")
+        
+        # Check season state - must be DECIDING for export
+        if season.state != "DECIDING":
+            raise HTTPException(
+                status_code=403,
+                detail=f"Cannot export candidates for season in {season.state} state (must be DECIDING)"
+            )
+        
+        # Export candidates
+        export = export_season_candidates(season_id, payload)
+        
+        # Write evidence
+        write_export_evidence(
+            export_response=export,
+            actor=payload.actor,
+        )
+        
+        return export
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to export candidates: {e}")
 
 
 # Phase 16.5: Real Data Snapshot Integration endpoints

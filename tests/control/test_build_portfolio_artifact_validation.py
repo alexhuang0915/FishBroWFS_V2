@@ -14,8 +14,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import hashlib
 
-from src.control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
-from src.contracts.supervisor.build_portfolio import BuildPortfolioPayload
+from control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
+from contracts.supervisor.build_portfolio import BuildPortfolioPayload
 
 
 def test_manifest_schema():

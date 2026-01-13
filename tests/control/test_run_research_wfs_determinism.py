@@ -2,8 +2,8 @@ import pytest
 import json
 from unittest.mock import Mock
 
-from src.control.supervisor.handlers.run_research_wfs import RunResearchWFSHandler
-from src.control.supervisor.job_handler import JobContext
+from control.supervisor.handlers.run_research_wfs import RunResearchWFSHandler
+from control.supervisor.job_handler import JobContext
 
 @pytest.fixture
 def mock_context():

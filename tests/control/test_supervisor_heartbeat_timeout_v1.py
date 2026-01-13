@@ -6,9 +6,9 @@ import time
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec, now_iso, parse_iso
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec, now_iso, parse_iso
+from control.supervisor.supervisor import Supervisor
 
 
 def test_find_running_jobs_stale(tmp_path: Path):

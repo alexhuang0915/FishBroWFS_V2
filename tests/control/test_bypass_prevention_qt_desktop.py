@@ -111,12 +111,12 @@ def test_desktop_imports_supervisor():
     supervisor_client_path = Path("src/gui/desktop/services/supervisor_client.py")
     assert supervisor_client_path.exists(), "supervisor_client.py should exist for proper API usage"
     
-    # Check that it imports from src.control.supervisor
+    # Check that it imports from control.supervisor
     with open(supervisor_client_path, "r") as f:
         content = f.read()
     
     # Should import submit, get_job, etc.
-    expected_imports = ["from src.control.supervisor", "import submit", "import get_job"]
+    expected_imports = ["from control.supervisor", "import submit", "import get_job"]
     for expected in expected_imports:
         if expected not in content:
             print(f"⚠️  Warning: {expected} not found in supervisor_client.py")

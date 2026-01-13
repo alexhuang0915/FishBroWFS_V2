@@ -6,7 +6,7 @@ Part A - Jobs list field expansion from params_override
 """
 import pytest
 from fastapi.testclient import TestClient
-from src.control.api import app, _expand_display_fields_from_params_override
+from control.api import app, _expand_display_fields_from_params_override
 
 
 @pytest.fixture(scope="module")

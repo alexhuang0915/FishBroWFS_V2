@@ -14,8 +14,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import hashlib
 
-from src.control.supervisor.handlers.run_research import RunResearchHandler
-from src.contracts.supervisor.run_research import RunResearchPayload
+from control.supervisor.handlers.run_research import RunResearchHandler
+from contracts.supervisor.run_research import RunResearchPayload
 
 
 def test_manifest_schema():

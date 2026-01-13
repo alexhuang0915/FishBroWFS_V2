@@ -52,7 +52,7 @@ def test_s2_feature_requirements():
     
     # S2 has a module-level feature_requirements function
     # We can import it directly
-    from src.strategy.builtin.s2_v1 import feature_requirements
+    from strategy.builtin.s2_v1 import feature_requirements
     req = feature_requirements()
     
     from contracts.strategy_features import StrategyFeatureRequirements
@@ -72,7 +72,7 @@ def test_s3_feature_requirements():
     spec = get("S3")
     
     # S3 has a module-level feature_requirements function
-    from src.strategy.builtin.s3_v1 import feature_requirements
+    from strategy.builtin.s3_v1 import feature_requirements
     req = feature_requirements()
     
     from contracts.strategy_features import StrategyFeatureRequirements

@@ -15,9 +15,9 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock, Mock
 from datetime import datetime, timezone
 
-from src.control.supervisor import submit, get_job
-from src.control.supervisor.db import SupervisorDB, get_default_db_path
-from src.control.supervisor.job_handler import get_handler
+from control.supervisor import submit, get_job
+from control.supervisor.db import SupervisorDB, get_default_db_path
+from control.supervisor.job_handler import get_handler
 
 
 def test_submit_run_portfolio_admission_job():
@@ -176,7 +176,7 @@ def test_run_portfolio_admission_handler_registered():
 
 def test_parameter_validation():
     """Test parameter validation for portfolio admission."""
-    from src.control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
+    from control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
     
     handler = RunPortfolioAdmissionHandler()
     
@@ -215,11 +215,11 @@ def test_parameter_validation():
     print("✓ Parameter validation passed")
 
 
-@patch('src.control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._load_results')
-@patch('src.control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._build_portfolio_config')
-@patch('src.control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._run_correlation_analysis')
-@patch('src.control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._determine_admission')
-@patch('src.control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._write_artifacts')
+@patch('control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._load_results')
+@patch('control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._build_portfolio_config')
+@patch('control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._run_correlation_analysis')
+@patch('control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._determine_admission')
+@patch('control.supervisor.handlers.run_portfolio_admission.RunPortfolioAdmissionHandler._write_artifacts')
 def test_handler_smoke_stub_results(
     mock_write_artifacts,
     mock_determine_admission,
@@ -228,8 +228,8 @@ def test_handler_smoke_stub_results(
     mock_load_results
 ):
     """Stub results returns deterministic admission decision."""
-    from src.control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
-    from src.contracts.portfolio.admission_schemas import AdmissionDecision, AdmissionVerdict
+    from control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
+    from contracts.portfolio.admission_schemas import AdmissionDecision, AdmissionVerdict
     
     # Mock the handler methods
     mock_load_results.return_value = {

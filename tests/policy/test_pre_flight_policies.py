@@ -5,9 +5,9 @@ import tempfile
 from pathlib import Path
 import json
 
-from src.control.supervisor.admission import AdmissionController
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
+from control.supervisor.admission import AdmissionController
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
 
 
 def test_duplicate_fingerprint_policy():
@@ -31,7 +31,7 @@ def test_duplicate_fingerprint_policy():
         
         # Submit the job (simulate)
         spec = JobSpec(job_type="RUN_RESEARCH_V2", params=payload1)
-        from src.contracts.supervisor.evidence_schemas import stable_params_hash
+        from contracts.supervisor.evidence_schemas import stable_params_hash
         params_hash = stable_params_hash(payload1)
         db.submit_job(spec, params_hash=params_hash, state="QUEUED")
         
@@ -191,7 +191,7 @@ def test_admission_controller_integration():
         
         # Test job that should fail (duplicate + invalid timeframe)
         spec = JobSpec(job_type="RUN_FREEZE_V2", params=payload)
-        from src.contracts.supervisor.evidence_schemas import stable_params_hash
+        from contracts.supervisor.evidence_schemas import stable_params_hash
         params_hash = stable_params_hash(payload)
         db.submit_job(spec, params_hash=params_hash, state="QUEUED")
         

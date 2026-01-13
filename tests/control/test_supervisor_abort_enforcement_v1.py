@@ -9,9 +9,9 @@ import time
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec, now_iso
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec, now_iso
+from control.supervisor.supervisor import Supervisor
 
 
 def test_abort_queued_job_with_error_details(tmp_path: Path):
@@ -322,7 +322,7 @@ def test_error_details_schema_compliance(tmp_path: Path):
         assert key in allowed, f"Unexpected key {key} in error_details"
 
     # Verify API response includes error_details
-    from src.control.api import _supervisor_job_to_response
+    from control.api import _supervisor_job_to_response
     response = _supervisor_job_to_response(job)
     assert response.error_details is not None
     assert response.error_details["type"] == "ValidationError"

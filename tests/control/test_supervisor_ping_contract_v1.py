@@ -8,14 +8,14 @@ import threading
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
+from control.supervisor.supervisor import Supervisor
 
 
 def test_ping_handler_registered():
     """Test that PING handler is registered."""
-    from src.control.supervisor.job_handler import get_handler
+    from control.supervisor.job_handler import get_handler
     handler = get_handler("PING")
     assert handler is not None
     assert handler.__class__.__name__ == "PingHandler"
@@ -23,7 +23,7 @@ def test_ping_handler_registered():
 
 def test_ping_validate_params():
     """Test PING parameter validation."""
-    from src.control.supervisor.handlers.ping import PingHandler
+    from control.supervisor.handlers.ping import PingHandler
     handler = PingHandler()
     
     # Valid params
@@ -45,8 +45,8 @@ def test_ping_validate_params():
 
 def test_ping_execute_quick(tmp_path: Path):
     """Test PING execution with minimal sleep."""
-    from src.control.supervisor.handlers.ping import PingHandler
-    from src.control.supervisor.job_handler import JobContext
+    from control.supervisor.handlers.ping import PingHandler
+    from control.supervisor.job_handler import JobContext
     
     handler = PingHandler()
     
@@ -72,8 +72,8 @@ def test_ping_execute_quick(tmp_path: Path):
 
 def test_ping_execute_with_abort(tmp_path: Path):
     """Test PING execution with abort request."""
-    from src.control.supervisor.handlers.ping import PingHandler
-    from src.control.supervisor.job_handler import JobContext
+    from control.supervisor.handlers.ping import PingHandler
+    from control.supervisor.job_handler import JobContext
     
     handler = PingHandler()
     

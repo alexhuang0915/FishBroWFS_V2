@@ -4,7 +4,7 @@ Freeze test for JobType enum.
 Ensures the canonical job type list is stable and matches the frozen set.
 """
 
-from src.control.supervisor.models import JobType
+from control.supervisor.models import JobType
 
 
 def test_job_type_enum_frozen():
@@ -30,7 +30,7 @@ def test_job_type_enum_frozen():
 
 def test_job_type_normalization():
     """Test that normalize_job_type maps legacy aliases to canonical values."""
-    from src.control.supervisor.models import normalize_job_type
+    from control.supervisor.models import normalize_job_type
     
     # Direct enum values
     assert normalize_job_type("BUILD_DATA") == JobType.BUILD_DATA

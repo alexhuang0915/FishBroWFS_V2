@@ -4,7 +4,7 @@ Test that Context Feeds allows multi-select as specified in Phase 17B.
 import pytest
 from PySide6.QtWidgets import QApplication, QCheckBox, QGroupBox, QLabel, QScrollArea
 from PySide6.QtCore import Qt
-from src.gui.desktop.tabs.op_tab import OpTab
+from gui.desktop.tabs.op_tab import OpTab
 
 
 @pytest.fixture

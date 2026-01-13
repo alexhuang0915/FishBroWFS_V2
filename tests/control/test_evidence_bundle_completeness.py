@@ -6,8 +6,8 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from src.control.supervisor.handlers.base_governed import BaseGovernedHandler
-from src.control.supervisor.job_handler import JobContext
+from control.supervisor.handlers.base_governed import BaseGovernedHandler
+from control.supervisor.job_handler import JobContext
 
 
 class TestGovernedHandler(BaseGovernedHandler):

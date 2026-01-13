@@ -23,7 +23,7 @@ def test_api_contract_matches_snapshot() -> None:
     If they differ, fail with a clear message.
     """
     # Import the FastAPI app (must be done after sys.path is set)
-    from src.control.api import app
+    from control.api import app
 
     # Load saved snapshot
     snapshot_path = Path(__file__).parent / "api_contract" / "openapi.json"
@@ -79,7 +79,7 @@ def test_api_snapshot_is_not_auto_written() -> None:
 
     # Run the comparison (should not write)
     # We'll just import and call app.openapi() but not write.
-    from src.control.api import app
+    from control.api import app
     _ = app.openapi()
 
     if snapshot_path.exists():

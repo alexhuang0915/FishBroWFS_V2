@@ -27,6 +27,9 @@ from PySide6.QtWidgets import QToolTip
 import json
 from gui.desktop.widgets.log_viewer import LogViewerDialog
 from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
+from gui.desktop.widgets.explain_hub_widget import ExplainHubWidget
+from gui.desktop.widgets.analysis_drawer_widget import AnalysisDrawerWidget
+from gui.desktop.widgets.season_ssot_dialog import SeasonSSOTDialog
 from gui.desktop.services.supervisor_client import (
     SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
@@ -42,6 +45,8 @@ from gui.services.job_status_translator import translate_job_status
 from gui.services.control_actions_gate import is_control_actions_enabled, is_abort_allowed, get_abort_button_tooltip, get_abort_attribution_summary
 from gui.services.ui_action_evidence import write_abort_request_evidence, EvidenceWriteError, verify_evidence_write_possible
 from gui.desktop.services.supervisor_client import abort_job
+from gui.services.hybrid_bc_adapters import adapt_to_index, adapt_to_context, adapt_to_analysis
+from gui.services.hybrid_bc_vms import JobIndexVM, JobContextVM, JobAnalysisVM
 
 logger = logging.getLogger(__name__)
 
@@ -59,8 +64,7 @@ class JobsTableModel(QAbstractTableModel):
         self.filtered_jobs: List[Dict[str, Any]] = list()  # Jobs after filtering
         self.headers = [
             "Job ID", "Strategy", "Instrument", "Timeframe",
-            "Run Mode", "Season", "Status", "Duration", "Score",
-            "Created", "Finished", "Actions"
+            "Run Mode", "Season", "Status", "Created", "Finished", "Actions"
         ]
         self.refresh_timer = QTimer()
         self.refresh_timer.timeout.connect(self.refresh_data)
@@ -228,22 +232,7 @@ class JobsTableModel(QAbstractTableModel):
                 if status == "SUCCEEDED":
                     return "Completed"
                 return status
-            elif col == 7:  # Duration
-                duration = job.get("duration_seconds")
-                if duration is not None:
-                    if duration < 60:
-                        return f"{duration:.1f}s"
-                    elif duration < 3600:
-                        return f"{duration/60:.1f}m"
-                    else:
-                        return f"{duration/3600:.1f}h"
-                return "—"
-            elif col == 8:  # Score
-                score = job.get("score")
-                if score is not None:
-                    return f"{score:.3f}"
-                return "—"
-            elif col == 9:  # Created
+            elif col == 7:  # Created (previously col 9)
                 created = job.get("created_at", "")
                 if created:
                     try:
@@ -252,7 +241,7 @@ class JobsTableModel(QAbstractTableModel):
                     except (ValueError, AttributeError):
                         return created
                 return ""
-            elif col == 10:  # Finished
+            elif col == 8:  # Finished (previously col 10)
                 finished = job.get("finished_at", "")
                 if finished:
                     try:
@@ -261,14 +250,14 @@ class JobsTableModel(QAbstractTableModel):
                     except (ValueError, AttributeError):
                         return finished
                 return "—"
+            elif col == 9:  # Actions column (previously col 11)
+                return ""  # Actions column is handled by delegate
         
         elif role == Qt.ItemDataRole.TextAlignmentRole:
-            if col in [9, 10]:  # Timestamps
+            if col in [7, 8]:  # Timestamps (Created, Finished)
                 return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
-            elif col == 11:  # Actions column
+            elif col == 9:  # Actions column
                 return Qt.AlignmentFlag.AlignCenter
-            elif col in [7, 8]:  # Duration, Score
-                return Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
             else:
                 return Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         
@@ -286,14 +275,6 @@ class JobsTableModel(QAbstractTableModel):
                     return QColor("#FFC107")  # lighter amber
                 else:
                     return QColor("#9A9A9A")  # gray
-            elif col == 8:  # Score column
-                score = job.get("score")
-                if score is not None:
-                    if score > 0:
-                        return QColor("#4CAF50")  # green for positive
-                    elif score < 0:
-                        return QColor("#F44336")  # red for negative
-                return None
         
         elif role == Qt.ItemDataRole.FontRole:
             if col == 6:  # Status column
@@ -559,6 +540,10 @@ class OpTab(QWidget):
         super().__init__()
         self.jobs_model = JobsTableModel()
         self.actions_delegate = ActionsDelegate()
+        self.explain_hub = ExplainHubWidget()
+        self.analysis_drawer = AnalysisDrawerWidget(self)
+        self.selected_job_id: Optional[str] = None
+        self.selected_job_context: Optional[JobContextVM] = None
         
         self.setup_ui()
         self.setup_connections()
@@ -763,6 +748,29 @@ class OpTab(QWidget):
         self.run_button.setMinimumHeight(50)
         form_layout.addRow(self.run_button)
         
+        # Season SSOT Management button
+        self.season_ssot_button = QPushButton("Manage Seasons (SSOT)")
+        self.season_ssot_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4a148c;
+                color: white;
+                font-weight: bold;
+                font-size: 12px;
+                padding: 8px;
+                border-radius: 4px;
+                border: 1px solid #6a1b9a;
+            }
+            QPushButton:hover {
+                background-color: #6a1b9a;
+                border: 1px solid #8e24aa;
+            }
+            QPushButton:pressed {
+                background-color: #38006b;
+            }
+        """)
+        self.season_ssot_button.setMinimumHeight(40)
+        form_layout.addRow(self.season_ssot_button)
+        
         # Set form widget to scroll area
         scroll.setWidget(form_widget)
         
@@ -773,16 +781,16 @@ class OpTab(QWidget):
         # Add launch group to left panel
         left_layout.addWidget(launch_group)
         
-        # Right panel: Job Tracker
+        # Right panel: Explain Hub (Hybrid BC Layer 2)
         right_widget = QWidget()
         right_widget.setStyleSheet("background-color: #121212;")
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(4, 4, 4, 4)
         right_layout.setSpacing(8)
         
-        # Job Tracker group
-        tracker_group = QGroupBox("Job Tracker")
-        tracker_group.setStyleSheet("""
+        # Explain Hub group
+        explain_group = QGroupBox("Explain Hub")
+        explain_group.setStyleSheet("""
             QGroupBox {
                 font-weight: bold;
                 border: 2px solid #1b5e20;
@@ -799,7 +807,7 @@ class OpTab(QWidget):
             }
         """)
         
-        # Filter controls layout
+        # Filter controls layout (moved from Job Tracker to top of Explain Hub)
         filter_layout = QHBoxLayout()
         filter_layout.setSpacing(8)
         
@@ -846,10 +854,10 @@ class OpTab(QWidget):
         
         filter_layout.addStretch()
         
-        # Create table view
+        # Create table view (Job Index - Hybrid BC Layer 1)
         self.jobs_table = QTableView()
         self.jobs_table.setModel(self.jobs_model)
-        self.jobs_table.setItemDelegateForColumn(11, self.actions_delegate)
+        self.jobs_table.setItemDelegateForColumn(9, self.actions_delegate)  # Actions column is now column 9
         self.jobs_table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.jobs_table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.jobs_table.setAlternatingRowColors(True)
@@ -886,19 +894,18 @@ class OpTab(QWidget):
         self.jobs_table.setColumnWidth(4, 80)   # Run Mode
         self.jobs_table.setColumnWidth(5, 80)   # Season
         self.jobs_table.setColumnWidth(6, 90)   # Status
-        self.jobs_table.setColumnWidth(7, 80)   # Duration
-        self.jobs_table.setColumnWidth(8, 70)   # Score
-        self.jobs_table.setColumnWidth(9, 120)  # Created
-        self.jobs_table.setColumnWidth(10, 120) # Finished
-        self.jobs_table.setColumnWidth(11, 425) # Actions (now 5 buttons)
+        self.jobs_table.setColumnWidth(7, 120)  # Created
+        self.jobs_table.setColumnWidth(8, 120)  # Finished
+        self.jobs_table.setColumnWidth(9, 425)  # Actions (now 5 buttons)
         
-        # Add table to tracker group
-        tracker_layout = QVBoxLayout(tracker_group)
-        tracker_layout.addLayout(filter_layout)
-        tracker_layout.addWidget(self.jobs_table)
+        # Add table and Explain Hub to explain group
+        explain_layout = QVBoxLayout(explain_group)
+        explain_layout.addLayout(filter_layout)
+        explain_layout.addWidget(self.jobs_table)
+        explain_layout.addWidget(self.explain_hub)
         
-        # Add tracker group to right panel
-        right_layout.addWidget(tracker_group)
+        # Add explain group to right panel
+        right_layout.addWidget(explain_group)
         
         # Add panels to splitter
         main_splitter.addWidget(left_widget)
@@ -920,6 +927,9 @@ class OpTab(QWidget):
         
         # Connect RUN button
         self.run_button.clicked.connect(self.run_strategy)
+        
+        # Connect Season SSOT button
+        self.season_ssot_button.clicked.connect(self.open_season_ssot_dialog)
 
         self.run_mode_cb.currentTextChanged.connect(self._apply_mode_field_visibility)
         self._apply_mode_field_visibility(self.run_mode_cb.currentText())
@@ -938,6 +948,18 @@ class OpTab(QWidget):
         self.season_filter.currentTextChanged.connect(self.apply_filters)
         self.search_edit.textChanged.connect(self.apply_filters)
         self.clear_filters_btn.clicked.connect(self.clear_filters)
+        
+        # Connect job table selection to update Explain Hub (Hybrid BC Layer 1 → Layer 2)
+        self.jobs_table.selectionModel().selectionChanged.connect(self.handle_job_selection)
+        
+        # Connect Explain Hub's open analysis signal
+        self.explain_hub.request_open_analysis.connect(self.handle_open_analysis_request)
+        
+        # Disable double-click bypass (Hybrid BC governance)
+        self.jobs_table.doubleClicked.connect(self.block_double_click)
+        
+        # Connect Analysis Drawer close signal
+        self.analysis_drawer.drawer_closed.connect(self.handle_drawer_closed)
     
     def load_registry_data(self):
         """Load registry data from supervisor API."""
@@ -1508,6 +1530,133 @@ class OpTab(QWidget):
         
         return "\n".join(lines)
     
+    def handle_job_selection(self, selected, deselected):
+        """Handle job selection change (Hybrid BC Layer 1 → Layer 2)."""
+        indexes = selected.indexes()
+        if not indexes:
+            # No selection, clear Explain Hub
+            self.selected_job_id = None
+            self.selected_job_context = None
+            self.explain_hub.clear()
+            # Auto-close drawer if open (Hybrid BC governance)
+            self.analysis_drawer.close()
+            return
+        
+        # Get the first selected row
+        index = indexes[0]
+        row = index.row()
+        job = self.jobs_model.get_job_at_row(row)
+        if not job:
+            return
+        
+        job_id = job.get("job_id")
+        if not job_id:
+            return
+        
+        # Update selected job
+        self.selected_job_id = job_id
+        
+        try:
+            # Fetch artifacts for context
+            artifacts = get_artifacts(job_id)
+            if not artifacts:
+                # No artifacts yet, create minimal context
+                context_data = {
+                    "job_id": job_id,
+                    "status": job.get("status", ""),
+                    "note": job.get("note", ""),
+                    "artifacts": {},
+                    "gatekeeper": {"total_permutations": 0, "valid_candidates": 0, "plateau_check": "N/A"}
+                }
+            else:
+                context_data = {
+                    "job_id": job_id,
+                    "status": job.get("status", ""),
+                    "note": job.get("note", ""),
+                    "artifacts": artifacts,
+                    "gatekeeper": artifacts.get("gatekeeper", {"total_permutations": 0, "valid_candidates": 0, "plateau_check": "N/A"})
+                }
+            
+            # Adapt raw data to JobContextVM
+            context_vm = adapt_to_context(context_data)
+            self.selected_job_context = context_vm
+            
+            # Update Explain Hub
+            self.explain_hub.set_context(context_vm)
+            
+            # Auto-close drawer if open (Hybrid BC governance)
+            self.analysis_drawer.close()
+            
+        except SupervisorClientError as e:
+            logger.error(f"Failed to fetch artifacts for job {job_id}: {e}")
+            # Show error in Explain Hub
+            self.explain_hub.show_error(f"Failed to load job context: {e}")
+    
+    def handle_open_analysis_request(self, job_id: str):
+        """Handle request to open analysis drawer (Hybrid BC Layer 2 → Layer 3)."""
+        # Re-check valid_candidates > 0 (safety gate)
+        if not self.selected_job_context:
+            logger.warning(f"No context for job {job_id}, cannot open analysis")
+            return
+        
+        if self.selected_job_context.gatekeeper.get("valid_candidates", 0) <= 0:
+            logger.warning(f"Job {job_id} has no valid candidates, analysis blocked")
+            # Show tooltip or status message
+            self.status_label.setText(f"Analysis blocked: no valid candidates for job {job_id[:8]}...")
+            return
+        
+        # Open drawer
+        self.analysis_drawer.open_for_job(job_id)
+        
+        # Lazy-load analysis content
+        QTimer.singleShot(100, lambda: self.load_analysis_content(job_id))
+    
+    def load_analysis_content(self, job_id: str):
+        """Lazy-load analysis content for the drawer."""
+        try:
+            # Fetch artifacts for analysis
+            artifacts = get_artifacts(job_id)
+            if not artifacts:
+                self.analysis_drawer.show_error("No artifacts available for analysis")
+                return
+            
+            # Adapt to JobAnalysisVM (metrics allowed here)
+            analysis_vm = adapt_to_analysis({
+                "job_id": job_id,
+                "artifacts": artifacts
+            })
+            
+            # Load report widgets into drawer
+            self.analysis_drawer.load_analysis(analysis_vm)
+            
+        except SupervisorClientError as e:
+            logger.error(f"Failed to load analysis for job {job_id}: {e}")
+            self.analysis_drawer.show_error(f"Failed to load analysis: {e}")
+    
+    def block_double_click(self, index):
+        """Block double-click bypass (Hybrid BC governance)."""
+        # Simply ignore the double-click event
+        # Optionally show a tooltip or status message
+        self.status_label.setText("Double-click disabled. Use Explain Hub's 'Open Analysis Drawer' button.")
+        # You could also play a beep or show a brief notification
+        return
+    
+    def open_season_ssot_dialog(self):
+        """Open Season SSOT management dialog."""
+        try:
+            dialog = SeasonSSOTDialog(parent=self)
+            dialog.exec()
+            self.log_signal.emit("Season SSOT dialog opened")
+        except Exception as e:
+            QMessageBox.critical(self, "Season SSOT Error", f"Failed to open Season SSOT dialog: {e}")
+            logger.error(f"Failed to open Season SSOT dialog: {e}")
+    
+    def handle_drawer_closed(self):
+        """Handle drawer closed event."""
+        # Update status
+        self.status_label.setText("Analysis drawer closed")
+    
     def cleanup(self):
         """Clean up resources."""
         self.jobs_model.stop_auto_refresh()
+        self.analysis_drawer.close()

@@ -6,7 +6,7 @@ pytest.skip("UI feature not yet implemented", allow_module_level=True)
 
 from PySide6.QtWidgets import QApplication
 from pathlib import Path
-from src.gui.desktop.tabs.op_tab import OpTab
+from gui.desktop.tabs.op_tab import OpTab
 
 
 @pytest.fixture
@@ -157,7 +157,7 @@ def test_artifact_validation_required_for_publish(op_tab, monkeypatch):
     monkeypatch.setattr(op_tab, 'find_latest_valid_artifact', mock_find_latest_valid_artifact)
     
     # Mock RUN_INDEX_AVAILABLE to be False so it uses legacy validation
-    monkeypatch.setattr('src.gui.desktop.tabs.op_tab.RUN_INDEX_AVAILABLE', False)
+    monkeypatch.setattr('gui.desktop.tabs.op_tab.RUN_INDEX_AVAILABLE', False)
     
     # Set up a mock result
     op_tab.current_result = {

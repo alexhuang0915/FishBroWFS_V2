@@ -3,7 +3,7 @@ Test params_hash stability (ABI-level lock).
 """
 import json
 import hashlib
-from src.contracts.supervisor.evidence_schemas import stable_params_hash
+from contracts.supervisor.evidence_schemas import stable_params_hash
 
 
 def test_params_hash_stability():
@@ -55,7 +55,7 @@ def test_params_hash_stability():
 
 def test_params_hash_versioning():
     """Test that hash_version is included in fingerprint bundle."""
-    from src.contracts.supervisor.evidence_schemas import FingerprintBundle
+    from contracts.supervisor.evidence_schemas import FingerprintBundle
     
     bundle = FingerprintBundle(
         params_hash="test_hash",

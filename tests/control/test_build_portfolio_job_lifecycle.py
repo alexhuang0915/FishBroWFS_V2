@@ -14,9 +14,9 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.control.supervisor import submit, get_job, list_jobs
-from src.control.supervisor.db import SupervisorDB, get_default_db_path
-from src.control.supervisor.models import JobSpec
+from control.supervisor import submit, get_job, list_jobs
+from control.supervisor.db import SupervisorDB, get_default_db_path
+from control.supervisor.models import JobSpec
 
 
 def test_submit_build_portfolio_v2_job():
@@ -77,7 +77,7 @@ def test_build_portfolio_v2_job_validation():
 
 def test_build_portfolio_v2_handler_registered():
     """Test that BUILD_PORTFOLIO_V2 handler is registered."""
-    from src.control.supervisor.job_handler import get_handler
+    from control.supervisor.job_handler import get_handler
     
     handler = get_handler("BUILD_PORTFOLIO_V2")
     assert handler is not None
@@ -87,10 +87,10 @@ def test_build_portfolio_v2_handler_registered():
     print("✓ BUILD_PORTFOLIO_V2 handler is registered")
 
 
-@patch('src.control.supervisor.handlers.build_portfolio.BuildPortfolioHandler._execute_portfolio')
+@patch('control.supervisor.handlers.build_portfolio.BuildPortfolioHandler._execute_portfolio')
 def test_build_portfolio_v2_job_execution(mock_execute):
     """Test BUILD_PORTFOLIO_V2 job execution with mock."""
-    from src.control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
+    from control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
     
     # Mock successful execution
     mock_execute.return_value = {
@@ -132,8 +132,8 @@ def test_build_portfolio_v2_job_execution(mock_execute):
 
 def test_build_portfolio_v2_manifest_generation():
     """Test manifest generation for BUILD_PORTFOLIO_V2 jobs."""
-    from src.control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
-    from src.contracts.supervisor.build_portfolio import BuildPortfolioPayload
+    from control.supervisor.handlers.build_portfolio import BuildPortfolioHandler
+    from contracts.supervisor.build_portfolio import BuildPortfolioPayload
     
     handler = BuildPortfolioHandler()
     

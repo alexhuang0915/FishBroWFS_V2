@@ -298,7 +298,7 @@ def test_full_build_features_integration(tmp_path: Path):
             features = load_features_npz(feat_path)
             # 動態計算該 timeframe 應有的特徵 keys
             # 使用與 build_shared 相同的 registry
-            from src.features.registry import get_default_registry
+            from features.registry import get_default_registry
             registry = get_default_registry()
             specs = registry.specs_for_tf(tf)
             spec_names = {spec.name for spec in specs}

@@ -14,12 +14,12 @@ def test_contracts_import():
 
 def test_config_import():
     """Test that config modules can be imported."""
-    from src.config.strategies import StrategyConfig
+    from config.strategies import StrategyConfig
     assert StrategyConfig is not None
 
 def test_core_import():
     """Test that core modules can be imported."""
-    from src.core.features import FeatureBundle
+    from core.features import FeatureBundle
     assert FeatureBundle is not None
 
 if __name__ == "__main__":

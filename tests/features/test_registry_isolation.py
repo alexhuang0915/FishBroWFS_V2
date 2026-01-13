@@ -6,7 +6,7 @@ and that ContextVar provides proper isolation for parallel execution.
 """
 import asyncio
 import pytest
-from src.features.registry import (
+from features.registry import (
     FeatureRegistry,
     get_default_registry,
     set_default_registry,
@@ -128,7 +128,7 @@ def test_sync_context_isolation():
     
     # Save token and set new registry
     import contextvars
-    from src.features.registry import _registry_ctx
+    from features.registry import _registry_ctx
     
     token = _registry_ctx.set(None)  # Temporarily clear
     

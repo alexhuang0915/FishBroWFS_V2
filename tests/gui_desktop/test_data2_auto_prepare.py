@@ -10,7 +10,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from src.control.prepare_orchestration import prepare_with_data2_enforcement
+from control.prepare_orchestration import prepare_with_data2_enforcement
 
 
 @pytest.fixture
@@ -33,11 +33,11 @@ def temp_outputs_dir():
 def test_data2_auto_prepare_missing_fingerprint(temp_outputs_dir):
     """Test that Data2 feed is auto-prepared when fingerprint is missing."""
     # Mock the dependencies
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
-         patch('src.control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
+         patch('control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
         
         # Setup mocks for Data1 (primary dataset)
         mock_build.return_value = {
@@ -93,11 +93,11 @@ def test_data2_auto_prepare_missing_fingerprint(temp_outputs_dir):
 def test_data2_auto_prepare_existing_fingerprint(temp_outputs_dir):
     """Test that Data2 feed is NOT auto-prepared when fingerprint already exists."""
     # Mock the dependencies
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
-         patch('src.control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
+         patch('control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
         
         # Setup mocks
         mock_build.return_value = {"success": True}
@@ -151,11 +151,11 @@ def test_data2_auto_prepare_existing_fingerprint(temp_outputs_dir):
 def test_data2_auto_prepare_multiple_feeds(temp_outputs_dir):
     """Test auto-prepare with multiple Data2 feeds, some missing, some existing."""
     # Mock the dependencies
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
-         patch('src.control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
+         patch('control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
         
         # Setup mocks
         mock_build.return_value = {"success": True}
@@ -241,11 +241,11 @@ def test_data2_auto_prepare_fingerprint_file_creation(temp_outputs_dir):
     """Test that auto-prepare actually creates fingerprint file."""
     # This test would require actual file system operations
     # For now, we'll verify the contract through mocks
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
-         patch('src.control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
+         patch('control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
         
         # Create a real fingerprint file path
         fingerprint_path = temp_outputs_dir / "seasons" / "2026Q1" / "shared" / "VX.FUT_fingerprint.json"

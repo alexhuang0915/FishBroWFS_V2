@@ -5,7 +5,7 @@ import pytest
 pytest.skip("UI feature not yet implemented", allow_module_level=True)
 
 from PySide6.QtWidgets import QApplication
-from src.gui.desktop.tabs.op_tab import OpTab
+from gui.desktop.tabs.op_tab import OpTab
 
 
 @pytest.fixture

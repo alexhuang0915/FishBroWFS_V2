@@ -148,7 +148,7 @@ def test_ui_uses_registry_loaders():
                 content = f.read()
             
             # Check for config registry imports
-            if "from src.config" in content or "import src.config" in content:
+            if "from config" in content or "import src.config" in content:
                 registry_imports_found = True
             
             # Check for registry loader usage
@@ -161,7 +161,7 @@ def test_ui_uses_registry_loaders():
     # During migration, this is a warning, not a failure
     if not registry_imports_found:
         warnings.warn(
-            "UI modules should import from src.config registry loaders. "
+            "UI modules should import from config registry loaders. "
             "Found no imports of src.config in GUI modules.",
             UserWarning
         )

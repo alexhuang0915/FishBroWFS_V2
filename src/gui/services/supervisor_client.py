@@ -280,6 +280,46 @@ class SupervisorClient:
         """Get outputs summary for clean UI navigation."""
         return self._get("/api/v1/outputs/summary")
 
+    # P2-A: Season SSOT + Boundary Validator methods
+    def create_season_ssot(self, payload: dict) -> dict:
+        """Create a new Season SSOT entity."""
+        return self._post("/api/v1/seasons/ssot/create", payload)
+
+    def list_seasons_ssot(self) -> dict:
+        """List all Season SSOT entities."""
+        return self._get("/api/v1/seasons/ssot")
+
+    def get_season_ssot(self, season_id: str) -> dict:
+        """Get detailed information about a Season SSOT entity."""
+        return self._get(f"/api/v1/seasons/ssot/{season_id}")
+
+    def attach_job_to_season_ssot(self, season_id: str, job_id: str) -> dict:
+        """Attach a job to a Season SSOT with hard boundary validation."""
+        payload = {"job_id": job_id}
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/attach", payload)
+
+    def freeze_season_ssot(self, season_id: str) -> dict:
+        """Freeze a Season SSOT (transition from OPEN to FROZEN)."""
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/freeze", {})
+
+    def archive_season_ssot(self, season_id: str) -> dict:
+        """Archive a Season SSOT (transition from FROZEN/DECIDING to ARCHIVED)."""
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/archive", {})
+
+    # P2-B/C/D: Season Analysis, Admission, Export methods
+    def analyze_season_ssot(self, season_id: str) -> dict:
+        """Analyze a Season SSOT (P2-B: Season Viewer/Analysis Aggregator)."""
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/analyze", {})
+
+    def admit_candidates_to_season_ssot(self, season_id: str, decisions: List[dict]) -> dict:
+        """Admit candidates to a Season SSOT (P2-C: Admission Decisions)."""
+        payload = {"decisions": decisions}
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/admit", payload)
+
+    def export_candidates_from_season_ssot(self, season_id: str) -> dict:
+        """Export candidate set from a Season SSOT (P2-D: Export Portfolio Candidate Set)."""
+        return self._post(f"/api/v1/seasons/ssot/{season_id}/export_candidates", {})
+
 
 # Singleton client instance
 _client = SupervisorClient()
@@ -407,6 +447,44 @@ def get_outputs_summary() -> dict:
     """Get outputs summary for clean UI navigation."""
     return _client.get_outputs_summary()
 
+# P2-A: Season SSOT + Boundary Validator public functions
+def create_season_ssot(payload: dict) -> dict:
+    """Create a new Season SSOT entity."""
+    return _client.create_season_ssot(payload)
+
+def list_seasons_ssot() -> dict:
+    """List all Season SSOT entities."""
+    return _client.list_seasons_ssot()
+
+def get_season_ssot(season_id: str) -> dict:
+    """Get detailed information about a Season SSOT entity."""
+    return _client.get_season_ssot(season_id)
+
+def attach_job_to_season_ssot(season_id: str, job_id: str) -> dict:
+    """Attach a job to a Season SSOT with hard boundary validation."""
+    return _client.attach_job_to_season_ssot(season_id, job_id)
+
+def freeze_season_ssot(season_id: str) -> dict:
+    """Freeze a Season SSOT (transition from OPEN to FROZEN)."""
+    return _client.freeze_season_ssot(season_id)
+
+def archive_season_ssot(season_id: str) -> dict:
+    """Archive a Season SSOT (transition from FROZEN/DECIDING to ARCHIVED)."""
+    return _client.archive_season_ssot(season_id)
+
+# P2-B/C/D: Season Analysis, Admission, Export public functions
+def analyze_season_ssot(season_id: str) -> dict:
+    """Analyze a Season SSOT (P2-B: Season Viewer/Analysis Aggregator)."""
+    return _client.analyze_season_ssot(season_id)
+
+def admit_candidates_to_season_ssot(season_id: str, decisions: List[dict]) -> dict:
+    """Admit candidates to a Season SSOT (P2-C: Admission Decisions)."""
+    return _client.admit_candidates_to_season_ssot(season_id, decisions)
+
+def export_candidates_from_season_ssot(season_id: str) -> dict:
+    """Export candidate set from a Season SSOT (P2-D: Export Portfolio Candidate Set)."""
+    return _client.export_candidates_from_season_ssot(season_id)
+
 
 __all__ = [
     "SupervisorClient",
@@ -438,4 +516,15 @@ __all__ = [
     "get_portfolio",
     # Phase E.4 additions
     "get_outputs_summary",
+    # P2-A: Season SSOT additions
+    "create_season_ssot",
+    "list_seasons_ssot",
+    "get_season_ssot",
+    "attach_job_to_season_ssot",
+    "freeze_season_ssot",
+    "archive_season_ssot",
+    # P2-B/C/D additions
+    "analyze_season_ssot",
+    "admit_candidates_to_season_ssot",
+    "export_candidates_from_season_ssot",
 ]

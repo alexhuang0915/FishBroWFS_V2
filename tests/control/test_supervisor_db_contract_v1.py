@@ -6,8 +6,8 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
 
 
 def test_init_schema(tmp_path: Path):

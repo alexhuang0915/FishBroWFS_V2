@@ -10,8 +10,8 @@ When skip_verification=True:
 import numpy as np
 import pytest
 
-from src.features.registry import FeatureRegistry
-from src.features.models import FeatureSpec
+from features.registry import FeatureRegistry
+from features.models import FeatureSpec
 
 
 def test_skip_verification_marks_as_unverified():

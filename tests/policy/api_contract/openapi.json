@@ -1,6 +1,86 @@
 {
   "components": {
     "schemas": {
+      "AdmissionDecision": {
+        "description": "Admission decision record (used in season_admission service).",
+        "properties": {
+          "candidate_identity": {
+            "title": "Candidate Identity",
+            "type": "string"
+          },
+          "decided_at": {
+            "title": "Decided At",
+            "type": "string"
+          },
+          "decided_by": {
+            "title": "Decided By",
+            "type": "string"
+          },
+          "decision_reason": {
+            "title": "Decision Reason",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/AdmissionEvidence"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          }
+        },
+        "required": [
+          "candidate_identity",
+          "outcome",
+          "decision_reason",
+          "evidence",
+          "decided_at",
+          "decided_by"
+        ],
+        "title": "AdmissionDecision",
+        "type": "object"
+      },
+      "AdmissionEvidence": {
+        "description": "Evidence for an admission decision.",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "decision_criteria": {
+            "additionalProperties": true,
+            "title": "Decision Criteria",
+            "type": "object"
+          },
+          "decision_outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          },
+          "decision_reason": {
+            "title": "Decision Reason",
+            "type": "string"
+          },
+          "evidence_data": {
+            "additionalProperties": true,
+            "title": "Evidence Data",
+            "type": "object"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "generated_at",
+          "decision_outcome",
+          "decision_reason"
+        ],
+        "title": "AdmissionEvidence",
+        "type": "object"
+      },
       "ArtifactFile": {
         "description": "File entry in artifacts index.",
         "properties": {
@@ -211,6 +291,135 @@
         "title": "BatchSummaryResponse",
         "type": "object"
       },
+      "BoundaryMismatchItem": {
+        "description": "Details of a single boundary mismatch.",
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "job_value": {
+            "title": "Job Value",
+            "type": "string"
+          },
+          "season_value": {
+            "title": "Season Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "season_value",
+          "job_value"
+        ],
+        "title": "BoundaryMismatchItem",
+        "type": "object"
+      },
+      "CandidateIdentity": {
+        "description": "Identity of a candidate.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "rank": {
+            "default": 1,
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidate_id"
+        ],
+        "title": "CandidateIdentity",
+        "type": "object"
+      },
+      "CandidateRef": {
+        "description": "SSOT pointer to a candidate within a job.",
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "candidate_key": {
+            "title": "Candidate Key",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "job_id",
+          "candidate_key"
+        ],
+        "title": "CandidateRef",
+        "type": "object"
+      },
+      "CandidateSource": {
+        "description": "Source information for a candidate.",
+        "properties": {
+          "artifact_type": {
+            "default": "winners.json",
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "extracted_at": {
+            "title": "Extracted At",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "extracted_at"
+        ],
+        "title": "CandidateSource",
+        "type": "object"
+      },
       "ConstraintsReport": {
         "properties": {
           "max_per_dataset_truncated": {
@@ -388,6 +597,16 @@
         ],
         "title": "DatasetRecord",
         "type": "object"
+      },
+      "DecisionOutcome": {
+        "description": "Decision outcome enum (used in evidence).",
+        "enum": [
+          "ADMIT",
+          "REJECT",
+          "HOLD"
+        ],
+        "title": "DecisionOutcome",
+        "type": "string"
       },
       "GovernanceParamsOverrides": {
         "description": "Optional governance parameter overrides.",
@@ -1831,6 +2050,493 @@
         "title": "RevealEvidencePathResponse",
         "type": "object"
       },
+      "SeasonAdmissionRequest": {
+        "description": "Request for season admission decisions (P2-C).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "candidate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateRef"
+            },
+            "title": "Candidate Refs",
+            "type": "array"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAdmissionRequest",
+        "type": "object"
+      },
+      "SeasonAdmissionResponse": {
+        "description": "Response for season admission decisions (P2-C).",
+        "properties": {
+          "admitted_count": {
+            "default": 0,
+            "title": "Admitted Count",
+            "type": "integer"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/AdmissionDecision"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "generated_at": {
+            "default": "",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "held_count": {
+            "default": 0,
+            "title": "Held Count",
+            "type": "integer"
+          },
+          "rejected_count": {
+            "default": 0,
+            "title": "Rejected Count",
+            "type": "integer"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "total_candidates": {
+            "default": 0,
+            "title": "Total Candidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAdmissionResponse",
+        "type": "object"
+      },
+      "SeasonAnalysisRequest": {
+        "description": "Request for season analysis (P2-B).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAnalysisRequest",
+        "type": "object"
+      },
+      "SeasonAnalysisResponse": {
+        "description": "Response for season analysis (P2-B).",
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "deterministic_order": {
+            "default": "score desc, candidate_id asc",
+            "title": "Deterministic Order",
+            "type": "string"
+          },
+          "generated_at": {
+            "default": "",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "season_state": {
+            "default": "",
+            "title": "Season State",
+            "type": "string"
+          },
+          "skipped_jobs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped Jobs",
+            "type": "array"
+          },
+          "total_jobs": {
+            "default": 0,
+            "title": "Total Jobs",
+            "type": "integer"
+          },
+          "valid_candidates": {
+            "default": 0,
+            "title": "Valid Candidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAnalysisResponse",
+        "type": "object"
+      },
+      "SeasonArchiveResponse": {
+        "description": "Response after archiving a season.",
+        "properties": {
+          "new_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "New State",
+            "type": "string"
+          },
+          "previous_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "Previous State",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "previous_state",
+          "new_state",
+          "updated_at"
+        ],
+        "title": "SeasonArchiveResponse",
+        "type": "object"
+      },
+      "SeasonAttachRequest": {
+        "description": "Request to attach a job to a season.",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "SeasonAttachRequest",
+        "type": "object"
+      },
+      "SeasonAttachResponse": {
+        "description": "Response after attempting to attach a job to a season.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "mismatches": {
+            "items": {
+              "$ref": "#/components/schemas/BoundaryMismatchItem"
+            },
+            "title": "Mismatches",
+            "type": "array"
+          },
+          "result": {
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "job_id",
+          "result"
+        ],
+        "title": "SeasonAttachResponse",
+        "type": "object"
+      },
+      "SeasonCandidate": {
+        "description": "A candidate in season analysis.",
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/CandidateIdentity"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "param_hash": {
+            "default": "",
+            "title": "Param Hash",
+            "type": "string"
+          },
+          "research_metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Research Metrics",
+            "type": "object"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CandidateSource"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "identity",
+          "strategy_id",
+          "source"
+        ],
+        "title": "SeasonCandidate",
+        "type": "object"
+      },
+      "SeasonCreateRequest": {
+        "description": "Request to create a new season.",
+        "properties": {
+          "hard_boundary": {
+            "$ref": "#/components/schemas/SeasonHardBoundary"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "hard_boundary"
+        ],
+        "title": "SeasonCreateRequest",
+        "type": "object"
+      },
+      "SeasonCreateResponse": {
+        "description": "Response after creating a season.",
+        "properties": {
+          "season": {
+            "$ref": "#/components/schemas/SeasonRecord"
+          }
+        },
+        "required": [
+          "season"
+        ],
+        "title": "SeasonCreateResponse",
+        "type": "object"
+      },
+      "SeasonDetailResponse": {
+        "description": "Response for getting season details.",
+        "properties": {
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Job Ids",
+            "type": "array"
+          },
+          "season": {
+            "$ref": "#/components/schemas/SeasonRecord"
+          }
+        },
+        "required": [
+          "season"
+        ],
+        "title": "SeasonDetailResponse",
+        "type": "object"
+      },
+      "SeasonExportCandidatesRequest": {
+        "description": "Request to export portfolio candidate set (P2-D).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonExportCandidatesRequest",
+        "type": "object"
+      },
+      "SeasonExportCandidatesResponse": {
+        "description": "Response after exporting portfolio candidate set (P2-D).",
+        "properties": {
+          "artifact_path": {
+            "title": "Artifact Path",
+            "type": "string"
+          },
+          "candidate_count": {
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "export_id",
+          "candidate_count",
+          "artifact_path",
+          "generated_at"
+        ],
+        "title": "SeasonExportCandidatesResponse",
+        "type": "object"
+      },
+      "SeasonFreezeResponse": {
+        "description": "Response after freezing a season.",
+        "properties": {
+          "new_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "New State",
+            "type": "string"
+          },
+          "previous_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "Previous State",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "previous_state",
+          "new_state",
+          "updated_at"
+        ],
+        "title": "SeasonFreezeResponse",
+        "type": "object"
+      },
+      "SeasonHardBoundary": {
+        "description": "Hard boundary for a season - must match exactly for job attachment.",
+        "properties": {
+          "dataset_snapshot_id": {
+            "title": "Dataset Snapshot Id",
+            "type": "string"
+          },
+          "engine_constitution_id": {
+            "title": "Engine Constitution Id",
+            "type": "string"
+          },
+          "timeframes_fingerprint": {
+            "title": "Timeframes Fingerprint",
+            "type": "string"
+          },
+          "universe_fingerprint": {
+            "title": "Universe Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "universe_fingerprint",
+          "timeframes_fingerprint",
+          "dataset_snapshot_id",
+          "engine_constitution_id"
+        ],
+        "title": "SeasonHardBoundary",
+        "type": "object"
+      },
+      "SeasonListResponse": {
+        "description": "Response for listing seasons.",
+        "properties": {
+          "seasons": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRecord"
+            },
+            "title": "Seasons",
+            "type": "array"
+          }
+        },
+        "title": "SeasonListResponse",
+        "type": "object"
+      },
       "SeasonMetadataUpdate": {
         "description": "Request for updating season metadata.",
         "properties": {
@@ -1872,6 +2578,61 @@
           }
         },
         "title": "SeasonMetadataUpdate",
+        "type": "object"
+      },
+      "SeasonRecord": {
+        "description": "Season record as stored in DB.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "hard_boundary": {
+            "$ref": "#/components/schemas/SeasonHardBoundary"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "state": {
+            "default": "DRAFT",
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "label",
+          "hard_boundary",
+          "created_at",
+          "created_by",
+          "updated_at"
+        ],
+        "title": "SeasonRecord",
         "type": "object"
       },
       "SnapshotCreatePayload": {
@@ -4101,6 +4862,384 @@
           }
         },
         "summary": "Get Run Status"
+      }
+    },
+    "/api/v1/seasons/ssot": {
+      "get": {
+        "description": "List all Season SSOT entities.\n\nContract:\n- Returns all seasons sorted by created_at descending\n- Includes summary information (not full details)",
+        "operationId": "list_seasons_ssot_api_v1_seasons_ssot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Seasons Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/create": {
+      "post": {
+        "description": "Create a new Season SSOT entity with hard boundary validation.\n\nContract:\n- Creates a new season in the SSOT database (jobs_v2.db)\n- Season ID must be unique (409 conflict if exists)\n- Initial state: DRAFT\n- Boundary fields are required and immutable after creation\n- Returns SeasonCreateResponse with created season details",
+        "operationId": "create_season_ssot_api_v1_seasons_ssot_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}": {
+      "get": {
+        "description": "Get detailed information about a Season SSOT entity.\n\nContract:\n- Returns full season details including boundary and state\n- Includes attached job IDs\n- 404 if season not found",
+        "operationId": "get_season_ssot_api_v1_seasons_ssot__season_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/admit": {
+      "post": {
+        "description": "P2-C: Season Admission Decisions.\n\nContract:\n- Season must be FROZEN (403 if not FROZEN)\n- Validates candidate identities (candidate_id or rank:N format)\n- Makes ADMIT/REJECT/HOLD decisions based on governance rules\n- Writes decisions to season_admissions table with evidence\n- Returns decision summary with counts",
+        "operationId": "admit_season_candidates_ssot_api_v1_seasons_ssot__season_id__admit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAdmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAdmissionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admit Season Candidates Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/analyze": {
+      "post": {
+        "description": "P2-B: Season Analysis Aggregator (Hybrid BC Season Viewer).\n\nContract:\n- Season must be FROZEN (403 if not FROZEN)\n- Reads attached job artifacts (winners.json) and aggregates candidate performance\n- Returns aggregated analysis with candidate rankings and metrics\n- Writes evidence to outputs/_dp_evidence/season_analysis/",
+        "operationId": "analyze_season_ssot_api_v1_seasons_ssot__season_id__analyze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/archive": {
+      "post": {
+        "description": "Archive a Season SSOT (transition from FROZEN/DECIDING to ARCHIVED).\n\nContract:\n- Only FROZEN or DECIDING seasons can be archived (403 if not)\n- Archived seasons are read-only\n- Returns updated season state",
+        "operationId": "archive_season_ssot_api_v1_seasons_ssot__season_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonArchiveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/attach": {
+      "post": {
+        "description": "Attach a job to a Season SSOT with hard boundary validation.\n\nContract:\n- Validates job boundary matches season boundary (all 4 fields must match exactly)\n- If mismatch: returns 422 with BoundaryMismatchErrorPayload\n- If match: attaches job to season, writes evidence, returns success\n- Season must be in DRAFT or OPEN state (403 if FROZEN/DECIDING/ARCHIVED)\n- Job must exist in supervisor DB (404 if not found)\n- Idempotent: if already attached, returns success (200)",
+        "operationId": "attach_job_to_season_ssot_api_v1_seasons_ssot__season_id__attach_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAttachRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAttachResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach Job To Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/export_candidates": {
+      "post": {
+        "description": "P2-D: Export Portfolio Candidate Set.\n\nContract:\n- Season must be in DECIDING state (403 if not DECIDING)\n- Reads admission decisions from season_admissions table\n- Exports ADMITTED candidates as portfolio candidate set artifact\n- Writes versioned artifact to outputs/portfolio/candidates/\n- Returns export summary with artifact path and SHA256",
+        "operationId": "export_season_candidates_ssot_api_v1_seasons_ssot__season_id__export_candidates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonExportCandidatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonExportCandidatesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season Candidates Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/freeze": {
+      "post": {
+        "description": "Freeze a Season SSOT (transition from OPEN to FROZEN).\n\nContract:\n- Only OPEN seasons can be frozen (403 if not OPEN)\n- Frozen seasons cannot accept new job attachments\n- Returns updated season state",
+        "operationId": "freeze_season_ssot_api_v1_seasons_ssot__season_id__freeze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonFreezeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Season Ssot"
       }
     },
     "/api/v1/seasons/{season}/compare/batches": {

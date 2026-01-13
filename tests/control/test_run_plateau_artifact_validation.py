@@ -14,8 +14,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import hashlib
 
-from src.control.supervisor.handlers.run_plateau import RunPlateauHandler
-from src.contracts.supervisor.run_plateau import RunPlateauPayload
+from control.supervisor.handlers.run_plateau import RunPlateauHandler
+from contracts.supervisor.run_plateau import RunPlateauPayload
 
 
 def test_manifest_schema():

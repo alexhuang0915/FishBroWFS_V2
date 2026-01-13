@@ -6,9 +6,9 @@ import time
 from pathlib import Path
 import pytest
 
-from src.control.supervisor.db import SupervisorDB
-from src.control.supervisor.models import JobSpec
-from src.control.supervisor.supervisor import Supervisor
+from control.supervisor.db import SupervisorDB
+from control.supervisor.models import JobSpec
+from control.supervisor.supervisor import Supervisor
 
 
 def test_clean_cache_handler_dry_run(tmp_path: Path):
@@ -108,7 +108,7 @@ def test_clean_cache_handler_dataset_scope(tmp_path: Path):
 
 def test_clean_cache_handler_validation(tmp_path: Path):
     """Test CLEAN_CACHE parameter validation."""
-    from src.control.supervisor.handlers.clean_cache import CleanCacheHandler
+    from control.supervisor.handlers.clean_cache import CleanCacheHandler
     
     handler = CleanCacheHandler()
     

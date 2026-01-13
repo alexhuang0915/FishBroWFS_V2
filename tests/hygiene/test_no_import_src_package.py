@@ -1,5 +1,5 @@
 """
-Hygiene test to ensure no illegal 'src.' imports exist in the codebase.
+Hygiene test to ensure no illegal '' imports exist in the codebase.
 
 Contract:
 - Parse every `src/**/*.py` file as plain text (no imports).
@@ -18,13 +18,13 @@ from pathlib import Path
 
 
 def test_no_import_src_package():
-    """Fail if any Python file in src/ contains 'from src.' or 'import src.'"""
+    """Fail if any Python file in src/ contains 'from ' or 'import src.'"""
     src_dir = Path("src")
     if not src_dir.exists():
         return  # If src/ doesn't exist, nothing to check
     
     # Pattern to match illegal imports
-    # Matches 'from src.' or 'import src.' at start of line (with optional whitespace)
+    # Matches 'from ' or 'import src.' at start of line (with optional whitespace)
     pattern = re.compile(r'^\s*(from|import)\s+src\.')
     
     violations = []
@@ -50,7 +50,7 @@ def test_no_import_src_package():
     if violations:
         # Build failure message
         msg_lines = [
-            f"Found {len(violations)} illegal 'src.' import(s):",
+            f"Found {len(violations)} illegal '' import(s):",
             "",
         ]
         
@@ -62,8 +62,8 @@ def test_no_import_src_package():
         msg_lines.extend([
             "",
             "These imports violate the PYTHONPATH=src contract.",
-            "Fix by removing the 'src.' prefix:",
-            "  - Change 'from src.X import Y' to 'from X import Y'",
+            "Fix by removing the '' prefix:",
+            "  - Change 'from X import Y' to 'from X import Y'",
             "  - Change 'import src.X' to 'import X'",
             "",
             "Run `rg -n \"^(from|import)\\\\s+src\\\\.\" src` to see all violations.",

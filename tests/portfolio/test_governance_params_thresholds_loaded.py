@@ -5,7 +5,7 @@ import yaml
 import tempfile
 from pathlib import Path
 
-from src.portfolio.governance.params import load_governance_params
+from portfolio.governance.params import load_governance_params
 
 
 def test_load_governance_params_with_overrides(tmp_path):

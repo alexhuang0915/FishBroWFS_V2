@@ -2,7 +2,7 @@
 import numpy as np
 import pandas as pd
 
-from src.portfolio.gatekeeper import AdmissionGate
+from portfolio.gatekeeper import AdmissionGate
 
 
 def _series(values, start="2024-01-01"):

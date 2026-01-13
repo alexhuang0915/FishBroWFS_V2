@@ -10,7 +10,7 @@ from unittest.mock import patch, MagicMock
 
 from fastapi.testclient import TestClient
 
-from src.control.api import app
+from control.api import app
 
 
 client = TestClient(app)
@@ -102,10 +102,10 @@ def test_reveal_portfolio_admission_path_safe():
     portfolio_id = "test_portfolio_123"
     
     # Mock the directory check to avoid actual filesystem access
-    with patch('src.control.portfolio.api_v1.Path.exists') as mock_exists:
+    with patch('control.portfolio.api_v1.Path.exists') as mock_exists:
         mock_exists.return_value = True
         
-        with patch('src.control.portfolio.api_v1.Path.resolve') as mock_resolve:
+        with patch('control.portfolio.api_v1.Path.resolve') as mock_resolve:
             # Mock resolve to return a path within the expected root
             mock_path = MagicMock()
             mock_path.relative_to.return_value = Path("test_portfolio_123/admission")

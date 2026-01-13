@@ -14,8 +14,8 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 import hashlib
 
-from src.control.supervisor.handlers.run_freeze import RunFreezeHandler
-from src.contracts.supervisor.run_freeze import RunFreezePayload
+from control.supervisor.handlers.run_freeze import RunFreezeHandler
+from contracts.supervisor.run_freeze import RunFreezePayload
 
 
 def test_manifest_schema():

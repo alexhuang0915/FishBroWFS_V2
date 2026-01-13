@@ -9,8 +9,8 @@ not just a warning or silent fallback.
 import numpy as np
 import pytest
 
-from src.features.registry import FeatureRegistry
-from src.features.models import FeatureSpec
+from features.registry import FeatureRegistry
+from features.models import FeatureSpec
 from features.causality import (
     LookaheadDetectedError,
     CausalityVerificationError

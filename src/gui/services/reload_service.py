@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 from typing import List, Tuple
 
-# Import from src.config (SSOT) - referenced by UI registry loader test
+# Import from config (SSOT) - referenced by UI registry loader test
 from config.registry.strategy_catalog import load_strategy_catalog  # pylint: disable=no-name-in-module
 from config import ConfigError
 from .timeframe_options import get_timeframe_id_label_pairs, get_timeframe_registry

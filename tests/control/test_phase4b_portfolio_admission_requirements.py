@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, MagicMock, Mock
 from typing import Dict, Any
 
-from src.control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
+from control.supervisor.handlers.run_portfolio_admission import RunPortfolioAdmissionHandler
 
 
 def test_rolling_windows_calendar_days():
@@ -115,7 +115,7 @@ def test_admission_report_schema_validity():
     }
     
     # Create mock admission decision
-    from src.contracts.portfolio.admission_schemas import AdmissionDecision, AdmissionVerdict
+    from contracts.portfolio.admission_schemas import AdmissionDecision, AdmissionVerdict
     admission_decision = AdmissionDecision(
         verdict=AdmissionVerdict.ADMITTED,
         admitted_run_ids=["job_1", "job_2"],

@@ -11,8 +11,8 @@ from unittest.mock import Mock, patch, MagicMock
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
 
-from src.gui.desktop.tabs.op_tab import OpTab
-from src.control.prepare_orchestration import prepare_with_data2_enforcement
+from gui.desktop.tabs.op_tab import OpTab
+from control.prepare_orchestration import prepare_with_data2_enforcement
 
 
 @pytest.fixture
@@ -158,10 +158,10 @@ def test_data2_selection_marks_prepare_dirty(op_tab):
 def test_prepare_orchestration_contract():
     """Test the prepare orchestration function contract."""
     # Mock the dependencies
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path:
         
         # Setup mocks
         mock_build.return_value = {
@@ -202,11 +202,11 @@ def test_prepare_orchestration_contract():
 def test_prepare_orchestration_with_existing_artifacts():
     """Test prepare orchestration when Data2 already has artifacts."""
     # Mock the dependencies
-    with patch('src.control.prepare_orchestration.build_shared') as mock_build, \
-         patch('src.control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
-         patch('src.control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
-         patch('src.control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
-         patch('src.control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
+    with patch('control.prepare_orchestration.build_shared') as mock_build, \
+         patch('control.prepare_orchestration._find_txt_path_for_feed') as mock_find_txt, \
+         patch('control.prepare_orchestration.load_shared_manifest') as mock_load_manifest, \
+         patch('control.prepare_orchestration.fingerprint_index_path') as mock_fingerprint_path, \
+         patch('control.prepare_orchestration.load_fingerprint_index_if_exists') as mock_load_fingerprint:
         
         # Setup mocks - Data2 already has artifacts
         mock_build.return_value = {"success": True}

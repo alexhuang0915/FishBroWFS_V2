@@ -8,13 +8,13 @@ import re
 import pytest
 
 # Import the actual function from the module
-from src.gui.desktop.artifact_validation import is_artifact_dir_name
+from gui.desktop.artifact_validation import is_artifact_dir_name
 
 
 def test_regex_pattern():
     """Test that the regex pattern matches the requirements."""
     # The pattern should be compiled in the module
-    from src.gui.desktop.artifact_validation import _DIR_RE
+    from gui.desktop.artifact_validation import _DIR_RE
     
     # Valid cases (6-64 hex chars, lowercase only per [0-9a-f])
     valid_names = [
@@ -57,7 +57,7 @@ def test_regex_pattern():
 
 def test_edge_cases():
     """Test edge cases for the regex."""
-    from src.gui.desktop.artifact_validation import _DIR_RE
+    from gui.desktop.artifact_validation import _DIR_RE
     
     # Test with exactly 6 hex chars (minimum per spec)
     assert _DIR_RE.match("run_123456") is not None
@@ -86,7 +86,7 @@ def test_backward_compatibility():
     """Ensure backward compatibility with existing run/artifact directories."""
     # Existing code might have directories with timestamps or other patterns
     # Our regex should still accept valid hex patterns
-    from src.gui.desktop.artifact_validation import _DIR_RE
+    from gui.desktop.artifact_validation import _DIR_RE
     
     # These are examples of what might exist in the wild
     legacy_compatible = [

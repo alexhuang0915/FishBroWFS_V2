@@ -5,7 +5,7 @@ Test data readiness service for checking bars and features.
 from pathlib import Path
 import pytest
 
-from src.gui.desktop.services.data_readiness_service import (
+from gui.desktop.services.data_readiness_service import (
     check_bars,
     check_features,
     check_all,

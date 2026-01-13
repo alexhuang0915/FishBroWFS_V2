@@ -10,7 +10,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import List, Tuple
 
-# Import from src.config (SSOT) - referenced by UI registry loader test
+# Import from config (SSOT) - referenced by UI registry loader test
 from config import load_timeframes, TimeframeRegistry
 
 

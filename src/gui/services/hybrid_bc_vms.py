@@ -42,7 +42,7 @@ class JobIndexVM:
 class JobContextVM:
     """
     ViewModel for Layer 2 (Explain Hub).
-    
+
     Contains full context for explanation, no performance metrics.
     """
     job_id: str
@@ -68,6 +68,9 @@ class JobContextVM:
     status: str = ""
     error_details: Optional[Dict[str, Any]] = None
     artifacts: Dict[str, Any] = field(default_factory=dict)
+    
+    # Job lifecycle state (ACTIVE, ARCHIVED, PURGED)
+    lifecycle_state: str = "ACTIVE"
     
     # Explicitly prohibited fields (for type safety)
     # No performance metrics

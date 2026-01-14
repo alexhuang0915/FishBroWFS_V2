@@ -25,6 +25,9 @@ class ExplainHubWidget(QWidget):
     request_open_evidence = Signal(str)
     request_explain_failure = Signal(str)
     request_abort = Signal(str)
+    request_archive = Signal(str)  # job_id
+    request_restore = Signal(str)  # job_id
+    request_purge = Signal(str)   # job_id
     
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -327,7 +330,74 @@ class ExplainHubWidget(QWidget):
         """)
         self.abort_btn.clicked.connect(self._on_abort)
         action_layout.addWidget(self.abort_btn)
-        
+
+        # Lifecycle buttons
+        self.archive_btn = QPushButton("Archive")
+        self.archive_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #5d4037;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 3px;
+                border: 1px solid #795548;
+            }
+            QPushButton:hover {
+                background-color: #795548;
+            }
+            QPushButton:disabled {
+                background-color: #424242;
+                color: #9e9e9e;
+                border: 1px solid #616161;
+            }
+        """)
+        self.archive_btn.clicked.connect(self._on_archive)
+        self.archive_btn.setToolTip("Move job to archive (outputs/jobs/_trash/)")
+        action_layout.addWidget(self.archive_btn)
+
+        self.restore_btn = QPushButton("Restore")
+        self.restore_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2e7d32;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 3px;
+                border: 1px solid #4caf50;
+            }
+            QPushButton:hover {
+                background-color: #4caf50;
+            }
+            QPushButton:disabled {
+                background-color: #424242;
+                color: #9e9e9e;
+                border: 1px solid #616161;
+            }
+        """)
+        self.restore_btn.clicked.connect(self._on_restore)
+        self.restore_btn.setToolTip("Restore job from archive to active")
+        action_layout.addWidget(self.restore_btn)
+
+        self.purge_btn = QPushButton("Purge")
+        self.purge_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #c62828;
+                color: white;
+                padding: 6px 12px;
+                border-radius: 3px;
+                border: 1px solid #d32f2f;
+            }
+            QPushButton:hover {
+                background-color: #d32f2f;
+            }
+            QPushButton:disabled {
+                background-color: #424242;
+                color: #9e9e9e;
+                border: 1px solid #616161;
+            }
+        """)
+        self.purge_btn.clicked.connect(self._on_purge)
+        self.purge_btn.setToolTip("Permanently delete archived job (requires ENABLE_PURGE_ACTION=1)")
+        action_layout.addWidget(self.purge_btn)
+
         action_layout.addStretch()
         layout.addWidget(action_frame)
         
@@ -451,6 +521,20 @@ class ExplainHubWidget(QWidget):
             self.abort_btn.setEnabled(is_abort_allowed(status))
         else:
             self.abort_btn.setEnabled(False)
+        
+        # Lifecycle buttons
+        if has_vm:
+            lifecycle_state = getattr(self.current_vm, 'lifecycle_state', 'ACTIVE')
+            # Archive button: enabled if job is ACTIVE
+            self.archive_btn.setEnabled(lifecycle_state == 'ACTIVE')
+            # Restore button: enabled if job is ARCHIVED
+            self.restore_btn.setEnabled(lifecycle_state == 'ARCHIVED')
+            # Purge button: enabled if job is ARCHIVED (environment variable check will be done by parent)
+            self.purge_btn.setEnabled(lifecycle_state == 'ARCHIVED')
+        else:
+            self.archive_btn.setEnabled(False)
+            self.restore_btn.setEnabled(False)
+            self.purge_btn.setEnabled(False)
     
     def _get_status_color(self, status: str) -> str:
         """Get color for status badge."""
@@ -497,6 +581,21 @@ class ExplainHubWidget(QWidget):
         """Handle Abort button click."""
         if self.current_job_id:
             self.request_abort.emit(self.current_job_id)
+
+    def _on_archive(self):
+        """Handle Archive button click."""
+        if self.current_job_id:
+            self.request_archive.emit(self.current_job_id)
+
+    def _on_restore(self):
+        """Handle Restore button click."""
+        if self.current_job_id:
+            self.request_restore.emit(self.current_job_id)
+
+    def _on_purge(self):
+        """Handle Purge button click."""
+        if self.current_job_id:
+            self.request_purge.emit(self.current_job_id)
     
     def show_error(self, message: str):
         """Display an error message in the widget."""

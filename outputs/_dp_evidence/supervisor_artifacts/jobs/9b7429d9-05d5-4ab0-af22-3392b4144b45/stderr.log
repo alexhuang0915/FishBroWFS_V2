@@ -1,0 +1,8 @@
+Result file not found: /tmp/tmp83f5yxfw/result_0.json
+Result file not found: /tmp/tmp83f5yxfw/result_1.json
+Failed to execute portfolio admission: No valid Phase4-A results found
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_portfolio_admission.py", line 144, in execute
+    raise ValueError("No valid Phase4-A results found")
+ValueError: No valid Phase4-A results found
+

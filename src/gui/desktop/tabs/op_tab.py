@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
     QLabel, QComboBox, QPushButton, QTableView, QSplitter,
     QGroupBox, QScrollArea, QSizePolicy,
     QStyledItemDelegate, QStyleOptionViewItem,
-    QMessageBox, QSpacerItem, QLineEdit
+    QMessageBox, QSpacerItem, QLineEdit, QCheckBox
 )  # pylint: disable=no-name-in-module
 from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices, QMouseEvent  # pylint: disable=no-name-in-module
 from PySide6.QtWidgets import QToolTip
@@ -47,6 +47,7 @@ from gui.services.ui_action_evidence import write_abort_request_evidence, Eviden
 from gui.desktop.services.supervisor_client import abort_job
 from gui.services.hybrid_bc_adapters import adapt_to_index, adapt_to_context, adapt_to_analysis
 from gui.services.hybrid_bc_vms import JobIndexVM, JobContextVM, JobAnalysisVM
+from gui.services.job_lifecycle_service import JobLifecycleService
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,10 @@ class JobsTableModel(QAbstractTableModel):
         self.filter_instrument = "ALL"
         self.filter_season = "ALL"
         self.filter_search = ""
+        
+        # Lifecycle visibility
+        self.lifecycle_service: Optional[JobLifecycleService] = None
+        self.show_archived = False
     
     @property
     def jobs(self):
@@ -114,10 +119,37 @@ class JobsTableModel(QAbstractTableModel):
         self.apply_filters()
         self.endResetModel()
     
+    def set_lifecycle_service(self, service: JobLifecycleService):
+        """Set the lifecycle service for filtering archived/purged jobs."""
+        self.lifecycle_service = service
+    
+    def set_show_archived(self, show: bool):
+        """Set whether archived jobs should be shown."""
+        if self.show_archived != show:
+            self.show_archived = show
+            self.beginResetModel()
+            self.apply_filters()
+            self.endResetModel()
+    
     def apply_filters(self):
         """Apply current filters to all_jobs and update filtered_jobs."""
         self.filtered_jobs = list()
+        
+        # Get archived/purged job IDs if lifecycle service is available
+        archived_ids = set()
+        purged_ids = set()
+        if self.lifecycle_service and not self.show_archived:
+            archived_ids = set(self.lifecycle_service.get_job_ids_by_state("ARCHIVED"))
+            purged_ids = set(self.lifecycle_service.get_job_ids_by_state("PURGED"))
+        
         for job in self.all_jobs:
+            job_id = job.get("job_id", "")
+            
+            # Lifecycle filter: exclude archived/purged jobs unless show_archived is True
+            if not self.show_archived:
+                if job_id in archived_ids or job_id in purged_ids:
+                    continue
+            
             # Status filter
             if self.filter_status != "ALL":
                 job_status = job.get("status", "")
@@ -153,10 +185,10 @@ class JobsTableModel(QAbstractTableModel):
             # Text search
             if self.filter_search:
                 search_lower = self.filter_search.lower()
-                job_id = job.get("job_id", "").lower()
+                job_id_lower = job_id.lower()
                 strategy = job.get("strategy_name", job.get("strategy_id", "")).lower()
                 instrument = job.get("instrument", "").lower()
-                if (search_lower not in job_id and
+                if (search_lower not in job_id_lower and
                     search_lower not in strategy and
                     search_lower not in instrument):
                     continue
@@ -294,7 +326,8 @@ class JobsTableModel(QAbstractTableModel):
     
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = int(Qt.ItemDataRole.DisplayRole)):
         if orientation == Qt.Orientation.Horizontal and role == Qt.ItemDataRole.DisplayRole:
-            if section < len(self.headers):
+            # Guard against missing headers attribute (should not happen, but defensive)
+            if hasattr(self, 'headers') and section < len(self.headers):
                 return self.headers[section]
         return None
     
@@ -544,6 +577,9 @@ class OpTab(QWidget):
         self.analysis_drawer = AnalysisDrawerWidget(self)
         self.selected_job_id: Optional[str] = None
         self.selected_job_context: Optional[JobContextVM] = None
+        self.job_lifecycle_service = JobLifecycleService()
+        self.job_lifecycle_service.sync_index_with_filesystem()
+        self.jobs_model.set_lifecycle_service(self.job_lifecycle_service)
         
         self.setup_ui()
         self.setup_connections()
@@ -852,6 +888,12 @@ class OpTab(QWidget):
         self.clear_filters_btn.setMaximumWidth(100)
         filter_layout.addWidget(self.clear_filters_btn)
         
+        # Show Archived checkbox
+        self.show_archived_cb = QCheckBox("Show Archived")
+        self.show_archived_cb.setToolTip("Show archived jobs (normally hidden)")
+        self.show_archived_cb.setMaximumWidth(120)
+        filter_layout.addWidget(self.show_archived_cb)
+        
         filter_layout.addStretch()
         
         # Create table view (Job Index - Hybrid BC Layer 1)
@@ -948,12 +990,19 @@ class OpTab(QWidget):
         self.season_filter.currentTextChanged.connect(self.apply_filters)
         self.search_edit.textChanged.connect(self.apply_filters)
         self.clear_filters_btn.clicked.connect(self.clear_filters)
+        # Connect Show Archived checkbox
+        self.show_archived_cb.stateChanged.connect(self.handle_show_archived_changed)
         
         # Connect job table selection to update Explain Hub (Hybrid BC Layer 1 → Layer 2)
         self.jobs_table.selectionModel().selectionChanged.connect(self.handle_job_selection)
         
         # Connect Explain Hub's open analysis signal
         self.explain_hub.request_open_analysis.connect(self.handle_open_analysis_request)
+        
+        # Connect Explain Hub's lifecycle signals
+        self.explain_hub.request_archive.connect(self.handle_archive_request)
+        self.explain_hub.request_restore.connect(self.handle_restore_request)
+        self.explain_hub.request_purge.connect(self.handle_purge_request)
         
         # Disable double-click bypass (Hybrid BC governance)
         self.jobs_table.doubleClicked.connect(self.block_double_click)
@@ -1087,6 +1136,16 @@ class OpTab(QWidget):
         self.season_filter.setCurrentText("ALL")
         self.search_edit.clear()
         # apply_filters will be triggered by the signals
+    
+    def handle_show_archived_changed(self, state: int):
+        """Handle Show Archived checkbox state change."""
+        show = state == Qt.CheckState.Checked.value
+        self.jobs_model.set_show_archived(show)
+        # Update status label
+        if show:
+            self.status_label.setText("Showing archived jobs")
+        else:
+            self.status_label.setText("Hiding archived jobs")
     
     def run_strategy(self):
         """Submit a new strategy job with duplicate job warning guardrail."""
@@ -1632,6 +1691,176 @@ class OpTab(QWidget):
         except SupervisorClientError as e:
             logger.error(f"Failed to load analysis for job {job_id}: {e}")
             self.analysis_drawer.show_error(f"Failed to load analysis: {e}")
+    
+    def handle_archive_request(self, job_id: str):
+        """Handle archive request from Explain Hub."""
+        if not job_id:
+            return
+        
+        # Confirm with user
+        reply = QMessageBox.question(
+            self,
+            "Archive Job",
+            f"Archive job {job_id[:8]}...?\n\n"
+            "The job directory will be moved to outputs/jobs/_trash/.\n"
+            "Archived jobs are hidden from the job list but can be restored later.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        try:
+            # Call service
+            result = self.job_lifecycle_service.archive_job(job_id)
+            self.log_signal.emit(f"Archived job {job_id}: {result}")
+            self.status_label.setText(f"Archived job {job_id[:8]}...")
+            
+            # Refresh job list (archived jobs should be hidden)
+            self.jobs_model.refresh_data()
+            
+            # Update Explain Hub context (if this job is still selected)
+            if self.selected_job_id == job_id:
+                # Update lifecycle state in context VM
+                if self.selected_job_context:
+                    self.selected_job_context.lifecycle_state = "ARCHIVED"
+                    self.explain_hub.set_context(self.selected_job_context)
+            
+            # Show success message
+            QMessageBox.information(
+                self,
+                "Job Archived",
+                f"Job {job_id[:8]}... has been archived.\n"
+                "It will no longer appear in the job list unless you show archived jobs."
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to archive job {job_id}: {e}")
+            QMessageBox.critical(
+                self,
+                "Archive Failed",
+                f"Failed to archive job: {e}"
+            )
+    
+    def handle_restore_request(self, job_id: str):
+        """Handle restore request from Explain Hub."""
+        if not job_id:
+            return
+        
+        # Confirm with user
+        reply = QMessageBox.question(
+            self,
+            "Restore Job",
+            f"Restore job {job_id[:8]}...?\n\n"
+            "The job directory will be moved back to outputs/jobs/.\n"
+            "The job will reappear in the job list.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        try:
+            # Call service
+            result = self.job_lifecycle_service.restore_job(job_id)
+            self.log_signal.emit(f"Restored job {job_id}: {result}")
+            self.status_label.setText(f"Restored job {job_id[:8]}...")
+            
+            # Refresh job list (restored job should appear)
+            self.jobs_model.refresh_data()
+            
+            # Update Explain Hub context (if this job is still selected)
+            if self.selected_job_id == job_id:
+                # Update lifecycle state in context VM
+                if self.selected_job_context:
+                    self.selected_job_context.lifecycle_state = "ACTIVE"
+                    self.explain_hub.set_context(self.selected_job_context)
+            
+            # Show success message
+            QMessageBox.information(
+                self,
+                "Job Restored",
+                f"Job {job_id[:8]}... has been restored.\n"
+                "It will now appear in the job list."
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to restore job {job_id}: {e}")
+            QMessageBox.critical(
+                self,
+                "Restore Failed",
+                f"Failed to restore job: {e}"
+            )
+    
+    def handle_purge_request(self, job_id: str):
+        """Handle purge request from Explain Hub."""
+        if not job_id:
+            return
+        
+        # Check if purge is enabled via environment variable
+        import os
+        if os.environ.get("ENABLE_PURGE_ACTION", "0") != "1":
+            QMessageBox.warning(
+                self,
+                "Purge Disabled",
+                "Purge action is disabled. Set ENABLE_PURGE_ACTION=1 to enable."
+            )
+            return
+        
+        # Strong warning confirmation
+        reply = QMessageBox.warning(
+            self,
+            "PURGE JOB (IRREVERSIBLE)",
+            f"⚠️  PURGE JOB {job_id[:8]}... ⚠️\n\n"
+            "This will PERMANENTLY DELETE the job directory and all its artifacts.\n"
+            "This action cannot be undone.\n\n"
+            "Are you absolutely sure?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        
+        # Second confirmation
+        reply2 = QMessageBox.warning(
+            self,
+            "Final Confirmation",
+            f"Type the job ID '{job_id}' to confirm permanent deletion:",
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel
+        )
+        if reply2 != QMessageBox.StandardButton.Ok:
+            return
+        
+        try:
+            # Call service
+            result = self.job_lifecycle_service.purge_job(job_id)
+            self.log_signal.emit(f"Purged job {job_id}: {result}")
+            self.status_label.setText(f"Purged job {job_id[:8]}...")
+            
+            # Refresh job list (purged job should be gone)
+            self.jobs_model.refresh_data()
+            
+            # Clear selection if this job was selected
+            if self.selected_job_id == job_id:
+                self.selected_job_id = None
+                self.selected_job_context = None
+                self.explain_hub.clear()
+            
+            # Show success message
+            QMessageBox.information(
+                self,
+                "Job Purged",
+                f"Job {job_id[:8]}... has been permanently deleted."
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to purge job {job_id}: {e}")
+            QMessageBox.critical(
+                self,
+                "Purge Failed",
+                f"Failed to purge job: {e}"
+            )
     
     def block_double_click(self, index):
         """Block double-click bypass (Hybrid BC governance)."""

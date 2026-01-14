@@ -438,6 +438,80 @@ class TestHybridBCBehaviorLocks:
                 assert not drawer_opened
                 assert not tab.analysis_drawer.isVisible()
 
+    @patch('gui.desktop.tabs.op_tab.get_registry_strategies')
+    @patch('gui.desktop.tabs.op_tab.get_registry_instruments')
+    @patch('gui.desktop.tabs.op_tab.get_registry_datasets')
+    @patch('gui.desktop.tabs.op_tab.get_jobs')
+    @patch('gui.desktop.tabs.op_tab.get_strategy_report_v1')
+    @patch('gui.desktop.widgets.gate_summary_widget.fetch_gate_summary')
+    def test_open_report_wiring(self, mock_fetch_gate_summary, mock_get_strategy_report_v1,
+                                mock_get_jobs, mock_get_datasets,
+                                mock_get_instruments, mock_get_strategies, app):
+        """Open Report button must be wired to switch_to_audit_tab signal."""
+        # Mock the API calls
+        mock_get_strategies.return_value = []
+        mock_get_instruments.return_value = []
+        mock_get_datasets.return_value = []
+        mock_get_jobs.return_value = []
+        mock_get_strategy_report_v1.return_value = {"report": "dummy"}
+        from gui.services.gate_summary_service import GateSummary, GateStatus
+        mock_summary = GateSummary(
+            gates=[],
+            timestamp="2026-01-13T00:00:00Z",
+            overall_status=GateStatus.PASS,
+            overall_message="All gates passed"
+        )
+        mock_fetch_gate_summary.return_value = mock_summary
+        
+        # Create OpTab
+        tab = OpTab()
+        tab.resize(800, 600)
+        tab.show()
+        QApplication.processEvents()
+        
+        # Mock job data with report link
+        jobs = [
+            {
+                "job_id": "test_job_123",
+                "strategy_name": "Test Strategy",
+                "instrument": "MNQ",
+                "timeframe": "5m",
+                "run_mode": "backtest",
+                "season": "2026Q1",
+                "status": "SUCCEEDED",
+                "created_at": "2026-01-13T00:00:00Z",
+                "finished_at": "2026-01-13T01:00:00Z",
+                "artifacts": {
+                    "links": {
+                        "strategy_report_v1_url": "http://example.com/report"
+                    }
+                }
+            }
+        ]
+        tab.jobs_model.set_jobs(jobs)
+        
+        # Connect spy to switch_to_audit_tab signal
+        signal_emitted = False
+        emitted_job_id = None
+        def on_signal(job_id):
+            nonlocal signal_emitted, emitted_job_id
+            signal_emitted = True
+            emitted_job_id = job_id
+        
+        tab.switch_to_audit_tab.connect(on_signal)
+        
+        # Simulate clicking the "Open Report" action button
+        # We can directly call handle_action_click with row 0 and action_type "report"
+        tab.handle_action_click(0, "report")
+        QApplication.processEvents()
+        
+        # Verify signal was emitted with correct job ID
+        assert signal_emitted, "switch_to_audit_tab signal not emitted"
+        assert emitted_job_id == "test_job_123"
+        
+        # Verify that get_strategy_report_v1 was called with correct job ID
+        mock_get_strategy_report_v1.assert_called_once_with("test_job_123")
+
 
 def test_analysis_drawer_lazy_load(app):
     """Analysis drawer should lazy-load content on open."""

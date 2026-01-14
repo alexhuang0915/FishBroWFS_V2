@@ -173,6 +173,7 @@ class ControlStation(QMainWindow):
         self.op_tab.log_signal.connect(self.handle_log)
         self.op_tab.progress_signal.connect(self.handle_progress)
         self.op_tab.artifact_state_changed.connect(self.handle_artifact_state)
+        self.op_tab.switch_to_audit_tab.connect(self.handle_open_report_request)
         
         self.report_tab.log_signal.connect(self.handle_log)
         self.registry_tab.log_signal.connect(self.handle_log)
@@ -213,7 +214,18 @@ class ControlStation(QMainWindow):
         # Emit audit event to audit tab
         # TODO: Actually add event to audit trail
         self.handle_log(f"Allocation change audited: {audit_event.get('event_type', 'unknown')}")
-    
+
+    @Slot(str)
+    def handle_open_report_request(self, job_id: str):
+        """Handle request to open a strategy report from OP tab."""
+        logger.info(f"Opening strategy report for job {job_id}")
+        # Switch to Audit tab (index 4)
+        self.tab_widget.setCurrentIndex(4)
+        # Call audit tab's open_strategy_report method
+        self.audit_tab.open_strategy_report(job_id)
+        # Log the action
+        self.handle_log(f"Opened strategy report for job {job_id[:8]}...")
+
     @Slot(int)
     def on_tab_changed(self, index: int):
         """Handle tab change events."""

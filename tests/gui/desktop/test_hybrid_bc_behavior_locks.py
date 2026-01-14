@@ -555,13 +555,13 @@ def test_analysis_drawer_lazy_load(app):
     # Check that _load_analysis_content was called
     assert load_called, "_load_analysis_content should be called for lazy loading"
     
-    # Also test that without VM, placeholder shows loading
+    # Also test that without VM, status label shows loading
     drawer2 = AnalysisDrawerWidget(parent)
     drawer2.open_for_job("test_job_456")  # No VM
     QApplication.processEvents()
     
-    # Placeholder should show "Loading analysis..."
-    assert drawer2.placeholder_label.text() == "Loading analysis..."
+    # Status label should show "Loading analysis..."
+    assert drawer2.status_label.text() == "Loading analysis..."
 
 
 if __name__ == "__main__":

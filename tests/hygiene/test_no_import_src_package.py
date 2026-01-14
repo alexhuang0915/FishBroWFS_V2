@@ -4,7 +4,7 @@ Hygiene test to ensure no illegal '' imports exist in the codebase.
 Contract:
 - Parse every `src/**/*.py` file as plain text (no imports).
 - Fail if pattern matches:
-  - `^(from|import)\s+src\.`
+  - `^(from|import)\\s+src\\.`
 
 Implementation requirements:
 - Deterministic file iteration order (`sorted(Path(...).rglob(...))`)

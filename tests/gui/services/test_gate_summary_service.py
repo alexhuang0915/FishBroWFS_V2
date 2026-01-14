@@ -214,18 +214,24 @@ class TestGateSummaryService:
         assert worker_gate.details["running_count"] == 0
         assert worker_gate.details["queued_count"] == 0
 
-    def test_fetch_registry_surface_empty(self):
+    @patch('gui.services.registry_adapter.fetch_registry_gate_result')
+    def test_fetch_registry_surface_empty(self, mock_fetch):
         """Test registry surface gate with empty list (WARN)."""
         mock_client = Mock()
         mock_client.health.return_value = {"status": "ok"}
         mock_client.get_jobs.return_value = []
-        mock_session = Mock()
-        mock_response = Mock()
-        mock_response.json.return_value = []  # empty list
-        mock_response.raise_for_status.return_value = None
-        mock_session.get.return_value = mock_response
-        mock_client.session = mock_session
-        mock_client.base_url = "http://testserver"
+        
+        # Mock the registry adapter to return WARN for empty registry
+        from gui.services.gate_summary_service import GateResult, GateStatus
+        from datetime import datetime, timezone
+        mock_fetch.return_value = GateResult(
+            gate_id="registry_surface",
+            gate_name="Registry Surface",
+            status=GateStatus.WARN,
+            message="Registry surface accessible but empty (no timeframes).",
+            details={"timeframes_count": 0, "datasets_count": 0, "strategies_count": 0, "instruments_count": 0, "status": "PARTIAL"},
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
 
         service = GateSummaryService(client=mock_client)
         summary = service.fetch()
@@ -234,22 +240,31 @@ class TestGateSummaryService:
         assert registry_gate.status == GateStatus.WARN
         assert "empty" in registry_gate.message.lower()
 
-    def test_fetch_registry_surface_fail(self):
+    @patch('gui.services.registry_adapter.fetch_registry_gate_result')
+    def test_fetch_registry_surface_fail(self, mock_fetch):
         """Test registry surface gate with network error (FAIL)."""
         mock_client = Mock()
         mock_client.health.return_value = {"status": "ok"}
         mock_client.get_jobs.return_value = []
-        mock_session = Mock()
-        mock_session.get.side_effect = Exception("Connection refused")
-        mock_client.session = mock_session
-        mock_client.base_url = "http://testserver"
+        
+        # Mock the registry adapter to return FAIL for network error
+        from gui.services.gate_summary_service import GateResult, GateStatus
+        from datetime import datetime, timezone
+        mock_fetch.return_value = GateResult(
+            gate_id="registry_surface",
+            gate_name="Registry Surface",
+            status=GateStatus.FAIL,
+            message="Registry surface unavailable: Connection refused",
+            details={"missing_methods": ["get_registry_timeframes"], "error": "Connection refused", "status": "UNAVAILABLE"},
+            timestamp=datetime.now(timezone.utc).isoformat()
+        )
 
         service = GateSummaryService(client=mock_client)
         summary = service.fetch()
 
         registry_gate = next(g for g in summary.gates if g.gate_id == "registry_surface")
         assert registry_gate.status == GateStatus.FAIL
-        assert "unreachable" in registry_gate.message.lower()
+        assert "unavailable" in registry_gate.message.lower()
 
     def test_compute_overall_status(self):
         """Test _compute_overall_status logic."""

@@ -1,0 +1,26 @@
+Freeze CLI failed with return code 1
+Failed to execute season freeze: Failed to execute freeze: Freeze CLI failed with return code 1
+Stderr: Error locating default files: Could not locate dataset registry
+Please specify explicit paths using command line arguments.
+
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_freeze.py", line 148, in _execute_freeze
+    raise RuntimeError(f"{error_msg}\nStderr: {stderr_content}")
+RuntimeError: Freeze CLI failed with return code 1
+Stderr: Error locating default files: Could not locate dataset registry
+Please specify explicit paths using command line arguments.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_freeze.py", line 61, in execute
+    result = self._execute_freeze(payload, context, freeze_dir)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_freeze.py", line 153, in _execute_freeze
+    raise RuntimeError(f"Failed to execute freeze: {e}")
+RuntimeError: Failed to execute freeze: Freeze CLI failed with return code 1
+Stderr: Error locating default files: Could not locate dataset registry
+Please specify explicit paths using command line arguments.
+
+

@@ -323,60 +323,19 @@ class GateSummaryService:
 
     def _fetch_registry_surface(self) -> GateResult:
         """Gate 5: Registry Surface (timeframes list)."""
-        gate_id = "registry_surface"
-        gate_name = "Registry Surface"
+        # Use defensive adapter to prevent crashes from missing methods
+        from gui.services.registry_adapter import fetch_registry_gate_result
         try:
-            timeframes = self.client.get_registry_timeframes()
-            # The supervisor client doesn't have get_registry_timeframes method.
-            # Actually there is a method `get_registry_timeframes`? Let's check.
-            # The supervisor client has `get_registry_timeframes`? I saw `get_registry_timeframes`?
-            # Looking at the file, there is `get_registry_timeframes`? No, there is `get_registry_timeframes`?
-            # Let's search: we saw `get_registry_timeframes` in the API endpoint but not in client.
-            # The client has `get_registry_timeframes`? Actually there is `get_registry_timeframes`?
-            # Let's examine the client again: there is `get_registry_timeframes`? I think not.
-            # We'll need to add a method, but for now we'll call the endpoint directly.
-            url = f"{self.client.base_url}/api/v1/registry/timeframes"
-            response = self.client.session.get(url, timeout=self.timeout)
-            response.raise_for_status()
-            data = response.json()
-            if isinstance(data, list):
-                if data:
-                    return GateResult(
-                        gate_id=gate_id,
-                        gate_name=gate_name,
-                        status=GateStatus.PASS,
-                        message=f"Registry surface accessible, {len(data)} timeframe(s) available.",
-                        details={"timeframes": data},
-                        actions=list(({"label": "View Registry", "url": "/api/v1/registry/timeframes"},)),
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    )
-                else:
-                    return GateResult(
-                        gate_id=gate_id,
-                        gate_name=gate_name,
-                        status=GateStatus.WARN,
-                        message="Registry surface accessible but empty (no timeframes).",
-                        details={"timeframes": list()},
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    )
-            else:
-                return GateResult(
-                    gate_id=gate_id,
-                    gate_name=gate_name,
-                    status=GateStatus.WARN,
-                    message=f"Unexpected registry response: {data}",
-                    details={"response": data},
-                    timestamp=datetime.now(timezone.utc).isoformat(),
-                )
+            return fetch_registry_gate_result()
         except Exception as e:
-            status_code = getattr(e, 'response', None) and e.response.status_code
-            error_type = "network" if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)) else "server"
+            # Fallback if adapter itself fails
+            logger.error(f"Registry surface adapter failed: {e}", exc_info=True)
             return GateResult(
-                gate_id=gate_id,
-                gate_name=gate_name,
+                gate_id="registry_surface",
+                gate_name="Registry Surface",
                 status=GateStatus.FAIL,
-                message=f"Registry surface unreachable: {str(e)}",
-                details={"error_type": error_type, "status_code": status_code},
+                message=f"Registry surface check failed: {e}",
+                details={"error_type": "adapter_failure", "traceback": str(e)},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 

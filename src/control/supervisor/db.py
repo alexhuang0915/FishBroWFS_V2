@@ -3,6 +3,7 @@ import sqlite3
 import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
+from core.paths import get_outputs_root
 from .models import (
     JobSpec, JobRow, WorkerRow, JobState, JobStatus, JobStateMachine,
     new_job_id, new_worker_id, now_iso, parse_iso, seconds_since
@@ -24,7 +25,7 @@ class DuplicateJobError(Exception):
 def get_default_db_path(outputs_root: Optional[Path] = None) -> Path:
     """Return default DB path under outputs/jobs_v2.db."""
     if outputs_root is None:
-        outputs_root = Path("outputs")
+        outputs_root = get_outputs_root()
     return outputs_root / "jobs_v2.db"
 
 

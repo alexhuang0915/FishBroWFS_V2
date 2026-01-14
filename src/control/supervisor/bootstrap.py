@@ -19,6 +19,7 @@ from .db import SupervisorDB, get_default_db_path
 from .job_handler import get_handler, execute_job, validate_job_spec
 from .models import JobSpec, now_iso
 from control.artifacts import write_text_atomic, write_json_atomic
+from core.paths import get_outputs_root
 
 
 def _write_bootstrap_error_artifact(artifacts_dir: Path, error_type: str, error_msg: str, detail: str) -> None:
@@ -64,7 +65,7 @@ def main() -> int:
     
     # Default artifacts directory: canonical job artifact root
     if args.artifacts_root is None:
-        args.artifacts_root = Path("outputs")
+        args.artifacts_root = get_outputs_root()
     
     # Create canonical artifact directory for this job
     from .models import get_job_artifact_dir

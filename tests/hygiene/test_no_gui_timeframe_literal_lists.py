@@ -53,19 +53,12 @@ def is_timeframe_token(s: object) -> bool:
 
 def extract_string_value(el: ast.AST) -> Optional[str]:
     """Extract string value from AST node safely."""
-    # Python 3.8+ uses ast.Constant for strings
-    if hasattr(ast, 'Constant') and isinstance(el, ast.Constant):
+    # Python 3.8+ uses ast.Constant for strings (project requires >=3.10)
+    if isinstance(el, ast.Constant):
         val = el.value
         if isinstance(val, str):
             return val
         # Not a string (could be int, float, etc.)
-        return None
-    # Python <3.8 uses ast.Str (deprecated)
-    if isinstance(el, ast.Str):
-        val = el.s
-        if isinstance(val, str):
-            return val
-        # Should not happen, but guard
         return None
     return None
 

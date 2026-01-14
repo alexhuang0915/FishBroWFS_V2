@@ -1,0 +1,23 @@
+Plateau CLI failed with return code 1
+Failed to execute plateau identification: Failed to execute plateau: Plateau CLI failed with return code 1
+Stderr: /home/fishbro/FishBroWFS_V2/.venv/bin/python: No module named scripts.run_phase3a_plateau
+
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_plateau.py", line 270, in _execute_plateau
+    raise RuntimeError(f"{error_msg}\nStderr: {stderr_content}")
+RuntimeError: Plateau CLI failed with return code 1
+Stderr: /home/fishbro/FishBroWFS_V2/.venv/bin/python: No module named scripts.run_phase3a_plateau
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_plateau.py", line 134, in execute
+    result = self._execute_plateau(payload, context, winners_path, plateau_dir)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/fishbro/FishBroWFS_V2/src/control/supervisor/handlers/run_plateau.py", line 278, in _execute_plateau
+    raise RuntimeError(f"Failed to execute plateau: {e}")
+RuntimeError: Failed to execute plateau: Plateau CLI failed with return code 1
+Stderr: /home/fishbro/FishBroWFS_V2/.venv/bin/python: No module named scripts.run_phase3a_plateau
+
+

@@ -68,7 +68,7 @@ def parse_ast_for_patterns(file_path: Path):
                 values = None
                 break
             
-            if values is not None:
+            if values is not None and values:  # Check list is not empty
                 # Common timeframe patterns
                 if set(values) == {15, 30, 60, 120, 240}:
                     patterns.append(("hardcoded_timeframes", node.lineno))

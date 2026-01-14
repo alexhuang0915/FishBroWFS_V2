@@ -259,6 +259,10 @@ class SupervisorClient:
         """Return list of dataset IDs (alias for get_datasets)."""
         return self.get_datasets()
 
+    def get_registry_timeframes(self) -> List[str]:
+        """Return list of available timeframes."""
+        return self._get("/api/v1/registry/timeframes")
+
     # Phase D: Portfolio Build API methods
     def post_portfolio_build(self, request_dict: dict) -> dict:
         """Submit a portfolio build request."""
@@ -425,6 +429,10 @@ def get_registry_datasets() -> List[str]:
     """Return list of dataset IDs."""
     return _client.get_registry_datasets()
 
+def get_registry_timeframes() -> List[str]:
+    """Return list of available timeframes."""
+    return _client.get_registry_timeframes()
+
 
 # Phase D: Portfolio Build API public functions
 def post_portfolio_build(request_dict: dict) -> dict:
@@ -509,6 +517,7 @@ __all__ = [
     "get_registry_strategies",
     "get_registry_instruments",
     "get_registry_datasets",
+    "get_registry_timeframes",
     # Phase D additions
     "post_portfolio_build",
     "get_portfolio_artifacts",

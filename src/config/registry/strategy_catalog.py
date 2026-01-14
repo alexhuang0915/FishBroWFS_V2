@@ -53,7 +53,7 @@ class StrategyCatalogEntry(BaseModel):
     status: StrategyStatus = Field(..., description="Strategy status")
     
     config_file: str = Field(
-        ..., 
+        ...,
         description="Path to strategy configuration file (relative to configs/strategies/)"
     )
     
@@ -70,6 +70,15 @@ class StrategyCatalogEntry(BaseModel):
     supported_timeframes: List[int] = Field(
         default_factory=list,
         description="List of timeframes this strategy supports"
+    )
+    
+    # DATA2 dependency declaration
+    requires_secondary_data: bool = Field(
+        default=True,
+        description="Whether this strategy requires secondary dataset (DATA2) for execution. "
+                    "If True and DATA2 is missing/stale, gate will block/warn. "
+                    "If False, DATA2 gate passes regardless of DATA2 status. "
+                    "Safe default: True (block if missing)."
     )
     
     model_config = ConfigDict(frozen=True)

@@ -52,6 +52,7 @@ from contracts.research_wfs.result_schema import (
 )
 from wfs.evaluation_enhanced import evaluate_enhanced as evaluate
 from wfs.evaluation import RawMetrics
+from wfs.artifact_reporting import write_governance_and_scoring_artifacts
 from wfs.stitching import stitch_equity_series
 from wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
 from core.determinism import stable_seed_from_intent
@@ -173,6 +174,14 @@ class RunResearchWFSHandler(BaseJobHandler):
             dataset = params.get("dataset", "None")
             run_mode = params.get("run_mode", "wfs")
             workers = params.get("workers", 1)
+
+            season_label = params.get("season", f"{start_season}-{end_season}")
+            reporting_inputs = {
+                "instrument": instrument,
+                "timeframe": timeframe,
+                "run_mode": run_mode,
+                "season": season_label,
+            }
             
             # Apply guardrails before heavy computation
             self._apply_guardrails(start_season, end_season, strategy_id, context)
@@ -235,6 +244,82 @@ class RunResearchWFSHandler(BaseJobHandler):
             
             # Evaluate (5D scoring + hard gates)
             evaluation_result = evaluate(raw_metrics)
+            scoring_result = evaluation_result.scoring_guard_result or {}
+            net_profit = raw_metrics.get("net_profit", 0.0)
+            max_dd = raw_metrics.get("max_dd", 0.0)
+            trades = raw_metrics.get("trades", 0)
+
+            raw_breakdown = {"net_profit": net_profit, "mdd": max_dd, "trades": trades}
+            final_breakdown = {
+                "final_score": float(scoring_result.get("final_score") or 0.0),
+                "robustness_factor": float(scoring_result.get("robustness_factor", 1.0)),
+                "trade_multiplier": float(scoring_result.get("trade_multiplier", 1.0)),
+            }
+
+            edge_threshold = scoring_result.get("config", {}).get("min_avg_profit", 5.0)
+            cliff_threshold = scoring_result.get("config", {}).get("robust_cliff_threshold", 0.7)
+            edge_passed = scoring_result.get("edge_gate_passed")
+            non_null_edge = True if edge_passed is None else edge_passed
+            cliff_passed = scoring_result.get("cliff_gate_passed")
+            non_null_cliff = True if cliff_passed is None else cliff_passed
+
+            notes: list[str] = []
+            edge_reason = scoring_result.get("edge_gate_reason")
+            if edge_reason:
+                notes.append(edge_reason)
+            cliff_reason = scoring_result.get("cliff_gate_reason")
+            if cliff_reason:
+                notes.append(cliff_reason)
+            cluster_reason = scoring_result.get("cluster_test", {}).get("reason")
+            if cluster_reason:
+                notes.append(cluster_reason)
+            if scoring_result.get("cluster_penalty_applied"):
+                notes.append("Cluster penalty applied")
+
+            guards_payload = {
+                "edge_gate": {
+                    "passed": non_null_edge,
+                    "threshold": edge_threshold,
+                    "value": (net_profit / trades if trades else 0.0),
+                },
+                "cliff_gate": {
+                    "passed": non_null_cliff,
+                    "threshold": cliff_threshold,
+                    "value": scoring_result.get("robustness_factor", 1.0),
+                },
+                "notes": notes,
+            }
+
+            governance_payload = {
+                "policy_enforced": bool(scoring_result),
+                "compliance_passed": evaluation_result.is_tradable and non_null_edge and non_null_cliff,
+                "mode": {
+                    "mode_b_enabled": bool(scoring_result.get("config", {}).get("mode_b_enabled")),
+                    "scoring_guards_enabled": bool(scoring_result),
+                },
+                "gates": {
+                    "edge_gate_passed": non_null_edge,
+                    "cliff_gate_passed": non_null_cliff,
+                    "reasons": notes or [evaluation_result.summary],
+                },
+                "inputs": reporting_inputs,
+                "metrics": raw_breakdown,
+                "links": {"scoring_breakdown": "scoring_breakdown.json"},
+                "notes": notes,
+            }
+
+            try:
+                write_governance_and_scoring_artifacts(
+                    job_id=context.job_id,
+                    out_dir=Path(context.artifacts_dir),
+                    inputs=reporting_inputs,
+                    raw=raw_breakdown,
+                    final=final_breakdown,
+                    guards=guards_payload,
+                    governance=governance_payload,
+                )
+            except Exception as art_err:
+                logger.warning("Failed to write governance artifacts: %s", art_err)
             
             # Stitch series
             context.heartbeat(progress=0.8, phase="stitching_series")
@@ -580,6 +665,11 @@ class RunResearchWFSHandler(BaseJobHandler):
         
         # Generate synthetic aggregate metrics (placeholder)
         # In real implementation, would compute from stitched equity series
+        total_net_profit = sum(w.oos_metrics.get("net", 0.0) for w in windows)
+        max_mdd = max(
+            (w.oos_metrics.get("mdd", 0.0) for w in windows),
+            default=0.0
+        )
         return RawMetrics(
             rf=self.rng.uniform(1.0, 5.0),  # Return Factor
             wfe=self.rng.uniform(0.3, 0.9),  # Walk-Forward Efficiency
@@ -587,7 +677,9 @@ class RunResearchWFSHandler(BaseJobHandler):
             trades=total_trades,
             pass_rate=pass_rate,
             ulcer_index=self.rng.uniform(0.0, 20.0),
-            max_underwater_days=self.rng.randint(0, 50)
+            max_underwater_days=self.rng.randint(0, 50),
+            net_profit=total_net_profit,
+            max_dd=max_mdd,
         )
 
 

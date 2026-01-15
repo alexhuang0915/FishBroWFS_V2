@@ -96,6 +96,8 @@ class ReportTab(QWidget):
             ("equity.parquet", "Equity curve time series"),
             ("trades.parquet", "Individual trade records"),
             ("report.json", "Comprehensive analysis report"),
+            ("governance_summary.json", "Governance compliance snapshot"),
+            ("scoring_breakdown.json", "Detailed scoring breakdown"),
         ]
         
         for artifact_name, description in artifact_defs:
@@ -222,6 +224,85 @@ class ReportTab(QWidget):
         preview_group.setLayout(preview_layout)
         right_layout.addWidget(preview_group, 40)  # 40% height
         
+        # Governance + scoring section (read-only hook)
+        governance_group = QGroupBox("Governance & Scoring")
+        governance_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #ffa000;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 11px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        governance_layout = QVBoxLayout()
+        governance_layout.setContentsMargins(6, 6, 6, 6)
+        governance_layout.setSpacing(4)
+
+        def _build_row(file_name: str, btn: QPushButton, status_label: QLabel) -> QWidget:
+            widget = QWidget()
+            layout = QHBoxLayout(widget)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(8)
+            label = QLabel(file_name)
+            label.setStyleSheet("font-weight: bold; color: #E6E6E6; font-size: 11px;")
+            status_label.setStyleSheet("color: #9A9A9A; font-size: 10px;")
+            layout.addWidget(label)
+            layout.addStretch()
+            layout.addWidget(status_label)
+            layout.addWidget(btn)
+            return widget
+
+        self.gov_summary_btn = QPushButton("Open governance_summary.json")
+        self.gov_summary_status = QLabel("Not available")
+        self.gov_summary_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 2px 6px;
+                font-size: 10px;
+            }
+            QPushButton:disabled {
+                color: #777777;
+            }
+        """)
+        self.gov_summary_btn.setEnabled(False)
+
+        self.scoring_breakdown_btn = QPushButton("Open scoring_breakdown.json")
+        self.scoring_breakdown_status = QLabel("Not available")
+        self.scoring_breakdown_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 2px 6px;
+                font-size: 10px;
+            }
+            QPushButton:disabled {
+                color: #777777;
+            }
+        """)
+        self.scoring_breakdown_btn.setEnabled(False)
+
+        governance_layout.addWidget(_build_row(
+            "governance_summary.json", self.gov_summary_btn, self.gov_summary_status
+        ))
+        governance_layout.addWidget(_build_row(
+            "scoring_breakdown.json", self.scoring_breakdown_btn, self.scoring_breakdown_status
+        ))
+        governance_group.setLayout(governance_layout)
+        right_layout.addWidget(governance_group, 20)
+        
         # Add panels to split layout
         split_layout.addWidget(left_panel, 40)  # 40% width
         split_layout.addWidget(right_panel, 60)  # 60% width
@@ -232,6 +313,8 @@ class ReportTab(QWidget):
         self.preview_equity_btn.clicked.connect(lambda: self.preview_file("equity.parquet"))
         self.preview_trades_btn.clicked.connect(lambda: self.preview_file("trades.parquet"))
         self.preview_report_btn.clicked.connect(lambda: self.preview_file("report.json"))
+        self.gov_summary_btn.clicked.connect(lambda: self.preview_file("governance_summary.json"))
+        self.scoring_breakdown_btn.clicked.connect(lambda: self.preview_file("scoring_breakdown.json"))
     
     def create_checklist_item(self, artifact_name: str, description: str) -> QWidget:
         """Create a checklist item widget for an artifact."""
@@ -312,6 +395,7 @@ class ReportTab(QWidget):
         
         # Display metrics.json if available
         self.update_metrics_display()
+        self.update_governance_controls()
     
     def refresh_from_state(self):
         """Refresh the display from the active run state."""
@@ -331,7 +415,7 @@ class ReportTab(QWidget):
             self.preview_equity_btn.setEnabled(False)
             self.preview_trades_btn.setEnabled(False)
             self.preview_report_btn.setEnabled(False)
-            
+            self.update_governance_controls()
             return
         
         # Update checklist from diagnostics
@@ -345,11 +429,14 @@ class ReportTab(QWidget):
             "equity_parquet": "equity.parquet",
             "trades_parquet": "trades.parquet",
             "report_json": "report.json",
+            "governance_summary_json": "governance_summary.json",
+            "scoring_breakdown_json": "scoring_breakdown.json",
         }
         
         for diag_key, artifact_name in diagnostic_map.items():
             status = diagnostics.get(diag_key, "UNKNOWN")
             self.update_checklist_item(artifact_name, status)
+        self.update_governance_controls()
     
     def update_metrics_display(self):
         """Update the metrics.json display."""
@@ -364,6 +451,27 @@ class ReportTab(QWidget):
         except Exception as e:
             self.metrics_text.setPlainText(f"Error displaying metrics: {str(e)}")
     
+    def update_governance_controls(self):
+        """Update governance/scoring availability controls."""
+        def _normalize_status(key: str) -> str:
+            state = active_run_state.diagnostics.get(key, "")
+            return "Ready" if state == "READY" else "Not available"
+
+        if not active_run_state.run_dir:
+            self.gov_summary_status.setText("Not available")
+            self.scoring_breakdown_status.setText("Not available")
+            self.gov_summary_btn.setEnabled(False)
+            self.scoring_breakdown_btn.setEnabled(False)
+            return
+
+        summary_ready = active_run_state.diagnostics.get("governance_summary_json") == "READY"
+        scoring_ready = active_run_state.diagnostics.get("scoring_breakdown_json") == "READY"
+
+        self.gov_summary_status.setText(_normalize_status("governance_summary_json"))
+        self.scoring_breakdown_status.setText(_normalize_status("scoring_breakdown_json"))
+        self.gov_summary_btn.setEnabled(summary_ready)
+        self.scoring_breakdown_btn.setEnabled(scoring_ready)
+
     def preview_file(self, file_name: str):
         """Preview the contents of a file."""
         if not active_run_state.run_dir:

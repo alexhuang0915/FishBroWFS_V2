@@ -112,6 +112,8 @@ class ActiveRunState:
             "equity_parquet": "MISSING",
             "trades_parquet": "MISSING",
             "report_json": "MISSING",
+            "governance_summary_json": "MISSING",
+            "scoring_breakdown_json": "MISSING",
         }
         
         # Check other files
@@ -120,6 +122,12 @@ class ActiveRunState:
         
         if (run_dir / "run_record.json").exists():
             diagnostics["run_record_json"] = "READY"
+
+        if (run_dir / "governance_summary.json").exists():
+            diagnostics["governance_summary_json"] = "READY"
+
+        if (run_dir / "scoring_breakdown.json").exists():
+            diagnostics["scoring_breakdown_json"] = "READY"
         
         # Check parquet files (with size check)
         equity_path = run_dir / "equity.parquet"

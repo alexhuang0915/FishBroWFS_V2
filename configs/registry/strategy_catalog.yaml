@@ -20,3 +20,43 @@ strategies:
       - 240
     # This strategy does not require DATA2 (proves PASS path)
     requires_secondary_data: false
+
+  - id: "s2_v1"
+    display_name: "Stage 2 Strategy (Pullback Continuation)"
+    family: "pullback"
+    status: "active"
+    config_file: "S2_v1.yaml"
+    description: "Pullback continuation strategy using context and value gates"
+    version: "1.0"
+    author: "FishBro"
+    created_date: "2025-01-01"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240
+    requires_secondary_data: false
+
+  - id: "s3_v1"
+    display_name: "Stage 3 Strategy (Extreme Reversion)"
+    family: "reversion"
+    status: "active"
+    config_file: "S3_v1.yaml"
+    description: "Extreme reversion strategy using oversold condition"
+    version: "1.0"
+    author: "FishBro"
+    created_date: "2025-01-01"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240
+    requires_secondary_data: false

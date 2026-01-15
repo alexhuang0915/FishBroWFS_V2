@@ -11,10 +11,7 @@ def test_profiles_exist_in_configs(profiles_root: Path) -> None:
     """Verify that all expected profile YAMLs exist in configs/profiles/."""
     expected_profiles = [
         "CME_MNQ_TPE_v1.yaml",
-        "CME_MNQ_EXCHANGE_v1.yaml",
-        "CME_MNQ_v2.yaml",
         "TWF_MXF_TPE_v1.yaml",
-        "TWF_MXF_v2.yaml",
     ]
     
     for profile_name in expected_profiles:

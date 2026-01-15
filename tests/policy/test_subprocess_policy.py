@@ -39,6 +39,8 @@ ALLOWLIST = [
     "pipeline/funnel_runner.py",
     # Audit tab - opening evidence folders (legitimate UI feature)
     "gui/desktop/tabs/audit_tab.py",
+    # Replay compare service - opening evidence directory
+    "gui/services/replay_compare_service.py",
     # Scripts directory (non‑product)
     # Note: scripts/ is not under src/, but we can allow any file under scripts/
 ]

@@ -3,7 +3,7 @@ instruments:
   - id: "CME.MNQ"
     display_name: "E-mini Nasdaq-100"
     type: "future"
-    profile: "CME_MNQ_v2"
+    default_profile: "CME_MNQ_TPE_v1"
     currency: "USD"
     default_timeframe: 60
     exchange: "CME"
@@ -13,7 +13,7 @@ instruments:
   - id: "TWF.MXF"
     display_name: "Taiwan Futures Exchange Mini-TAIEX"
     type: "future"
-    profile: "TWF_MXF_v2"
+    default_profile: "TWF_MXF_TPE_v1"
     currency: "TWD"
     default_timeframe: 60
     exchange: "TAIFEX"

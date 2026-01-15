@@ -109,7 +109,7 @@ class ParameterSchema(BaseModel):
         
         return v
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
 
 
 class FeatureSpec(BaseModel):
@@ -122,7 +122,7 @@ class FeatureSpec(BaseModel):
     required: bool = Field(True, description="Whether feature is required")
     params: Optional[Dict[str, Any]] = Field(None, description="Feature parameters")
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
 
 
 class DeterminismConfig(BaseModel):
@@ -133,7 +133,7 @@ class DeterminismConfig(BaseModel):
         description="Default random seed (used when job.seed is not provided)"
     )
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
 
 
 class StrategyConfig(BaseModel):
@@ -167,7 +167,7 @@ class StrategyConfig(BaseModel):
     # SHA256 hash of original YAML
     sha256: Optional[str] = Field(None, description="SHA256 hash of YAML file")
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
     
     @field_validator('features')
     @classmethod

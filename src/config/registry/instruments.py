@@ -40,7 +40,7 @@ class InstrumentSpec(BaseModel):
     id: str = Field(..., description="Instrument identifier (e.g., 'CME.MNQ')")
     display_name: str = Field(..., description="Display name for UI")
     type: InstrumentType = Field(..., description="Instrument type")
-    profile: str = Field(..., description="Profile ID for this instrument")
+    profile: str = Field(..., description="Profile ID for this instrument", alias="default_profile")
     currency: str = Field(..., description="Trading currency")
     default_timeframe: int = Field(60, description="Default timeframe in minutes")
     
@@ -50,7 +50,7 @@ class InstrumentSpec(BaseModel):
     tick_size: Optional[float] = Field(None, description="Minimum price increment")
     tick_value: Optional[float] = Field(None, description="Value per tick")
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, populate_by_name=True, extra='forbid')
 
 
 class InstrumentRegistry(BaseModel):
@@ -58,13 +58,15 @@ class InstrumentRegistry(BaseModel):
     
     version: str = Field(..., description="Registry schema version")
     instruments: List[InstrumentSpec] = Field(
-        ..., 
+        ...,
         description="List of available instruments"
     )
     default: str = Field(
-        ..., 
+        ...,
         description="Default instrument ID (must be in instruments)"
     )
+    
+    model_config = ConfigDict(frozen=True, extra='forbid')
     
     @field_validator('instruments')
     @classmethod

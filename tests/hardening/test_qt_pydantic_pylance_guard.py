@@ -84,11 +84,11 @@ PYDANTIC_DEFAULT_FACTORY_PATTERN = r"Field\(\s*default_factory\s*=\s*([A-Za-z_][
 
 # Widget attribute injection (common anti-pattern keys)
 WIDGET_ATTR_INJECTION_PATTERNS = [
-    (r"\.\s*job_id\s*=",
+    (r"\.\s*job_id\s*=(?!=)",
      "Use setProperty('job_id', value) and property('job_id')"),
-    (r"\.\s*run_id\s*=",
+    (r"\.\s*run_id\s*=(?!=)",
      "Use setProperty('run_id', value) and property('run_id')"),
-    (r"\.\s*season\s*=",
+    (r"\.\s*season\s*=(?!=)",
      "Use setProperty('season', value) and property('season')"),
 ]
 

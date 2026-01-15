@@ -31,3 +31,11 @@ outputs/*
 # Raw data
 FishBroData/
 *.txt
+# === FishBro: volatile outputs ignore (DO NOT COMMIT) ===
+# FishBro: volatile outputs ignore
+outputs/_dp_evidence/supervisor_artifacts/jobs/
+outputs/_runtime/
+outputs/_trash/
+outputs/jobs_v2.db-wal
+outputs/jobs_v2.db-shm
+*.log

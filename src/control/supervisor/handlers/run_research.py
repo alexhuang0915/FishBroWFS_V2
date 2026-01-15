@@ -13,6 +13,7 @@ from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.run_research import RunResearchPayload
 from control.paths import get_outputs_root
 from control.artifacts import write_json_atomic
+from config.registry.instruments import load_instruments
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +23,14 @@ def _normalize_run_research_params(raw: Dict[str, Any]) -> Dict[str, Any]:
     Ensure params passed into RunResearchPayload(**params) contain only dataclass fields.
     Any extra keys (instrument/timeframe/season/run_mode/...) are packed into params_override.
     """
+    # Guardrail: reject any profile field in payload
+    profile_keys = [k for k in raw.keys() if 'profile' in k.lower()]
+    if profile_keys:
+        raise ValueError(
+            "Profile selection via payload is FORBIDDEN. "
+            "Please configure 'default_profile' in registry/instruments.yaml."
+        )
+    
     allowed = {f.name for f in fields(RunResearchPayload)}
     params: Dict[str, Any] = dict(raw)  # shallow copy
 
@@ -194,6 +203,23 @@ class RunResearchHandler(BaseJobHandler):
         
         return result
     
+    def _get_profile_for_instrument(self, instrument_id: str) -> str:
+        """Get default profile for instrument from registry."""
+        registry = load_instruments()
+        instrument = registry.get_instrument_by_id(instrument_id)
+        if instrument is None:
+            # Try to find by suffix (e.g., "MNQ" matches "CME.MNQ")
+            for inst in registry.instruments:
+                if inst.id.endswith(f".{instrument_id}"):
+                    instrument = inst
+                    break
+            if instrument is None:
+                raise ValueError(
+                    f"Instrument '{instrument_id}' not found in registry. "
+                    f"Available instruments: {registry.get_instrument_ids()}"
+                )
+        return instrument.profile
+    
     def _generate_manifest(self, job_id: str, payload: RunResearchPayload, run_dir: Path) -> None:
         """Generate manifest.json for the research run."""
         import git
@@ -210,13 +236,23 @@ class RunResearchHandler(BaseJobHandler):
         # Compute input fingerprint
         input_fingerprint = payload.compute_input_fingerprint()
         
+        # Determine instrument from params_override
+        instrument_id = None
+        if payload.params_override:
+            instrument_id = payload.params_override.get("instrument")
+        if not instrument_id:
+            raise ValueError("Missing instrument in params_override")
+        
+        # Get profile from instrument registry
+        profile_name = self._get_profile_for_instrument(instrument_id)
+        
         manifest = {
             "job_id": job_id,
             "job_type": "run_research_v2",
             "created_at": datetime.now(UTC).isoformat().replace('+00:00', 'Z'),
             "input_fingerprint": {
                 "strategy_id": payload.strategy_id,
-                "profile_name": payload.profile_name,
+                "profile_name": profile_name,
                 "start_date": payload.start_date,
                 "end_date": payload.end_date,
                 "params_hash": input_fingerprint

@@ -634,3 +634,34 @@ def percentile_rank(arr: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
+@njit(cache=True)
+def daily_pivot(high: np.ndarray, low: np.ndarray, close: np.ndarray) -> np.ndarray:
+    """
+    Daily pivot point: (high + low + close) / 3.
+    No window parameter; returns typical price per bar.
+    """
+    n = high.shape[0]
+    out = np.empty(n, dtype=np.float64)
+    for i in range(n):
+        out[i] = (high[i] + low[i] + close[i]) / 3.0
+    return out
+
+
+@njit(cache=True)
+def swing_high(arr: np.ndarray, window: int) -> np.ndarray:
+    """
+    Swing high: highest high over trailing window (causal).
+    Alias for hh.
+    """
+    return hh(arr, window)
+
+
+@njit(cache=True)
+def swing_low(arr: np.ndarray, window: int) -> np.ndarray:
+    """
+    Swing low: lowest low over trailing window (causal).
+    Alias for ll.
+    """
+    return ll(arr, window)
+
+

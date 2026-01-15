@@ -34,6 +34,8 @@ class StrategyFamily(str, Enum):
     MARKET_MAKING = "market_making"
     CARRY = "carry"
     VOLATILITY = "volatility"
+    PULLBACK = "pullback"
+    REVERSION = "reversion"
 
 
 class StrategyStatus(str, Enum):
@@ -81,7 +83,7 @@ class StrategyCatalogEntry(BaseModel):
                     "Safe default: True (block if missing)."
     )
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
     
     @field_validator('config_file')
     @classmethod
@@ -97,9 +99,11 @@ class StrategyCatalogRegistry(BaseModel):
     
     version: str = Field(..., description="Registry schema version")
     strategies: List[StrategyCatalogEntry] = Field(
-        ..., 
+        ...,
         description="List of available strategies"
     )
+    
+    model_config = ConfigDict(extra='forbid')
     
     @field_validator('strategies')
     @classmethod

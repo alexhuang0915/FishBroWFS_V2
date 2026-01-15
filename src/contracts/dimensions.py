@@ -56,7 +56,7 @@ class InstrumentDimension(BaseModel):
 
 class DimensionRegistry(BaseModel):
     """維度註冊表，支援透過 dataset_id 或 symbol 查詢"""
-    model_config = ConfigDict(extra="allow")  # 允許 metadata 等額外欄位
+    model_config = ConfigDict(extra="forbid")  # 嚴格禁止未定義欄位
     
     by_dataset_id: Dict[str, InstrumentDimension] = Field(default_factory=dict)
     by_symbol: Dict[str, InstrumentDimension] = Field(default_factory=dict)

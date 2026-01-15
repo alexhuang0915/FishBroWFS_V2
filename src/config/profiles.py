@@ -137,7 +137,7 @@ class MemoryConfig(BaseModel):
         description="Minimum downsampling fraction"
     )
     
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra='forbid')
 
 
 class ProfileConfig(BaseModel):

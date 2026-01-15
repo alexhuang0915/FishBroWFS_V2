@@ -982,6 +982,16 @@ def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
     return artifacts
 
 
+def _reject_profile_fields(payload: dict) -> None:
+    """Raise ValueError if any profile field is present in payload."""
+    profile_keys = [k for k in payload.keys() if 'profile' in k.lower()]
+    if profile_keys:
+        raise ValueError(
+            "Profile selection via payload is FORBIDDEN. "
+            "Please configure 'default_profile' in registry/instruments.yaml."
+        )
+
+
 def _build_run_research_v2_params(req: dict) -> dict:
     """
     Build supervisor params for RUN_RESEARCH_V2 job from UI request.
@@ -990,19 +1000,17 @@ def _build_run_research_v2_params(req: dict) -> dict:
     RunResearchPayload contract with extras packed into params_override.
     
     Defaults:
-    - profile_name: "default" if not provided
     - start_date: "" if not provided (will cause validation error)
     - end_date: "" if not provided (will cause validation error)
     """
+    # Guardrail: reject any profile field in request
+    _reject_profile_fields(req)
+    
     strategy_id = req.get("strategy_id")
     if not strategy_id:
         raise ValueError("strategy_id is required")
     if not isinstance(strategy_id, str):
         raise ValueError("strategy_id must be a string")
-
-    profile_name = req.get("profile_name") or "default"
-    if not isinstance(profile_name, str):
-        raise ValueError("profile_name must be a string")
     
     start_date = req.get("start_date")
     if not start_date or not isinstance(start_date, str) or start_date.strip() == "":
@@ -1026,7 +1034,6 @@ def _build_run_research_v2_params(req: dict) -> dict:
 
     return {
         "strategy_id": strategy_id,
-        "profile_name": profile_name,
         "start_date": start_date,
         "end_date": end_date,
         "params_override": override,
@@ -1034,6 +1041,9 @@ def _build_run_research_v2_params(req: dict) -> dict:
 
 
 def _build_run_plateau_v2_params(req: dict) -> dict:
+    # Guardrail: reject any profile field in request
+    _reject_profile_fields(req)
+    
     research_run_id = req.get("research_run_id")
     if not research_run_id or not isinstance(research_run_id, str) or research_run_id.strip() == "":
         raise ValueError("research_run_id is required and must be a non-empty string")
@@ -1056,6 +1066,9 @@ def _build_run_plateau_v2_params(req: dict) -> dict:
 
 
 def _build_run_research_wfs_params(req: dict) -> dict:
+    # Guardrail: reject any profile field in request
+    _reject_profile_fields(req)
+    
     strategy_id = req.get("strategy_id")
     instrument = req.get("instrument")
     timeframe = req.get("timeframe")

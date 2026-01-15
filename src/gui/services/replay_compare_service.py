@@ -19,9 +19,9 @@ from dataclasses import dataclass
 from PySide6.QtCore import Signal, QObject, Slot
 from PySide6.QtWidgets import QMessageBox, QFileDialog, QWidget
 
-from src.core.deployment.bundle_resolver import BundleResolver
-from src.core.deployment.diff_engine import DiffEngine, CompareReportV1
-from src.core.paths import get_outputs_root
+from core.deployment.bundle_resolver import BundleResolver
+from core.deployment.diff_engine import DiffEngine, CompareReportV1
+from core.paths import get_outputs_root
 
 logger = logging.getLogger(__name__)
 
@@ -419,7 +419,7 @@ def add_compare_context_menu(analysis_drawer, job_id: str):
     replay/compare functionality to its context menus.
     """
     # Import here to avoid circular imports
-    from src.gui.desktop.widgets.analysis_drawer_widget import AnalysisDrawerWidget
+    from gui.desktop.widgets.analysis_drawer_widget import AnalysisDrawerWidget
     
     if not isinstance(analysis_drawer, AnalysisDrawerWidget):
         return

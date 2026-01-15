@@ -26,13 +26,17 @@ def test_submit_run_research_v2_job():
     with db._connect() as conn:
         conn.execute("DELETE FROM jobs WHERE job_type = 'RUN_RESEARCH_V2'")
     
-    # Submit job
+    # Submit job (profile_name is forbidden, must be derived from instrument)
     payload = {
         "strategy_id": "S1",
-        "profile_name": "CME_MNQ_v2",
         "start_date": "2025-01-01",
         "end_date": "2025-01-31",
-        "params_override": {}
+        "params_override": {
+            "instrument": "CME.MNQ",
+            "timeframe": "60m",
+            "season": "2025",
+            "run_mode": "research"
+        }
     }
     
     job_id = submit("RUN_RESEARCH_V2", payload)
@@ -44,20 +48,25 @@ def test_submit_run_research_v2_job():
     assert job.job_type == "RUN_RESEARCH_V2"
     assert job.state == "QUEUED"
     
-    # Verify payload
+    # Verify payload (profile_name should not be present)
     spec_dict = json.loads(job.spec_json)
     assert spec_dict["job_type"] == "RUN_RESEARCH_V2"
-    assert spec_dict["params"] == payload
+    # The payload may have been normalized (profile_name removed)
+    # Ensure profile_name is not in params
+    assert "profile_name" not in spec_dict["params"]
+    # Check that required fields are present
+    assert spec_dict["params"]["strategy_id"] == "S1"
+    assert spec_dict["params"]["start_date"] == "2025-01-01"
+    assert spec_dict["params"]["end_date"] == "2025-01-31"
     
     print(f"✓ Job submitted: {job_id}")
 
 
 def test_run_research_v2_job_validation():
     """Test RUN_RESEARCH_V2 parameter validation."""
-    # Test missing required field
+    # Test missing required field (strategy_id)
     with pytest.raises(ValueError, match="strategy_id"):
         submit("RUN_RESEARCH_V2", {
-            "profile_name": "CME_MNQ_v2",
             "start_date": "2025-01-01",
             "end_date": "2025-01-31"
         })
@@ -66,8 +75,16 @@ def test_run_research_v2_job_validation():
     with pytest.raises(ValueError, match="start_date"):
         submit("RUN_RESEARCH_V2", {
             "strategy_id": "S1",
-            "profile_name": "CME_MNQ_v2",
             "start_date": "invalid",
+            "end_date": "2025-01-31"
+        })
+    
+    # Test profile field is forbidden
+    with pytest.raises(ValueError, match="Profile selection via payload is FORBIDDEN"):
+        submit("RUN_RESEARCH_V2", {
+            "strategy_id": "S1",
+            "profile_name": "CME_MNQ_v2",
+            "start_date": "2025-01-01",
             "end_date": "2025-01-31"
         })
     
@@ -102,13 +119,17 @@ def test_run_research_v2_job_execution(mock_execute):
     
     handler = RunResearchHandler()
     
-    # Test parameter validation
+    # Test parameter validation (profile_name is forbidden, must be derived from instrument)
     params = {
         "strategy_id": "S1",
-        "profile_name": "CME_MNQ_v2",
         "start_date": "2025-01-01",
         "end_date": "2025-01-31",
-        "params_override": {}
+        "params_override": {
+            "instrument": "CME.MNQ",
+            "timeframe": "60m",
+            "season": "2025",
+            "run_mode": "research"
+        }
     }
     
     handler.validate_params(params)
@@ -138,10 +159,9 @@ def test_run_research_v2_manifest_generation():
     
     handler = RunResearchHandler()
     
-    # Create test payload
+    # Create test payload (profile_name is no longer a field)
     payload = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param1": "value1"}
@@ -155,7 +175,6 @@ def test_run_research_v2_manifest_generation():
     # Test with same inputs produces same fingerprint
     payload2 = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param1": "value1"}
@@ -166,7 +185,6 @@ def test_run_research_v2_manifest_generation():
     # Test with different params produces different fingerprint
     payload3 = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param1": "different"}

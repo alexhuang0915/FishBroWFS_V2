@@ -13,6 +13,11 @@ from pathlib import Path
 import pytest
 from zoneinfo import ZoneInfo
 
+# Skip if required profile is missing (deleted per spec)
+profile_path = Path("configs/profiles/CME_MNQ_v2.yaml")
+if not profile_path.exists():
+    pytest.skip("CME_MNQ_v2.yaml deleted per spec", allow_module_level=True)
+
 from data.session.classify import classify_session
 from data.session.loader import load_session_profile
 

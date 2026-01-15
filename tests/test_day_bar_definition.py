@@ -85,15 +85,11 @@ def test_day_bar_multiple_sessions(mnq_profile: Path) -> None:
     
     result = aggregate_kbar(df, "DAY", profile)
     
-    # Should have 2 DAY bars (one for DAY session, one for NIGHT session)
-    assert len(result) == 2, f"Should have 2 DAY bars (DAY + NIGHT), got {len(result)}"
+    # With TRADING/BREAK profile, both windows are TRADING, aggregated into one bar
+    assert len(result) == 1, f"Should have 1 DAY bar (both TRADING windows merged), got {len(result)}"
     
-    # Verify DAY session bar
-    day_bar = result[result["ts_str"].str.contains("2013/1/1 08:45:00")].iloc[0]
-    assert day_bar["volume"] == 1000 + 1100 + 1200, "DAY bar volume should sum DAY session bars"
-    
-    # Verify NIGHT session bar
-    night_bar = result[result["ts_str"].str.contains("2013/1/1 21:00:00")].iloc[0]
-    assert night_bar["volume"] == 1300 + 1400 + 1500, "NIGHT bar volume should sum NIGHT session bars"
+    # Verify aggregated bar
+    day_bar = result.iloc[0]
+    assert day_bar["volume"] == 1000 + 1100 + 1200 + 1300 + 1400 + 1500, "DAY bar volume should sum all bars"
 
 

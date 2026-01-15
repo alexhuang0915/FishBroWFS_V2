@@ -50,14 +50,14 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_TPE_v1.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params: {}
   - leg_id: "leg1"  # Duplicate
     symbol: "TWF.MXF"
     timeframe_min: 60
-    session_profile: "configs/profiles/TWF_MXF_v2.yaml"
+    session_profile: "configs/profiles/TWF_MXF_TPE_v1.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v1"
     params: {}
@@ -79,7 +79,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_TPE_v1.yaml"
     strategy_id: "nonexistent_strategy"  # Not in registry
     strategy_version: "v1"
     params: {}
@@ -103,7 +103,7 @@ legs:
   - leg_id: "leg1"
     symbol: "CME.MNQ"
     timeframe_min: 60
-    session_profile: "configs/profiles/CME_MNQ_v2.yaml"
+    session_profile: "configs/profiles/CME_MNQ_TPE_v1.yaml"
     strategy_id: "sma_cross"
     strategy_version: "v2"  # Mismatch (registry has v1)
     params: {}

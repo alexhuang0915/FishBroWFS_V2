@@ -22,35 +22,35 @@ def test_mnq_day_session(mnq_profile: Path) -> None:
     """Test DAY session classification for CME.MNQ."""
     profile = load_session_profile(mnq_profile)
     
-    # Test DAY session times
-    assert classify_session("2013/1/1 08:45:00", profile) == "DAY"
-    assert classify_session("2013/1/1 10:00:00", profile) == "DAY"
-    assert classify_session("2013/1/1 13:44:59", profile) == "DAY"
+    # Test DAY session times (now returns TRADING)
+    assert classify_session("2013/1/1 08:45:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 10:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 13:44:59", profile) == "TRADING"
     
-    # Test boundary (end is exclusive)
-    assert classify_session("2013/1/1 13:45:00", profile) is None
+    # Test boundary (end is exclusive) -> BREAK
+    assert classify_session("2013/1/1 13:45:00", profile) == "BREAK"
 
 
 def test_mnq_night_session(mnq_profile: Path) -> None:
     """Test NIGHT session classification for CME.MNQ."""
     profile = load_session_profile(mnq_profile)
     
-    # Test NIGHT session times (spans midnight)
-    assert classify_session("2013/1/1 21:00:00", profile) == "NIGHT"
-    assert classify_session("2013/1/1 23:59:59", profile) == "NIGHT"
-    assert classify_session("2013/1/2 00:00:00", profile) == "NIGHT"
-    assert classify_session("2013/1/2 05:59:59", profile) == "NIGHT"
+    # Test NIGHT session times (spans midnight) -> TRADING
+    assert classify_session("2013/1/1 21:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 23:59:59", profile) == "TRADING"
+    assert classify_session("2013/1/2 00:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/2 05:59:59", profile) == "TRADING"
     
-    # Test boundary (end is exclusive)
-    assert classify_session("2013/1/2 06:00:00", profile) is None
+    # Test boundary (end is exclusive) -> BREAK
+    assert classify_session("2013/1/2 06:00:00", profile) == "BREAK"
 
 
 def test_mnq_outside_session(mnq_profile: Path) -> None:
     """Test timestamps outside trading sessions."""
     profile = load_session_profile(mnq_profile)
     
-    # Between sessions
-    assert classify_session("2013/1/1 14:00:00", profile) is None
-    assert classify_session("2013/1/1 20:59:59", profile) is None
+    # Between sessions -> BREAK
+    assert classify_session("2013/1/1 14:00:00", profile) == "BREAK"
+    assert classify_session("2013/1/1 20:59:59", profile) == "BREAK"
 
 

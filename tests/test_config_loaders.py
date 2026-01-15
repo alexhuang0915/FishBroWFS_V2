@@ -60,7 +60,7 @@ def test_load_instruments():
     assert mnq is not None
     assert mnq.id == "CME.MNQ"
     assert mnq.display_name == "E-mini Nasdaq-100"
-    assert mnq.profile == "CME_MNQ_v2"
+    assert mnq.profile == "CME_MNQ_TPE_v1"
     assert mnq.currency == "USD"
     
     # Test default instrument
@@ -118,7 +118,7 @@ def test_load_strategy_catalog():
 
 def test_load_profile():
     """Test loading profile with mandatory cost model."""
-    profile = load_profile("CME_MNQ_v2")
+    profile = load_profile("CME_MNQ_TPE_v1")
     
     assert isinstance(profile, ProfileConfig)
     assert profile.version == "2.0"

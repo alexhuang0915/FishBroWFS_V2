@@ -14,11 +14,78 @@ All human-edited configs must be YAML-only with strict validation.
 """
 
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict, List, Any
 import hashlib
+from collections import defaultdict
 
 from pydantic import BaseModel, Field, ConfigDict, field_validator
 import yaml
+
+# Configuration load instrumentation
+_loaded_configs: Dict[str, Dict[str, Any]] = defaultdict(lambda: {"count": 0, "sha256": None})
+_config_recording_enabled = True
+
+def record_config_load(path: Path, sha256: Optional[str] = None) -> None:
+    """Record a config file load for reachability reporting."""
+    if not _config_recording_enabled:
+        return
+    rel_path = str(path.relative_to(get_config_root())) if path.is_relative_to(get_config_root()) else str(path)
+    if sha256 is None:
+        sha256 = compute_yaml_sha256(path)
+    entry = _loaded_configs[rel_path]
+    entry["count"] += 1
+    entry["sha256"] = sha256
+
+def reset_config_load_records() -> None:
+    """Clear all recorded config loads."""
+    _loaded_configs.clear()
+
+def get_config_load_records() -> Dict[str, Dict[str, Any]]:
+    """Get a copy of recorded config loads."""
+    return dict(_loaded_configs)
+
+def enable_config_recording(enabled: bool = True) -> None:
+    """Enable or disable config load recording."""
+    global _config_recording_enabled
+    _config_recording_enabled = enabled
+
+
+def clear_config_caches() -> None:
+    """Clear all LRU caches in config loaders to force fresh loads."""
+    from .profiles import load_profile
+    from .strategies import load_strategy
+    from .registry.instruments import load_instruments
+    from .registry.datasets import load_datasets
+    from .registry.strategy_catalog import load_strategy_catalog
+    from .registry.timeframes import load_timeframes
+    from .registry import _load_registry_cached
+    from .portfolio import load_portfolio_config
+    from .cost_utils import get_instrument_spec, get_profile_for_instrument
+
+    # List of functions that are known to be cached
+    cached_functions = [
+        load_profile,
+        load_strategy,
+        load_instruments,
+        load_datasets,
+        load_strategy_catalog,
+        load_timeframes,
+        _load_registry_cached,
+        load_portfolio_config,
+        get_instrument_spec,
+        get_profile_for_instrument,
+    ]
+    
+    for func in cached_functions:
+        try:
+            # Check if function has cache_clear attribute and it's callable
+            cache_clear = getattr(func, 'cache_clear', None)
+            if cache_clear is not None and callable(cache_clear):
+                cache_clear()
+        except Exception:
+            # Silently ignore any errors; cache clearing is non-critical
+            pass
+
 
 # Note: We use lazy imports to avoid circular imports
 # Registry loaders are imported on demand
@@ -47,6 +114,10 @@ __all__ = [
     
     # Cost utilities (new in Config Constitution v1)
     'CostModelError', 'get_cost_model_for_instrument', 'get_commission_slippage_for_instrument',
+    
+    # Instrumentation
+    'record_config_load', 'reset_config_load_records', 'get_config_load_records', 'enable_config_recording',
+    'clear_config_caches', 'write_config_load_report',
 ]
 
 
@@ -155,6 +226,9 @@ def load_yaml(path: Path) -> dict:
     
     try:
         raw_bytes = path.read_bytes()
+        # Record config load for reachability reporting
+        sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        record_config_load(path, sha256)
         data = yaml.safe_load(raw_bytes)
         if data is None:
             data = {}
@@ -225,3 +299,39 @@ def get_portfolio_path(filename: str) -> Path:
         Full path to portfolio file
     """
     return get_config_root() / "portfolio" / filename
+
+
+def write_config_load_report(output_dir: Path) -> None:
+    """
+    Write recorded config loads to a JSON report.
+    
+    Args:
+        output_dir: Directory where report should be written.
+                    The report will be saved as 'loaded_configs_report.json'.
+    """
+    import json
+    import time
+    
+    records = get_config_load_records()
+    report = {
+        "generated_at": time.time(),
+        "generated_at_iso": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "configs_loaded": len(records),
+        "records": records,
+    }
+    
+    output_dir.mkdir(parents=True, exist_ok=True)
+    report_path = output_dir / "loaded_configs_report.json"
+    
+    with open(report_path, "w", encoding="utf-8") as f:
+        json.dump(report, f, indent=2, ensure_ascii=False)
+    
+    # Also write a summary text file for quick inspection
+    summary_path = output_dir / "loaded_configs_summary.txt"
+    with open(summary_path, "w", encoding="utf-8") as f:
+        f.write(f"Config Load Reachability Report\n")
+        f.write(f"Generated at: {report['generated_at_iso']}\n")
+        f.write(f"Total config files loaded: {len(records)}\n")
+        f.write("\n")
+        for rel_path, info in sorted(records.items()):
+            f.write(f"{rel_path}: count={info['count']}, sha256={info['sha256'][:16]}...\n")

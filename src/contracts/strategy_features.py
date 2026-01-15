@@ -117,22 +117,16 @@ def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
         FileNotFoundError: 檔案不存在
         ValueError: YAML 解析失敗或驗證失敗
     """
-    import yaml
     from pathlib import Path
+    from config import load_yaml, ConfigNotFoundError, ConfigValidationError
     
     path = Path(yaml_path)
-    if not path.exists():
-        raise FileNotFoundError(f"策略配置檔案不存在: {yaml_path}")
-    
     try:
-        content = path.read_text(encoding="utf-8")
-    except (IOError, OSError) as e:
-        raise ValueError(f"無法讀取策略配置檔案 {yaml_path}: {e}")
-    
-    try:
-        data = yaml.safe_load(content)
-    except yaml.YAMLError as e:
-        raise ValueError(f"策略配置 YAML 解析失敗 {yaml_path}: {e}")
+        data = load_yaml(path)
+    except ConfigNotFoundError as e:
+        raise FileNotFoundError(f"策略配置檔案不存在: {yaml_path}") from e
+    except ConfigValidationError as e:
+        raise ValueError(f"策略配置 YAML 解析失敗 {yaml_path}: {e}") from e
     
     # 提取 strategy_id
     strategy_id = data.get("strategy_id")

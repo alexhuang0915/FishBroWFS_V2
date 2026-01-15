@@ -1,7 +1,9 @@
 # S3 Strategy Configuration (Extreme Reversion)
-# Migrated from configs/strategies/S3/baseline.yaml
+# Migrated from configs/strategies/S3.yaml
+# Schema version: 1.0
+
 version: "1.0"
-strategy_id: "S3"
+strategy_id: "s3_v1"
 
 # Determinism configuration
 determinism:
@@ -12,27 +14,27 @@ parameters:
   filter_mode:
     type: "choice"
     default: "NONE"
-    choices: ["NONE", "ABOVE", "BELOW", "CROSS_ABOVE", "CROSS_BELOW"]
-    description: "Filter mode for additional feature filtering"
+    choices: ["NONE", "THRESHOLD"]
+    description: "Filter application mode"
   
   trigger_mode:
     type: "choice"
     default: "NONE"
-    choices: ["NONE", "BAR_CLOSE", "NEXT_OPEN", "IMMEDIATE"]
-    description: "Trigger mode for entry execution"
+    choices: ["NONE", "STOP", "CROSS"]
+    description: "Trigger generation mode"
   
   entry_mode:
     type: "choice"
     default: "MARKET_NEXT_OPEN"
-    choices: ["MARKET_NEXT_OPEN", "LIMIT", "STOP"]
-    description: "Entry mode for trade execution"
+    choices: ["MARKET_NEXT_OPEN"]
+    description: "Entry execution mode (only when trigger_mode=NONE)"
   
   context_threshold:
     type: "float"
     default: 0.0
     min: -2.0
     max: 2.0
-    description: "Context feature threshold"
+    description: "Threshold for context_feature"
     step: 0.1
   
   value_threshold:
@@ -107,4 +109,4 @@ notes: |
   Filter mode: NONE (no additional filtering)
   Trigger mode: NONE (market next open entry)
   Note: For extreme reversion, value_feature < value_threshold triggers (oversold condition).
-  Migrated from S3/baseline.yaml with added determinism and parameter schema
+  Migrated from S3.yaml with canonical parameter schema.

@@ -128,7 +128,7 @@ def _build_dimension_registry_from_profiles() -> DimensionRegistry:
     
     for instrument in instruments_data["instruments"]:
         symbol = instrument["id"]
-        profile_name = instrument.get("profile")
+        profile_name = instrument.get("default_profile") or instrument.get("profile")
         
         if not profile_name:
             continue

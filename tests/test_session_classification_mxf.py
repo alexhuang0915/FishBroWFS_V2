@@ -22,35 +22,35 @@ def test_mxf_day_session(mxf_profile: Path) -> None:
     """Test DAY session classification for TWF.MXF."""
     profile = load_session_profile(mxf_profile)
     
-    # Test DAY session times
-    assert classify_session("2013/1/1 08:45:00", profile) == "DAY"
-    assert classify_session("2013/1/1 10:00:00", profile) == "DAY"
-    assert classify_session("2013/1/1 13:44:59", profile) == "DAY"
+    # Test DAY session times (now returns TRADING)
+    assert classify_session("2013/1/1 08:45:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 10:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 13:44:59", profile) == "TRADING"
     
-    # Test boundary (end is exclusive)
-    assert classify_session("2013/1/1 13:45:00", profile) is None
+    # Test boundary (end is exclusive) -> BREAK
+    assert classify_session("2013/1/1 13:45:00", profile) == "BREAK"
 
 
 def test_mxf_night_session(mxf_profile: Path) -> None:
     """Test NIGHT session classification for TWF.MXF."""
     profile = load_session_profile(mxf_profile)
     
-    # Test NIGHT session times (spans midnight)
-    assert classify_session("2013/1/1 15:00:00", profile) == "NIGHT"
-    assert classify_session("2013/1/1 23:59:59", profile) == "NIGHT"
-    assert classify_session("2013/1/2 00:00:00", profile) == "NIGHT"
-    assert classify_session("2013/1/2 04:59:59", profile) == "NIGHT"
+    # Test NIGHT session times (spans midnight) -> TRADING
+    assert classify_session("2013/1/1 15:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/1 23:59:59", profile) == "TRADING"
+    assert classify_session("2013/1/2 00:00:00", profile) == "TRADING"
+    assert classify_session("2013/1/2 04:59:59", profile) == "TRADING"
     
-    # Test boundary (end is exclusive)
-    assert classify_session("2013/1/2 05:00:00", profile) is None
+    # Test boundary (end is exclusive) -> BREAK
+    assert classify_session("2013/1/2 05:00:00", profile) == "BREAK"
 
 
 def test_mxf_outside_session(mxf_profile: Path) -> None:
     """Test timestamps outside trading sessions."""
     profile = load_session_profile(mxf_profile)
     
-    # Between sessions
-    assert classify_session("2013/1/1 14:00:00", profile) is None
-    assert classify_session("2013/1/1 14:59:59", profile) is None
+    # Between sessions (now covered by BREAK window 13:45-15:00)
+    assert classify_session("2013/1/1 14:00:00", profile) == "BREAK"
+    assert classify_session("2013/1/1 14:59:59", profile) == "BREAK"
 
 

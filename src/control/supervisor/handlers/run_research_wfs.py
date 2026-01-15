@@ -50,7 +50,8 @@ from contracts.research_wfs.result_schema import (
     TimeRange,
     WindowRule,
 )
-from wfs.evaluation import evaluate, RawMetrics
+from wfs.evaluation_enhanced import evaluate_enhanced as evaluate
+from wfs.evaluation import RawMetrics
 from wfs.stitching import stitch_equity_series
 from wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
 from core.determinism import stable_seed_from_intent

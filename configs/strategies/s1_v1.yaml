@@ -91,15 +91,15 @@ features:
     timeframe: 60
     required: true
   
-  - name: "vx_percentile_126"
+  - name: "percentile_126"
     timeframe: 60
     required: true
   
-  - name: "vx_percentile_252"
+  - name: "percentile_252"
     timeframe: 60
     required: true
   
-  - name: "ret_z_200"
+  - name: "zscore_200"
     timeframe: 60
     required: true
   

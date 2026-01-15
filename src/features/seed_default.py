@@ -12,8 +12,10 @@ from features.registry import FeatureRegistry
 from indicators.numba_indicators import (
     sma, hh, ll, atr_wilder, vx_percentile, percentile_rank, rsi, ema, wma, rolling_stdev,
     zscore, momentum, roc, bbands_pb, bbands_width, atr_channel_upper,
-    atr_channel_lower, atr_channel_pos, donchian_width, dist_to_hh, dist_to_ll
+    atr_channel_lower, atr_channel_pos, donchian_width, dist_to_hh, dist_to_ll,
+    daily_pivot, swing_high, swing_low
 )
+from core.features import compute_session_vwap
 from config.registry.timeframes import load_timeframes
 
 def compute_min_warmup_bars(family: str, window: int) -> int:
@@ -23,6 +25,8 @@ def compute_min_warmup_bars(family: str, window: int) -> int:
     if family in ("ema", "adx"):
         return math.ceil(3 * window)
     # SMA, WMA, STDEV, HH, LL, Percentile, ATR Wilder, RSI, etc.
+    if family == "volume":
+        return 0
     return window
 
 
@@ -368,3 +372,62 @@ def seed_default_registry(reg: FeatureRegistry) -> None:
                 div0_policy="DIV0_RET_NAN",
                 family="percentile",
             )
+
+        # G6 Structural features
+        # Daily pivot (no window)
+        reg.register_feature(
+            name="daily_pivot",
+            timeframe_min=tf,
+            lookback_bars=0,
+            params={},
+            compute_func=lambda h, l, c: daily_pivot(h, l, c),
+            skip_verification=True,
+            window=1,
+            min_warmup_bars=0,
+            dtype="float64",
+            div0_policy="DIV0_RET_NAN",
+            family="structural",
+        )
+        # Swing high (alias of hh)
+        for w in (5, 10, 20, 40, 80, 160, 252):
+            reg.register_feature(
+                name=f"swing_high_{w}",
+                timeframe_min=tf,
+                lookback_bars=w,
+                params={"window": w},
+                compute_func=lambda arr, w=w: swing_high(arr, w),
+                skip_verification=True,
+                window=w,
+                min_warmup_bars=compute_min_warmup_bars("structural", w),
+                dtype="float64",
+                div0_policy="DIV0_RET_NAN",
+                family="structural",
+            )
+            reg.register_feature(
+                name=f"swing_low_{w}",
+                timeframe_min=tf,
+                lookback_bars=w,
+                params={"window": w},
+                compute_func=lambda arr, w=w: swing_low(arr, w),
+                skip_verification=True,
+                window=w,
+                min_warmup_bars=compute_min_warmup_bars("structural", w),
+                dtype="float64",
+                div0_policy="DIV0_RET_NAN",
+                family="structural",
+            )
+
+        # Session VWAP (baseline feature)
+        reg.register_feature(
+            name="session_vwap",
+            timeframe_min=tf,
+            lookback_bars=0,
+            params={},
+            compute_func=None,
+            skip_verification=True,
+            window=1,
+            min_warmup_bars=0,
+            dtype="float64",
+            div0_policy="DIV0_RET_NAN",
+            family="volume",
+        )

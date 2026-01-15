@@ -22,13 +22,15 @@ def test_manifest_schema():
     """Test manifest.json schema generation."""
     handler = RunResearchHandler()
     
-    # Create test payload
+    # Create test payload (profile_name is derived from instrument)
     payload = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
-        params_override={"test_param": "value"}
+        params_override={
+            "instrument": "CME.MNQ",
+            "test_param": "value"
+        }
     )
     
     # Create temporary directory
@@ -57,7 +59,8 @@ def test_manifest_schema():
         # Input fingerprint structure
         input_fp = manifest["input_fingerprint"]
         assert input_fp["strategy_id"] == "S1"
-        assert input_fp["profile_name"] == "CME_MNQ_v2"
+        # profile_name should be derived from instrument (CME_MNQ_TPE_v1)
+        assert input_fp["profile_name"] == "CME_MNQ_TPE_v1"
         assert input_fp["start_date"] == "2025-01-01"
         assert input_fp["end_date"] == "2025-01-31"
         assert "params_hash" in input_fp
@@ -76,7 +79,6 @@ def test_manifest_fingerprint_consistency():
     """Test that fingerprint is consistent for same inputs."""
     payload1 = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param1": "value1", "param2": "value2"}
@@ -84,7 +86,6 @@ def test_manifest_fingerprint_consistency():
     
     payload2 = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param2": "value2", "param1": "value1"}  # Different order
@@ -100,7 +101,6 @@ def test_manifest_fingerprint_consistency():
     # Different values should produce different fingerprint
     payload3 = RunResearchPayload(
         strategy_id="S1",
-        profile_name="CME_MNQ_v2",
         start_date="2025-01-01",
         end_date="2025-01-31",
         params_override={"param1": "different"}
@@ -118,16 +118,14 @@ def test_manifest_missing_fields_failure():
     # Test missing strategy_id
     with pytest.raises(ValueError, match="strategy_id"):
         handler.validate_params({
-            "profile_name": "CME_MNQ_v2",
             "start_date": "2025-01-01",
             "end_date": "2025-01-31"
         })
     
-    # Test missing profile_name
-    with pytest.raises(ValueError, match="profile_name"):
+    # Test missing start_date
+    with pytest.raises(ValueError, match="start_date"):
         handler.validate_params({
             "strategy_id": "S1",
-            "start_date": "2025-01-01",
             "end_date": "2025-01-31"
         })
     
@@ -135,8 +133,16 @@ def test_manifest_missing_fields_failure():
     with pytest.raises(ValueError, match="start_date"):
         handler.validate_params({
             "strategy_id": "S1",
-            "profile_name": "CME_MNQ_v2",
             "start_date": "01-01-2025",  # Wrong format
+            "end_date": "2025-01-31"
+        })
+    
+    # Test profile field is forbidden
+    with pytest.raises(ValueError, match="Profile selection via payload is FORBIDDEN"):
+        handler.validate_params({
+            "strategy_id": "S1",
+            "profile_name": "CME_MNQ_v2",
+            "start_date": "2025-01-01",
             "end_date": "2025-01-31"
         })
     
@@ -172,10 +178,14 @@ def test_artifact_directory_structure():
             with patch.object(handler, '_generate_manifest'):
                 params = {
                     "strategy_id": "S1",
-                    "profile_name": "CME_MNQ_v2",
                     "start_date": "2025-01-01",
                     "end_date": "2025-01-31",
-                    "params_override": {}
+                    "params_override": {
+                        "instrument": "CME.MNQ",
+                        "timeframe": "60m",
+                        "season": "2025",
+                        "run_mode": "research"
+                    }
                 }
                 
                 result = handler.execute(params, mock_context)
@@ -207,9 +217,9 @@ def test_job_id_matching():
         
         payload = RunResearchPayload(
             strategy_id="S1",
-            profile_name="CME_MNQ_v2",
             start_date="2025-01-01",
-            end_date="2025-01-31"
+            end_date="2025-01-31",
+            params_override={"instrument": "CME.MNQ"}
         )
         
         # Generate manifest

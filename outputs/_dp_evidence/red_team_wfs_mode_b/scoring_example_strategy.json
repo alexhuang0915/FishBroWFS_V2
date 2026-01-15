@@ -1,0 +1,28 @@
+{
+  "base_score": 14.030033365436996,
+  "net_profit": 4200.0,
+  "max_dd": 850.0,
+  "trades": 65,
+  "trade_multiplier": 2.8394115144336776,
+  "net_mdd_ratio": 4.9411764705882355,
+  "final_score": 14.030033365436996,
+  "edge_gate_passed": true,
+  "edge_gate_reason": "",
+  "config": {
+    "t_max": 100,
+    "alpha": 0.25,
+    "min_avg_profit": 5.0,
+    "robust_cliff_threshold": 0.7,
+    "cluster_bimodality_threshold": 0.3,
+    "mode_b_enabled": false
+  },
+  "robust_score": 14.030033365436996,
+  "robustness_factor": 1.0,
+  "cliff_gate_passed": true,
+  "cliff_gate_reason": "No OAT metrics available",
+  "cluster_test": {
+    "is_bimodal": false,
+    "reason": "Insufficient OAT metrics for cluster test"
+  },
+  "cluster_penalty_applied": false
+}

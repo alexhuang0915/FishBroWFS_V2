@@ -31,6 +31,7 @@ class SubmitJobRequest(BaseModel):
     run_mode: str
     season: str
     dataset: Optional[str] = None
+    wfs_policy: Optional[str] = None
 
 
 class JobListResponse(BaseModel):

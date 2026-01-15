@@ -42,6 +42,8 @@ def test_write_governance_and_scoring_artifacts_creates_files(tmp_path: Path):
         "version": "1.0",
         "hash": "sha256:deadbeef",
         "source": "configs/strategies/wfs/policy_v1_default.yaml",
+        "selector": None,
+        "resolved_source": "configs/strategies/wfs/policy_v1_default.yaml",
     }
 
     summary_path, breakdown_path = write_governance_and_scoring_artifacts(
@@ -62,6 +64,8 @@ def test_write_governance_and_scoring_artifacts_creates_files(tmp_path: Path):
     assert summary_payload["schema_version"] == "1.0"
     assert summary_payload["job_id"] == "test_job"
     assert summary_payload["mode"]["scoring_guards_enabled"] is True
+    assert summary_payload["policy"]["selector"] is None
+    assert summary_payload["policy"]["resolved_source"].endswith("policy_v1_default.yaml")
     assert summary_payload["policy"]["name"] == "default"
 
     breakdown_payload = json.loads(breakdown_path.read_text(encoding="utf-8"))
@@ -139,7 +143,8 @@ def test_run_research_wfs_handler_emits_governance_artifacts(tmp_path: Path, mon
     assert summary_payload["schema_version"] == "1.0"
     assert summary_payload["gates"]["edge_gate_passed"] is True
     assert summary_payload["policy"]["name"] == "default"
-    assert "policy_v1_default.yaml" in summary_payload["policy"]["source"]
+    assert summary_payload["policy"]["selector"] is None
+    assert "policy_v1_default.yaml" in summary_payload["policy"]["resolved_source"]
 
     breakdown_payload = json.loads(breakdown_path.read_text(encoding="utf-8"))
     assert breakdown_payload["raw"]["trades"] == 40
@@ -206,7 +211,67 @@ def test_run_research_wfs_handler_respects_policy_selection(tmp_path: Path, monk
     summary_path = artifacts_dir / "governance_summary.json"
     summary_payload = json.loads(summary_path.read_text(encoding="utf-8"))
     assert summary_payload["policy"]["name"] == "red_team"
-    assert "policy_v1_red_team.yaml" in summary_payload["policy"]["source"]
+    assert summary_payload["policy"]["selector"] == "red_team"
+    assert "policy_v1_red_team.yaml" in summary_payload["policy"]["resolved_source"]
+
+
+def test_run_research_wfs_handler_invalid_selector_fails(tmp_path: Path, monkeypatch):
+    """Handler rejects unsafe policy selectors."""
+    job_id = "wfs-invalid-selector"
+    artifacts_dir = tmp_path / job_id
+    db = MagicMock()
+    db.is_abort_requested.return_value = False
+    handler = RunResearchWFSHandler()
+
+    mock_window = WindowResult(
+        season="2025Q4",
+        is_range=TimeRange(start="2022-10-01T00:00:00Z", end="2025-09-30T23:59:59Z"),
+        oos_range=TimeRange(start="2025-01-01T00:00:00Z", end="2025-03-31T23:59:59Z"),
+        best_params={"param1": 1.0},
+        is_metrics={"net": 1000.0, "mdd": 200.0, "trades": 20},
+        oos_metrics={"net": 500.0, "mdd": 120.0, "trades": 20},
+        pass_=True,
+        fail_reasons=[],
+    )
+
+    monkeypatch.setattr(
+        RunResearchWFSHandler,
+        "_execute_wfs_windows",
+        lambda self, **kwargs: (
+            [mock_window],
+            [[{"t": "2025-01-01T00:00:00Z", "v": 0.0}]],
+            [[{"t": "2025-01-01T00:00:00Z", "v": 0.0}]],
+            [[{"t": "2025-01-01T00:00:00Z", "v": 0.0}]],
+        ),
+    )
+
+    metrics = {
+        "rf": 2.8,
+        "wfe": 0.7,
+        "ecr": 2.2,
+        "trades": 40,
+        "pass_rate": 0.75,
+        "ulcer_index": 4.5,
+        "max_underwater_days": 8,
+        "net_profit": 1500.0,
+        "max_dd": 200.0,
+    }
+    monkeypatch.setattr(RunResearchWFSHandler, "_aggregate_metrics", lambda self, windows: metrics)
+
+    context = JobContext(job_id, db, str(artifacts_dir))
+    params = {
+        "strategy_id": "S1",
+        "instrument": "MNQ",
+        "timeframe": "60m",
+        "run_mode": "wfs",
+        "season": "2026Q1",
+        "start_season": "2023Q1",
+        "end_season": "2026Q1",
+        "wfs_policy": "/etc/passwd",
+    }
+
+    with pytest.raises(ValueError):
+        handler.execute(params, context)
 
 
 def test_run_research_wfs_handler_invalid_policy_fails(tmp_path: Path, monkeypatch):
@@ -252,8 +317,8 @@ def test_run_research_wfs_handler_invalid_policy_fails(tmp_path: Path, monkeypat
     }
     monkeypatch.setattr(RunResearchWFSHandler, "_aggregate_metrics", lambda self, windows: metrics)
 
-    invalid_policy = tmp_path / "bad.yaml"
-    invalid_policy.write_text("schema_version: \"1.0\"\nname: missing_fields\n")
+    invalid_policy_path = Path("configs/strategies/wfs/policy_v1_invalid.yaml")
+    invalid_policy_path.write_text("schema_version: \"1.0\"\nname: missing_fields\n")
 
     context = JobContext(job_id, db, str(artifacts_dir))
     params = {
@@ -264,8 +329,11 @@ def test_run_research_wfs_handler_invalid_policy_fails(tmp_path: Path, monkeypat
         "season": "2026Q1",
         "start_season": "2023Q1",
         "end_season": "2026Q1",
-        "wfs_policy": str(invalid_policy),
+        "wfs_policy": "policy_v1_invalid.yaml",
     }
 
-    with pytest.raises(ValidationError):
-        handler.execute(params, context)
+    try:
+        with pytest.raises(ValidationError):
+            handler.execute(params, context)
+    finally:
+        invalid_policy_path.unlink(missing_ok=True)

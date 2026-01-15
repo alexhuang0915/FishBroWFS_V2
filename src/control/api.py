@@ -1113,6 +1113,21 @@ def _build_run_research_wfs_params(req: dict) -> dict:
         if not isinstance(req["workers"], int):
             raise ValueError("workers must be an integer")
         params["workers"] = req["workers"]
+    if "wfs_policy" in req:
+        policy_value = req["wfs_policy"]
+        if policy_value is None:
+            params["wfs_policy"] = None
+        else:
+            if not isinstance(policy_value, str):
+                raise ValueError("wfs_policy must be a string")
+            policy_value = policy_value.strip()
+            if policy_value == "":
+                raise ValueError("wfs_policy cannot be empty")
+            if policy_value.startswith("/"):
+                raise ValueError("wfs_policy cannot be an absolute path")
+            if ".." in policy_value:
+                raise ValueError("wfs_policy cannot contain path traversal sequence")
+            params["wfs_policy"] = policy_value
     params["run_mode"] = "wfs"
     return params
 

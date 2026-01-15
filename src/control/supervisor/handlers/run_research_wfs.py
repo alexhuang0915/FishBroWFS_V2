@@ -54,6 +54,7 @@ from wfs.evaluation_enhanced import evaluate_enhanced as evaluate
 from wfs.evaluation import RawMetrics
 from wfs.artifact_reporting import write_governance_and_scoring_artifacts
 from wfs.policy_engine import apply_wfs_policy
+from wfs.policy_resolver import resolve_wfs_policy_selector
 from wfs.stitching import stitch_equity_series
 from wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
 from core.determinism import stable_seed_from_intent
@@ -62,41 +63,7 @@ from contracts.wfs_policy import load_wfs_policy
 logger = logging.getLogger(__name__)
 
 WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
-WFS_POLICY_DIR = WORKSPACE_ROOT / "configs" / "strategies" / "wfs"
-DEFAULT_POLICY_FILE = WFS_POLICY_DIR / "policy_v1_default.yaml"
-
-
-def _resolve_policy_path(policy_ref: Optional[str]) -> Path:
-    """Resolve a policy reference into an existing file path."""
-    if not WFS_POLICY_DIR.exists():
-        raise FileNotFoundError(f"WFS policy directory missing: {WFS_POLICY_DIR}")
-
-    if not policy_ref:
-        return DEFAULT_POLICY_FILE
-
-    candidate = Path(policy_ref)
-    if candidate.is_absolute():
-        if candidate.exists():
-            return candidate
-        raise FileNotFoundError(f"Policy file not found: {candidate}")
-
-    repo_candidate = WORKSPACE_ROOT / policy_ref
-    if repo_candidate.exists():
-        return repo_candidate
-
-    local_candidate = WFS_POLICY_DIR / policy_ref
-    if local_candidate.exists():
-        return local_candidate
-
-    yaml_candidate = WFS_POLICY_DIR / f"{policy_ref}.yaml"
-    if yaml_candidate.exists():
-        return yaml_candidate
-
-    prefixed_candidate = WFS_POLICY_DIR / f"policy_v1_{policy_ref}.yaml"
-    if prefixed_candidate.exists():
-        return prefixed_candidate
-
-    raise FileNotFoundError(f"Policy reference not found: {policy_ref}")
+DEFAULT_POLICY_FILE = WORKSPACE_ROOT / "configs" / "strategies" / "wfs" / "policy_v1_default.yaml"
 
 
 # Resource guardrails for WFS research
@@ -303,8 +270,11 @@ class RunResearchWFSHandler(BaseJobHandler):
                 "final_score": float(scoring_result.get("final_score") or final_breakdown["final_score"]),
             }
 
-            policy_ref = params.get("wfs_policy")
-            policy_path = _resolve_policy_path(policy_ref)
+            policy_selector = params.get("wfs_policy")
+            if policy_selector is None:
+                policy_path = DEFAULT_POLICY_FILE
+            else:
+                policy_path = resolve_wfs_policy_selector(policy_selector, repo_root=WORKSPACE_ROOT)
             policy = load_wfs_policy(policy_path)
             policy_decision = apply_wfs_policy(
                 policy=policy,
@@ -343,11 +313,15 @@ class RunResearchWFSHandler(BaseJobHandler):
             except ValueError:
                 pass
 
+            resolved_source = str(policy_path.resolve())
+
             policy_block = {
                 "name": policy_decision.policy_name,
                 "version": policy_decision.policy_version,
                 "hash": policy_decision.policy_hash,
                 "source": policy_source,
+                "selector": policy_selector,
+                "resolved_source": resolved_source,
             }
 
             governance_payload = {

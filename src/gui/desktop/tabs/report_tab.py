@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QTextEdit, QGroupBox,
     QFrame, QScrollArea, QSizePolicy, QTableWidget,
-    QTableWidgetItem, QHeaderView
+    QTableWidgetItem, QHeaderView, QFormLayout
 )
 
 from ..state.active_run_state import active_run_state, RunStatus
@@ -300,6 +300,28 @@ class ReportTab(QWidget):
         governance_layout.addWidget(_build_row(
             "scoring_breakdown.json", self.scoring_breakdown_btn, self.scoring_breakdown_status
         ))
+
+        # Policy info display
+        policy_info_widget = QWidget()
+        policy_info_layout = QFormLayout()
+        policy_info_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        policy_info_layout.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self.policy_name_value = QLabel("Not available")
+        self.policy_name_value.setStyleSheet("color: #E6E6E6; font-weight: bold;")
+        policy_info_layout.addRow("Policy Name:", self.policy_name_value)
+
+        self.policy_hash_value = QLabel("Not available")
+        policy_info_layout.addRow("Policy Hash:", self.policy_hash_value)
+
+        self.policy_selector_value = QLabel("Not available")
+        policy_info_layout.addRow("Selector:", self.policy_selector_value)
+
+        self.policy_resolved_value = QLabel("Not available")
+        policy_info_layout.addRow("Resolved Source:", self.policy_resolved_value)
+
+        policy_info_widget.setLayout(policy_info_layout)
+        governance_layout.addWidget(policy_info_widget)
         governance_group.setLayout(governance_layout)
         right_layout.addWidget(governance_group, 20)
         
@@ -462,6 +484,7 @@ class ReportTab(QWidget):
             self.scoring_breakdown_status.setText("Not available")
             self.gov_summary_btn.setEnabled(False)
             self.scoring_breakdown_btn.setEnabled(False)
+            self.update_policy_display()
             return
 
         summary_ready = active_run_state.diagnostics.get("governance_summary_json") == "READY"
@@ -471,6 +494,25 @@ class ReportTab(QWidget):
         self.scoring_breakdown_status.setText(_normalize_status("scoring_breakdown_json"))
         self.gov_summary_btn.setEnabled(summary_ready)
         self.scoring_breakdown_btn.setEnabled(scoring_ready)
+        self.update_policy_display()
+
+    def update_policy_display(self):
+        """Display the selected policy metadata."""
+        policy_info = active_run_state.policy_info
+        if not policy_info:
+            self.policy_name_value.setText("Not available")
+            self.policy_hash_value.setText("Not available")
+            self.policy_selector_value.setText("Not available")
+            self.policy_resolved_value.setText("Not available")
+            return
+
+        self.policy_name_value.setText(policy_info.get("name", "Unknown"))
+        self.policy_hash_value.setText(policy_info.get("hash", "Unknown"))
+        selector = policy_info.get("selector")
+        self.policy_selector_value.setText(selector if selector else "default")
+        self.policy_resolved_value.setText(
+            policy_info.get("resolved_source", policy_info.get("source", "Unknown"))
+        )
 
     def preview_file(self, file_name: str):
         """Preview the contents of a file."""

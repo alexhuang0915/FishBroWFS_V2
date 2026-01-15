@@ -1,0 +1,42 @@
+{
+  "compliance_passed": true,
+  "created_at": "2026-01-15T14:09:43Z",
+  "gates": {
+    "cliff_gate_passed": true,
+    "edge_gate_passed": true,
+    "reasons": [
+      "Final score: 18.86",
+      "No OAT metrics available",
+      "Insufficient OAT metrics for cluster test"
+    ]
+  },
+  "inputs": {
+    "instrument": "MNQ",
+    "run_mode": "wfs",
+    "season": "2026Q1",
+    "timeframe": "60m"
+  },
+  "job_id": "wfs-policy-select",
+  "links": {
+    "scoring_breakdown": "scoring_breakdown.json"
+  },
+  "metrics": {
+    "mdd": 200.0,
+    "net_profit": 1500.0,
+    "trades": 40
+  },
+  "mode": {
+    "mode_b_enabled": true,
+    "scoring_guards_enabled": true
+  },
+  "policy": {
+    "hash": "sha256:fd1d253a1359fb4ebbfba1f64f208604530c7a614de068f382675b4dca5ee41c",
+    "name": "red_team",
+    "resolved_source": "/home/fishbro/FishBroWFS_V2/configs/strategies/wfs/policy_v1_red_team.yaml",
+    "selector": "red_team",
+    "source": "configs/strategies/wfs/policy_v1_red_team.yaml",
+    "version": "1.0"
+  },
+  "policy_enforced": true,
+  "schema_version": "1.0"
+}

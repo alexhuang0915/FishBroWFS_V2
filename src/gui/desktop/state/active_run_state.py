@@ -48,6 +48,7 @@ class ActiveRunState:
         self._status: str = RunStatus.NONE
         self._diagnostics: Dict[str, Any] = {}
         self._metrics: Dict[str, Any] = {}
+        self._policy_info: Optional[Dict[str, Any]] = None
         
         self._initialized = True
     
@@ -70,6 +71,7 @@ class ActiveRunState:
                         self._metrics = json.load(f)
                 except Exception as e:
                     logger.warning(f"Failed to load metrics.json from {run_dir}: {e}")
+        self._policy_info = self._load_policy_info(run_dir)
     
     def clear_active_run(self) -> None:
         """Clear the active run (set to NONE state)."""
@@ -79,6 +81,7 @@ class ActiveRunState:
         self._status = RunStatus.NONE
         self._diagnostics = {}
         self._metrics = {}
+        self._policy_info = None
     
     @staticmethod
     def classify_run_dir(run_dir: Path) -> Tuple[str, Dict[str, Any]]:
@@ -152,6 +155,21 @@ class ActiveRunState:
             return RunStatus.READY, diagnostics
         else:
             return RunStatus.PARTIAL, diagnostics
+
+    def _load_policy_info(self, run_dir: Path) -> Optional[Dict[str, Any]]:
+        """Load policy metadata from governance_summary.json if available."""
+        summary_path = run_dir / "governance_summary.json"
+        if not summary_path.exists():
+            return None
+        try:
+            with open(summary_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            policy_block = data.get("policy")
+            if isinstance(policy_block, dict):
+                return dict(policy_block)
+        except Exception as e:
+            logger.warning(f"Failed to load policy info from {summary_path}: {e}")
+        return None
     
     @property
     def run_dir(self) -> Optional[Path]:
@@ -180,6 +198,10 @@ class ActiveRunState:
     @property
     def has_metrics(self) -> bool:
         return bool(self._metrics)
+
+    @property
+    def policy_info(self) -> Optional[Dict[str, Any]]:
+        return dict(self._policy_info) if self._policy_info else None
     
     def get_artifact_status(self, artifact_name: str) -> str:
         """Get the status of a specific artifact."""

@@ -736,6 +736,13 @@ class OpTab(QWidget):
         self.run_mode_cb.setToolTip("Select run mode")
         form_layout.addRow("Mode:", self.run_mode_cb)
 
+        self.policy_selector = QComboBox()
+        self.policy_selector.addItem("Default", "default")
+        self.policy_selector.addItem("Red Team", "red_team")
+        self.policy_selector.setToolTip("Select WFS policy (applies when mode=WFS)")
+        self.policy_selector.setEnabled(False)
+        form_layout.addRow("WFS Policy:", self.policy_selector)
+
         self.start_date_edit = QLineEdit()
         self.start_date_edit.setPlaceholderText("YYYY-MM-DD")
         self.start_date_edit.setToolTip("Required for Backtest/Research")
@@ -1337,6 +1344,10 @@ class OpTab(QWidget):
             "run_mode": run_mode,
             "season": season,
         }
+        if run_mode == "wfs":
+            policy_value = self.policy_selector.currentData()
+            if policy_value:
+                params["wfs_policy"] = policy_value
         
         # Add derived datasets to parameters if available
         try:
@@ -1494,24 +1505,14 @@ class OpTab(QWidget):
         mode = (mode_text or "").strip().lower()
         needs_dates = mode in {"backtest", "research"}
         needs_research_run_id = mode == "optimize"
+        needs_policy = mode == "wfs"
 
         self.start_date_edit.setEnabled(needs_dates)
-    
-    def _get_strategy_requires_data2(self, strategy_id: str) -> bool:
-        """Check if a strategy requires DATA2 dataset."""
-        try:
-            # Import here to avoid circular imports
-            from config.registry.strategy_catalog import load_strategy_catalog
-            catalog = load_strategy_catalog()
-            strategy_entry = catalog.get_strategy_by_id(strategy_id)
-            if strategy_entry:
-                return strategy_entry.requires_secondary_data
-            return True  # Safe default if strategy not found
-        except Exception as e:
-            logger.error(f"Failed to check strategy DATA2 requirement: {e}")
-            return True  # Safe default
         self.end_date_edit.setEnabled(needs_dates)
         self.research_run_id_edit.setEnabled(needs_research_run_id)
+        self.policy_selector.setEnabled(needs_policy)
+        if not needs_policy:
+            self.policy_selector.setCurrentIndex(0)
 
         if not needs_dates:
             self.start_date_edit.setText("")

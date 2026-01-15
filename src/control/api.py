@@ -13,7 +13,7 @@ from fastapi import FastAPI, HTTPException, APIRouter, Request # Request importe
 from pydantic import BaseModel
 from collections import deque
 from urllib.parse import unquote
-from dataclasses import fields
+from dataclasses import asdict, fields
 from typing import Any, Optional, Dict # Added Any, Optional, Dict imports
 from pathlib import Path # Added Path import
 
@@ -77,6 +77,7 @@ from control.season_export_replay import (
 # Phase 12: Meta API imports
 from data.dataset_registry import DatasetIndex
 from strategy.registry import StrategyRegistryResponse
+from wfs.policy_registry import list_wfs_policies
 
 # Phase A: Service Identity
 from core.service_identity import get_service_identity
@@ -138,6 +139,7 @@ from contracts.api import (
     BatchSummaryResponse,
     BatchMetadataUpdate,
     SeasonMetadataUpdate,
+    WfsPolicyRegistryResponse,
 )
 
 # Phase A: Registry endpoints
@@ -698,6 +700,15 @@ async def registry_timeframes() -> list[str]:
     display_names = registry.get_display_names()
     return sorted(display_names)
 
+@api_v1.get("/wfs/policies", response_model=WfsPolicyRegistryResponse)
+async def list_wfs_policies_endpoint() -> WfsPolicyRegistryResponse:
+    """
+    Enumerate available WFS policy YAMLs.
+    """
+    repo_root = Path(__file__).resolve().parents[2]
+    entries = list_wfs_policies(repo_root=repo_root)
+    serialized = [asdict(entry) for entry in entries]
+    return WfsPolicyRegistryResponse(entries=serialized)
 
 
 

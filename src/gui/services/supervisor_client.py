@@ -263,6 +263,13 @@ class SupervisorClient:
         """Return list of available timeframes."""
         return self._get("/api/v1/registry/timeframes")
 
+    def get_wfs_policies(self) -> list[dict]:
+        """Return WFS policy registry entries."""
+        result = self._get("/api/v1/wfs/policies")
+        if isinstance(result, dict):
+            return result.get("entries", [])
+        return result
+
     # Phase D: Portfolio Build API methods
     def post_portfolio_build(self, request_dict: dict) -> dict:
         """Submit a portfolio build request."""
@@ -432,6 +439,11 @@ def get_registry_datasets() -> List[str]:
 def get_registry_timeframes() -> List[str]:
     """Return list of available timeframes."""
     return _client.get_registry_timeframes()
+
+
+def get_wfs_policies() -> list[dict]:
+    """Return WFS policy registry entries."""
+    return _client.get_wfs_policies()
 
 
 # Phase D: Portfolio Build API public functions

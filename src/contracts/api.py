@@ -7,7 +7,7 @@ They are imported by both control/api.py and GUI components (if needed).
 
 from __future__ import annotations
 
-from typing import Optional, Any
+from typing import Optional, Any, List, Dict
 from pydantic import BaseModel, Field
 
 
@@ -32,6 +32,35 @@ class SubmitJobRequest(BaseModel):
     season: str
     dataset: Optional[str] = None
     wfs_policy: Optional[str] = None
+
+
+class PolicyGateModel(BaseModel):
+    metric: str
+    op: str
+    threshold: float
+    enabled: bool
+    fail_reason: str
+
+
+class PolicyModesModel(BaseModel):
+    mode_b_enabled: bool
+    scoring_guards_enabled: bool
+
+
+class WfsPolicyRegistryEntry(BaseModel):
+    selector: str
+    name: str
+    version: str
+    hash: str
+    source: str
+    resolved_source: str
+    modes: PolicyModesModel
+    gates: Dict[str, PolicyGateModel]
+    description: str
+
+
+class WfsPolicyRegistryResponse(BaseModel):
+    entries: List[WfsPolicyRegistryEntry]
 
 
 class JobListResponse(BaseModel):

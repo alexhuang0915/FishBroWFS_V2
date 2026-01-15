@@ -1293,6 +1293,57 @@
         "title": "PlannedWeight",
         "type": "object"
       },
+      "PolicyGateModel": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "fail_reason": {
+            "title": "Fail Reason",
+            "type": "string"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "metric",
+          "op",
+          "threshold",
+          "enabled",
+          "fail_reason"
+        ],
+        "title": "PolicyGateModel",
+        "type": "object"
+      },
+      "PolicyModesModel": {
+        "properties": {
+          "mode_b_enabled": {
+            "title": "Mode B Enabled",
+            "type": "boolean"
+          },
+          "scoring_guards_enabled": {
+            "title": "Scoring Guards Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode_b_enabled",
+          "scoring_guards_enabled"
+        ],
+        "title": "PolicyModesModel",
+        "type": "object"
+      },
       "PortfolioAdmissionSummaryV1": {
         "description": "Summary of portfolio admission decisions.",
         "properties": {
@@ -3321,6 +3372,77 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "WfsPolicyRegistryEntry": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "gates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PolicyGateModel"
+            },
+            "title": "Gates",
+            "type": "object"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "modes": {
+            "$ref": "#/components/schemas/PolicyModesModel"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resolved_source": {
+            "title": "Resolved Source",
+            "type": "string"
+          },
+          "selector": {
+            "title": "Selector",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "name",
+          "version",
+          "hash",
+          "source",
+          "resolved_source",
+          "modes",
+          "gates",
+          "description"
+        ],
+        "title": "WfsPolicyRegistryEntry",
+        "type": "object"
+      },
+      "WfsPolicyRegistryResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/WfsPolicyRegistryEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "WfsPolicyRegistryResponse",
         "type": "object"
       }
     }
@@ -5656,6 +5778,25 @@
           }
         },
         "summary": "Rebuild Season Index"
+      }
+    },
+    "/api/v1/wfs/policies": {
+      "get": {
+        "description": "Enumerate available WFS policy YAMLs.",
+        "operationId": "list_wfs_policies_endpoint_api_v1_wfs_policies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WfsPolicyRegistryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Wfs Policies Endpoint"
       }
     },
     "/health": {

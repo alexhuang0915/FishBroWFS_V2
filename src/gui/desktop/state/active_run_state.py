@@ -49,6 +49,7 @@ class ActiveRunState:
         self._diagnostics: Dict[str, Any] = {}
         self._metrics: Dict[str, Any] = {}
         self._policy_info: Optional[Dict[str, Any]] = None
+        self._policy_registry: list[Dict[str, Any]] = []
         
         self._initialized = True
     
@@ -202,6 +203,23 @@ class ActiveRunState:
     @property
     def policy_info(self) -> Optional[Dict[str, Any]]:
         return dict(self._policy_info) if self._policy_info else None
+
+    def set_policy_registry(self, entries: list[Dict[str, Any]]) -> None:
+        """Store WFS policy registry entries for UI previews."""
+        self._policy_registry = list(entries) if entries else []
+
+    @property
+    def policy_registry(self) -> list[Dict[str, Any]]:
+        return list(self._policy_registry)
+
+    def get_policy_entry(self, selector: str) -> Optional[Dict[str, Any]]:
+        for entry in self._policy_registry:
+            if entry.get("selector") == selector:
+                return entry
+        return None
+
+    def default_policy_entry(self) -> Optional[Dict[str, Any]]:
+        return self.get_policy_entry("default")
     
     def get_artifact_status(self, artifact_name: str) -> str:
         """Get the status of a specific artifact."""

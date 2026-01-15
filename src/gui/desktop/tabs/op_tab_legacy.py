@@ -19,7 +19,8 @@ from PySide6.QtWidgets import (
     QLabel, QComboBox, QPushButton, QTableView, QSplitter,
     QGroupBox, QScrollArea, QSizePolicy,
     QStyledItemDelegate, QStyleOptionViewItem,
-    QMessageBox, QSpacerItem, QLineEdit, QCheckBox
+    QMessageBox, QSpacerItem, QLineEdit, QCheckBox,
+    QTableWidget, QTableWidgetItem, QAbstractItemView
 )  # pylint: disable=no-name-in-module
 from PySide6.QtGui import QFont, QPainter, QBrush, QColor, QPen, QDesktopServices, QMouseEvent  # pylint: disable=no-name-in-module
 from PySide6.QtWidgets import QToolTip
@@ -34,8 +35,9 @@ from gui.desktop.services.supervisor_client import (
     SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
     get_jobs, get_artifacts, get_strategy_report_v1,
-    get_reveal_evidence_path, submit_job
+    get_reveal_evidence_path, submit_job, get_wfs_policies
 )
+from ..state.active_run_state import active_run_state
 from gui.services.timeframe_options import (
     get_timeframe_ids,
     get_default_timeframe,
@@ -582,6 +584,7 @@ class OpTab(QWidget):
         self.job_lifecycle_service.sync_index_with_filesystem()
         self.jobs_model.set_lifecycle_service(self.job_lifecycle_service)
         self.dataset_resolver = DatasetResolver()
+        self.policy_preview_error: Optional[str] = None
         
         self.setup_ui()
         self.setup_connections()
@@ -742,6 +745,73 @@ class OpTab(QWidget):
         self.policy_selector.setToolTip("Select WFS policy (applies when mode=WFS)")
         self.policy_selector.setEnabled(False)
         form_layout.addRow("WFS Policy:", self.policy_selector)
+
+        self.policy_preview_group = QGroupBox("Policy Preview")
+        self.policy_preview_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #0d47a1;
+                background-color: #121212;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 11px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+
+        preview_layout = QVBoxLayout()
+        preview_layout.setContentsMargins(8, 8, 8, 8)
+        preview_layout.setSpacing(4)
+
+        self.policy_preview_status = QLabel("Loading policy registry...")
+        self.policy_preview_status.setStyleSheet("color: #9e9e9e; font-size: 10px;")
+        preview_layout.addWidget(self.policy_preview_status)
+
+        preview_form = QFormLayout()
+        preview_form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+        preview_form.setFormAlignment(Qt.AlignmentFlag.AlignLeft)
+
+        self.policy_name_value = QLabel("Not available")
+        self.policy_name_value.setStyleSheet("color: #E6E6E6; font-weight: bold;")
+        preview_form.addRow("Name:", self.policy_name_value)
+
+        self.policy_version_value = QLabel("Not available")
+        preview_form.addRow("Version:", self.policy_version_value)
+
+        self.policy_hash_value = QLabel("Not available")
+        self.policy_hash_value.setWordWrap(True)
+        preview_form.addRow("Hash:", self.policy_hash_value)
+
+        self.policy_modes_value = QLabel("Not available")
+        preview_form.addRow("Modes:", self.policy_modes_value)
+
+        self.policy_description_value = QLabel("Not available")
+        self.policy_description_value.setWordWrap(True)
+        preview_form.addRow("Description:", self.policy_description_value)
+
+        preview_layout.addLayout(preview_form)
+
+        self.policy_gates_table = QTableWidget(2, 4)
+        self.policy_gates_table.setHorizontalHeaderLabels(["Gate", "Metric", "Op", "Threshold"])
+        self.policy_gates_table.verticalHeader().setVisible(False)
+        self.policy_gates_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        self.policy_gates_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.policy_gates_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        self.policy_gates_table.setMinimumHeight(120)
+        preview_layout.addWidget(self.policy_gates_table)
+
+        self.policy_diff_label = QLabel("Diff vs default: pending")
+        self.policy_diff_label.setWordWrap(True)
+        self.policy_diff_label.setStyleSheet("color: #9e9e9e; font-size: 11px;")
+        preview_layout.addWidget(self.policy_diff_label)
+
+        self.policy_preview_group.setLayout(preview_layout)
+        form_layout.addRow(self.policy_preview_group)
 
         self.start_date_edit = QLineEdit()
         self.start_date_edit.setPlaceholderText("YYYY-MM-DD")
@@ -986,6 +1056,7 @@ class OpTab(QWidget):
 
         self.run_mode_cb.currentTextChanged.connect(self._apply_mode_field_visibility)
         self._apply_mode_field_visibility(self.run_mode_cb.currentText())
+        self.policy_selector.currentIndexChanged.connect(lambda _: self._update_policy_preview())
         
         # Connect model refresh signal to update status and filter dropdowns
         self.jobs_model.dataChanged.connect(self.update_refresh_status)
@@ -1123,6 +1194,16 @@ class OpTab(QWidget):
             
             # Trigger initial dataset mapping update
             self.update_derived_dataset_mapping()
+            
+            # Load policy registry for preview
+            try:
+                policies = get_wfs_policies()
+                active_run_state.set_policy_registry(policies)
+                self.policy_preview_error = None
+            except SupervisorClientError as e:
+                self.policy_preview_error = str(e)
+                self.policy_preview_status.setText("Policy preview unavailable")
+            self._update_policy_preview()
             
         except SupervisorClientError as e:
             self.status_label.setText(f"Failed to load registry: {e}")
@@ -1519,6 +1600,90 @@ class OpTab(QWidget):
             self.end_date_edit.setText("")
         if not needs_research_run_id:
             self.research_run_id_edit.setText("")
+
+    def _update_policy_preview(self) -> None:
+        if not hasattr(self, "policy_preview_status"):
+            return
+
+        registry = active_run_state.policy_registry
+        if not registry:
+            msg = "Policy preview unavailable"
+            if self.policy_preview_error:
+                msg = f"Policy preview unavailable: {self.policy_preview_error}"
+            self.policy_preview_status.setText(msg)
+            self._clear_policy_preview_fields()
+            return
+
+        selector = self.policy_selector.currentData() or "default"
+        entry = active_run_state.get_policy_entry(selector)
+        if entry is None:
+            self.policy_preview_status.setText("Unknown policy selection")
+            self._clear_policy_preview_fields()
+            return
+
+        self.policy_preview_status.setText("Policy preview loaded")
+        self.policy_name_value.setText(entry.get("name", "Unknown"))
+        self.policy_version_value.setText(entry.get("version", "Unknown"))
+        self.policy_hash_value.setText(entry.get("hash", "Unknown"))
+        modes = entry.get("modes", {})
+        mode_text = (
+            f"Mode B enabled: {modes.get('mode_b_enabled', False)}; "
+            f"Scoring guards: {modes.get('scoring_guards_enabled', False)}"
+        )
+        self.policy_modes_value.setText(mode_text)
+        self.policy_description_value.setText(entry.get("description", ""))
+        self._populate_policy_gates(entry.get("gates", {}))
+
+        diff_text = self._compute_policy_diff(entry, active_run_state.default_policy_entry())
+        self.policy_diff_label.setText(diff_text)
+
+    def _clear_policy_preview_fields(self) -> None:
+        self.policy_name_value.setText("Not available")
+        self.policy_version_value.setText("Not available")
+        self.policy_hash_value.setText("Not available")
+        self.policy_modes_value.setText("Not available")
+        self.policy_description_value.setText("Not available")
+        self.policy_gates_table.setRowCount(0)
+        self.policy_diff_label.setText("Diff vs default: pending")
+
+    def _populate_policy_gates(self, gates: Dict[str, Dict[str, object]]) -> None:
+        keys = list(gates.keys())
+        self.policy_gates_table.setRowCount(len(keys))
+        for row, gate_name in enumerate(keys):
+            gate = gates.get(gate_name, {})
+            self.policy_gates_table.setItem(row, 0, QTableWidgetItem(gate_name.replace("_", " ").title()))
+            self.policy_gates_table.setItem(row, 1, QTableWidgetItem(str(gate.get("metric", ""))))
+            self.policy_gates_table.setItem(row, 2, QTableWidgetItem(str(gate.get("op", ""))))
+            self.policy_gates_table.setItem(row, 3, QTableWidgetItem(str(gate.get("threshold", ""))))
+
+    def _compute_policy_diff(self, entry: Dict[str, Any], default: Optional[Dict[str, Any]]) -> str:
+        if not default or entry.get("selector") == "default":
+            return "No differences vs default."
+
+        diffs = []
+        entry_modes = entry.get("modes", {})
+        default_modes = default.get("modes", {})
+        for key in ("mode_b_enabled", "scoring_guards_enabled"):
+            entry_val = entry_modes.get(key)
+            default_val = default_modes.get(key)
+            if entry_val != default_val:
+                diffs.append(f"{key}: {default_val} -> {entry_val}")
+
+        entry_gates = entry.get("gates", {})
+        default_gates = default.get("gates", {})
+        for gate_name in ("edge_gate", "cliff_gate"):
+            entry_gate = entry_gates.get(gate_name, {})
+            default_gate = default_gates.get(gate_name, {})
+            for field in ("metric", "op", "threshold"):
+                entry_val = entry_gate.get(field)
+                default_val = default_gate.get(field)
+                if entry_val != default_val:
+                    diffs.append(f"{gate_name}.{field}: {default_val} -> {entry_val}")
+
+        if not diffs:
+            return "No differences vs default."
+
+        return "Diff vs default:\n" + "\n".join(diffs)
 
     def explain_failure(self, job_id: str, job: Optional[Dict[str, Any]] = None):
         """Explain failure for a failed/rejected/aborted job."""

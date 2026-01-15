@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 
 def _current_iso_timestamp() -> str:
@@ -36,6 +36,7 @@ def write_governance_and_scoring_artifacts(
     final: Dict[str, Any],
     guards: Dict[str, Any],
     governance: Dict[str, Any],
+    policy: Optional[Dict[str, Any]] = None,
 ) -> Tuple[Path, Path]:
     """
     Emit governance summary and scoring breakdown artifacts for a WFS job.
@@ -61,6 +62,9 @@ def write_governance_and_scoring_artifacts(
         "metrics": governance.get("metrics", raw),
         "links": governance.get("links", {"scoring_breakdown": "scoring_breakdown.json"}),
     }
+
+    if policy is not None:
+        summary_payload["policy"] = policy
 
     breakdown_payload: Dict[str, Any] = {
         "schema_version": "1.0",

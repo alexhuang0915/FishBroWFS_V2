@@ -53,11 +53,50 @@ from contracts.research_wfs.result_schema import (
 from wfs.evaluation_enhanced import evaluate_enhanced as evaluate
 from wfs.evaluation import RawMetrics
 from wfs.artifact_reporting import write_governance_and_scoring_artifacts
+from wfs.policy_engine import apply_wfs_policy
 from wfs.stitching import stitch_equity_series
 from wfs.bnh_baseline import compute_bnh_equity_for_seasons, CostModel as BnhCostModel
 from core.determinism import stable_seed_from_intent
+from contracts.wfs_policy import load_wfs_policy
 
 logger = logging.getLogger(__name__)
+
+WORKSPACE_ROOT = Path(__file__).resolve().parents[4]
+WFS_POLICY_DIR = WORKSPACE_ROOT / "configs" / "strategies" / "wfs"
+DEFAULT_POLICY_FILE = WFS_POLICY_DIR / "policy_v1_default.yaml"
+
+
+def _resolve_policy_path(policy_ref: Optional[str]) -> Path:
+    """Resolve a policy reference into an existing file path."""
+    if not WFS_POLICY_DIR.exists():
+        raise FileNotFoundError(f"WFS policy directory missing: {WFS_POLICY_DIR}")
+
+    if not policy_ref:
+        return DEFAULT_POLICY_FILE
+
+    candidate = Path(policy_ref)
+    if candidate.is_absolute():
+        if candidate.exists():
+            return candidate
+        raise FileNotFoundError(f"Policy file not found: {candidate}")
+
+    repo_candidate = WORKSPACE_ROOT / policy_ref
+    if repo_candidate.exists():
+        return repo_candidate
+
+    local_candidate = WFS_POLICY_DIR / policy_ref
+    if local_candidate.exists():
+        return local_candidate
+
+    yaml_candidate = WFS_POLICY_DIR / f"{policy_ref}.yaml"
+    if yaml_candidate.exists():
+        return yaml_candidate
+
+    prefixed_candidate = WFS_POLICY_DIR / f"policy_v1_{policy_ref}.yaml"
+    if prefixed_candidate.exists():
+        return prefixed_candidate
+
+    raise FileNotFoundError(f"Policy reference not found: {policy_ref}")
 
 
 # Resource guardrails for WFS research
@@ -256,50 +295,71 @@ class RunResearchWFSHandler(BaseJobHandler):
                 "trade_multiplier": float(scoring_result.get("trade_multiplier", 1.0)),
             }
 
-            edge_threshold = scoring_result.get("config", {}).get("min_avg_profit", 5.0)
-            cliff_threshold = scoring_result.get("config", {}).get("robust_cliff_threshold", 0.7)
-            edge_passed = scoring_result.get("edge_gate_passed")
-            non_null_edge = True if edge_passed is None else edge_passed
-            cliff_passed = scoring_result.get("cliff_gate_passed")
-            non_null_cliff = True if cliff_passed is None else cliff_passed
+            avg_profit = (net_profit / trades) if trades else 0.0
+            derived_metrics = {
+                "min_avg_profit": avg_profit,
+                "trade_multiplier": float(scoring_result.get("trade_multiplier", 1.0)),
+                "robustness_factor": float(scoring_result.get("robustness_factor", 1.0)),
+                "final_score": float(scoring_result.get("final_score") or final_breakdown["final_score"]),
+            }
+
+            policy_ref = params.get("wfs_policy")
+            policy_path = _resolve_policy_path(policy_ref)
+            policy = load_wfs_policy(policy_path)
+            policy_decision = apply_wfs_policy(
+                policy=policy,
+                raw=raw_breakdown,
+                derived=derived_metrics,
+            )
 
             notes: list[str] = []
-            edge_reason = scoring_result.get("edge_gate_reason")
-            if edge_reason:
-                notes.append(edge_reason)
-            cliff_reason = scoring_result.get("cliff_gate_reason")
-            if cliff_reason:
-                notes.append(cliff_reason)
+            notes.extend(policy_decision.notes)
+            for reason_key in ("edge_gate_reason", "cliff_gate_reason"):
+                reason = scoring_result.get(reason_key)
+                if reason and reason not in notes:
+                    notes.append(reason)
+
             cluster_reason = scoring_result.get("cluster_test", {}).get("reason")
-            if cluster_reason:
+            if cluster_reason and cluster_reason not in notes:
                 notes.append(cluster_reason)
             if scoring_result.get("cluster_penalty_applied"):
                 notes.append("Cluster penalty applied")
 
             guards_payload = {
-                "edge_gate": {
-                    "passed": non_null_edge,
-                    "threshold": edge_threshold,
-                    "value": (net_profit / trades if trades else 0.0),
-                },
-                "cliff_gate": {
-                    "passed": non_null_cliff,
-                    "threshold": cliff_threshold,
-                    "value": scoring_result.get("robustness_factor", 1.0),
-                },
+                "edge_gate": policy_decision.edge_gate,
+                "cliff_gate": policy_decision.cliff_gate,
                 "notes": notes,
             }
 
+            compliance_passed = (
+                evaluation_result.is_tradable
+                and policy_decision.edge_gate["passed"]
+                and policy_decision.cliff_gate["passed"]
+            )
+
+            policy_source = str(policy_path)
+            try:
+                policy_source = str(policy_path.relative_to(WORKSPACE_ROOT))
+            except ValueError:
+                pass
+
+            policy_block = {
+                "name": policy_decision.policy_name,
+                "version": policy_decision.policy_version,
+                "hash": policy_decision.policy_hash,
+                "source": policy_source,
+            }
+
             governance_payload = {
-                "policy_enforced": bool(scoring_result),
-                "compliance_passed": evaluation_result.is_tradable and non_null_edge and non_null_cliff,
+                "policy_enforced": True,
+                "compliance_passed": compliance_passed,
                 "mode": {
-                    "mode_b_enabled": bool(scoring_result.get("config", {}).get("mode_b_enabled")),
-                    "scoring_guards_enabled": bool(scoring_result),
+                    "mode_b_enabled": policy_decision.mode_b_enabled,
+                    "scoring_guards_enabled": policy_decision.scoring_guards_enabled,
                 },
                 "gates": {
-                    "edge_gate_passed": non_null_edge,
-                    "cliff_gate_passed": non_null_cliff,
+                    "edge_gate_passed": policy_decision.edge_gate["passed"],
+                    "cliff_gate_passed": policy_decision.cliff_gate["passed"],
                     "reasons": notes or [evaluation_result.summary],
                 },
                 "inputs": reporting_inputs,
@@ -317,6 +377,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                     final=final_breakdown,
                     guards=guards_payload,
                     governance=governance_payload,
+                    policy=policy_block,
                 )
             except Exception as art_err:
                 logger.warning("Failed to write governance artifacts: %s", art_err)

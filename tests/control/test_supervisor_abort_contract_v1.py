@@ -3,7 +3,6 @@ Test supervisor abort contract v1.
 """
 import json
 import time
-import subprocess
 import signal
 from pathlib import Path
 import pytest
@@ -11,6 +10,7 @@ import pytest
 from control.supervisor.db import SupervisorDB
 from control.supervisor.models import JobSpec
 from control.supervisor.supervisor import Supervisor
+from control.subprocess_exec import run_python_module
 
 
 def test_abort_request_flag(tmp_path: Path):
@@ -155,18 +155,11 @@ def test_cli_abort_command(tmp_path: Path):
     job_id = db.submit_job(spec)
     
     # Run abort command
-    import sys
-    import os
-    env = os.environ.copy()
-    env["PYTHONPATH"] = "src"
-    cmd = [
-        sys.executable, "-m", "src.control.supervisor.cli",
-        "--db", str(db_path),
-        "abort",
-        "--job-id", job_id
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    result = run_python_module(
+        "control.supervisor.cli",
+        ["--db", str(db_path), "abort", "--job-id", job_id],
+        cwd=Path(__file__).resolve().parents[2],
+    )
     assert result.returncode == 0
     assert f"Abort requested for job {job_id}" in result.stdout
     
@@ -174,14 +167,11 @@ def test_cli_abort_command(tmp_path: Path):
     assert db.is_abort_requested(job_id) is True
     
     # Try to abort non-existent job
-    cmd = [
-        sys.executable, "-m", "src.control.supervisor.cli",
-        "--db", str(db_path),
-        "abort",
-        "--job-id", "non_existent"
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True, env=env)
+    result = run_python_module(
+        "control.supervisor.cli",
+        ["--db", str(db_path), "abort", "--job-id", "non_existent"],
+        cwd=Path(__file__).resolve().parents[2],
+    )
     assert result.returncode == 1
     assert "not found or not abortable" in result.stderr
 

@@ -10,6 +10,7 @@ import pytest
 from control.supervisor.db import SupervisorDB
 from control.supervisor.models import JobSpec
 from control.supervisor.supervisor import Supervisor
+from tests.control._helpers.job_wait import wait_until
 
 
 def test_build_data_handler_minimal_harmless(tmp_path: Path):
@@ -54,15 +55,18 @@ def test_build_data_handler_minimal_harmless(tmp_path: Path):
         spec = JobSpec(job_type="BUILD_DATA", params=params)
         job_id = supervisor.db.submit_job(spec)
         
-        # Run ticks until job completes
-        max_ticks = 50
-        for _ in range(max_ticks):
+        def _tick_until_done() -> bool:
             supervisor.tick()
-            time.sleep(0.1)
-            
             job = supervisor.db.get_job_row(job_id)
-            if job and job.state in ("SUCCEEDED", "FAILED", "ABORTED"):
-                break
+            return bool(job and job.state in ("SUCCEEDED", "FAILED", "ABORTED"))
+
+        def _dump_state() -> str:
+            job = supervisor.db.get_job_row(job_id)
+            if not job:
+                return "job_state=missing"
+            return f"job_state={job.state} reason={job.state_reason}"
+
+        wait_until(_tick_until_done, timeout_s=6.0, interval_s=0.1, on_timeout_dump=_dump_state)
         
         # Get final job state
         job = supervisor.db.get_job_row(job_id)

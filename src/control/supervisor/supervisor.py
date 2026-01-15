@@ -4,6 +4,7 @@ import signal
 import subprocess
 import time
 import threading
+import sys
 from pathlib import Path
 from typing import Dict, Optional, List
 from datetime import datetime, timezone
@@ -63,12 +64,22 @@ class Supervisor:
                     stdout_f = open(stdout_path, "ab", buffering=0)
                     stderr_f = open(stderr_path, "ab", buffering=0)
 
+                    env = os.environ.copy()
+                    src_path = str(Path(__file__).resolve().parents[2])
+                    pythonpath = env.get("PYTHONPATH", "")
+                    if pythonpath:
+                        if src_path not in pythonpath.split(os.pathsep):
+                            pythonpath = f"{src_path}{os.pathsep}{pythonpath}"
+                    else:
+                        pythonpath = src_path
+                    env["PYTHONPATH"] = pythonpath
+
                     proc = subprocess.Popen(
                         cmd,
                         stdout=stdout_f,
                         stderr=stderr_f,
                         start_new_session=True,
-                        env=os.environ.copy()
+                        env=env,
                     )
                 finally:
                     if stdout_f is not None:

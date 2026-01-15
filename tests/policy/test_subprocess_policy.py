@@ -31,6 +31,8 @@ ALLOWLIST = [
     "control/supervisor/handlers/build_data.py",
     # System checks (port occupancy detection)
     "control/lifecycle.py",
+    # Test helper for deterministic subprocess usage
+    "control/subprocess_exec.py",
     # API spawning supervisor
     "control/api.py",
     # Runtime context (diagnostics, not UI entrypoint) – allowed with comment

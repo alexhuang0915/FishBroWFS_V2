@@ -3,7 +3,6 @@ Test PING handler contract v1.
 """
 import json
 import time
-import subprocess
 import threading
 from pathlib import Path
 import pytest
@@ -11,6 +10,8 @@ import pytest
 from control.supervisor.db import SupervisorDB
 from control.supervisor.models import JobSpec
 from control.supervisor.supervisor import Supervisor
+from control.subprocess_exec import run_python_module
+from tests.control._helpers.job_wait import wait_until
 
 
 def test_ping_handler_registered():
@@ -117,16 +118,19 @@ def test_ping_integration_smoke(tmp_path: Path):
         artifacts_root=tmp_path / "artifacts"
     )
     
-    # Run a few ticks
-    for _ in range(10):
+    def _tick_until_done() -> bool:
         supervisor.tick()
-        time.sleep(0.1)
-        
-        # Check job state
         job = db.get_job_row(job_id)
-        if job and job.state == "SUCCEEDED":
-            break
-    
+        return bool(job and job.state in ("SUCCEEDED", "FAILED", "ABORTED"))
+
+    def _dump_state() -> str:
+        job = db.get_job_row(job_id)
+        if not job:
+            return "job_state=missing"
+        return f"job_state={job.state} reason={job.state_reason}"
+
+    wait_until(_tick_until_done, timeout_s=6.0, interval_s=0.1, on_timeout_dump=_dump_state)
+
     # Verify job succeeded
     job = db.get_job_row(job_id)
     assert job is not None
@@ -144,18 +148,20 @@ def test_ping_integration_smoke(tmp_path: Path):
 def test_ping_cli_submit(tmp_path: Path):
     """Test CLI submission of PING job."""
     db_path = tmp_path / "jobs_v2.db"
-    
-    # Use python -m to submit
-    import sys
-    cmd = [
-        sys.executable, "-m", "src.control.supervisor.cli",
-        "--db", str(db_path),
-        "submit",
-        "--job-type", "PING",
-        "--params-json", '{"sleep_sec": 0.05}'
-    ]
-    
-    result = subprocess.run(cmd, capture_output=True, text=True)
+
+    result = run_python_module(
+        "control.supervisor.cli",
+        [
+            "--db",
+            str(db_path),
+            "submit",
+            "--job-type",
+            "PING",
+            "--params-json",
+            '{"sleep_sec": 0.05}',
+        ],
+        cwd=Path(__file__).resolve().parents[2],
+    )
     assert result.returncode == 0
     assert "Submitted job:" in result.stdout
     

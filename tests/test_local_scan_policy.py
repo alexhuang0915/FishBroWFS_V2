@@ -35,6 +35,7 @@ def test_default_policy():
     assert policy.allowed_roots == ("src", "tests", "scripts", "docs")
     assert "Makefile" in policy.allowed_root_files_glob
     assert "pyproject.toml" in policy.allowed_root_files_glob
+    assert ".cursorignore" in policy.allowed_root_files_glob
     assert ".git" in policy.deny_segments
     assert ".venv" in policy.deny_segments
     assert "node_modules" in policy.deny_segments
@@ -53,6 +54,7 @@ def test_should_include_file():
     assert should_include_file(Path("Makefile"), policy) is True
     assert should_include_file(Path("pyproject.toml"), policy) is True
     assert should_include_file(Path("README.md"), policy) is True
+    assert should_include_file(Path(".cursorignore"), policy) is True
     assert should_include_file(Path("random.txt"), policy) is False  # not in glob
     
     # Allowed roots

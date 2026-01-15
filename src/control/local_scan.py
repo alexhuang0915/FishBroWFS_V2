@@ -44,6 +44,7 @@ def default_local_strict_policy() -> LocalScanPolicy:
             "pyproject.toml",
             "README*",
             ".python-version",
+            ".cursorignore",  # Cursor IDE developer tooling ignore file (non-runtime)
             "requirements*.txt",
             "uv.lock",
             "poetry.lock",

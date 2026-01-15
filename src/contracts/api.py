@@ -7,7 +7,7 @@ They are imported by both control/api.py and GUI components (if needed).
 
 from __future__ import annotations
 
-from typing import Optional, Any, List, Dict
+from typing import Optional, Any, List, Dict, Literal
 from pydantic import BaseModel, Field
 
 
@@ -78,6 +78,49 @@ class JobListResponse(BaseModel):
     duration_seconds: Optional[float] = None
     score: Optional[float] = None
     error_details: Optional[dict] = None
+    failure_code: Optional[str] = None
+    failure_message: Optional[str] = None
+    policy_stage: Optional[str] = None
+
+
+class JobExplainCodes(BaseModel):
+    failure_code: str = ""
+    policy_stage: str = ""
+    http_status: Optional[int] = None
+
+
+class JobExplainEvidence(BaseModel):
+    policy_check_url: Optional[str] = None
+    manifest_url: Optional[str] = None
+    inputs_fingerprint_url: Optional[str] = None
+    stdout_tail_url: Optional[str] = None
+    evidence_bundle_url: Optional[str] = None
+
+
+class JobExplainCache(BaseModel):
+    hit: bool
+    ttl_s: int
+
+
+class JobExplainDebug(BaseModel):
+    derived_from: List[str]
+    cache: JobExplainCache
+
+
+class JobExplainResponse(BaseModel):
+    """Response for GET /api/v1/jobs/{job_id}/explain."""
+    schema_version: Literal["1.0"] = "1.0"
+    job_id: str
+    job_type: str
+    final_status: str
+    decision_layer: Literal["POLICY", "INPUT", "GOVERNANCE", "ARTIFACT", "SYSTEM", "UNKNOWN"]
+    human_tag: Literal["VIOLATION", "MALFORMED", "FROZEN", "CORRUPTED", "INFRA_FAILURE", "UNKNOWN"]
+    recoverable: bool
+    summary: str
+    action_hint: str
+    codes: JobExplainCodes
+    evidence: JobExplainEvidence
+    debug: JobExplainDebug
 
 
 class ArtifactIndexResponse(BaseModel):

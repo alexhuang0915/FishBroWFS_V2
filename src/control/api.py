@@ -19,6 +19,7 @@ from pathlib import Path # Added Path import
 
 # Supervisor imports
 from control.supervisor import submit as supervisor_submit, list_jobs as supervisor_list_jobs, get_job as supervisor_get_job, request_abort as supervisor_request_abort
+from control.policy_enforcement import PolicyEnforcementError
 from control.supervisor.models import JobSpec as SupervisorJobSpec, JobType, normalize_job_type
 from control.supervisor.db import DuplicateJobError
 
@@ -133,6 +134,7 @@ from contracts.api import (
     ReadinessResponse,
     SubmitJobRequest,
     JobListResponse,
+    JobExplainResponse,
     ArtifactIndexResponse,
     RevealEvidencePathResponse,
     BatchStatusResponse,
@@ -159,6 +161,8 @@ from control.reporting.io import (
     read_job_report,
     read_portfolio_report,
 )
+from control.explain_service import build_job_explain
+from control.job_artifacts import get_job_evidence_dir
 
 # Phase D: Portfolio Build API
 from control.portfolio.api_v1 import router as portfolio_router
@@ -863,6 +867,9 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
         duration_seconds=duration_seconds,
         score=score,
         error_details=error_details,
+        failure_code=job.failure_code or None,
+        failure_message=job.failure_message or None,
+        policy_stage=job.policy_stage or None,
     )
 
 
@@ -885,6 +892,20 @@ async def get_job_endpoint(job_id: str) -> JobListResponse:
         raise HTTPException(status_code=404, detail=str(e))
 
 
+@api_v1.get("/jobs/{job_id}/explain", response_model=JobExplainResponse)
+async def explain_job_endpoint(job_id: str) -> JobExplainResponse:
+    """
+    Provide a semantic explanation for why the job finished in its final state.
+    """
+    try:
+        payload = build_job_explain(job_id)
+        return JobExplainResponse(**payload)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @api_v1.post("/jobs/{job_id}/abort")
 async def abort_job_endpoint(job_id: str) -> dict[str, Any]:
     """
@@ -902,39 +923,12 @@ async def abort_job_endpoint(job_id: str) -> dict[str, Any]:
 # Phase A: Artifact endpoints helpers
 # -----------------------------------------------------------------------------
 
-def _get_jobs_evidence_root() -> Path:
-    """
-    Return the root directory for job evidence bundles (Phase C).
-    LOCKED: outputs/jobs/
-    """
-    return Path("outputs/jobs")
-
-
-def _get_job_evidence_dir(job_id: str) -> Path:
-    """Return the evidence directory for a job, ensuring containment."""
-    root = _get_jobs_evidence_root()
-    job_dir = root / job_id
-    # Security: ensure job_dir is within root (no path traversal)
-    try:
-        job_dir.resolve().relative_to(root.resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Job ID contains path traversal")
-    return job_dir
-
-
 def _get_strategy_report_v1_path(job_id: str) -> Path:
     """
     Return the path to strategy_report_v1.json for a job.
     Security: ensure containment within outputs/jobs/<job_id>/
     """
-    root = Path("outputs/jobs")
-    job_dir = root / job_id
-    # Security: ensure job_dir is within root (no path traversal)
-    try:
-        job_dir.resolve().relative_to(root.resolve())
-    except ValueError:
-        raise HTTPException(status_code=403, detail="Job ID contains path traversal")
-    return job_dir / "strategy_report_v1.json"
+    return get_job_evidence_dir(job_id) / "strategy_report_v1.json"
 
 
 def _get_portfolio_report_v1_path(portfolio_id: str) -> Path:
@@ -957,7 +951,7 @@ def _list_artifacts(job_id: str) -> list[dict[str, Any]]:
     List files in the job evidence directory.
     Returns list of dicts with filename, size_bytes, content_type, sha256, url.
     """
-    job_dir = _get_job_evidence_dir(job_id)
+    job_dir = get_job_evidence_dir(job_id)
     if not job_dir.exists():
         return []
     
@@ -1181,25 +1175,6 @@ def _validate_artifact_filename_or_403(filename: str) -> str:
     return filename
 
 
-def _get_policy_check_link(job_id: str) -> Optional[str]:
-    """Return URL to policy_check.json if it exists."""
-    job_dir = _get_job_evidence_dir(job_id)
-    policy_path = job_dir / "policy_check.json"
-    if policy_path.exists():
-        return f"/api/v1/jobs/{job_id}/artifacts/policy_check.json"
-    return None
-
-
-def _get_stdout_tail_link(job_id: str) -> Optional[str]:
-    """Return URL to stdout tail endpoint."""
-    # Always present if job evidence directory exists
-    job_dir = _get_job_evidence_dir(job_id)
-    if job_dir.exists():
-        return f"/api/v1/jobs/{job_id}/logs/stdout_tail"
-    return None
-
-
-
 
 
 
@@ -1311,6 +1286,18 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError) as e:
         # Convert mapping errors into HTTP 422
         raise HTTPException(status_code=422, detail=f"Invalid run_research payload: {e}") from e
+    except PolicyEnforcementError as e:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "ok": False,
+                "job_id": e.job_id,
+                "policy_code": e.result.code,
+                "policy_message": e.result.message,
+                "policy_stage": e.result.stage,
+                "policy_details": e.result.details,
+            },
+        ) from e
     except Exception as e:
         # Catch other unexpected errors during submission
         raise HTTPException(status_code=500, detail=f"Failed to submit job to supervisor: {e}")
@@ -1331,12 +1318,12 @@ async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
     - Must ensure the resolved path is within the locked evidence root (outputs/jobs/).
     - Returns 404 if evidence directory does not exist.
     """
-    job_dir = _get_job_evidence_dir(job_id)
+    job_dir = get_job_evidence_dir(job_id)
     
     if not job_dir.exists():
         raise HTTPException(status_code=404, detail="Job evidence directory not found")
     
-    # Already validated containment in _get_job_evidence_dir
+    # Already validated containment in get_job_evidence_dir
     return RevealEvidencePathResponse(
         approved=True,
         path=str(job_dir.resolve()),

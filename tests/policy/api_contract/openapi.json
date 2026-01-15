@@ -678,6 +678,215 @@
         "title": "HistogramV1",
         "type": "object"
       },
+      "JobExplainCache": {
+        "properties": {
+          "hit": {
+            "title": "Hit",
+            "type": "boolean"
+          },
+          "ttl_s": {
+            "title": "Ttl S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hit",
+          "ttl_s"
+        ],
+        "title": "JobExplainCache",
+        "type": "object"
+      },
+      "JobExplainCodes": {
+        "properties": {
+          "failure_code": {
+            "default": "",
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "policy_stage": {
+            "default": "",
+            "title": "Policy Stage",
+            "type": "string"
+          }
+        },
+        "title": "JobExplainCodes",
+        "type": "object"
+      },
+      "JobExplainDebug": {
+        "properties": {
+          "cache": {
+            "$ref": "#/components/schemas/JobExplainCache"
+          },
+          "derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Derived From",
+            "type": "array"
+          }
+        },
+        "required": [
+          "derived_from",
+          "cache"
+        ],
+        "title": "JobExplainDebug",
+        "type": "object"
+      },
+      "JobExplainEvidence": {
+        "properties": {
+          "evidence_bundle_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Bundle Url"
+          },
+          "inputs_fingerprint_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs Fingerprint Url"
+          },
+          "manifest_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Url"
+          },
+          "policy_check_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Check Url"
+          },
+          "stdout_tail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stdout Tail Url"
+          }
+        },
+        "title": "JobExplainEvidence",
+        "type": "object"
+      },
+      "JobExplainResponse": {
+        "description": "Response for GET /api/v1/jobs/{job_id}/explain.",
+        "properties": {
+          "action_hint": {
+            "title": "Action Hint",
+            "type": "string"
+          },
+          "codes": {
+            "$ref": "#/components/schemas/JobExplainCodes"
+          },
+          "debug": {
+            "$ref": "#/components/schemas/JobExplainDebug"
+          },
+          "decision_layer": {
+            "enum": [
+              "POLICY",
+              "INPUT",
+              "GOVERNANCE",
+              "ARTIFACT",
+              "SYSTEM",
+              "UNKNOWN"
+            ],
+            "title": "Decision Layer",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/JobExplainEvidence"
+          },
+          "final_status": {
+            "title": "Final Status",
+            "type": "string"
+          },
+          "human_tag": {
+            "enum": [
+              "VIOLATION",
+              "MALFORMED",
+              "FROZEN",
+              "CORRUPTED",
+              "INFRA_FAILURE",
+              "UNKNOWN"
+            ],
+            "title": "Human Tag",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "title": "Job Type",
+            "type": "string"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "final_status",
+          "decision_layer",
+          "human_tag",
+          "recoverable",
+          "summary",
+          "action_hint",
+          "codes",
+          "evidence",
+          "debug"
+        ],
+        "title": "JobExplainResponse",
+        "type": "object"
+      },
       "JobListResponse": {
         "description": "Response for GET /api/v1/jobs.",
         "properties": {
@@ -708,6 +917,28 @@
             ],
             "title": "Error Details"
           },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Message"
+          },
           "finished_at": {
             "anyOf": [
               {
@@ -733,6 +964,17 @@
           "job_id": {
             "title": "Job Id",
             "type": "string"
+          },
+          "policy_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Stage"
           },
           "run_mode": {
             "anyOf": [
@@ -4191,6 +4433,46 @@
           }
         },
         "summary": "Abort Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/explain": {
+      "get": {
+        "description": "Provide a semantic explanation for why the job finished in its final state.",
+        "operationId": "explain_job_endpoint_api_v1_jobs__job_id__explain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explain Job Endpoint"
       }
     },
     "/api/v1/jobs/{job_id}/reveal_evidence_path": {

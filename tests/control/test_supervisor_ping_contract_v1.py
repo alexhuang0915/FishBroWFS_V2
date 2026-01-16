@@ -62,9 +62,9 @@ def test_ping_execute_quick(tmp_path: Path):
     context = JobContext("test_job", mock_db, str(tmp_path))
     
     # Execute with tiny sleep
-    start = time.time()
+    start = time.monotonic()
     result = handler.execute({"sleep_sec": 0.01}, context)
-    elapsed = time.time() - start
+    elapsed = time.monotonic() - start
     
     assert result["ok"] is True
     assert result["elapsed"] >= 0.01
@@ -118,8 +118,67 @@ def test_ping_integration_smoke(tmp_path: Path):
         artifacts_root=tmp_path / "artifacts"
     )
     
+    # Helper for bounded tick with timeout
+    def _safe_tick(timeout_s: float = 0.5) -> None:
+        """Call supervisor.tick() with a hard timeout.
+        
+        Raises AssertionError if tick blocks longer than timeout_s.
+        """
+        tick_done = threading.Event()
+        tick_exception = []
+        
+        def _tick_worker():
+            try:
+                supervisor.tick()
+            except Exception as e:
+                tick_exception.append(e)
+            finally:
+                tick_done.set()
+        
+        thread = threading.Thread(target=_tick_worker, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout_s)
+        
+        if thread.is_alive():
+            # Thread still running -> tick blocked
+            job = db.get_job_row(job_id)
+            job_state = job.state if job else "missing"
+            raise AssertionError(
+                f"supervisor.tick() blocked > {timeout_s}s "
+                f"(job_state={job_state})"
+            )
+        
+        if tick_exception:
+            raise tick_exception[0]
+    
+    # Helper for bounded shutdown
+    def _safe_shutdown(timeout_s: float = 1.0) -> None:
+        """Call supervisor.shutdown() with a hard timeout."""
+        shutdown_done = threading.Event()
+        shutdown_exception = []
+        
+        def _shutdown_worker():
+            try:
+                supervisor.shutdown()
+            except Exception as e:
+                shutdown_exception.append(e)
+            finally:
+                shutdown_done.set()
+        
+        thread = threading.Thread(target=_shutdown_worker, daemon=True)
+        thread.start()
+        thread.join(timeout=timeout_s)
+        
+        if thread.is_alive():
+            raise AssertionError(
+                f"supervisor.shutdown() blocked > {timeout_s}s"
+            )
+        
+        if shutdown_exception:
+            raise shutdown_exception[0]
+    
     def _tick_until_done() -> bool:
-        supervisor.tick()
+        _safe_tick(timeout_s=0.5)
         job = db.get_job_row(job_id)
         return bool(job and job.state in ("SUCCEEDED", "FAILED", "ABORTED"))
 
@@ -141,8 +200,8 @@ def test_ping_integration_smoke(tmp_path: Path):
     assert result["ok"] is True
     assert result["elapsed"] >= 0.1
     
-    # Clean up
-    supervisor.shutdown()
+    # Clean up with bounded shutdown
+    _safe_shutdown(timeout_s=1.0)
 
 
 def test_ping_cli_submit(tmp_path: Path):

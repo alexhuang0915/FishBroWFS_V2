@@ -7,10 +7,12 @@
 # AI 不需要讀它自己剛寫完的 Log 或 Report，除非你手動指定
 outputs/
 outputs/_dp_evidence/
+!outputs/_dp_evidence/
 outputs/runs/
 outputs/jobs/
 outputs/jobs.db
 outputs/jobs_v2.db
+!outputs/_dp_evidence/phaseDP2_wiring_20260116_160548/
 
 # 2. 封鎖超大依賴鎖定檔 (隱形殺手)
 # AI 讀 pyproject.toml 或 requirements.txt 就懂依賴了

@@ -251,12 +251,24 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     rule = _select_rule(context)
     summary = _render_summary(rule["summary_template"], context)
 
+    alignment_report = read_job_artifact(job.job_id, "data_alignment_report.json")
+    alignment_url = artifact_url_if_exists(job.job_id, "data_alignment_report.json")
+    if alignment_report:
+        ratio = alignment_report.get("forward_fill_ratio")
+        dropped = alignment_report.get("dropped_rows", 0)
+        ratio_text = f"{ratio:.0%}" if isinstance(ratio, (int, float)) else "N/A"
+        summary = (
+            f"{summary} Data Alignment held-to-last {ratio_text} of bars; "
+            f"dropped {dropped} rows."
+        )
+
     evidence = {
         "policy_check_url": artifact_url_if_exists(job_id, "policy_check.json"),
         "manifest_url": artifact_url_if_exists(job_id, "manifest.json"),
         "inputs_fingerprint_url": artifact_url_if_exists(job_id, "inputs_fingerprint.json"),
         "stdout_tail_url": stdout_tail_url(job_id),
         "evidence_bundle_url": evidence_bundle_url(job_id),
+        "data_alignment_url": alignment_url,
     }
 
     policy_stage_value = context.policy_stage or context.policy_final_stage
@@ -277,6 +289,7 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
             "http_status": 200,
         },
         "evidence": evidence,
+        "data_alignment": alignment_report or {},
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

@@ -23,6 +23,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
+from control.job_artifacts import artifact_url_if_exists
+from control.reporting.io import read_job_artifact
+
 from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
 from gui.services.explain_cache import get_cache_instance
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
@@ -30,6 +33,8 @@ from gui.services.supervisor_client import SupervisorClient, SupervisorClientErr
 logger = logging.getLogger(__name__)
 
 _explain_adapter = ExplainAdapter(cache=get_cache_instance())
+
+DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD = 0.5  # Warn when more than 50% of bars are held
 
 
 class GateStatus(str, Enum):
@@ -87,6 +92,7 @@ class GateSummaryService:
                 gates.append(self._fetch_worker_execution_reality())
                 gates.append(self._fetch_registry_surface())
                 gates.append(self._fetch_policy_enforcement_gate())
+                gates.append(self._fetch_data_alignment_gate())
             except SupervisorClientError as e:
                 # If any gate fails due to network/server error, we treat as overall FAIL
                 logger.error(f"Gate fetch failed: {e}")
@@ -434,6 +440,69 @@ class GateSummaryService:
             gate_name=gate_name,
             status=GateStatus.PASS,
             message="No policy enforcements detected yet.",
+            details={},
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _fetch_data_alignment_gate(self) -> GateResult:
+        """Gate 7: Data Alignment (forward-fill metrics)."""
+        gate_id = "data_alignment"
+        gate_name = "Data Alignment"
+        try:
+            jobs = self.client.get_jobs(limit=20)
+        except SupervisorClientError as e:
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=GateStatus.WARN,
+                message=f"Data alignment gate unavailable: {e.message}",
+                details={"error_type": e.error_type, "status_code": e.status_code},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        sorted_jobs = sorted(jobs, key=lambda entry: entry.get("created_at", ""), reverse=True)
+        for job in sorted_jobs:
+            job_id = job.get("job_id")
+            if not job_id:
+                continue
+
+            alignment_url = artifact_url_if_exists(job_id, "data_alignment_report.json")
+            if not alignment_url:
+                continue
+
+            report = read_job_artifact(job_id, "data_alignment_report.json") or {}
+            ratio = report.get("forward_fill_ratio")
+            dropped = report.get("dropped_rows", 0)
+
+            ratio_display = f"{ratio:.1%}" if isinstance(ratio, (int, float)) else "N/A"
+            status = (
+                GateStatus.WARN
+                if isinstance(ratio, (int, float)) and ratio > DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD
+                else GateStatus.PASS
+            )
+            message = f"Forward fill ratio {ratio_display}; dropped {dropped} rows."
+            details = {
+                "forward_fill_ratio": ratio,
+                "dropped_rows": dropped,
+                "job_id": job_id,
+            }
+
+            actions = [{"label": "Open data alignment report", "url": alignment_url}]
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=status,
+                message=message,
+                details=details,
+                actions=actions,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        return GateResult(
+            gate_id=gate_id,
+            gate_name=gate_name,
+            status=GateStatus.WARN,
+            message="Data alignment report not available for recent jobs.",
             details={},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )

@@ -14,23 +14,17 @@ def test_root_hygiene_no_forbidden_files():
     test_dir = Path(__file__).parent
     root = test_dir.parent.parent
     
-    # Standard allowed files and directories
-    allowed_files = {
-        'README.md',
-        'main.py',
-        'Makefile',
-        'pyproject.toml',
-        'pytest.ini',
-        'requirements.txt',
-        'SNAPSHOT_CLEAN.jsonl',
-        '.gitattributes',
-        '.gitignore',
-        '.cursorignore',  # Cursor IDE developer tooling ignore file (non-runtime)
-        '.pre-commit-config.yaml',
-        'FishBroWFS_UI.bat',  # Sole human entrypoint. Approved by constitution.
-        '.rooignore',  # AI context guard for API cost control
-        'pyrightconfig.json',  # Pyright configuration for type checking
-    }
+    # Standard allowed files are maintained in an external root allowlist.
+    root_allowlist_path = root / "docs" / "contracts" / "ROOT_TOPLEVEL_ALLOWLIST_V1.txt"
+    if not root_allowlist_path.exists():
+        raise AssertionError(f"Root allowlist missing: {root_allowlist_path}")
+
+    allowed_files = set()
+    for line in root_allowlist_path.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        allowed_files.add(stripped)
     
     allowed_dirs = {
         'src',

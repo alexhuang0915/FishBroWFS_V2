@@ -10,6 +10,8 @@ instruments:
     multiplier: 2.0
     tick_size: 0.25
     tick_value: 0.50
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
   - id: "TWF.MXF"
     display_name: "Taiwan Futures Exchange Mini-TAIEX"
     type: "future"
@@ -20,4 +22,6 @@ instruments:
     multiplier: 50.0
     tick_size: 1.0
     tick_value: 50.0
+    timezone: "Asia/Taipei"
+    trade_date_roll_time_local: "15:00"
 default: "CME.MNQ"

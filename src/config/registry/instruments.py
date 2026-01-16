@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from functools import lru_cache
 from enum import Enum
+from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 
@@ -49,8 +50,33 @@ class InstrumentSpec(BaseModel):
     multiplier: Optional[float] = Field(None, description="Contract multiplier")
     tick_size: Optional[float] = Field(None, description="Minimum price increment")
     tick_value: Optional[float] = Field(None, description="Value per tick")
+    timezone: str = Field(..., description="Primary trading timezone (Area/City)")
+    trade_date_roll_time_local: str = Field(
+        ..., 
+        description="Local HH:MM time when the trade date rolls"
+    )
     
     model_config = ConfigDict(frozen=True, populate_by_name=True, extra='forbid')
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, value: str) -> str:
+        """Ensure timezone is not empty."""
+        if not value or not value.strip():
+            raise ValueError("timezone must be provided")
+        return value
+
+    @field_validator("trade_date_roll_time_local")
+    @classmethod
+    def validate_roll_time(cls, value: str) -> str:
+        """Ensure roll time is in HH:MM format."""
+        if not value or not value.strip():
+            raise ValueError("trade_date_roll_time_local must be provided")
+        try:
+            datetime.strptime(value.strip(), "%H:%M")
+        except ValueError as exc:
+            raise ValueError("trade_date_roll_time_local must be HH:MM") from exc
+        return value
 
 
 class InstrumentRegistry(BaseModel):

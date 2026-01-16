@@ -3,10 +3,21 @@ import json
 import logging
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+import pandas as pd
+
 from ..job_handler import BaseJobHandler, JobContext
 from control.artifacts import write_json_atomic
+from control.supervisor.models import get_job_artifact_dir
+from core.paths import get_outputs_root
+from core.timeframe_aggregator import TimeframeAggregator
+from core.data_aligner import DataAligner
+from control.bars_store import normalized_bars_path, resampled_bars_path, load_npz
+from config.registry.datasets import load_datasets
+from config.registry.instruments import load_instruments
 
 logger = logging.getLogger(__name__)
 
@@ -98,6 +109,8 @@ class BuildDataHandler(BaseJobHandler):
             write_json_atomic(result_path, result)
             
             # Extract produced paths from result
+            alignment_path = _write_data_alignment_report(context.job_id, params, result)
+
             produced_paths = []
             if "data1_report" in result and "fingerprint_path" in result["data1_report"]:
                 produced_paths.append(result["data1_report"]["fingerprint_path"])
@@ -105,6 +118,8 @@ class BuildDataHandler(BaseJobHandler):
                 for feed_id, report in result["data2_reports"].items():
                     if "fingerprint_path" in report:
                         produced_paths.append(report["fingerprint_path"])
+            if alignment_path:
+                produced_paths.append(alignment_path)
             
             return {
                 "ok": True,
@@ -256,6 +271,133 @@ class BuildDataHandler(BaseJobHandler):
             logger.info("Abort requested during BUILD_DATA execution")
             return True
         return False
+
+
+def _npz_to_dataframe(npz_data: dict[str, Any]) -> pd.DataFrame:
+    columns = ["ts", "open", "high", "low", "close", "volume"]
+    missing = [col for col in columns if col not in npz_data]
+    if missing:
+        raise ValueError(f"bars data missing columns: {missing}")
+
+    data = {col: npz_data[col] for col in columns}
+    data["ts"] = pd.to_datetime(data["ts"])
+    return pd.DataFrame(data)
+
+
+def _write_data_alignment_report(job_id: str, params: Dict[str, Any], result: Dict[str, Any]) -> Optional[str]:
+    data2_reports = (result.get("data2_reports") or {})
+    if not data2_reports:
+        logger.debug("No Data2 reports present; skipping alignment report.")
+        return None
+
+    data2_dataset_id = next(iter(data2_reports))
+    dataset_id = params.get("dataset_id")
+    if not dataset_id:
+        logger.warning("BUILD_DATA parameters missing dataset_id; cannot produce alignment report.")
+        return None
+
+    timeframe_min = params.get("timeframe_min", 60)
+    season = params.get("season", "2026Q1")
+    outputs_root = get_outputs_root()
+
+    dataset_registry = load_datasets()
+    data1_spec = dataset_registry.get_dataset_by_id(dataset_id)
+    if data1_spec is None:
+        logger.warning("Unknown Data1 dataset id '%s'; skipping alignment report.", dataset_id)
+        return None
+
+    instrument_registry = load_instruments()
+    instrument_spec = instrument_registry.get_instrument_by_id(data1_spec.instrument_id)
+    if instrument_spec is None:
+        logger.warning(
+            "Instrument spec not found for '%s'; cannot compute trade-date alignment.",
+            data1_spec.instrument_id,
+        )
+        return None
+
+    try:
+        roll_time = datetime.strptime(instrument_spec.trade_date_roll_time_local, "%H:%M").time()
+    except ValueError as exc:
+        logger.warning(
+            "Invalid trade_date_roll_time_local for instrument %s: %s",
+            instrument_spec.id,
+            exc,
+        )
+        return None
+
+    timezone_name = instrument_spec.timezone
+
+    normalized_path = normalized_bars_path(outputs_root, season, data2_dataset_id)
+    if not normalized_path.exists():
+        logger.warning("Normalized bars missing for Data2 '%s'; cannot align.", data2_dataset_id)
+        return None
+
+    resampled_path = resampled_bars_path(outputs_root, season, dataset_id, timeframe_min)
+    if not resampled_path.exists():
+        logger.warning("Resampled bars missing for Data1 '%s'; cannot align.", dataset_id)
+        return None
+
+    try:
+        data2_norm = load_npz(normalized_path)
+        data1_resampled = load_npz(resampled_path)
+
+        data2_df = _npz_to_dataframe(data2_norm).sort_values("ts")
+        data1_df = _npz_to_dataframe(data1_resampled).sort_values("ts")
+    except Exception as exc:
+        logger.warning("Failed to load bars for data alignment: %s", exc)
+        return None
+
+    if data2_df.empty:
+        logger.warning("Data2 normalized bars empty for '%s'; skipping alignment.", data2_dataset_id)
+        return None
+
+    try:
+        aggregator = TimeframeAggregator(timeframe_min=timeframe_min, roll_time=roll_time)
+        data2_agg = aggregator.aggregate(data2_df)
+    except Exception as exc:
+        logger.warning("Aggregation failed for Data2 '%s': %s", data2_dataset_id, exc)
+        return None
+
+    if data2_agg.empty:
+        logger.warning("Aggregated Data2 bars empty after applying timeframe %s.", timeframe_min)
+        return None
+
+    try:
+        aligner = DataAligner()
+        aligned_df, metrics = aligner.align(data1_df, data2_agg)
+    except Exception as exc:
+        logger.warning("Data alignment failed for job %s: %s", job_id, exc)
+        return None
+
+    input_rows = len(data2_agg)
+    output_rows = len(aligned_df)
+    dropped_rows = max(0, input_rows - output_rows)
+
+    report = {
+        "job_id": job_id,
+        "instrument": data1_spec.instrument_id,
+        "timeframe": f"{timeframe_min}m",
+        "trade_date_roll_time_local": instrument_spec.trade_date_roll_time_local,
+        "timezone": timezone_name,
+        "input_rows": input_rows,
+        "output_rows": output_rows,
+        "dropped_rows": dropped_rows,
+        "forward_filled_rows": metrics.data2_hold_bars_total,
+        "forward_fill_ratio": metrics.data2_hold_ratio,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    job_artifacts_dir = get_job_artifact_dir(outputs_root, job_id)
+    job_artifacts_dir.mkdir(parents=True, exist_ok=True)
+    report_path = job_artifacts_dir / "data_alignment_report.json"
+    try:
+        write_json_atomic(report_path, report)
+    except Exception as exc:
+        logger.warning("Failed to write data_alignment_report.json for job %s: %s", job_id, exc)
+        return None
+
+    logger.info("Data alignment report written to %s", report_path)
+    return str(report_path)
 
 
 # Register handler

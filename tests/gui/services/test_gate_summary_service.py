@@ -59,7 +59,7 @@ def default_explain_payload(monkeypatch):
 class TestGateSummaryService:
     """Test suite for GateSummaryService."""
 
-    def test_fetch_all_gates_pass(self):
+    def test_fetch_all_gates_pass(self, monkeypatch):
         """Test fetch when all gates return PASS."""
         mock_client = Mock()
         mock_client.health.return_value = {"status": "ok"}
@@ -89,13 +89,25 @@ class TestGateSummaryService:
         mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
+        monkeypatch.setattr(
+            "gui.services.gate_summary_service.GateSummaryService._fetch_data_alignment_gate",
+            lambda self: GateResult(
+                gate_id="data_alignment",
+                gate_name="Data Alignment",
+                status=GateStatus.PASS,
+                message="Data alignment gate stubbed for tests.",
+                details={},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+
         service = GateSummaryService(client=mock_client)
         summary = service.fetch()
 
         # Verify overall status
         assert summary.overall_status == GateStatus.PASS
         assert "All gates PASS" in summary.overall_message
-        assert len(summary.gates) == 6
+        assert len(summary.gates) == 7
         # Check each gate status
         gate_ids = [g.gate_id for g in summary.gates]
         assert "api_health" in gate_ids
@@ -104,6 +116,7 @@ class TestGateSummaryService:
         assert "worker_execution_reality" in gate_ids
         assert "registry_surface" in gate_ids
         assert "policy_enforcement" in gate_ids
+        assert "data_alignment" in gate_ids
         policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
         assert policy_gate.status == GateStatus.PASS
         for gate in summary.gates:

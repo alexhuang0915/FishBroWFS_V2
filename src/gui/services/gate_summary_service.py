@@ -31,31 +31,19 @@ from control.job_artifacts import artifact_url_if_exists, job_artifact_url
 from gui.services.data_alignment_status import (
     ARTIFACT_NAME,
     resolve_data_alignment_status,
-    build_data_alignment_reason_cards,
-    DATA_ALIGNMENT_MISSING,
-    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
-    DATA_ALIGNMENT_DROPPED_ROWS,
 )
 from gui.services.resource_status import (
     resolve_resource_status,
-    build_resource_reason_cards,
-    RESOURCE_MISSING_ARTIFACT,
-    RESOURCE_MEMORY_EXCEEDED,
-    RESOURCE_WORKER_CRASH,
     RESOURCE_USAGE_ARTIFACT,
     DEFAULT_MEMORY_WARN_THRESHOLD_MB,
 )
 from gui.services.portfolio_admission_status import (
     resolve_portfolio_admission_status,
-    build_portfolio_admission_reason_cards,
-    PORTFOLIO_MISSING_ARTIFACT,
-    PORTFOLIO_CORRELATION_TOO_HIGH,
-    PORTFOLIO_MDD_EXCEEDED,
-    PORTFOLIO_INSUFFICIENT_HISTORY,
     ADMISSION_DECISION_FILE,
     DEFAULT_CORRELATION_THRESHOLD,
     DEFAULT_MDD_THRESHOLD,
 )
+from gui.services.gate_reason_cards_registry import build_reason_cards_for_gate
 from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
 from gui.services.explain_cache import get_cache_instance
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
@@ -102,6 +90,19 @@ class GateSummaryService:
     def __init__(self, client: Optional[SupervisorClient] = None):
         self.client = client or SupervisorClient()
         self.timeout = 5.0  # seconds per request
+    
+    def _get_recent_job_id(self) -> Optional[str]:
+        """Get a recent job ID for gates that need job-specific reason cards."""
+        try:
+            jobs = self.client.get_jobs(limit=20)
+            if isinstance(jobs, list):
+                for job in jobs:
+                    job_id = job.get("job_id")
+                    if job_id:
+                        return job_id
+        except SupervisorClientError:
+            pass
+        return None
 
     def fetch(self) -> GateSummary:
         """
@@ -175,31 +176,43 @@ class GateSummaryService:
             response = self.client.health()
             # Expect {"status": "ok"}
             if isinstance(response, dict) and response.get("status") == "ok":
+                # Build reason cards (empty for system health gates)
+                reason_cards = build_reason_cards_for_gate(gate_id, "")
+                reason_cards_dict = [card.__dict__ for card in reason_cards]
+                
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
                     status=GateStatus.PASS,
                     message="API health endpoint responds with status ok.",
-                    details=response,
+                    details={"response": response, "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Health", "url": "/health"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
             else:
+                # Build reason cards
+                reason_cards = build_reason_cards_for_gate(gate_id, "")
+                reason_cards_dict = [card.__dict__ for card in reason_cards]
+                
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
                     status=GateStatus.WARN,
                     message=f"Unexpected health response: {response}",
-                    details=response,
+                    details={"response": response, "reason_cards": reason_cards_dict},
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
         except SupervisorClientError as e:
+            # Build reason cards
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.FAIL,
                 message=f"Health endpoint unreachable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -208,44 +221,25 @@ class GateSummaryService:
         gate_id = "api_readiness"
         gate_name = "API Readiness"
         try:
-            # The readiness endpoint is /api/v1/readiness (no parameters)
-            # We'll use the supervisor client's check_readiness with dummy parameters
-            # but there's no generic readiness method. Let's call the endpoint directly.
-            # The supervisor client doesn't have a dedicated readiness method, but we can
-            # use the generic _get method. However we want to avoid exposing internal methods.
-            # Instead we can call the client's health? Wait readiness is separate.
-            # Let's add a method to supervisor client? That's out of scope.
-            # We'll use the existing client's _get via monkeypatch? Not good.
-            # Actually the supervisor client has a `check_readiness` method that requires
-            # season, dataset_id, timeframe. That's not generic readiness.
-            # Looking at the API, there is a generic readiness endpoint at /api/v1/readiness
-            # that returns {"status": "ok"}. We'll need to call it directly.
-            # We'll use requests directly but we should reuse the client's session.
-            # Let's add a method to supervisor client later; for now we'll call the endpoint
-            # using the client's internal _get method (which is private).
-            # We'll import the client and call _get with path.
-            # Since _get is private, we can still use it but it's not ideal.
-            # Better to add a public method to supervisor client, but that's a separate change.
-            # For now, we'll use the existing `check_readiness` with default parameters
-            # that are known to exist? That's not safe.
-            # Let's examine the supervisor client: there is a `check_readiness` method
-            # that calls /api/v1/readiness/{season}/{dataset_id}/{timeframe}.
-            # That's not the generic readiness.
-            # However the generic readiness endpoint is at /api/v1/readiness (no parameters).
-            # The supervisor client doesn't have a method for that.
-            # We'll implement a simple HTTP call using the same session as the client.
-            # We'll access self.client.session and make a GET.
             url = f"{self.client.base_url}/api/v1/readiness"
             response = self.client.session.get(url, timeout=self.timeout)
             response.raise_for_status()
             data = response.json()
+            
+            # Get recent job ID for readiness gate reason cards
+            recent_job_id = self._get_recent_job_id() or ""
+            
+            # Build reason cards
+            reason_cards = build_reason_cards_for_gate(gate_id, recent_job_id)
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             if isinstance(data, dict) and data.get("status") == "ok":
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
                     status=GateStatus.PASS,
                     message="API readiness endpoint responds with status ok.",
-                    details=data,
+                    details={"response": data, "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Readiness", "url": "/api/v1/readiness"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
@@ -255,19 +249,25 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.WARN,
                     message=f"Unexpected readiness response: {data}",
-                    details=data,
+                    details={"response": data, "reason_cards": reason_cards_dict},
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
         except Exception as e:
             # Map to SupervisorClientError-like
             status_code = getattr(e, 'response', None) and e.response.status_code
             error_type = "network" if isinstance(e, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)) else "server"
+            
+            # Build reason cards even on error
+            recent_job_id = self._get_recent_job_id() or ""
+            reason_cards = build_reason_cards_for_gate(gate_id, recent_job_id)
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.FAIL,
                 message=f"Readiness endpoint unreachable: {str(e)}",
-                details={"error_type": error_type, "status_code": status_code},
+                details={"error_type": error_type, "status_code": status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -277,6 +277,11 @@ class GateSummaryService:
         gate_name = "Supervisor DB SSOT"
         try:
             jobs = self.client.get_jobs(limit=1)
+            
+            # Build reason cards (empty for system gates)
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             # If we get a list (even empty), DB is accessible
             if isinstance(jobs, list):
                 return GateResult(
@@ -284,7 +289,7 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.PASS,
                     message=f"Supervisor DB accessible, {len(jobs)} total jobs.",
-                    details={"jobs_count": len(jobs)},
+                    details={"jobs_count": len(jobs), "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Jobs", "url": "/api/v1/jobs"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
@@ -294,16 +299,20 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.WARN,
                     message=f"Unexpected jobs response type: {type(jobs)}",
-                    details={"response": jobs},
+                    details={"response": jobs, "reason_cards": reason_cards_dict},
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.FAIL,
                 message=f"Supervisor DB unreachable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -313,13 +322,18 @@ class GateSummaryService:
         gate_name = "Worker Execution Reality"
         try:
             jobs = self.client.get_jobs(limit=50)
+            
+            # Build reason cards (empty for system gates)
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             if not isinstance(jobs, list):
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
                     status=GateStatus.WARN,
                     message="Could not parse jobs list.",
-                    details={"response": jobs},
+                    details={"response": jobs, "reason_cards": reason_cards_dict},
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
             running = [j for j in jobs if isinstance(j, dict) and j.get("status") == "RUNNING"]
@@ -330,7 +344,7 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.PASS,
                     message=f"{len(running)} job(s) currently RUNNING, {len(queued)} QUEUED.",
-                    details={"running_count": len(running), "queued_count": len(queued)},
+                    details={"running_count": len(running), "queued_count": len(queued), "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Jobs", "url": "/api/v1/jobs"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
@@ -340,7 +354,7 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.WARN,
                     message=f"No RUNNING jobs, but {len(queued)} job(s) QUEUED (workers may be idle).",
-                    details={"running_count": 0, "queued_count": len(queued)},
+                    details={"running_count": 0, "queued_count": len(queued), "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Jobs", "url": "/api/v1/jobs"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
@@ -350,17 +364,21 @@ class GateSummaryService:
                     gate_name=gate_name,
                     status=GateStatus.PASS,
                     message="No RUNNING or QUEUED jobs (system idle).",
-                    details={"running_count": 0, "queued_count": 0},
+                    details={"running_count": 0, "queued_count": 0, "reason_cards": reason_cards_dict},
                     actions=list(({"label": "View Jobs", "url": "/api/v1/jobs"},)),
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.FAIL,
                 message=f"Failed to fetch jobs for worker reality: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -369,16 +387,30 @@ class GateSummaryService:
         # Use defensive adapter to prevent crashes from missing methods
         from gui.services.registry_adapter import fetch_registry_gate_result
         try:
-            return fetch_registry_gate_result()
+            result = fetch_registry_gate_result()
+            # Add reason cards to the result
+            reason_cards = build_reason_cards_for_gate("registry_surface", "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
+            # Update details to include reason cards
+            if result.details is None:
+                result.details = {"reason_cards": reason_cards_dict}
+            elif isinstance(result.details, dict):
+                result.details["reason_cards"] = reason_cards_dict
+            return result
         except Exception as e:
             # Fallback if adapter itself fails
             logger.error(f"Registry surface adapter failed: {e}", exc_info=True)
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate("registry_surface", "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id="registry_surface",
                 gate_name="Registry Surface",
                 status=GateStatus.FAIL,
                 message=f"Registry surface check failed: {e}",
-                details={"error_type": "adapter_failure", "traceback": str(e)},
+                details={"error_type": "adapter_failure", "traceback": str(e), "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -389,12 +421,16 @@ class GateSummaryService:
         try:
             jobs = self.client.get_jobs(limit=20)
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate(gate_id, "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
+            
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.FAIL,
                 message=f"Policy enforcement gate unavailable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -409,10 +445,16 @@ class GateSummaryService:
             if status == "REJECTED" and policy_stage == "preflight":
                 job_id = job_id_from(job)
                 message, actions, explain_payload = self._policy_explain_context(job_id)
+                
+                # Build reason cards for this job
+                reason_cards = build_reason_cards_for_gate(gate_id, job_id)
+                reason_cards_dict = [card.__dict__ for card in reason_cards]
+                
                 details = {
                     "job_id": job_id,
                     "failure_code": job.get("failure_code"),
                     "policy_stage": policy_stage,
+                    "reason_cards": reason_cards_dict,
                 }
                 if explain_payload:
                     details["human_tag"] = explain_payload.human_tag
@@ -429,10 +471,16 @@ class GateSummaryService:
             if status == "FAILED" and policy_stage == "postflight":
                 job_id = job_id_from(job)
                 message, actions, explain_payload = self._policy_explain_context(job_id)
+                
+                # Build reason cards for this job
+                reason_cards = build_reason_cards_for_gate(gate_id, job_id)
+                reason_cards_dict = [card.__dict__ for card in reason_cards]
+                
                 details = {
                     "job_id": job_id,
                     "failure_code": job.get("failure_code"),
                     "policy_stage": policy_stage,
+                    "reason_cards": reason_cards_dict,
                 }
                 if explain_payload:
                     details["human_tag"] = explain_payload.human_tag
@@ -451,7 +499,12 @@ class GateSummaryService:
             if job.get("status") == "SUCCEEDED":
                 job_id = job_id_from(job)
                 message, actions, explain_payload = self._policy_explain_context(job_id)
-                details = {"job_id": job_id, "overall_status": job.get("status")}
+                
+                # Build reason cards for this job
+                reason_cards = build_reason_cards_for_gate(gate_id, job_id)
+                reason_cards_dict = [card.__dict__ for card in reason_cards]
+                
+                details = {"job_id": job_id, "overall_status": job.get("status"), "reason_cards": reason_cards_dict}
                 if explain_payload:
                     details["decision_layer"] = explain_payload.decision_layer
                     details["human_tag"] = explain_payload.human_tag
@@ -467,12 +520,16 @@ class GateSummaryService:
                     timestamp=datetime.now(timezone.utc).isoformat(),
                 )
 
+        # No matching jobs found, return PASS with empty reason cards
+        reason_cards = build_reason_cards_for_gate(gate_id, "")
+        reason_cards_dict = [card.__dict__ for card in reason_cards]
+        
         return GateResult(
             gate_id=gate_id,
             gate_name=gate_name,
             status=GateStatus.PASS,
             message="No policy enforcements detected yet.",
-            details={},
+            details={"reason_cards": reason_cards_dict},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -483,12 +540,15 @@ class GateSummaryService:
         try:
             jobs = self.client.get_jobs(limit=20)
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate("data_alignment", "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.WARN,
                 message=f"Data alignment gate unavailable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -504,28 +564,9 @@ class GateSummaryService:
                 or job_artifact_url(job_id, alignment_status.artifact_relpath)
             )
 
-            # Build reason cards
-            reason_cards = build_data_alignment_reason_cards(
-                job_id=job_id,
-                status=alignment_status,
-                warn_forward_fill_ratio=DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD,
-            )
-            
-            # Convert reason cards to dict for serialization
-            reason_cards_dict = [
-                {
-                    "code": card.code,
-                    "title": card.title,
-                    "severity": card.severity,
-                    "why": card.why,
-                    "impact": card.impact,
-                    "recommended_action": card.recommended_action,
-                    "evidence_artifact": card.evidence_artifact,
-                    "evidence_path": card.evidence_path,
-                    "action_target": card.action_target,
-                }
-                for card in reason_cards
-            ]
+            # Build reason cards using registry
+            reason_cards = build_reason_cards_for_gate("data_alignment", job_id)
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
 
             if alignment_status.status == "OK":
                 ratio = alignment_status.metrics.get("forward_fill_ratio")
@@ -564,12 +605,15 @@ class GateSummaryService:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
+        # No recent jobs found, return with empty reason cards
+        reason_cards = build_reason_cards_for_gate("data_alignment", "")
+        reason_cards_dict = [card.__dict__ for card in reason_cards]
         return GateResult(
             gate_id=gate_id,
             gate_name=gate_name,
             status=GateStatus.WARN,
             message="Data alignment report not available for recent jobs.",
-            details={},
+            details={"reason_cards": reason_cards_dict},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -580,12 +624,15 @@ class GateSummaryService:
         try:
             jobs = self.client.get_jobs(limit=20)
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate("resource", "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.WARN,
                 message=f"Resource gate unavailable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -601,27 +648,9 @@ class GateSummaryService:
                 or job_artifact_url(job_id, resource_status.artifact_relpath)
             )
 
-            # Build reason cards
-            reason_cards = build_resource_reason_cards(
-                job_id=job_id,
-                status=resource_status,
-                warn_memory_threshold_mb=DEFAULT_MEMORY_WARN_THRESHOLD_MB,
-            )
-            
-            reason_cards_dict = [
-                {
-                    "code": card.code,
-                    "title": card.title,
-                    "severity": card.severity,
-                    "why": card.why,
-                    "impact": card.impact,
-                    "recommended_action": card.recommended_action,
-                    "evidence_artifact": card.evidence_artifact,
-                    "evidence_path": card.evidence_path,
-                    "action_target": card.action_target,
-                }
-                for card in reason_cards
-            ]
+            # Build reason cards using registry
+            reason_cards = build_reason_cards_for_gate("resource", job_id)
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
 
             if resource_status.status == "OK":
                 peak_memory = resource_status.metrics.get("peak_memory_mb")
@@ -660,12 +689,15 @@ class GateSummaryService:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
+        # No recent jobs found, return with empty reason cards
+        reason_cards = build_reason_cards_for_gate("resource", "")
+        reason_cards_dict = [card.__dict__ for card in reason_cards]
         return GateResult(
             gate_id=gate_id,
             gate_name=gate_name,
             status=GateStatus.WARN,
             message="Resource usage report not available for recent jobs.",
-            details={},
+            details={"reason_cards": reason_cards_dict},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 
@@ -676,12 +708,15 @@ class GateSummaryService:
         try:
             jobs = self.client.get_jobs(limit=20)
         except SupervisorClientError as e:
+            # Build reason cards even on error
+            reason_cards = build_reason_cards_for_gate("portfolio_admission", "")
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
                 status=GateStatus.WARN,
                 message=f"Portfolio admission gate unavailable: {e.message}",
-                details={"error_type": e.error_type, "status_code": e.status_code},
+                details={"error_type": e.error_type, "status_code": e.status_code, "reason_cards": reason_cards_dict},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
@@ -697,28 +732,9 @@ class GateSummaryService:
                 or job_artifact_url(job_id, admission_status.artifact_relpath)
             )
 
-            # Build reason cards
-            reason_cards = build_portfolio_admission_reason_cards(
-                job_id=job_id,
-                status=admission_status,
-                correlation_threshold=DEFAULT_CORRELATION_THRESHOLD,
-                mdd_threshold=DEFAULT_MDD_THRESHOLD,
-            )
-            
-            reason_cards_dict = [
-                {
-                    "code": card.code,
-                    "title": card.title,
-                    "severity": card.severity,
-                    "why": card.why,
-                    "impact": card.impact,
-                    "recommended_action": card.recommended_action,
-                    "evidence_artifact": card.evidence_artifact,
-                    "evidence_path": card.evidence_path,
-                    "action_target": card.action_target,
-                }
-                for card in reason_cards
-            ]
+            # Build reason cards using registry
+            reason_cards = build_reason_cards_for_gate("portfolio_admission", job_id)
+            reason_cards_dict = [card.__dict__ for card in reason_cards]
 
             if admission_status.status == "OK":
                 verdict = admission_status.metrics.get("verdict")
@@ -757,12 +773,15 @@ class GateSummaryService:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
 
+        # No recent jobs found, return with empty reason cards
+        reason_cards = build_reason_cards_for_gate("portfolio_admission", "")
+        reason_cards_dict = [card.__dict__ for card in reason_cards]
         return GateResult(
             gate_id=gate_id,
             gate_name=gate_name,
             status=GateStatus.WARN,
             message="Portfolio admission decision not available for recent jobs.",
-            details={},
+            details={"reason_cards": reason_cards_dict},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )
 

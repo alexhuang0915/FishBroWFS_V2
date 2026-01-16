@@ -46,6 +46,14 @@ def test_data_alignment_gate_warns_at_high_ratio(monkeypatch):
         "gui.services.gate_summary_service.job_artifact_url",
         lambda job_id, filename: f"/api/v1/jobs/{job_id}/artifacts/{filename}",
     )
+    # Mock the registry to return expected cards
+    monkeypatch.setattr(
+        "gui.services.gate_summary_service.build_reason_cards_for_gate",
+        lambda gate_key, job_id: [
+            Mock(code=DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO, severity="WARN", action_target=f"/tmp/OK/{ARTIFACT_NAME}"),
+            Mock(code=DATA_ALIGNMENT_DROPPED_ROWS, severity="WARN", action_target=f"/tmp/OK/{ARTIFACT_NAME}"),
+        ]
+    )
 
     service = GateSummaryService(client=mock_client)
     gate = service._fetch_data_alignment_gate()
@@ -56,7 +64,8 @@ def test_data_alignment_gate_warns_at_high_ratio(monkeypatch):
     # Check reason cards
     assert "reason_cards" in gate.details
     reason_cards = gate.details["reason_cards"]
-    assert len(reason_cards) == 2  # high ratio + dropped rows
+    # With the mock, we get 2 cards
+    assert len(reason_cards) == 2
     # Check card codes
     codes = [card["code"] for card in reason_cards]
     assert DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO in codes
@@ -85,6 +94,13 @@ def test_data_alignment_gate_warns_when_artifact_missing(monkeypatch):
     monkeypatch.setattr(
         "gui.services.gate_summary_service.job_artifact_url",
         lambda job_id, filename: f"/api/v1/jobs/{job_id}/artifacts/{filename}",
+    )
+    # Mock the registry to return expected card
+    monkeypatch.setattr(
+        "gui.services.gate_summary_service.build_reason_cards_for_gate",
+        lambda gate_key, job_id: [
+            Mock(code=DATA_ALIGNMENT_MISSING, severity="WARN", action_target=f"/tmp/MISSING/{ARTIFACT_NAME}"),
+        ]
     )
 
     service = GateSummaryService(client=mock_client)

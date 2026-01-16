@@ -13,32 +13,16 @@ from control.supervisor.models import JobRow
 from gui.services.data_alignment_status import (
     ARTIFACT_NAME,
     resolve_data_alignment_status,
-    build_data_alignment_reason_cards,
-    DATA_ALIGNMENT_MISSING,
-    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
-    DATA_ALIGNMENT_DROPPED_ROWS,
-    DEFAULT_FORWARD_FILL_WARN_THRESHOLD,
 )
 from gui.services.resource_status import (
     resolve_resource_status,
-    build_resource_reason_cards,
-    RESOURCE_MISSING_ARTIFACT,
-    RESOURCE_MEMORY_EXCEEDED,
-    RESOURCE_WORKER_CRASH,
     RESOURCE_USAGE_ARTIFACT,
-    DEFAULT_MEMORY_WARN_THRESHOLD_MB,
 )
 from gui.services.portfolio_admission_status import (
     resolve_portfolio_admission_status,
-    build_portfolio_admission_reason_cards,
-    PORTFOLIO_MISSING_ARTIFACT,
-    PORTFOLIO_CORRELATION_TOO_HIGH,
-    PORTFOLIO_MDD_EXCEEDED,
-    PORTFOLIO_INSUFFICIENT_HISTORY,
     ADMISSION_DECISION_FILE,
-    DEFAULT_CORRELATION_THRESHOLD,
-    DEFAULT_MDD_THRESHOLD,
 )
+from gui.services.gate_reason_cards_registry import build_reason_cards_for_gate
 
 CACHE_TTL_SECONDS = 2.0
 DEBUG_DERIVED_FROM = ["jobs_db", "policy_check", "artifacts_index"]
@@ -280,27 +264,9 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         job.job_id, ARTIFACT_NAME
     )
     
-    # Build reason cards for data alignment
-    reason_cards = build_data_alignment_reason_cards(
-        job_id=job.job_id,
-        status=alignment_status,
-        warn_forward_fill_ratio=DEFAULT_FORWARD_FILL_WARN_THRESHOLD,
-    )
-    # Convert to dict for serialization
-    reason_cards_dict = [
-        {
-            "code": card.code,
-            "title": card.title,
-            "severity": card.severity,
-            "why": card.why,
-            "impact": card.impact,
-            "recommended_action": card.recommended_action,
-            "evidence_artifact": card.evidence_artifact,
-            "evidence_path": card.evidence_path,
-            "action_target": card.action_target,
-        }
-        for card in reason_cards
-    ]
+    # Build reason cards for data alignment using registry
+    data_alignment_reason_cards = build_reason_cards_for_gate("data_alignment", job.job_id)
+    data_alignment_reason_cards_dict = [card.__dict__ for card in data_alignment_reason_cards]
     
     if alignment_status.status == "OK":
         ratio = alignment_status.metrics.get("forward_fill_ratio")
@@ -318,51 +284,16 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     resource_url = artifact_url_if_exists(job.job_id, RESOURCE_USAGE_ARTIFACT) or job_artifact_url(
         job.job_id, RESOURCE_USAGE_ARTIFACT
     )
-    resource_reason_cards = build_resource_reason_cards(
-        job_id=job.job_id,
-        status=resource_status,
-        warn_memory_threshold_mb=DEFAULT_MEMORY_WARN_THRESHOLD_MB,
-    )
-    resource_reason_cards_dict = [
-        {
-            "code": card.code,
-            "title": card.title,
-            "severity": card.severity,
-            "why": card.why,
-            "impact": card.impact,
-            "recommended_action": card.recommended_action,
-            "evidence_artifact": card.evidence_artifact,
-            "evidence_path": card.evidence_path,
-            "action_target": card.action_target,
-        }
-        for card in resource_reason_cards
-    ]
+    resource_reason_cards = build_reason_cards_for_gate("resource", job.job_id)
+    resource_reason_cards_dict = [card.__dict__ for card in resource_reason_cards]
 
     # Portfolio Admission status and reason cards
     admission_status = resolve_portfolio_admission_status(job.job_id)
     admission_url = artifact_url_if_exists(job.job_id, ADMISSION_DECISION_FILE) or job_artifact_url(
         job.job_id, ADMISSION_DECISION_FILE
     )
-    admission_reason_cards = build_portfolio_admission_reason_cards(
-        job_id=job.job_id,
-        status=admission_status,
-        correlation_threshold=DEFAULT_CORRELATION_THRESHOLD,
-        mdd_threshold=DEFAULT_MDD_THRESHOLD,
-    )
-    admission_reason_cards_dict = [
-        {
-            "code": card.code,
-            "title": card.title,
-            "severity": card.severity,
-            "why": card.why,
-            "impact": card.impact,
-            "recommended_action": card.recommended_action,
-            "evidence_artifact": card.evidence_artifact,
-            "evidence_path": card.evidence_path,
-            "action_target": card.action_target,
-        }
-        for card in admission_reason_cards
-    ]
+    admission_reason_cards = build_reason_cards_for_gate("portfolio_admission", job.job_id)
+    admission_reason_cards_dict = [card.__dict__ for card in admission_reason_cards]
 
     evidence = {
         "policy_check_url": artifact_url_if_exists(job_id, "policy_check.json"),
@@ -376,6 +307,27 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     }
 
     policy_stage_value = context.policy_stage or context.policy_final_stage
+
+    # Build gate_reason_cards mapping for all gates
+    gate_keys = [
+        "api_health",
+        "api_readiness",
+        "supervisor_db_ssot",
+        "worker_execution_reality",
+        "registry_surface",
+        "policy_enforcement",
+        "data_alignment",
+        "resource",
+        "portfolio_admission",
+        "slippage_stress",
+        "control_actions",
+        "shared_build",
+    ]
+    
+    gate_reason_cards: dict[str, list[dict[str, Any]]] = {}
+    for gate_key in gate_keys:
+        cards = build_reason_cards_for_gate(gate_key, job.job_id)
+        gate_reason_cards[gate_key] = [card.__dict__ for card in cards]
 
     payload: dict[str, Any] = {
         "schema_version": "1.0",
@@ -394,11 +346,12 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         },
         "evidence": evidence,
         "data_alignment_status": asdict(alignment_status),
-        "data_alignment_reason_cards": reason_cards_dict,
+        "data_alignment_reason_cards": data_alignment_reason_cards_dict,
         "resource_status": asdict(resource_status),
         "resource_reason_cards": resource_reason_cards_dict,
         "admission_status": asdict(admission_status),
         "admission_reason_cards": admission_reason_cards_dict,
+        "gate_reason_cards": gate_reason_cards,
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

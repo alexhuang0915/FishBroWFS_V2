@@ -14,9 +14,23 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from control.supervisor import submit, get_job, list_jobs
+from control.supervisor import submit, get_job
 from control.supervisor.db import SupervisorDB, get_default_db_path
 from control.supervisor.models import JobSpec
+
+
+def _wait_for_job(job_id: str, timeout: float = 1.0, interval: float = 0.05):
+    """Poll until the job record appears in the supervisor DB."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        job = get_job(job_id)
+        if job is not None:
+            return job
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            break
+        time.sleep(min(interval, remaining))
+    raise AssertionError(f"Job {job_id} did not appear in supervisor DB within {timeout:.2f}s")
 
 
 def test_submit_build_portfolio_v2_job():
@@ -35,8 +49,9 @@ def test_submit_build_portfolio_v2_job():
     
     job_id = submit("BUILD_PORTFOLIO_V2", payload)
     
+    job = _wait_for_job(job_id)
+    
     # Verify job was created
-    job = get_job(job_id)
     assert job is not None
     assert job.job_id == job_id
     assert job.job_type == "BUILD_PORTFOLIO_V2"

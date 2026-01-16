@@ -27,6 +27,7 @@ tmp/
 outputs/*
 !outputs/_dp_evidence/
 !outputs/_dp_evidence/**
+*.egg-info/
 
 # Raw data
 FishBroData/

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Callable, Dict, List
 
 from control.supervisor.models import get_job_artifact_dir
 from core.paths import get_outputs_root
@@ -11,18 +11,39 @@ from core.paths import get_outputs_root
 from gui.desktop.services.supervisor_client import get_artifacts
 from gui.services.data_alignment_status import ARTIFACT_NAME, resolve_data_alignment_status, DataAlignmentStatus
 from gui.services.explain_adapter import ExplainAdapter, JobReason
-from gui.services.gate_summary_service import fetch_gate_summary
+from gui.services.gate_summary_service import fetch_gate_summary, GateSummary
 
 logger = logging.getLogger(__name__)
 
 GATE_SUMMARY_TARGET = "gate_summary"
 EXPLAIN_TARGET_PREFIX = "explain://"
 
+# Provider type definitions
+GateProvider = Callable[[], GateSummary]
+ExplainProvider = Callable[[str], JobReason]
+ArtifactIndexProvider = Callable[[str], Dict[str, Any]]
+
 
 @dataclass(frozen=True)
 class Action:
     label: str
     target: str
+
+
+def default_gate_provider() -> GateSummary:
+    """Default gate provider bound to SSOT helper."""
+    return fetch_gate_summary()
+
+
+def default_explain_provider(job_id: str) -> JobReason:
+    """Default explain provider bound to SSOT helper."""
+    adapter = ExplainAdapter()
+    return adapter.get_job_reason(job_id)
+
+
+def default_artifact_index_provider(job_id: str) -> Dict[str, Any]:
+    """Default artifact index provider bound to SSOT helper."""
+    return get_artifacts(job_id)
 
 
 @dataclass
@@ -33,9 +54,13 @@ class ArtifactNavigatorVM:
     gate: Dict[str, Any] = field(default_factory=dict)
     explain: Dict[str, Any] = field(default_factory=dict)
     artifacts: List[Dict[str, Any]] = field(default_factory=list)
+    gate_provider: GateProvider = field(default_factory=lambda: default_gate_provider)
+    explain_provider: ExplainProvider = field(default_factory=lambda: default_explain_provider)
+    artifact_index_provider: ArtifactIndexProvider = field(default_factory=lambda: default_artifact_index_provider)
 
     def __post_init__(self):
-        self._explain_adapter = ExplainAdapter()
+        # Ensure providers are callable (they already are via defaults)
+        pass
 
     def load_for_job(self, job_id: str) -> None:
         """Load gate summary, explain context, and artifact index for a job."""
@@ -47,7 +72,7 @@ class ArtifactNavigatorVM:
 
     def _load_gate_summary(self) -> Dict[str, Any]:
         try:
-            summary = fetch_gate_summary()
+            summary = self.gate_provider()
             status = summary.overall_status.value if getattr(summary, "overall_status", None) else "UNKNOWN"
             message = getattr(summary, "overall_message", "Gate summary unavailable.")
             return {
@@ -79,7 +104,7 @@ class ArtifactNavigatorVM:
 
     def _build_explain_context(self, job_id: str, alignment: DataAlignmentStatus) -> Dict[str, Any]:
         try:
-            reason = self._explain_adapter.get_job_reason(job_id)
+            reason = self.explain_provider(job_id)
             summary = reason.summary
         except Exception:  # pragma: no cover - best effort
             logger.exception("Failed to load explain context for %s", job_id)
@@ -125,7 +150,7 @@ class ArtifactNavigatorVM:
 
     def _fetch_artifact_index(self, job_id: str) -> Dict[str, Any]:
         try:
-            index = get_artifacts(job_id)
+            index = self.artifact_index_provider(job_id)
             if isinstance(index, dict):
                 return index
         except Exception:  # pylint: disable=broad-except

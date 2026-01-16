@@ -31,6 +31,7 @@ from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
 from gui.desktop.widgets.explain_hub_widget import ExplainHubWidget
 from gui.desktop.widgets.analysis_drawer_widget import AnalysisDrawerWidget
 from gui.desktop.widgets.season_ssot_dialog import SeasonSSOTDialog
+from gui.desktop.widgets.artifact_navigator import ArtifactNavigatorDialog, GateSummaryDialog
 from gui.desktop.services.supervisor_client import (
     SupervisorClientError,
     get_registry_strategies, get_registry_instruments, get_registry_datasets,
@@ -379,11 +380,12 @@ class ActionsDelegate(QStyledItemDelegate):
             ("evidence", "Open Evidence", job.get("status") not in ["PENDING", "CREATED"]),
             ("report", "Open Report", links.get("strategy_report_v1_url") is not None),
             ("explain", "Explain Failure", status in ["FAILED", "REJECTED", "ABORTED"]),
+            ("artifacts", "Artifacts", True),
             ("abort", "Abort", abort_allowed)
         ]
         
         # Calculate button positions
-        button_width = 80
+        button_width = 70
         button_height = 24
         button_spacing = 4
         total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
@@ -455,11 +457,12 @@ class ActionsDelegate(QStyledItemDelegate):
                 ("evidence", job.get("status") not in ["PENDING", "CREATED"]),
                 ("report", links.get("strategy_report_v1_url") is not None),
                 ("explain", status in ["FAILED", "REJECTED", "ABORTED"]),
+                ("artifacts", True),
                 ("abort", abort_allowed)
             ]
             
             # Calculate button positions
-            button_width = 80
+            button_width = 70
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
@@ -506,11 +509,12 @@ class ActionsDelegate(QStyledItemDelegate):
                 ("evidence", job.get("status") not in ["PENDING", "CREATED"]),
                 ("report", links.get("strategy_report_v1_url") is not None),
                 ("explain", status in ["FAILED", "REJECTED", "ABORTED"]),
+                ("artifacts", True),
                 ("abort", abort_allowed)
             ]
             
             # Calculate button positions
-            button_width = 80
+            button_width = 70
             button_height = 24
             button_spacing = 4
             total_width = len(buttons) * button_width + (len(buttons) - 1) * button_spacing
@@ -1019,7 +1023,7 @@ class OpTab(QWidget):
         self.jobs_table.setColumnWidth(6, 90)   # Status
         self.jobs_table.setColumnWidth(7, 120)  # Created
         self.jobs_table.setColumnWidth(8, 120)  # Finished
-        self.jobs_table.setColumnWidth(9, 425)  # Actions (now 5 buttons)
+        self.jobs_table.setColumnWidth(9, 500)  # Actions (now includes artifacts button)
         
         # Add table and Explain Hub to explain group
         explain_layout = QVBoxLayout(explain_group)
@@ -1541,8 +1545,20 @@ class OpTab(QWidget):
             self.open_report(job_id)
         elif action_type == "explain":
             self.explain_failure(job_id, job)
+        elif action_type == "artifacts":
+            self.open_artifact_navigator(job_id, job)
         elif action_type == "abort":
             self.handle_abort_request(job_id, job, row)
+    
+    def open_artifact_navigator(self, job_id: str, job: Dict[str, Any]) -> None:
+        """Launch the artifact navigator dialog for a job."""
+        dialog = ArtifactNavigatorDialog(job_id, parent=self)
+        dialog.open_gate_summary.connect(self._show_gate_summary_dialog)
+        dialog.open_explain.connect(lambda jid: self.explain_failure(jid, job))
+        dialog.exec()
+
+    def _show_gate_summary_dialog(self) -> None:
+        GateSummaryDialog(self).exec()
     
     def view_logs(self, job_id: str):
         """Open log viewer dialog for a job."""

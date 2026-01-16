@@ -23,9 +23,9 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
-from control.job_artifacts import artifact_url_if_exists
-from control.reporting.io import read_job_artifact
+from control.job_artifacts import artifact_url_if_exists, job_artifact_url
 
+from gui.services.data_alignment_status import ARTIFACT_NAME, resolve_data_alignment_status
 from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
 from gui.services.explain_cache import get_cache_instance
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
@@ -466,32 +466,38 @@ class GateSummaryService:
             if not job_id:
                 continue
 
-            alignment_url = artifact_url_if_exists(job_id, "data_alignment_report.json")
-            if not alignment_url:
-                continue
-
-            report = read_job_artifact(job_id, "data_alignment_report.json") or {}
-            ratio = report.get("forward_fill_ratio")
-            dropped = report.get("dropped_rows", 0)
-
-            ratio_display = f"{ratio:.1%}" if isinstance(ratio, (int, float)) else "N/A"
-            status = (
-                GateStatus.WARN
-                if isinstance(ratio, (int, float)) and ratio > DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD
-                else GateStatus.PASS
+            alignment_status = resolve_data_alignment_status(job_id)
+            artifact_url = (
+                artifact_url_if_exists(job_id, alignment_status.artifact_relpath)
+                or job_artifact_url(job_id, alignment_status.artifact_relpath)
             )
-            message = f"Forward fill ratio {ratio_display}; dropped {dropped} rows."
-            details = {
-                "forward_fill_ratio": ratio,
-                "dropped_rows": dropped,
-                "job_id": job_id,
-            }
 
-            actions = [{"label": "Open data alignment report", "url": alignment_url}]
+            if alignment_status.status == "OK":
+                ratio = alignment_status.metrics.get("forward_fill_ratio")
+                dropped = alignment_status.metrics.get("dropped_rows", 0)
+                ratio_display = f"{ratio:.1%}" if isinstance(ratio, (int, float)) else "N/A"
+                gate_status = (
+                    GateStatus.WARN
+                    if isinstance(ratio, (int, float))
+                    and ratio > DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD
+                    else GateStatus.PASS
+                )
+                message = f"Forward fill ratio {ratio_display}; dropped {dropped} rows."
+                details = {
+                    "forward_fill_ratio": ratio,
+                    "dropped_rows": dropped,
+                    "job_id": job_id,
+                }
+            else:
+                gate_status = GateStatus.WARN
+                message = alignment_status.message
+                details = {"status": alignment_status.status, "job_id": job_id}
+
+            actions = [{"label": "Open data alignment report", "url": artifact_url}]
             return GateResult(
                 gate_id=gate_id,
                 gate_name=gate_name,
-                status=status,
+                status=gate_status,
                 message=message,
                 details=details,
                 actions=actions,

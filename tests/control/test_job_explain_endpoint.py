@@ -115,7 +115,7 @@ def test_succeeded_job_returns_policy_pass(task_client: TestClient, outputs_root
     assert body["decision_layer"] == "POLICY"
     assert body["human_tag"] == "UNKNOWN"
     assert body["recoverable"] is False
-    assert body["summary"] == "Job succeeded and policy checks passed."
+    assert body["summary"].startswith("Job succeeded and policy checks passed.")
     assert body["action_hint"].startswith("No action required")
     assert body["evidence"]["policy_check_url"] is not None
 

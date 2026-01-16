@@ -1,20 +1,16 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Dict, Iterable, Optional, Sequence
 
 from fastapi import HTTPException
 
+from control.job_artifacts import artifact_url_if_exists, evidence_bundle_url, job_artifact_url, stdout_tail_url
 from control.reporting.io import read_job_artifact
 from control.supervisor import get_job as supervisor_get_job
 from control.supervisor.models import JobRow
-
-from .job_artifacts import (
-    artifact_url_if_exists,
-    evidence_bundle_url,
-    stdout_tail_url,
-)
+from gui.services.data_alignment_status import ARTIFACT_NAME, resolve_data_alignment_status
 
 CACHE_TTL_SECONDS = 2.0
 DEBUG_DERIVED_FROM = ["jobs_db", "policy_check", "artifacts_index"]
@@ -251,16 +247,20 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     rule = _select_rule(context)
     summary = _render_summary(rule["summary_template"], context)
 
-    alignment_report = read_job_artifact(job.job_id, "data_alignment_report.json")
-    alignment_url = artifact_url_if_exists(job.job_id, "data_alignment_report.json")
-    if alignment_report:
-        ratio = alignment_report.get("forward_fill_ratio")
-        dropped = alignment_report.get("dropped_rows", 0)
+    alignment_status = resolve_data_alignment_status(job.job_id)
+    alignment_url = artifact_url_if_exists(job.job_id, ARTIFACT_NAME) or job_artifact_url(
+        job.job_id, ARTIFACT_NAME
+    )
+    if alignment_status.status == "OK":
+        ratio = alignment_status.metrics.get("forward_fill_ratio")
+        dropped = alignment_status.metrics.get("dropped_rows", 0)
         ratio_text = f"{ratio:.0%}" if isinstance(ratio, (int, float)) else "N/A"
         summary = (
             f"{summary} Data Alignment held-to-last {ratio_text} of bars; "
             f"dropped {dropped} rows."
         )
+    else:
+        summary = f"{summary} Data Alignment missing: {alignment_status.message}."
 
     evidence = {
         "policy_check_url": artifact_url_if_exists(job_id, "policy_check.json"),
@@ -289,7 +289,7 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
             "http_status": 200,
         },
         "evidence": evidence,
-        "data_alignment": alignment_report or {},
+        "data_alignment_status": asdict(alignment_status),
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

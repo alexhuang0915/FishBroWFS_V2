@@ -4,18 +4,18 @@ Gate Summary Service for UI observability.
 Provides a single SSOT client utility that fetches gate statuses from supervisor API
 and returns a pure data model suitable for UI display.
 
-Five gates:
+Six gates:
 1. API Health (/health)
 2. API Readiness (/api/v1/readiness)
 3. Supervisor DB SSOT (/api/v1/jobs)
 4. Worker Execution Reality (presence of RUNNING jobs)
 5. Registry Surface (/api/v1/registry/timeframes)
+6. Policy Enforcement (/api/v1/jobs/<job_id>/artifacts/policy_check.json)
 
 Each gate returns a GateResult with status (PASS/WARN/FAIL), human message,
 and optional drill‑down actions.
 """
 
-import json
 import logging
 import requests
 from dataclasses import dataclass
@@ -23,6 +23,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
+from gui.services.explain_cache import get_job_explain
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
 
 logger = logging.getLogger(__name__)
@@ -82,6 +83,7 @@ class GateSummaryService:
                 gates.append(self._fetch_supervisor_db_ssot())
                 gates.append(self._fetch_worker_execution_reality())
                 gates.append(self._fetch_registry_surface())
+                gates.append(self._fetch_policy_enforcement_gate())
             except SupervisorClientError as e:
                 # If any gate fails due to network/server error, we treat as overall FAIL
                 logger.error(f"Gate fetch failed: {e}")
@@ -338,6 +340,173 @@ class GateSummaryService:
                 details={"error_type": "adapter_failure", "traceback": str(e)},
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
+
+    def _fetch_policy_enforcement_gate(self) -> GateResult:
+        """Gate 6: Policy Enforcement (policy_check.json evidence)."""
+        gate_id = "policy_enforcement"
+        gate_name = "Policy Enforcement"
+        try:
+            jobs = self.client.get_jobs(limit=20)
+        except SupervisorClientError as e:
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=GateStatus.FAIL,
+                message=f"Policy enforcement gate unavailable: {e.message}",
+                details={"error_type": e.error_type, "status_code": e.status_code},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        def job_id_from(entry: dict) -> str:
+            return entry.get("job_id", "<unknown>")
+
+        sorted_jobs = sorted(jobs, key=lambda entry: entry.get("created_at", ""), reverse=True)
+
+        for job in sorted_jobs:
+            status = job.get("status")
+            policy_stage = job.get("policy_stage") or ""
+            if status == "REJECTED" and policy_stage == "preflight":
+                job_id = job_id_from(job)
+                message, actions, explain_payload = self._policy_explain_context(job_id)
+                details = {
+                    "job_id": job_id,
+                    "failure_code": job.get("failure_code"),
+                    "policy_stage": policy_stage,
+                }
+                if explain_payload:
+                    details["human_tag"] = explain_payload.get("human_tag")
+                    details["decision_layer"] = explain_payload.get("decision_layer")
+                return GateResult(
+                    gate_id=gate_id,
+                    gate_name=gate_name,
+                    status=GateStatus.FAIL,
+                    message=message,
+                    details=details,
+                    actions=actions,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+            if status == "FAILED" and policy_stage == "postflight":
+                job_id = job_id_from(job)
+                message, actions, explain_payload = self._policy_explain_context(job_id)
+                details = {
+                    "job_id": job_id,
+                    "failure_code": job.get("failure_code"),
+                    "policy_stage": policy_stage,
+                }
+                if explain_payload:
+                    details["human_tag"] = explain_payload.get("human_tag")
+                    details["decision_layer"] = explain_payload.get("decision_layer")
+                return GateResult(
+                    gate_id=gate_id,
+                    gate_name=gate_name,
+                    status=GateStatus.FAIL,
+                    message=message,
+                    details=details,
+                    actions=actions,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+
+        for job in sorted_jobs:
+            if job.get("status") == "SUCCEEDED":
+                job_id = job_id_from(job)
+                try:
+                    payload = get_job_explain(job_id)
+                except SupervisorClientError as e:
+                    message, actions, _ = self._policy_explain_context(
+                        job_id,
+                        fetch=False,
+                    )
+                    return GateResult(
+                        gate_id=gate_id,
+                        gate_name=gate_name,
+                        status=GateStatus.WARN,
+                        message=message,
+                        details={"job_id": job_id, "error": e.message},
+                        actions=actions,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    )
+                except Exception as exc:
+                    message, actions, _ = self._policy_explain_context(
+                        job_id,
+                        fetch=False,
+                    )
+                    return GateResult(
+                        gate_id=gate_id,
+                        gate_name=gate_name,
+                        status=GateStatus.WARN,
+                        message=message,
+                        details={"job_id": job_id, "error": str(exc)},
+                        actions=actions,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    )
+
+                overall_status = payload.get("final_status", "")
+                message, actions, _ = self._policy_explain_context(job_id, payload=payload)
+                details = {"job_id": job_id, "overall_status": overall_status}
+                if payload:
+                    details["decision_layer"] = payload.get("decision_layer")
+                    details["human_tag"] = payload.get("human_tag")
+
+                if overall_status == "SUCCEEDED":
+                    return GateResult(
+                        gate_id=gate_id,
+                        gate_name=gate_name,
+                        status=GateStatus.PASS,
+                        message=message,
+                        details=details,
+                        actions=actions,
+                        timestamp=datetime.now(timezone.utc).isoformat(),
+                    )
+                return GateResult(
+                    gate_id=gate_id,
+                    gate_name=gate_name,
+                    status=GateStatus.FAIL,
+                    message=message,
+                    details=details,
+                    actions=actions,
+                    timestamp=datetime.now(timezone.utc).isoformat(),
+                )
+
+        return GateResult(
+            gate_id=gate_id,
+            gate_name=gate_name,
+            status=GateStatus.PASS,
+            message="No policy enforcements detected yet.",
+            details={},
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _policy_explain_context(
+        self,
+        job_id: str,
+        *,
+        payload: Optional[Dict[str, Any]] = None,
+        fetch: bool = True,
+        fallback_message: str = "Explain unavailable; open policy evidence if present.",
+    ) -> tuple[str, Optional[List[Dict[str, str]]], Optional[Dict[str, Any]]]:
+        """Return summary message, actions, and explain payload for a job."""
+        message = fallback_message
+        action_url = f"/api/v1/jobs/{job_id}/artifacts/policy_check.json"
+        explain_payload: Optional[Dict[str, Any]] = payload
+        if explain_payload is None and fetch:
+            try:
+                explain_payload = get_job_explain(job_id)
+            except SupervisorClientError:
+                explain_payload = None
+
+        if explain_payload:
+            summary = explain_payload.get("summary")
+            if summary:
+                message = summary
+            evidence = explain_payload.get("evidence") or {}
+            action_url = evidence.get("policy_check_url") or action_url
+
+        actions = (
+            [{"label": "View policy evidence", "url": action_url}]
+            if action_url
+            else None
+        )
+        return message, actions, explain_payload
 
     def _compute_overall_status(self, gates: List[GateResult]) -> GateStatus:
         """Compute overall status from individual gates."""

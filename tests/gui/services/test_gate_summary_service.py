@@ -7,7 +7,6 @@ Tests the mapping of supervisor API responses to gate statuses.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
-
 from gui.services.supervisor_client import SupervisorClientError
 from gui.services.gate_summary_service import (
     GateSummaryService,
@@ -17,6 +16,26 @@ from gui.services.gate_summary_service import (
     get_gate_summary_service,
     fetch_gate_summary,
 )
+
+
+@pytest.fixture(autouse=True)
+def default_explain_payload(monkeypatch):
+    def _payload(job_id: str) -> dict[str, str]:
+        return {
+            "summary": f"Policy summary for {job_id}",
+            "action_hint": "Adjust parameters and resubmit.",
+            "evidence": {
+                "policy_check_url": f"/api/v1/jobs/{job_id}/artifacts/policy_check.json"
+            },
+            "decision_layer": "POLICY",
+            "human_tag": "VIOLATION",
+            "final_status": "SUCCEEDED",
+        }
+
+    monkeypatch.setattr(
+        "gui.services.gate_summary_service.get_job_explain",
+        lambda job_id: _payload(job_id),
+    )
 
 
 class TestGateSummaryService:
@@ -49,6 +68,7 @@ class TestGateSummaryService:
                 raise ValueError(f"Unexpected URL: {url}")
         mock_session.get.side_effect = side_effect
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -57,7 +77,7 @@ class TestGateSummaryService:
         # Verify overall status
         assert summary.overall_status == GateStatus.PASS
         assert "All gates PASS" in summary.overall_message
-        assert len(summary.gates) == 5
+        assert len(summary.gates) == 6
         # Check each gate status
         gate_ids = [g.gate_id for g in summary.gates]
         assert "api_health" in gate_ids
@@ -65,6 +85,9 @@ class TestGateSummaryService:
         assert "supervisor_db_ssot" in gate_ids
         assert "worker_execution_reality" in gate_ids
         assert "registry_surface" in gate_ids
+        assert "policy_enforcement" in gate_ids
+        policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
+        assert policy_gate.status == GateStatus.PASS
         for gate in summary.gates:
             assert gate.status == GateStatus.PASS
 
@@ -81,6 +104,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -104,6 +128,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -128,6 +153,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -153,6 +179,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -178,6 +205,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -203,6 +231,7 @@ class TestGateSummaryService:
         mock_response.raise_for_status.return_value = None
         mock_session.get.return_value = mock_response
         mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
         service = GateSummaryService(client=mock_client)
@@ -213,6 +242,75 @@ class TestGateSummaryService:
         assert "idle" in worker_gate.message.lower()
         assert worker_gate.details["running_count"] == 0
         assert worker_gate.details["queued_count"] == 0
+
+    def test_policy_gate_reports_preflight_rejection(self):
+        """Policy gate FAIL when preflight policy rejects a job."""
+        mock_client = Mock()
+        mock_client.health.return_value = {"status": "ok"}
+        mock_client.get_jobs.return_value = [
+            {
+                "job_id": "policy-1",
+                "status": "REJECTED",
+                "policy_stage": "preflight",
+                "failure_code": "POLICY_REJECT_MISSING_SEASON",
+                "created_at": "2026-01-01T00:00:00Z",
+            }
+        ]
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.json.return_value = {"status": "ok"}
+        mock_response.raise_for_status.return_value = None
+        mock_session.get.return_value = mock_response
+        mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
+        mock_client.base_url = "http://testserver"
+
+        service = GateSummaryService(client=mock_client)
+        summary = service.fetch()
+
+        policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
+        assert policy_gate.status == GateStatus.FAIL
+        assert policy_gate.details["policy_stage"] == "preflight"
+        assert policy_gate.message == "Policy summary for policy-1"
+        assert policy_gate.actions and policy_gate.actions[0]["url"] == "/api/v1/jobs/policy-1/artifacts/policy_check.json"
+
+    def test_policy_gate_warns_when_policy_evidence_missing(self, monkeypatch):
+        """Policy gate WARN when succeeded job lacks policy_check artifact."""
+        mock_client = Mock()
+        mock_client.health.return_value = {"status": "ok"}
+        mock_client.get_jobs.return_value = [
+            {
+                "job_id": "policy-2",
+                "status": "SUCCEEDED",
+                "created_at": "2026-01-02T00:00:00Z",
+            }
+        ]
+        mock_client.get_artifact_file.side_effect = SupervisorClientError(
+            status_code=404, message="Not found", error_type="validation"
+        )
+        mock_session = Mock()
+        mock_response = Mock()
+        mock_response.json.return_value = {"status": "ok"}
+        mock_response.raise_for_status.return_value = None
+        mock_session.get.return_value = mock_response
+        mock_client.session = mock_session
+        mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
+        mock_client.base_url = "http://testserver"
+
+        def raise_explain(job_id: str) -> dict:
+            raise SupervisorClientError(status_code=404, message="Explain missing", error_type="validation")
+
+        monkeypatch.setattr(
+            "gui.services.gate_summary_service.get_job_explain",
+            raise_explain,
+        )
+
+        service = GateSummaryService(client=mock_client)
+        summary = service.fetch()
+
+        policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
+        assert policy_gate.status == GateStatus.WARN
+        assert "explain unavailable" in policy_gate.message.lower()
 
     @patch('gui.services.registry_adapter.fetch_registry_gate_result')
     def test_fetch_registry_surface_empty(self, mock_fetch):

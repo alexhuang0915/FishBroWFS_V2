@@ -178,6 +178,10 @@ class SupervisorClient:
         """Return job details."""
         return self._get(f"/api/v1/jobs/{job_id}")
 
+    def get_job_explain(self, job_id: str) -> dict:
+        """Return explain payload for a job."""
+        return self._get(f"/api/v1/jobs/{job_id}/explain")
+
     def submit_job(self, payload: dict) -> dict:
         """Submit a job."""
         return self._post("/api/v1/jobs", payload)
@@ -370,6 +374,11 @@ def get_jobs(limit: int = 50) -> List[dict]:
 def get_job(job_id: str) -> dict:
     """Return job details."""
     return _client.get_job(job_id)
+
+
+def get_job_explain(job_id: str) -> dict:
+    """Return explain payload for a job."""
+    return _client.get_job_explain(job_id)
 
 
 def submit_job(payload: dict) -> dict:

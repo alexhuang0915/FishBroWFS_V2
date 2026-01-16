@@ -1,16 +1,36 @@
 """
 Job Status Semantic Translator – pure function mapping (status, error_details) to human-readable explanation.
 
-This is a presentation‑layer utility that derives explanations from existing data only.
-No network calls, no state changes, no branching on new fields.
+This is a presentation-layer utility that derives explanations from existing data only.
+No network calls, no state changes, no branching on new fields except Explain SSOT integration.
 """
 
 from typing import Optional, Dict, Any
 
+from gui.services.explain_cache import get_job_explain
+from gui.services.supervisor_client import SupervisorClientError
 
-def translate_job_status(status: str, error_details: Optional[Dict[str, Any]] = None) -> str:
+
+def _try_explain_summary(job_id: Optional[str]) -> tuple[Optional[str], Optional[str], bool]:
+    """Attempt to fetch Explain SSOT summary + action hint for a job."""
+    if not job_id:
+        return None, None, False
+    try:
+        payload = get_job_explain(job_id)
+        summary = payload.get("summary")
+        action_hint = payload.get("action_hint")
+        return summary, action_hint, False
+    except SupervisorClientError:
+        return None, None, True
+
+
+def translate_job_status(
+    status: str,
+    error_details: Optional[Dict[str, Any]] = None,
+    job_id: Optional[str] = None,
+) -> str:
     """
-    Return a short human‑readable explanation for a job status.
+    Return a short human-readable explanation for a job status.
 
     Parameters
     ----------
@@ -19,15 +39,19 @@ def translate_job_status(status: str, error_details: Optional[Dict[str, Any]] = 
     error_details : dict or None
         Structured error details as defined in the supervisor DB schema.
         Expected keys: "type", "msg", "pid", "traceback", "phase", "timestamp".
-
-    Returns
-    -------
-    str
-        Explanation suitable for UI display.
-        Unknown patterns fall back to a generic message.
+    job_id : Optional[str]
+        Job ID used to fetch Explain SSOT payload when available.
     """
+    summary, action_hint, explain_failed = _try_explain_summary(job_id)
+    if summary:
+        text = summary
+        if action_hint:
+            text = f"{summary} Next: {action_hint}"
+        return text
+    if explain_failed:
+        return "Explain unavailable; open policy evidence if present."
+
     if not error_details or not isinstance(error_details, dict):
-        # No error details or malformed – generic status descriptions
         if status == "SUCCEEDED":
             return "Job completed successfully."
         elif status == "RUNNING":
@@ -45,12 +69,9 @@ def translate_job_status(status: str, error_details: Optional[Dict[str, Any]] = 
         else:
             return f"Job status: {status}."
 
-    # Use error_details.type to refine explanation
     error_type = error_details.get("type")
     msg = error_details.get("msg", "")
-    phase = error_details.get("phase", "")
 
-    # Mapping based on error_type and status
     if status == "ABORTED":
         if error_type == "AbortRequested":
             if "user_abort" in msg or "user" in msg.lower():
@@ -84,39 +105,22 @@ def translate_job_status(status: str, error_details: Optional[Dict[str, Any]] = 
             return f"Job failed: {msg[:60]}"
 
     elif status == "REJECTED":
-        # Policy rejection
         if error_type == "ValidationError":
             return "Job rejected due to parameter validation failure."
         else:
             return "Job rejected (policy violation)."
 
     elif status == "SUCCEEDED":
-        # Should not have error_details, but if present, ignore
         return "Job completed successfully."
 
-    # Fallback for unknown status/type combinations
     if error_type:
         return f"{status} – {error_type}: {msg[:60]}"
     else:
         return f"{status} – {msg[:60]}" if msg else f"Job status: {status}."
 
 
-# Convenience function for UI that receives a job dict
 def explain_job(job: Dict[str, Any]) -> str:
-    """
-    Extract status and error_details from a job dict and return explanation.
-
-    Parameters
-    ----------
-    job : dict
-        Job dictionary as returned by /api/v1/jobs (must contain "status"
-        and optionally "error_details").
-
-    Returns
-    -------
-    str
-        Human‑readable explanation.
-    """
     status = job.get("status", "UNKNOWN")
     error_details = job.get("error_details")
-    return translate_job_status(status, error_details)
+    job_id = job.get("job_id")
+    return translate_job_status(status, error_details, job_id=job_id)

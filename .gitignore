@@ -25,8 +25,9 @@ tmp/
 
 # Generated artifacts (never commit)
 outputs/*
-!outputs/_dp_evidence/
-!outputs/_dp_evidence/**
+outputs/_dp_evidence/
+outputs/_dp_evidence/**
+outputs/test_artifacts/
 *.egg-info/
 
 # Raw data

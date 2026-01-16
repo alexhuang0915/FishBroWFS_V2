@@ -38,6 +38,8 @@ def test_root_hygiene_no_forbidden_files():
         '.github',
         '.vscode',
         'FishBroData',  # Data directory for the project
+        '.roo',         # Roo Code / agent configuration state directory (explicitly allowed)
+        '.qdrant_storage',  # local vector DB storage (path-sensitive; cannot be moved)
     }
     
     # Patterns that are forbidden in root

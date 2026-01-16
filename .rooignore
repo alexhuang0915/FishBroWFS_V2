@@ -4,8 +4,7 @@
 
 # 1. 封鎖所有輸出與證據檔 (這是你 17M Token 的主因)
 # AI 不需要讀它自己剛寫完的 Log 或 Report，除非你手動指定
-outputs/
-outputs/_dp_evidence/
+
 outputs/runs/
 outputs/jobs/
 outputs/jobs.db

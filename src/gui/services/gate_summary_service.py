@@ -4,13 +4,16 @@ Gate Summary Service for UI observability.
 Provides a single SSOT client utility that fetches gate statuses from supervisor API
 and returns a pure data model suitable for UI display.
 
-Six gates:
+Eight gates:
 1. API Health (/health)
 2. API Readiness (/api/v1/readiness)
 3. Supervisor DB SSOT (/api/v1/jobs)
 4. Worker Execution Reality (presence of RUNNING jobs)
 5. Registry Surface (/api/v1/registry/timeframes)
 6. Policy Enforcement (/api/v1/jobs/<job_id>/artifacts/policy_check.json)
+7. Data Alignment (data_alignment_report.json)
+8. Resource / OOM (resource_usage.json / oom_gate_decision.json)
+9. Portfolio Admission (admission_decision.json)
 
 Each gate returns a GateResult with status (PASS/WARN/FAIL), human message,
 and optional drill‑down actions.
@@ -32,6 +35,26 @@ from gui.services.data_alignment_status import (
     DATA_ALIGNMENT_MISSING,
     DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
     DATA_ALIGNMENT_DROPPED_ROWS,
+)
+from gui.services.resource_status import (
+    resolve_resource_status,
+    build_resource_reason_cards,
+    RESOURCE_MISSING_ARTIFACT,
+    RESOURCE_MEMORY_EXCEEDED,
+    RESOURCE_WORKER_CRASH,
+    RESOURCE_USAGE_ARTIFACT,
+    DEFAULT_MEMORY_WARN_THRESHOLD_MB,
+)
+from gui.services.portfolio_admission_status import (
+    resolve_portfolio_admission_status,
+    build_portfolio_admission_reason_cards,
+    PORTFOLIO_MISSING_ARTIFACT,
+    PORTFOLIO_CORRELATION_TOO_HIGH,
+    PORTFOLIO_MDD_EXCEEDED,
+    PORTFOLIO_INSUFFICIENT_HISTORY,
+    ADMISSION_DECISION_FILE,
+    DEFAULT_CORRELATION_THRESHOLD,
+    DEFAULT_MDD_THRESHOLD,
 )
 from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
 from gui.services.explain_cache import get_cache_instance
@@ -100,6 +123,8 @@ class GateSummaryService:
                 gates.append(self._fetch_registry_surface())
                 gates.append(self._fetch_policy_enforcement_gate())
                 gates.append(self._fetch_data_alignment_gate())
+                gates.append(self._fetch_resource_gate())
+                gates.append(self._fetch_portfolio_admission_gate())
             except SupervisorClientError as e:
                 # If any gate fails due to network/server error, we treat as overall FAIL
                 logger.error(f"Gate fetch failed: {e}")
@@ -544,6 +569,199 @@ class GateSummaryService:
             gate_name=gate_name,
             status=GateStatus.WARN,
             message="Data alignment report not available for recent jobs.",
+            details={},
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _fetch_resource_gate(self) -> GateResult:
+        """Gate 8: Resource / OOM (resource usage and OOM decisions)."""
+        gate_id = "resource"
+        gate_name = "Resource / OOM"
+        try:
+            jobs = self.client.get_jobs(limit=20)
+        except SupervisorClientError as e:
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=GateStatus.WARN,
+                message=f"Resource gate unavailable: {e.message}",
+                details={"error_type": e.error_type, "status_code": e.status_code},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        sorted_jobs = sorted(jobs, key=lambda entry: entry.get("created_at", ""), reverse=True)
+        for job in sorted_jobs:
+            job_id = job.get("job_id")
+            if not job_id:
+                continue
+
+            resource_status = resolve_resource_status(job_id)
+            artifact_url = (
+                artifact_url_if_exists(job_id, resource_status.artifact_relpath)
+                or job_artifact_url(job_id, resource_status.artifact_relpath)
+            )
+
+            # Build reason cards
+            reason_cards = build_resource_reason_cards(
+                job_id=job_id,
+                status=resource_status,
+                warn_memory_threshold_mb=DEFAULT_MEMORY_WARN_THRESHOLD_MB,
+            )
+            
+            reason_cards_dict = [
+                {
+                    "code": card.code,
+                    "title": card.title,
+                    "severity": card.severity,
+                    "why": card.why,
+                    "impact": card.impact,
+                    "recommended_action": card.recommended_action,
+                    "evidence_artifact": card.evidence_artifact,
+                    "evidence_path": card.evidence_path,
+                    "action_target": card.action_target,
+                }
+                for card in reason_cards
+            ]
+
+            if resource_status.status == "OK":
+                peak_memory = resource_status.metrics.get("peak_memory_mb")
+                limit_mb = resource_status.metrics.get("limit_mb")
+                worker_crash = resource_status.metrics.get("worker_crash", False)
+                gate_status = GateStatus.PASS
+                if peak_memory is not None and limit_mb is not None and peak_memory > limit_mb:
+                    gate_status = GateStatus.WARN
+                if worker_crash:
+                    gate_status = GateStatus.FAIL
+                message = f"Peak memory {peak_memory}MB, limit {limit_mb}MB"
+                details = {
+                    "peak_memory_mb": peak_memory,
+                    "limit_mb": limit_mb,
+                    "worker_crash": worker_crash,
+                    "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
+                }
+            else:
+                gate_status = GateStatus.WARN if resource_status.status == "WARN" else GateStatus.FAIL
+                message = resource_status.message
+                details = {
+                    "status": resource_status.status,
+                    "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
+                }
+
+            actions = [{"label": "Open resource report", "url": artifact_url}]
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=gate_status,
+                message=message,
+                details=details,
+                actions=actions,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        return GateResult(
+            gate_id=gate_id,
+            gate_name=gate_name,
+            status=GateStatus.WARN,
+            message="Resource usage report not available for recent jobs.",
+            details={},
+            timestamp=datetime.now(timezone.utc).isoformat(),
+        )
+
+    def _fetch_portfolio_admission_gate(self) -> GateResult:
+        """Gate 9: Portfolio Admission (admission decision)."""
+        gate_id = "portfolio_admission"
+        gate_name = "Portfolio Admission"
+        try:
+            jobs = self.client.get_jobs(limit=20)
+        except SupervisorClientError as e:
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=GateStatus.WARN,
+                message=f"Portfolio admission gate unavailable: {e.message}",
+                details={"error_type": e.error_type, "status_code": e.status_code},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        sorted_jobs = sorted(jobs, key=lambda entry: entry.get("created_at", ""), reverse=True)
+        for job in sorted_jobs:
+            job_id = job.get("job_id")
+            if not job_id:
+                continue
+
+            admission_status = resolve_portfolio_admission_status(job_id)
+            artifact_url = (
+                artifact_url_if_exists(job_id, admission_status.artifact_relpath)
+                or job_artifact_url(job_id, admission_status.artifact_relpath)
+            )
+
+            # Build reason cards
+            reason_cards = build_portfolio_admission_reason_cards(
+                job_id=job_id,
+                status=admission_status,
+                correlation_threshold=DEFAULT_CORRELATION_THRESHOLD,
+                mdd_threshold=DEFAULT_MDD_THRESHOLD,
+            )
+            
+            reason_cards_dict = [
+                {
+                    "code": card.code,
+                    "title": card.title,
+                    "severity": card.severity,
+                    "why": card.why,
+                    "impact": card.impact,
+                    "recommended_action": card.recommended_action,
+                    "evidence_artifact": card.evidence_artifact,
+                    "evidence_path": card.evidence_path,
+                    "action_target": card.action_target,
+                }
+                for card in reason_cards
+            ]
+
+            if admission_status.status == "OK":
+                verdict = admission_status.metrics.get("verdict")
+                correlation_violations = admission_status.metrics.get("correlation_violations", [])
+                risk_budget_steps = admission_status.metrics.get("risk_budget_steps", [])
+                gate_status = GateStatus.PASS
+                if verdict == "REJECTED":
+                    gate_status = GateStatus.FAIL
+                elif correlation_violations or risk_budget_steps:
+                    gate_status = GateStatus.WARN
+                message = f"Portfolio admission verdict: {verdict}"
+                details = {
+                    "verdict": verdict,
+                    "correlation_violations": correlation_violations,
+                    "risk_budget_steps": risk_budget_steps,
+                    "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
+                }
+            else:
+                gate_status = GateStatus.WARN if admission_status.status == "WARN" else GateStatus.FAIL
+                message = admission_status.message
+                details = {
+                    "status": admission_status.status,
+                    "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
+                }
+
+            actions = [{"label": "Open admission decision", "url": artifact_url}]
+            return GateResult(
+                gate_id=gate_id,
+                gate_name=gate_name,
+                status=gate_status,
+                message=message,
+                details=details,
+                actions=actions,
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            )
+
+        return GateResult(
+            gate_id=gate_id,
+            gate_name=gate_name,
+            status=GateStatus.WARN,
+            message="Portfolio admission decision not available for recent jobs.",
             details={},
             timestamp=datetime.now(timezone.utc).isoformat(),
         )

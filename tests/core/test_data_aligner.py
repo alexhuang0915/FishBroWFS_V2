@@ -7,7 +7,7 @@ from core.data_aligner import DataAligner
 
 def test_aligner_hold_metrics():
     data1 = pd.DataFrame({
-        "ts": pd.date_range("2026-01-01T00:00:00", periods=5, freq="T"),
+        "ts": pd.date_range("2026-01-01T00:00:00", periods=5, freq="min"),
         "open": [1, 2, 3, 4, 5],
         "high": [1, 2, 3, 4, 5],
         "low": [1, 2, 3, 4, 5],

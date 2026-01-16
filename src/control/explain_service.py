@@ -19,6 +19,26 @@ from gui.services.data_alignment_status import (
     DATA_ALIGNMENT_DROPPED_ROWS,
     DEFAULT_FORWARD_FILL_WARN_THRESHOLD,
 )
+from gui.services.resource_status import (
+    resolve_resource_status,
+    build_resource_reason_cards,
+    RESOURCE_MISSING_ARTIFACT,
+    RESOURCE_MEMORY_EXCEEDED,
+    RESOURCE_WORKER_CRASH,
+    RESOURCE_USAGE_ARTIFACT,
+    DEFAULT_MEMORY_WARN_THRESHOLD_MB,
+)
+from gui.services.portfolio_admission_status import (
+    resolve_portfolio_admission_status,
+    build_portfolio_admission_reason_cards,
+    PORTFOLIO_MISSING_ARTIFACT,
+    PORTFOLIO_CORRELATION_TOO_HIGH,
+    PORTFOLIO_MDD_EXCEEDED,
+    PORTFOLIO_INSUFFICIENT_HISTORY,
+    ADMISSION_DECISION_FILE,
+    DEFAULT_CORRELATION_THRESHOLD,
+    DEFAULT_MDD_THRESHOLD,
+)
 
 CACHE_TTL_SECONDS = 2.0
 DEBUG_DERIVED_FROM = ["jobs_db", "policy_check", "artifacts_index"]
@@ -293,6 +313,57 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     else:
         summary = f"{summary} Data Alignment missing: {alignment_status.message}."
 
+    # Resource / OOM status and reason cards
+    resource_status = resolve_resource_status(job.job_id)
+    resource_url = artifact_url_if_exists(job.job_id, RESOURCE_USAGE_ARTIFACT) or job_artifact_url(
+        job.job_id, RESOURCE_USAGE_ARTIFACT
+    )
+    resource_reason_cards = build_resource_reason_cards(
+        job_id=job.job_id,
+        status=resource_status,
+        warn_memory_threshold_mb=DEFAULT_MEMORY_WARN_THRESHOLD_MB,
+    )
+    resource_reason_cards_dict = [
+        {
+            "code": card.code,
+            "title": card.title,
+            "severity": card.severity,
+            "why": card.why,
+            "impact": card.impact,
+            "recommended_action": card.recommended_action,
+            "evidence_artifact": card.evidence_artifact,
+            "evidence_path": card.evidence_path,
+            "action_target": card.action_target,
+        }
+        for card in resource_reason_cards
+    ]
+
+    # Portfolio Admission status and reason cards
+    admission_status = resolve_portfolio_admission_status(job.job_id)
+    admission_url = artifact_url_if_exists(job.job_id, ADMISSION_DECISION_FILE) or job_artifact_url(
+        job.job_id, ADMISSION_DECISION_FILE
+    )
+    admission_reason_cards = build_portfolio_admission_reason_cards(
+        job_id=job.job_id,
+        status=admission_status,
+        correlation_threshold=DEFAULT_CORRELATION_THRESHOLD,
+        mdd_threshold=DEFAULT_MDD_THRESHOLD,
+    )
+    admission_reason_cards_dict = [
+        {
+            "code": card.code,
+            "title": card.title,
+            "severity": card.severity,
+            "why": card.why,
+            "impact": card.impact,
+            "recommended_action": card.recommended_action,
+            "evidence_artifact": card.evidence_artifact,
+            "evidence_path": card.evidence_path,
+            "action_target": card.action_target,
+        }
+        for card in admission_reason_cards
+    ]
+
     evidence = {
         "policy_check_url": artifact_url_if_exists(job_id, "policy_check.json"),
         "manifest_url": artifact_url_if_exists(job_id, "manifest.json"),
@@ -300,6 +371,8 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         "stdout_tail_url": stdout_tail_url(job_id),
         "evidence_bundle_url": evidence_bundle_url(job_id),
         "data_alignment_url": alignment_url,
+        "resource_url": resource_url,
+        "admission_url": admission_url,
     }
 
     policy_stage_value = context.policy_stage or context.policy_final_stage
@@ -322,6 +395,10 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         "evidence": evidence,
         "data_alignment_status": asdict(alignment_status),
         "data_alignment_reason_cards": reason_cards_dict,
+        "resource_status": asdict(resource_status),
+        "resource_reason_cards": resource_reason_cards_dict,
+        "admission_status": asdict(admission_status),
+        "admission_reason_cards": admission_reason_cards_dict,
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

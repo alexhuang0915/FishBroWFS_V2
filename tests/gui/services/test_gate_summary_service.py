@@ -100,6 +100,28 @@ class TestGateSummaryService:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             ),
         )
+        monkeypatch.setattr(
+            "gui.services.gate_summary_service.GateSummaryService._fetch_resource_gate",
+            lambda self: GateResult(
+                gate_id="resource",
+                gate_name="Resource / OOM",
+                status=GateStatus.PASS,
+                message="Resource gate stubbed for tests.",
+                details={},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ),
+        )
+        monkeypatch.setattr(
+            "gui.services.gate_summary_service.GateSummaryService._fetch_portfolio_admission_gate",
+            lambda self: GateResult(
+                gate_id="portfolio_admission",
+                gate_name="Portfolio Admission",
+                status=GateStatus.PASS,
+                message="Portfolio admission gate stubbed for tests.",
+                details={},
+                timestamp=datetime.now(timezone.utc).isoformat(),
+            ),
+        )
 
         service = GateSummaryService(client=mock_client)
         summary = service.fetch()
@@ -107,7 +129,7 @@ class TestGateSummaryService:
         # Verify overall status
         assert summary.overall_status == GateStatus.PASS
         assert "All gates PASS" in summary.overall_message
-        assert len(summary.gates) == 7
+        assert len(summary.gates) == 9
         # Check each gate status
         gate_ids = [g.gate_id for g in summary.gates]
         assert "api_health" in gate_ids
@@ -117,6 +139,8 @@ class TestGateSummaryService:
         assert "registry_surface" in gate_ids
         assert "policy_enforcement" in gate_ids
         assert "data_alignment" in gate_ids
+        assert "resource" in gate_ids
+        assert "portfolio_admission" in gate_ids
         policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
         assert policy_gate.status == GateStatus.PASS
         for gate in summary.gates:

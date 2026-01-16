@@ -23,10 +23,13 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional, List, Dict, Any
 
-from gui.services.explain_cache import get_job_explain
+from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
+from gui.services.explain_cache import get_cache_instance
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
 
 logger = logging.getLogger(__name__)
+
+_explain_adapter = ExplainAdapter(cache=get_cache_instance())
 
 
 class GateStatus(str, Enum):
@@ -374,8 +377,8 @@ class GateSummaryService:
                     "policy_stage": policy_stage,
                 }
                 if explain_payload:
-                    details["human_tag"] = explain_payload.get("human_tag")
-                    details["decision_layer"] = explain_payload.get("decision_layer")
+                    details["human_tag"] = explain_payload.human_tag
+                    details["decision_layer"] = explain_payload.decision_layer
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
@@ -394,8 +397,8 @@ class GateSummaryService:
                     "policy_stage": policy_stage,
                 }
                 if explain_payload:
-                    details["human_tag"] = explain_payload.get("human_tag")
-                    details["decision_layer"] = explain_payload.get("decision_layer")
+                    details["human_tag"] = explain_payload.human_tag
+                    details["decision_layer"] = explain_payload.decision_layer
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
@@ -409,58 +412,17 @@ class GateSummaryService:
         for job in sorted_jobs:
             if job.get("status") == "SUCCEEDED":
                 job_id = job_id_from(job)
-                try:
-                    payload = get_job_explain(job_id)
-                except SupervisorClientError as e:
-                    message, actions, _ = self._policy_explain_context(
-                        job_id,
-                        fetch=False,
-                    )
-                    return GateResult(
-                        gate_id=gate_id,
-                        gate_name=gate_name,
-                        status=GateStatus.WARN,
-                        message=message,
-                        details={"job_id": job_id, "error": e.message},
-                        actions=actions,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    )
-                except Exception as exc:
-                    message, actions, _ = self._policy_explain_context(
-                        job_id,
-                        fetch=False,
-                    )
-                    return GateResult(
-                        gate_id=gate_id,
-                        gate_name=gate_name,
-                        status=GateStatus.WARN,
-                        message=message,
-                        details={"job_id": job_id, "error": str(exc)},
-                        actions=actions,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    )
+                message, actions, explain_payload = self._policy_explain_context(job_id)
+                details = {"job_id": job_id, "overall_status": job.get("status")}
+                if explain_payload:
+                    details["decision_layer"] = explain_payload.decision_layer
+                    details["human_tag"] = explain_payload.human_tag
 
-                overall_status = payload.get("final_status", "")
-                message, actions, _ = self._policy_explain_context(job_id, payload=payload)
-                details = {"job_id": job_id, "overall_status": overall_status}
-                if payload:
-                    details["decision_layer"] = payload.get("decision_layer")
-                    details["human_tag"] = payload.get("human_tag")
-
-                if overall_status == "SUCCEEDED":
-                    return GateResult(
-                        gate_id=gate_id,
-                        gate_name=gate_name,
-                        status=GateStatus.PASS,
-                        message=message,
-                        details=details,
-                        actions=actions,
-                        timestamp=datetime.now(timezone.utc).isoformat(),
-                    )
+                status = GateStatus.WARN if explain_payload and explain_payload.fallback else GateStatus.PASS
                 return GateResult(
                     gate_id=gate_id,
                     gate_name=gate_name,
-                    status=GateStatus.FAIL,
+                    status=status,
                     message=message,
                     details=details,
                     actions=actions,
@@ -480,33 +442,23 @@ class GateSummaryService:
         self,
         job_id: str,
         *,
-        payload: Optional[Dict[str, Any]] = None,
-        fetch: bool = True,
-        fallback_message: str = "Explain unavailable; open policy evidence if present.",
-    ) -> tuple[str, Optional[List[Dict[str, str]]], Optional[Dict[str, Any]]]:
-        """Return summary message, actions, and explain payload for a job."""
-        message = fallback_message
-        action_url = f"/api/v1/jobs/{job_id}/artifacts/policy_check.json"
-        explain_payload: Optional[Dict[str, Any]] = payload
-        if explain_payload is None and fetch:
-            try:
-                explain_payload = get_job_explain(job_id)
-            except SupervisorClientError:
-                explain_payload = None
-
-        if explain_payload:
-            summary = explain_payload.get("summary")
-            if summary:
-                message = summary
-            evidence = explain_payload.get("evidence") or {}
-            action_url = evidence.get("policy_check_url") or action_url
-
+        fallback_message: str = FALLBACK_SUMMARY,
+    ) -> tuple[str, Optional[List[Dict[str, str]]], JobReason]:
+        """Return summary message, actions, and JobReason for a job."""
+        try:
+            reason = _explain_adapter.get_job_reason(job_id)
+        except SupervisorClientError:
+            reason = _explain_adapter.fallback_reason(job_id)
+        message = reason.summary or fallback_message
+        if reason.action_hint:
+            message = f"{message} Next: {reason.action_hint}"
+        action_url = reason.evidence_urls.get("policy_check_url")
         actions = (
             [{"label": "View policy evidence", "url": action_url}]
             if action_url
             else None
         )
-        return message, actions, explain_payload
+        return message, actions, reason
 
     def _compute_overall_status(self, gates: List[GateResult]) -> GateStatus:
         """Compute overall status from individual gates."""

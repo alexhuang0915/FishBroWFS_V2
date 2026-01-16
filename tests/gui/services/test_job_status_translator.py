@@ -4,10 +4,30 @@ Unit tests for job_status_translator.
 
 import pytest
 from gui.services.job_status_translator import translate_job_status
+from gui.services.explain_adapter import JobReason
 
 
 class TestJobStatusTranslator:
     """Test suite for translate_job_status."""
+
+    def test_job_reason_adapter_used(self, monkeypatch):
+        reason = JobReason(
+            job_id="job-1",
+            summary="Adapter summary",
+            action_hint="Resubmit with fix",
+            decision_layer="POLICY",
+            human_tag="VIOLATION",
+            recoverable=True,
+            evidence_urls={},
+            fallback=False,
+        )
+        monkeypatch.setattr(
+            "gui.services.job_status_translator._explain_adapter.get_job_reason",
+            lambda _: reason,
+        )
+        result = translate_job_status("FAILED", None, job_id="job-1")
+        assert "adapter summary" in result.lower()
+        assert "next: resubmit with fix" in result.lower()
 
     def test_success(self):
         """SUCCEEDED status."""

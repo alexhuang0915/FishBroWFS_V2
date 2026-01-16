@@ -7,6 +7,7 @@ Tests the mapping of supervisor API responses to gate statuses.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime, timezone
+from gui.services.explain_adapter import JobReason
 from gui.services.supervisor_client import SupervisorClientError
 from gui.services.gate_summary_service import (
     GateSummaryService,
@@ -32,9 +33,26 @@ def default_explain_payload(monkeypatch):
             "final_status": "SUCCEEDED",
         }
 
+    def reason(job_id: str) -> JobReason:
+        payload = _payload(job_id)
+        return JobReason(
+            job_id=job_id,
+            summary=payload["summary"],
+            action_hint=payload["action_hint"],
+            decision_layer=payload["decision_layer"],
+            human_tag=payload["human_tag"],
+            recoverable=False,
+            evidence_urls={
+                "policy_check_url": payload["evidence"]["policy_check_url"],
+                "manifest_url": None,
+                "inputs_fingerprint_url": None,
+            },
+            fallback=False,
+        )
+
     monkeypatch.setattr(
-        "gui.services.gate_summary_service.get_job_explain",
-        lambda job_id: _payload(job_id),
+        "gui.services.gate_summary_service._explain_adapter.get_job_reason",
+        reason,
     )
 
 
@@ -271,7 +289,8 @@ class TestGateSummaryService:
         policy_gate = next(g for g in summary.gates if g.gate_id == "policy_enforcement")
         assert policy_gate.status == GateStatus.FAIL
         assert policy_gate.details["policy_stage"] == "preflight"
-        assert policy_gate.message == "Policy summary for policy-1"
+        assert "policy summary for policy-1" in policy_gate.message.lower()
+        assert "next: adjust parameters and resubmit." in policy_gate.message.lower()
         assert policy_gate.actions and policy_gate.actions[0]["url"] == "/api/v1/jobs/policy-1/artifacts/policy_check.json"
 
     def test_policy_gate_warns_when_policy_evidence_missing(self, monkeypatch):
@@ -297,12 +316,11 @@ class TestGateSummaryService:
         mock_client.get_artifact_file.return_value = b'{"overall_status": "PASS"}'
         mock_client.base_url = "http://testserver"
 
-        def raise_explain(job_id: str) -> dict:
-            raise SupervisorClientError(status_code=404, message="Explain missing", error_type="validation")
-
         monkeypatch.setattr(
-            "gui.services.gate_summary_service.get_job_explain",
-            raise_explain,
+            "gui.services.gate_summary_service._explain_adapter.get_job_reason",
+            lambda _: (_ for _ in ()).throw(
+                SupervisorClientError(status_code=404, message="Explain missing", error_type="validation")
+            ),
         )
 
         service = GateSummaryService(client=mock_client)

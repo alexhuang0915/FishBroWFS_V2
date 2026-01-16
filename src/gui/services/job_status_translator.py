@@ -2,24 +2,26 @@
 Job Status Semantic Translator – pure function mapping (status, error_details) to human-readable explanation.
 
 This is a presentation-layer utility that derives explanations from existing data only.
-No network calls, no state changes, no branching on new fields except Explain SSOT integration.
+It relies on ExplainAdapter when job_id is available to surface SSOT summaries.
 """
 
 from typing import Optional, Dict, Any
 
-from gui.services.explain_cache import get_job_explain
+from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY
 from gui.services.supervisor_client import SupervisorClientError
+from gui.services.explain_cache import get_cache_instance
+
+
+_explain_adapter = ExplainAdapter(cache=get_cache_instance())
 
 
 def _try_explain_summary(job_id: Optional[str]) -> tuple[Optional[str], Optional[str], bool]:
-    """Attempt to fetch Explain SSOT summary + action hint for a job."""
+    """Attempt to fetch ExplainAdapter summary + action hint for a job."""
     if not job_id:
         return None, None, False
     try:
-        payload = get_job_explain(job_id)
-        summary = payload.get("summary")
-        action_hint = payload.get("action_hint")
-        return summary, action_hint, False
+        reason = _explain_adapter.get_job_reason(job_id)
+        return reason.summary, reason.action_hint, reason.fallback
     except SupervisorClientError:
         return None, None, True
 
@@ -49,7 +51,7 @@ def translate_job_status(
             text = f"{summary} Next: {action_hint}"
         return text
     if explain_failed:
-        return "Explain unavailable; open policy evidence if present."
+        return FALLBACK_SUMMARY
 
     if not error_details or not isinstance(error_details, dict):
         if status == "SUCCEEDED":

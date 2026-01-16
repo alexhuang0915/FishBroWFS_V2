@@ -3,7 +3,7 @@
     "test": "integration",
     "strategy": "S1",
     "timestamp": "2026-01-15",
-    "created_at": "2026-01-16T09:55:02.178934",
+    "created_at": "2026-01-16T00:49:55.324562",
     "red_team_version": "1.0",
     "config": {
       "enable_scoring_guards": true,
@@ -65,7 +65,7 @@
         "structure_test": false,
         "artifact_compliance": false
       },
-      "timestamp": "2026-01-16T09:55:02.178791"
+      "timestamp": "2026-01-16T00:49:55.324423"
     }
   },
   "delta_report": {
@@ -73,11 +73,6 @@
     "current_hash": "d79f73467b529c78",
     "hashes_match": false,
     "changes": {
-      "trades": {
-        "action": "modified",
-        "old_value": 70,
-        "new_value": 75
-      },
       "net_profit": {
         "action": "added",
         "value": 2500.0
@@ -90,6 +85,11 @@
         "action": "modified",
         "old_value": 80.0,
         "new_value": 14.596441543658251
+      },
+      "trades": {
+        "action": "modified",
+        "old_value": 70,
+        "new_value": 75
       }
     },
     "summary": {
@@ -98,11 +98,11 @@
       "modified": 2,
       "total_changes": 4
     },
-    "timestamp": "2026-01-16T09:55:02.178930"
+    "timestamp": "2026-01-16T00:49:55.324558"
   },
   "validation_checks": {
     "structure_valid": true,
     "governance_compliant": true
   },
-  "integrity_hash": "0c4e00fdb5bc55eb981565f9b0014557"
+  "integrity_hash": "48e342a899141b0649e657d2f24376a7"
 }

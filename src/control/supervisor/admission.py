@@ -17,6 +17,7 @@ from contracts.supervisor.evidence_schemas import (
     now_iso,
 )
 from control.rejection_artifact import create_policy_rejection, write_rejection_artifact
+from control.policy_enforcement import PolicyResult, write_policy_check_artifact
 
 
 class AdmissionController:
@@ -174,6 +175,18 @@ def submit_with_admission(
     
     params_hash = stable_params_hash(spec.params)
     
+    def _preflight_results() -> list[PolicyResult]:
+        return [
+            PolicyResult(
+                allowed=check.passed,
+                code=check.policy_name,
+                message=check.message,
+                details={"checked_at": check.checked_at},
+                stage="preflight",
+            )
+            for check in bundle.pre_flight_checks
+        ]
+
     if not bundle.downstream_admissible:
         # Job should be REJECTED
         rejection_reason = "Failed pre-flight policies"
@@ -183,11 +196,19 @@ def submit_with_admission(
         job_evidence_dir = Path(evidence_dir) / job_id
         job_evidence_dir.mkdir(parents=True, exist_ok=True)
         
-        # Write policy_check.json
-        policy_check_path = job_evidence_dir / "policy_check.json"
-        with open(policy_check_path, 'w') as f:
-            json.dump(asdict(bundle), f, indent=2)
-        
+        failed_policies = [check.policy_name for check in bundle.pre_flight_checks if not check.passed]
+        write_policy_check_artifact(
+            job_id,
+            spec.job_type,
+            preflight_results=_preflight_results(),
+            final_reason={
+                "policy_stage": "preflight",
+                "failure_code": "POLICY_REJECT_PRE_FLIGHT",
+                "failure_message": rejection_reason,
+                "failure_details": {"failed_policies": failed_policies},
+            },
+            extra_paths=(job_evidence_dir,),
+        )
         # Write inputs_fingerprint.json
         inputs_fingerprint = {
             "params_hash": params_hash,
@@ -212,7 +233,6 @@ def submit_with_admission(
             json.dump(manifest, f, indent=2)
         
         # Write standardized rejection artifact
-        failed_policies = [check.policy_name for check in bundle.pre_flight_checks if not check.passed]
         rejection_artifact = create_policy_rejection(
             policy_name="pre_flight_policies",
             failure_message=f"Failed pre-flight policies: {', '.join(failed_policies)}",
@@ -234,9 +254,16 @@ def submit_with_admission(
         job_evidence_dir = Path(evidence_dir) / job_id
         job_evidence_dir.mkdir(parents=True, exist_ok=True)
         
-        # Write policy_check.json (pre-flight only)
-        policy_check_path = job_evidence_dir / "policy_check.json"
-        with open(policy_check_path, 'w') as f:
-            json.dump(asdict(bundle), f, indent=2)
-        
+        write_policy_check_artifact(
+            job_id,
+            spec.job_type,
+            preflight_results=_preflight_results(),
+            final_reason={
+                "policy_stage": "",
+                "failure_code": "",
+                "failure_message": "",
+                "failure_details": {},
+            },
+            extra_paths=(job_evidence_dir,),
+        )
         return job_id, JobStatus.QUEUED, bundle

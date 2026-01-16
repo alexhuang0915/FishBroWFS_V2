@@ -92,14 +92,12 @@ def test_rejected_job_evidence_completeness():
         # Check policy_check.json
         with open(job_evidence_dir / "policy_check.json", 'r') as f:
             policy_check = json.load(f)
-            assert "pre_flight_checks" in policy_check
-            assert "downstream_admissible" in policy_check
-            assert policy_check["downstream_admissible"] is False
-            
-            # Should have at least one failed check
+            assert "preflight" in policy_check
+            assert policy_check["overall_status"] == "FAIL"
+            assert policy_check["final_reason"]["policy_stage"] == "preflight"
             failed_checks = [
-                c for c in policy_check["pre_flight_checks"]
-                if not c["passed"]
+                c for c in policy_check["preflight"]
+                if c["status"] == "FAIL"
             ]
             assert len(failed_checks) > 0, "Should have failed checks"
         

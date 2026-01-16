@@ -1,6 +1,7 @@
 {
   "root_path": "/home/fishbro/FishBroWFS_V2",
   "allowed_files": [
+    ".cursorignore",
     ".gitattributes",
     ".gitignore",
     ".pre-commit-config.yaml",
@@ -48,6 +49,7 @@
     "examples"
   ],
   "actual_items": [
+    ".cursorignore",
     ".gitattributes",
     ".github",
     ".gitignore",
@@ -68,5 +70,5 @@
     "tests"
   ],
   "violations": [],
-  "timestamp": "2026-01-15T23:14:50.298217"
+  "timestamp": "2026-01-16T09:54:27.033927"
 }

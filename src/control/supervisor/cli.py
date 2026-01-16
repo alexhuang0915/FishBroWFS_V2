@@ -5,13 +5,15 @@ Supervisor CLI for submitting, listing, and aborting jobs.
 from __future__ import annotations
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional, List
 
 from .db import SupervisorDB, get_default_db_path
-from .models import JobSpec, JobRow, JobState, JobStatus, JobType, normalize_job_type
-from .job_handler import validate_job_spec
+from .models import JobRow, JobState, JobStatus
+from . import submit
+from ..policy_enforcement import PolicyEnforcementError
 
 
 def submit_job(db_path: Path, job_type: str, params_json: str, metadata_json: Optional[str] = None) -> str:
@@ -20,23 +22,24 @@ def submit_job(db_path: Path, job_type: str, params_json: str, metadata_json: Op
         params = json.loads(params_json)
     except json.JSONDecodeError as e:
         raise ValueError(f"Invalid params JSON: {e}")
-    
+
     metadata = {}
     if metadata_json:
         try:
             metadata = json.loads(metadata_json)
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid metadata JSON: {e}")
-    
-    # Convert string to canonical JobType enum (including legacy aliases)
-    canonical_job_type = normalize_job_type(job_type)
-    
-    spec = JobSpec(job_type=canonical_job_type, params=params, metadata=metadata)
-    validate_job_spec(spec)
-    
-    db = SupervisorDB(db_path)
-    job_id = db.submit_job(spec)
-    return job_id
+
+    outputs_root = db_path.parent.resolve()
+    old_outputs = os.environ.get("FISHBRO_OUTPUTS_ROOT")
+    os.environ["FISHBRO_OUTPUTS_ROOT"] = str(outputs_root)
+    try:
+        return submit(job_type, params, metadata)
+    finally:
+        if old_outputs is None:
+            os.environ.pop("FISHBRO_OUTPUTS_ROOT", None)
+        else:
+            os.environ["FISHBRO_OUTPUTS_ROOT"] = old_outputs
 
 
 def list_jobs(db_path: Path, state: Optional[str] = None) -> List[JobRow]:
@@ -149,6 +152,10 @@ def main() -> int:
                 print(f"Job {args.job_id} not found or not abortable", file=sys.stderr)
                 return 1
         
+    except PolicyEnforcementError as e:
+        print(f"ERROR: policy enforcement failed ({e.result.code}): {e.result.message}", file=sys.stderr)
+        print(f"Job recorded as {e.job_id} with stage {e.result.stage}", file=sys.stderr)
+        return 1
     except Exception as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1

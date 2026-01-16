@@ -8,6 +8,8 @@ from pathlib import Path
 from .models import JobSpec, JobRow, SubmitResult, JobType, normalize_job_type
 from .db import SupervisorDB, get_default_db_path
 from .job_handler import register_handler, get_handler, validate_job_spec
+from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError, write_policy_check_artifact
+from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError
 
 
 # Import and register built-in handlers
@@ -46,9 +48,39 @@ def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:
     
     spec = JobSpec(job_type=canonical_job_type, params=params, metadata=metadata)
     validate_job_spec(spec)
-    
+
+    policy_result = evaluate_preflight(spec)
     db = SupervisorDB(get_default_db_path())
-    return db.submit_job(spec)
+    if not policy_result.allowed:
+        job_id = db.submit_rejected_job(
+            spec,
+            "",
+            policy_result.message,
+            failure_code=policy_result.code,
+            failure_message=policy_result.message,
+            failure_details=policy_result.details,
+            policy_stage=policy_result.stage,
+        )
+        write_policy_check_artifact(
+            job_id,
+            spec.job_type,
+            preflight_results=[policy_result],
+            final_reason={
+                "policy_stage": policy_result.stage,
+                "failure_code": policy_result.code,
+                "failure_message": policy_result.message,
+                "failure_details": policy_result.details,
+            },
+        )
+        raise PolicyEnforcementError(job_id, policy_result)
+
+    job_id = db.submit_job(spec)
+    write_policy_check_artifact(
+        job_id,
+        spec.job_type,
+        preflight_results=[policy_result],
+    )
+    return job_id
 
 
 def request_abort(job_id: str) -> None:

@@ -9,6 +9,27 @@ import pytest
 from control.portfolio.evidence_reader import RunEvidenceReader
 
 
+def _policy_payload(**overrides) -> dict:
+    base = {
+        "schema_version": "1.0",
+        "job_id": "test_run",
+        "job_type": "RUN_RESEARCH_V2",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "overall_status": "PASS",
+        "preflight": [],
+        "postflight": [],
+        "final_reason": {
+            "policy_stage": "",
+            "failure_code": "",
+            "failure_message": "",
+            "failure_details": {},
+        },
+        "downstream_admissible": True,
+    }
+    base.update(overrides)
+    return base
+
+
 def test_missing_policy_check_rejects(tmp_path):
     """Run with missing policy_check.json should raise FileNotFoundError."""
     # Create a dummy run directory without policy_check.json
@@ -47,11 +68,7 @@ def test_missing_score_rejects(tmp_path):
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Write policy_check.json
-    policy = {
-        "pre_flight_checks": [],
-        "post_flight_checks": [],
-        "downstream_admissible": True
-    }
+    policy = _policy_payload()
     (run_dir / "policy_check.json").write_text(json.dumps(policy))
     
     # Write equity.parquet
@@ -81,11 +98,7 @@ def test_missing_equity_rejects(tmp_path):
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Write policy_check.json
-    policy = {
-        "pre_flight_checks": [],
-        "post_flight_checks": [],
-        "downstream_admissible": True
-    }
+    policy = _policy_payload()
     (run_dir / "policy_check.json").write_text(json.dumps(policy))
     
     # Write report.json with score and max_dd
@@ -118,11 +131,17 @@ def test_downstream_admissible_false_causes_rejection(tmp_path):
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Write policy_check.json with downstream_admissible = False
-    policy = {
-        "pre_flight_checks": [{"policy_name": "test", "passed": False, "message": "failed", "checked_at": "2026-01-01T00:00:00Z"}],
-        "post_flight_checks": [],
-        "downstream_admissible": False
-    }
+    policy = _policy_payload(
+        preflight=[{"policy_name": "test", "passed": False, "message": "failed", "checked_at": "2026-01-01T00:00:00Z"}],
+        overall_status="FAIL",
+        final_reason={
+            "policy_stage": "preflight",
+            "failure_code": "POLICY_REJECT_TEST",
+            "failure_message": "failed",
+            "failure_details": {},
+        },
+        downstream_admissible=False,
+    )
     (run_dir / "policy_check.json").write_text(json.dumps(policy))
     
     reader = RunEvidenceReader(outputs_root=tmp_path)
@@ -136,11 +155,7 @@ def test_artifact_validation_passes_when_all_present(tmp_path):
     run_dir.mkdir(parents=True, exist_ok=True)
     
     # Write policy_check.json
-    policy = {
-        "pre_flight_checks": [],
-        "post_flight_checks": [],
-        "downstream_admissible": True
-    }
+    policy = _policy_payload()
     (run_dir / "policy_check.json").write_text(json.dumps(policy))
     
     # Write report.json

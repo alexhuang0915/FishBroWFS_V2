@@ -24,7 +24,9 @@ def test_submit_run_research_v2_job():
     # Clean up any existing test jobs
     db = SupervisorDB(get_default_db_path())
     with db._connect() as conn:
+        conn.execute("PRAGMA foreign_keys = OFF")
         conn.execute("DELETE FROM jobs WHERE job_type = 'RUN_RESEARCH_V2'")
+        conn.execute("PRAGMA foreign_keys = ON")
     
     # Submit job (profile_name is forbidden, must be derived from instrument)
     payload = {

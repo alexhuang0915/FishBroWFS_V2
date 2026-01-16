@@ -54,10 +54,12 @@ class RunEvidenceReader:
         from contracts.supervisor.evidence_schemas import PolicyCheck
         
         pre_flight = [
-            PolicyCheck(**check_data) for check_data in data.get("pre_flight_checks", [])
+            PolicyCheck(**check_data)
+            for check_data in data.get("preflight", data.get("pre_flight_checks", []))
         ]
         post_flight = [
-            PolicyCheck(**check_data) for check_data in data.get("post_flight_checks", [])
+            PolicyCheck(**check_data)
+            for check_data in data.get("postflight", data.get("post_flight_checks", []))
         ]
         downstream_admissible = data.get("downstream_admissible", True)
         

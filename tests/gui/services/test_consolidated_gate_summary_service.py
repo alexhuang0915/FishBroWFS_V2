@@ -66,7 +66,7 @@ class TestConsolidatedGateSummaryService:
         assert gates[0].status == GateStatus.UNKNOWN
         assert "Failed to fetch system gates" in gates[0].message
     
-    @patch('gui.services.consolidated_gate_summary_service.EvidenceAggregator', create=True)
+    @patch('core.portfolio.evidence_aggregator.EvidenceAggregator', create=True)
     def test_fetch_gatekeeper_gates_success(self, mock_aggregator_class):
         """Test fetching gatekeeper gates successfully."""
         # Mock the evidence aggregator
@@ -90,7 +90,7 @@ class TestConsolidatedGateSummaryService:
         # Might be empty if import fails, but at least shouldn't crash
         # The test verifies the method doesn't raise exceptions
     
-    @patch('gui.services.consolidated_gate_summary_service.EvidenceAggregator', create=True, side_effect=ImportError)
+    @patch('core.portfolio.evidence_aggregator.EvidenceAggregator', create=True, side_effect=ImportError)
     def test_fetch_gatekeeper_gates_import_error(self, mock_aggregator):
         """Test fetching gatekeeper gates when evidence aggregator not available."""
         service = ConsolidatedGateSummaryService()

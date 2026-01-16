@@ -1,54 +1,101 @@
-.env
-**/.env
-.venv/
-**/.venv/
-__pycache__/
-**/__pycache__/
-*.pyc
-*.pyo
+# ============================================
+# 🚨 核心防漏財區 (Token Killers)
+# ============================================
 
+# 1. 封鎖所有輸出與證據檔 (這是你 17M Token 的主因)
+# AI 不需要讀它自己剛寫完的 Log 或 Report，除非你手動指定
+outputs/
+outputs/_dp_evidence/
+outputs/runs/
+outputs/jobs/
+outputs/jobs.db
+outputs/jobs_v2.db
+outputs/seasons/
+
+# 2. 封鎖超大依賴鎖定檔 (隱形殺手)
+# AI 讀 pyproject.toml 或 requirements.txt 就懂依賴了
+# 讀這些幾千行的 lock 檔純屬浪費錢
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+poetry.lock
+Pipfile.lock
+
+# 3. 封鎖 Jupyter Notebook
+# 裡面常有 Base64 編碼圖片或超長 Output，讀一個等於讀 100 個 py 檔
+*.ipynb
+**/.ipynb_checkpoints/
+
+# ============================================
+# 📉 大型數據與二進位檔 (WFS 專用)
+# ============================================
+# 絕對不要讓 AI 讀行情數據，它讀不懂且會瞬間爆額度
 FishBroData/
 FishBroData/raw/
 data/
 database/
+db/
 
+# 常見數據格式
 *.csv
 *.tsv
 *.xlsx
 *.xls
 *.h5
+*.hdf5
 *.pkl
+*.pickle
 *.parquet
+*.feather
 *.npz
 *.npy
+*.db
+*.sqlite
+*.sqlite3
+
+# 壓縮檔
 *.zip
+*.tar
 *.gz
+*.rar
+*.7z
 
-*.log
-logs/
-temp/
-tmp/
-
-outputs/seasons/
-outputs/runs/
-outputs/parquet/
-outputs/datasets/
-outputs/exports/
-outputs/portfolios/
-outputs/portfolio_store/
-outputs/shared/
-outputs/snapshots/
-outputs/summary/
-outputs/governance/
-outputs/strategy_governance/
-outputs/jobs/
-outputs/*.db
-outputs/jobs.db
-outputs/jobs_v2.db
-
+# ============================================
+# 🛠 系統、環境與快取 (標準配置)
+# ============================================
+.env
+**/.env
+.venv/
+**/.venv/
+env/
+venv/
+__pycache__/
+**/__pycache__/
 .git/
+.svn/
+.hg/
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+*.pyc
+*.pyo
+*.pyd
+*.so
+*.dll
+*.exe
+*.obj
+*.o
 
+# ============================================
+# 📝 記錄檔與暫存 (噪音)
+# ============================================
+*.log
+logs/
+temp/
+tmp/
+coverage/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

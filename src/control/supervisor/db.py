@@ -8,6 +8,7 @@ from .models import (
     JobSpec, JobRow, WorkerRow, JobState, JobStatus, JobStateMachine,
     new_job_id, new_worker_id, now_iso, parse_iso, seconds_since
 )
+from ..policy_enforcement import evaluate_postflight, write_policy_check_artifact
 
 
 class DuplicateJobError(Exception):
@@ -67,7 +68,11 @@ class SupervisorDB:
                         progress REAL NULL,
                         phase TEXT NULL,
                         params_hash TEXT DEFAULT '',
-                        error_details TEXT DEFAULT NULL
+                        error_details TEXT DEFAULT NULL,
+                        failure_code TEXT DEFAULT '',
+                        failure_message TEXT DEFAULT '',
+                        failure_details TEXT DEFAULT NULL,
+                        policy_stage TEXT DEFAULT ''
                     )
                 """)
                 
@@ -76,9 +81,16 @@ class SupervisorDB:
                 columns = [row[1] for row in cursor.fetchall()]
                 if "params_hash" not in columns:
                     conn.execute("ALTER TABLE jobs ADD COLUMN params_hash TEXT DEFAULT ''")
-                # Add error_details column if it doesn't exist
                 if "error_details" not in columns:
                     conn.execute("ALTER TABLE jobs ADD COLUMN error_details TEXT DEFAULT NULL")
+                if "failure_code" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN failure_code TEXT DEFAULT ''")
+                if "failure_message" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN failure_message TEXT DEFAULT ''")
+                if "failure_details" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN failure_details TEXT DEFAULT NULL")
+                if "policy_stage" not in columns:
+                    conn.execute("ALTER TABLE jobs ADD COLUMN policy_stage TEXT DEFAULT ''")
                 
                 # workers table
                 conn.execute("""
@@ -211,9 +223,31 @@ class SupervisorDB:
                         job_id, job_type, spec_json, state, state_reason,
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
-                        abort_requested, progress, phase, params_hash, error_details
-                    ) VALUES (?, ?, ?, ?, '', '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?, NULL)
-                """, (job_id, spec.job_type, spec_json, state, now, now, params_hash))
+                        abort_requested, progress, phase, params_hash, error_details,
+                        failure_code, failure_message, failure_details, policy_stage
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    job_id,
+                    spec.job_type,
+                    spec_json,
+                    state,
+                    "",
+                    "",
+                    now,
+                    now,
+                    None,
+                    None,
+                    None,
+                    0,
+                    None,
+                    None,
+                    params_hash,
+                    None,
+                    "",
+                    "",
+                    None,
+                    "",
+                ))
                 conn.commit()
             except sqlite3.IntegrityError as e:
                 conn.rollback()
@@ -231,7 +265,17 @@ class SupervisorDB:
         
         return job_id
     
-    def submit_rejected_job(self, spec: JobSpec, params_hash: str, rejection_reason: str) -> str:
+    def submit_rejected_job(
+        self,
+        spec: JobSpec,
+        params_hash: str,
+        rejection_reason: str,
+        *,
+        failure_code: str = "",
+        failure_message: str | None = None,
+        failure_details: dict | None = None,
+        policy_stage: str = "preflight",
+    ) -> str:
         """Submit a job with REJECTED state."""
         job_id = new_job_id()
         now = now_iso()
@@ -245,9 +289,31 @@ class SupervisorDB:
                         job_id, job_type, spec_json, state, state_reason,
                         result_json, created_at, updated_at,
                         worker_id, worker_pid, last_heartbeat,
-                        abort_requested, progress, phase, params_hash, error_details
-                    ) VALUES (?, ?, ?, ?, ?, '', ?, ?, NULL, NULL, NULL, 0, NULL, NULL, ?, NULL)
-                """, (job_id, spec.job_type, spec_json, JobStatus.REJECTED, rejection_reason, now, now, params_hash))
+                        abort_requested, progress, phase, params_hash, error_details,
+                        failure_code, failure_message, failure_details, policy_stage
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    job_id,
+                    spec.job_type,
+                    spec_json,
+                    JobStatus.REJECTED,
+                    rejection_reason,
+                    "",
+                    now,
+                    now,
+                    None,
+                    None,
+                    None,
+                    0,
+                    None,
+                    None,
+                    params_hash,
+                    None,
+                    failure_code or "",
+                    failure_message or rejection_reason,
+                    json.dumps(failure_details or {}),
+                    policy_stage or "preflight",
+                ))
                 conn.commit()
             except Exception:
                 conn.rollback()
@@ -341,11 +407,52 @@ class SupervisorDB:
             conn.execute("BEGIN IMMEDIATE")
             try:
                 # Get current state for validation
-                cursor = conn.execute("SELECT state, worker_id, worker_pid FROM jobs WHERE job_id = ?", (job_id,))
+                cursor = conn.execute("SELECT state, worker_id, worker_pid, job_type FROM jobs WHERE job_id = ?", (job_id,))
                 row = cursor.fetchone()
                 if row is None:
                     raise ValueError(f"Job {job_id} not found")
                 current_state = row["state"]
+                job_type = row["job_type"]
+                policy_result = evaluate_postflight(job_id, result)
+                if not policy_result.allowed:
+                    write_policy_check_artifact(
+                        job_id,
+                        job_type,
+                        postflight_results=[policy_result],
+                        final_reason={
+                            "policy_stage": policy_result.stage,
+                            "failure_code": policy_result.code,
+                            "failure_message": policy_result.message,
+                            "failure_details": policy_result.details,
+                        },
+                    )
+                    conn.rollback()
+                    self.mark_failed(
+                        job_id,
+                        policy_result.message,
+                        error_details={
+                            "type": "policy_violation",
+                            "code": policy_result.code,
+                            "details": policy_result.details,
+                        },
+                        failure_code=policy_result.code,
+                        failure_message=policy_result.message,
+                        failure_details=policy_result.details,
+                        policy_stage=policy_result.stage,
+                    )
+                    return
+                write_policy_check_artifact(
+                    job_id,
+                    job_type,
+                    postflight_results=[policy_result],
+                    final_reason={
+                        "policy_stage": "",
+                        "failure_code": "",
+                        "failure_message": "",
+                        "failure_details": {},
+                    },
+                )
+
                 # Validate transition
                 JobStateMachine.validate_transition(
                     JobStatus(current_state), JobStatus.SUCCEEDED
@@ -354,7 +461,9 @@ class SupervisorDB:
                 conn.execute("""
                     UPDATE jobs
                     SET state = ?, updated_at = ?,
-                        result_json = ?, state_reason = ''
+                        result_json = ?, state_reason = '',
+                        failure_code = '', failure_message = '',
+                        failure_details = NULL, policy_stage = ''
                     WHERE job_id = ? AND state = ?
                 """, (JobStatus.SUCCEEDED, now_iso(), result_json, job_id, JobStatus.RUNNING))
                 # Clear worker assignment
@@ -369,7 +478,17 @@ class SupervisorDB:
                 conn.rollback()
                 raise
     
-    def mark_failed(self, job_id: str, reason: str, *, error_details: dict | None = None) -> None:
+    def mark_failed(
+        self,
+        job_id: str,
+        reason: str,
+        *,
+        error_details: dict | None = None,
+        failure_code: str = "",
+        failure_message: str | None = None,
+        failure_details: dict | None = None,
+        policy_stage: str = "",
+    ) -> None:
         """Mark job as FAILED with reason and optional structured error details."""
         with self._connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
@@ -394,12 +513,26 @@ class SupervisorDB:
                         "phase": "bootstrap"
                     }
                 error_details_json = json.dumps(error_details)
+                failure_details_json = json.dumps(failure_details) if failure_details is not None else None
                 
                 conn.execute("""
                     UPDATE jobs
-                    SET state = ?, updated_at = ?, state_reason = ?, error_details = ?
+                    SET state = ?, updated_at = ?, state_reason = ?, error_details = ?,
+                        failure_code = ?, failure_message = ?, failure_details = ?, policy_stage = ?
                     WHERE job_id = ? AND state IN (?, ?)
-                """, (JobStatus.FAILED, now_iso(), reason, error_details_json, job_id, JobStatus.QUEUED, JobStatus.RUNNING))
+                """, (
+                    JobStatus.FAILED,
+                    now_iso(),
+                    reason,
+                    error_details_json,
+                    failure_code,
+                    failure_message or reason,
+                    failure_details_json,
+                    policy_stage,
+                    job_id,
+                    JobStatus.QUEUED,
+                    JobStatus.RUNNING,
+                ))
                 # Clear worker assignment if any
                 if row["worker_id"]:
                     conn.execute("""

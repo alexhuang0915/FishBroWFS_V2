@@ -145,6 +145,11 @@ class JobRow(BaseModel):
     progress: Optional[float] = None
     phase: Optional[str] = None
     error_details: Optional[str] = None
+    params_hash: str = ""
+    failure_code: str = ""
+    failure_message: str = ""
+    failure_details: Optional[str] = None
+    policy_stage: str = ""
 
 
 class WorkerRow(BaseModel):

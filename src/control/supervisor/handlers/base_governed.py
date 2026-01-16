@@ -15,7 +15,6 @@ from ..job_handler import BaseJobHandler, JobContext
 from ..evidence import (
     job_evidence_dir,
     write_manifest,
-    write_policy_check,
     write_inputs_fingerprint,
     write_outputs_fingerprint,
     write_runtime_metrics,
@@ -26,12 +25,10 @@ from ..evidence import (
     stable_params_hash,
     now_iso,
 )
+from control.policy_enforcement import write_policy_check_artifact
 from ..admission import AdmissionController
 from ..policies.post_flight import QualityGate
-from contracts.supervisor.evidence_schemas import (
-    PolicyCheckBundle,
-    RuntimeMetrics,
-)
+from contracts.supervisor.evidence_schemas import RuntimeMetrics
 
 
 class BaseGovernedHandler(BaseJobHandler):
@@ -106,27 +103,6 @@ class BaseGovernedHandler(BaseJobHandler):
                 custom_metrics={}
             )
             
-            # Policy check bundle (pre-flight from admission, post-flight from quality gate)
-            # Note: pre-flight checks are written during admission, we need to read them
-            policy_bundle = PolicyCheckBundle(
-                pre_flight_checks=[],  # Will be populated from existing file
-                post_flight_checks=post_flight_checks,
-                downstream_admissible=all(check.passed for check in post_flight_checks)
-            )
-            
-            # Read pre-flight checks if they exist
-            pre_flight_file = evidence_dir / "policy_check.json"
-            if pre_flight_file.exists():
-                import json
-                with open(pre_flight_file, 'r') as f:
-                    existing = json.load(f)
-                    # Extract pre-flight checks
-                    for check_data in existing.get("pre_flight_checks", []):
-                        from contracts.supervisor.evidence_schemas import PolicyCheck
-                        policy_bundle.pre_flight_checks.append(
-                            PolicyCheck(**check_data)
-                        )
-            
             # Write evidence files
             write_manifest(
                 evidence_dir,
@@ -136,7 +112,17 @@ class BaseGovernedHandler(BaseJobHandler):
                 start_time_iso,
                 end_time_iso
             )
-            write_policy_check(evidence_dir, policy_bundle)
+            write_policy_check_artifact(
+                job_id,
+                self.get_job_type(),
+                final_reason={
+                    "policy_stage": "",
+                    "failure_code": "",
+                    "failure_message": "",
+                    "failure_details": {},
+                },
+                extra_paths=(evidence_dir,),
+            )
             write_inputs_fingerprint(
                 evidence_dir,
                 params_hash,
@@ -182,27 +168,18 @@ class BaseGovernedHandler(BaseJobHandler):
                 end_time_iso,
                 {"error": error_msg}
             )
-            
-            # Create empty policy bundle for failed job
-            policy_bundle = PolicyCheckBundle(
-                pre_flight_checks=[],
-                post_flight_checks=[],
-                downstream_admissible=False
+            write_policy_check_artifact(
+                job_id,
+                self.get_job_type(),
+                final_reason={
+                    "policy_stage": "postflight",
+                    "failure_code": "HANDLER_EXCEPTION",
+                    "failure_message": error_msg,
+                    "failure_details": {"traceback": traceback_str},
+                },
+                extra_paths=(evidence_dir,),
             )
             
-            # Read pre-flight checks if they exist
-            pre_flight_file = evidence_dir / "policy_check.json"
-            if pre_flight_file.exists():
-                import json
-                with open(pre_flight_file, 'r') as f:
-                    existing = json.load(f)
-                    for check_data in existing.get("pre_flight_checks", []):
-                        from contracts.supervisor.evidence_schemas import PolicyCheck
-                        policy_bundle.pre_flight_checks.append(
-                            PolicyCheck(**check_data)
-                        )
-            
-            write_policy_check(evidence_dir, policy_bundle)
             
             # Compute and write inputs fingerprint
             params_hash = stable_params_hash(params)

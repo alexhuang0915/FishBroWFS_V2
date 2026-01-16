@@ -260,3 +260,42 @@ def test_metric_keyword_detection():
     assert not contains_metric_keyword("network")  # Contains "net" but as part of word
     
     print("✓ Metric keyword detection works correctly")
+
+
+def test_policy_check_artifact_has_no_metrics():
+    """Verify that the policy_check artifact schema does not include metric keys."""
+    payload = {
+        "schema_version": "1.0",
+        "job_id": "job123",
+        "job_type": "RUN_RESEARCH_V2",
+        "created_utc": "2026-01-01T00:00:00Z",
+        "overall_status": "PASS",
+        "preflight": [
+            {
+                "status": "PASS",
+                "code": "POLICY_OK",
+                "message": "Preflight passed",
+                "details": {"checked_at": "2026-01-01T00:00:00Z"},
+                "stage": "preflight",
+                "checked_at": "2026-01-01T00:00:00Z",
+            }
+        ],
+        "postflight": [
+            {
+                "status": "PASS",
+                "code": "POLICY_OUTPUTS",
+                "message": "Postflight outputs validated",
+                "details": {},
+                "stage": "postflight",
+                "checked_at": "2026-01-01T00:05:00Z",
+            }
+        ],
+        "final_reason": {
+            "policy_stage": "",
+            "failure_code": "",
+            "failure_message": "",
+            "failure_details": {},
+        },
+    }
+    violations = check_dict_for_metric_keys(payload)
+    assert not violations, f"Policy check artifact schema contains metric keywords: {violations}"

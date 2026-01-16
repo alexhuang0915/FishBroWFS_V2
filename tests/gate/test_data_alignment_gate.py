@@ -4,6 +4,9 @@ from gui.services.data_alignment_status import (
     ARTIFACT_NAME,
     DataAlignmentStatus,
     MISSING_MESSAGE,
+    DATA_ALIGNMENT_MISSING,
+    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
+    DATA_ALIGNMENT_DROPPED_ROWS,
 )
 from gui.services.gate_summary_service import GateSummaryService, GateStatus
 
@@ -50,6 +53,17 @@ def test_data_alignment_gate_warns_at_high_ratio(monkeypatch):
     assert gate.status == GateStatus.WARN
     assert "Forward fill ratio" in gate.message
     assert gate.actions and gate.actions[0]["url"] == "/api/v1/jobs/job-1/artifacts/data_alignment_report.json"
+    # Check reason cards
+    assert "reason_cards" in gate.details
+    reason_cards = gate.details["reason_cards"]
+    assert len(reason_cards) == 2  # high ratio + dropped rows
+    # Check card codes
+    codes = [card["code"] for card in reason_cards]
+    assert DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO in codes
+    assert DATA_ALIGNMENT_DROPPED_ROWS in codes
+    # Check action target matches artifact path
+    for card in reason_cards:
+        assert card["action_target"] == f"/tmp/OK/{ARTIFACT_NAME}"
 
 
 def test_data_alignment_gate_warns_when_artifact_missing(monkeypatch):
@@ -80,3 +94,11 @@ def test_data_alignment_gate_warns_when_artifact_missing(monkeypatch):
     assert gate.message == MISSING_MESSAGE
     assert gate.details.get("status") == "MISSING"
     assert gate.actions and gate.actions[0]["url"] == "/api/v1/jobs/job-2/artifacts/data_alignment_report.json"
+    # Check reason cards
+    assert "reason_cards" in gate.details
+    reason_cards = gate.details["reason_cards"]
+    assert len(reason_cards) == 1
+    card = reason_cards[0]
+    assert card["code"] == DATA_ALIGNMENT_MISSING
+    assert card["severity"] == "WARN"
+    assert card["action_target"] == f"/tmp/MISSING/{ARTIFACT_NAME}"

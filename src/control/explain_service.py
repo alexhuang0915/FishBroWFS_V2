@@ -10,7 +10,15 @@ from control.job_artifacts import artifact_url_if_exists, evidence_bundle_url, j
 from control.reporting.io import read_job_artifact
 from control.supervisor import get_job as supervisor_get_job
 from control.supervisor.models import JobRow
-from gui.services.data_alignment_status import ARTIFACT_NAME, resolve_data_alignment_status
+from gui.services.data_alignment_status import (
+    ARTIFACT_NAME,
+    resolve_data_alignment_status,
+    build_data_alignment_reason_cards,
+    DATA_ALIGNMENT_MISSING,
+    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
+    DATA_ALIGNMENT_DROPPED_ROWS,
+    DEFAULT_FORWARD_FILL_WARN_THRESHOLD,
+)
 
 CACHE_TTL_SECONDS = 2.0
 DEBUG_DERIVED_FROM = ["jobs_db", "policy_check", "artifacts_index"]
@@ -251,6 +259,29 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
     alignment_url = artifact_url_if_exists(job.job_id, ARTIFACT_NAME) or job_artifact_url(
         job.job_id, ARTIFACT_NAME
     )
+    
+    # Build reason cards for data alignment
+    reason_cards = build_data_alignment_reason_cards(
+        job_id=job.job_id,
+        status=alignment_status,
+        warn_forward_fill_ratio=DEFAULT_FORWARD_FILL_WARN_THRESHOLD,
+    )
+    # Convert to dict for serialization
+    reason_cards_dict = [
+        {
+            "code": card.code,
+            "title": card.title,
+            "severity": card.severity,
+            "why": card.why,
+            "impact": card.impact,
+            "recommended_action": card.recommended_action,
+            "evidence_artifact": card.evidence_artifact,
+            "evidence_path": card.evidence_path,
+            "action_target": card.action_target,
+        }
+        for card in reason_cards
+    ]
+    
     if alignment_status.status == "OK":
         ratio = alignment_status.metrics.get("forward_fill_ratio")
         dropped = alignment_status.metrics.get("dropped_rows", 0)
@@ -290,6 +321,7 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         },
         "evidence": evidence,
         "data_alignment_status": asdict(alignment_status),
+        "data_alignment_reason_cards": reason_cards_dict,
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

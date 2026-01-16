@@ -25,7 +25,14 @@ from typing import Optional, List, Dict, Any
 
 from control.job_artifacts import artifact_url_if_exists, job_artifact_url
 
-from gui.services.data_alignment_status import ARTIFACT_NAME, resolve_data_alignment_status
+from gui.services.data_alignment_status import (
+    ARTIFACT_NAME,
+    resolve_data_alignment_status,
+    build_data_alignment_reason_cards,
+    DATA_ALIGNMENT_MISSING,
+    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
+    DATA_ALIGNMENT_DROPPED_ROWS,
+)
 from gui.services.explain_adapter import ExplainAdapter, FALLBACK_SUMMARY, JobReason
 from gui.services.explain_cache import get_cache_instance
 from gui.services.supervisor_client import SupervisorClient, SupervisorClientError
@@ -472,6 +479,29 @@ class GateSummaryService:
                 or job_artifact_url(job_id, alignment_status.artifact_relpath)
             )
 
+            # Build reason cards
+            reason_cards = build_data_alignment_reason_cards(
+                job_id=job_id,
+                status=alignment_status,
+                warn_forward_fill_ratio=DATA_ALIGNMENT_FORWARD_FILL_WARN_THRESHOLD,
+            )
+            
+            # Convert reason cards to dict for serialization
+            reason_cards_dict = [
+                {
+                    "code": card.code,
+                    "title": card.title,
+                    "severity": card.severity,
+                    "why": card.why,
+                    "impact": card.impact,
+                    "recommended_action": card.recommended_action,
+                    "evidence_artifact": card.evidence_artifact,
+                    "evidence_path": card.evidence_path,
+                    "action_target": card.action_target,
+                }
+                for card in reason_cards
+            ]
+
             if alignment_status.status == "OK":
                 ratio = alignment_status.metrics.get("forward_fill_ratio")
                 dropped = alignment_status.metrics.get("dropped_rows", 0)
@@ -487,11 +517,16 @@ class GateSummaryService:
                     "forward_fill_ratio": ratio,
                     "dropped_rows": dropped,
                     "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
                 }
             else:
                 gate_status = GateStatus.WARN
                 message = alignment_status.message
-                details = {"status": alignment_status.status, "job_id": job_id}
+                details = {
+                    "status": alignment_status.status,
+                    "job_id": job_id,
+                    "reason_cards": reason_cards_dict,
+                }
 
             actions = [{"label": "Open data alignment report", "url": artifact_url}]
             return GateResult(

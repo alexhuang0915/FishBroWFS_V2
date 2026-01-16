@@ -6,6 +6,9 @@ from gui.services.data_alignment_status import (
     ARTIFACT_NAME,
     DataAlignmentStatus,
     MISSING_MESSAGE,
+    DATA_ALIGNMENT_MISSING,
+    DATA_ALIGNMENT_HIGH_FORWARD_FILL_RATIO,
+    DATA_ALIGNMENT_DROPPED_ROWS,
 )
 from control.explain_service import build_job_explain
 
@@ -70,6 +73,15 @@ def test_explain_discloses_alignment_metrics():
     assert alignment.get("status") == "OK"
     assert alignment.get("metrics", {}).get("forward_fill_ratio") == 0.42
     assert alignment.get("metrics", {}).get("dropped_rows") == 3
+    # Check reason cards
+    reason_cards = payload.get("data_alignment_reason_cards", [])
+    # With forward_fill_ratio=0.42 (<0.5 threshold) and dropped_rows=3 (>0)
+    # Should have 1 card for dropped rows
+    assert len(reason_cards) == 1
+    card = reason_cards[0]
+    assert card["code"] == DATA_ALIGNMENT_DROPPED_ROWS
+    assert card["severity"] == "WARN"
+    assert card["action_target"] == f"/tmp/job-alignment/{ARTIFACT_NAME}"
 
 
 def test_explain_reports_missing_alignment(monkeypatch):
@@ -92,3 +104,10 @@ def test_explain_reports_missing_alignment(monkeypatch):
     assert alignment.get("message") == MISSING_MESSAGE
     assert alignment.get("metrics") == {}
     assert "missing" in payload.get("summary", "").lower()
+    # Check reason cards
+    reason_cards = payload.get("data_alignment_reason_cards", [])
+    assert len(reason_cards) == 1
+    card = reason_cards[0]
+    assert card["code"] == DATA_ALIGNMENT_MISSING
+    assert card["severity"] == "WARN"
+    assert card["action_target"] == f"/tmp/job-alignment/{ARTIFACT_NAME}"

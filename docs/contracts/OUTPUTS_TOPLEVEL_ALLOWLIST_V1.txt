@@ -10,6 +10,7 @@ jobs_v2.db
 run_status.json
 # Legacy directories (empty, allowed for now)
 deployment
+exports
 portfolio_store
 research
 seasons

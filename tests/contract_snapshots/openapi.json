@@ -1,0 +1,6107 @@
+{
+  "components": {
+    "schemas": {
+      "AdmissionDecision": {
+        "description": "Admission decision record (used in season_admission service).",
+        "properties": {
+          "candidate_identity": {
+            "title": "Candidate Identity",
+            "type": "string"
+          },
+          "decided_at": {
+            "title": "Decided At",
+            "type": "string"
+          },
+          "decided_by": {
+            "title": "Decided By",
+            "type": "string"
+          },
+          "decision_reason": {
+            "title": "Decision Reason",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/AdmissionEvidence"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          }
+        },
+        "required": [
+          "candidate_identity",
+          "outcome",
+          "decision_reason",
+          "evidence",
+          "decided_at",
+          "decided_by"
+        ],
+        "title": "AdmissionDecision",
+        "type": "object"
+      },
+      "AdmissionEvidence": {
+        "description": "Evidence for an admission decision.",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "decision_criteria": {
+            "additionalProperties": true,
+            "title": "Decision Criteria",
+            "type": "object"
+          },
+          "decision_outcome": {
+            "$ref": "#/components/schemas/DecisionOutcome"
+          },
+          "decision_reason": {
+            "title": "Decision Reason",
+            "type": "string"
+          },
+          "evidence_data": {
+            "additionalProperties": true,
+            "title": "Evidence Data",
+            "type": "object"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "generated_at",
+          "decision_outcome",
+          "decision_reason"
+        ],
+        "title": "AdmissionEvidence",
+        "type": "object"
+      },
+      "ArtifactFile": {
+        "description": "File entry in artifacts index.",
+        "properties": {
+          "content_type": {
+            "description": "MIME type",
+            "title": "Content Type",
+            "type": "string"
+          },
+          "filename": {
+            "description": "Filename (relative path)",
+            "title": "Filename",
+            "type": "string"
+          },
+          "sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SHA256 hash (null if not computed)",
+            "title": "Sha256"
+          },
+          "size_bytes": {
+            "description": "File size in bytes",
+            "title": "Size Bytes",
+            "type": "integer"
+          },
+          "url": {
+            "description": "URL to download the file",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "filename",
+          "size_bytes",
+          "content_type",
+          "url"
+        ],
+        "title": "ArtifactFile",
+        "type": "object"
+      },
+      "BatchMetadata": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_at": {
+            "default": "",
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "default": "",
+            "title": "Created By",
+            "type": "string"
+          },
+          "frozen": {
+            "default": false,
+            "title": "Frozen",
+            "type": "boolean"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "season": {
+            "default": "",
+            "title": "Season",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "updated_at": {
+            "default": "",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id"
+        ],
+        "title": "BatchMetadata",
+        "type": "object"
+      },
+      "BatchMetadataUpdate": {
+        "description": "Request for updating batch metadata.",
+        "properties": {
+          "frozen": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "season": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "title": "BatchMetadataUpdate",
+        "type": "object"
+      },
+      "BatchStatusResponse": {
+        "description": "Response for batch status.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "jobs_done": {
+            "default": 0,
+            "title": "Jobs Done",
+            "type": "integer"
+          },
+          "jobs_failed": {
+            "default": 0,
+            "title": "Jobs Failed",
+            "type": "integer"
+          },
+          "jobs_total": {
+            "default": 0,
+            "title": "Jobs Total",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "state"
+        ],
+        "title": "BatchStatusResponse",
+        "type": "object"
+      },
+      "BatchSummaryResponse": {
+        "description": "Response for batch summary.",
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "metrics": {
+            "additionalProperties": true,
+            "title": "Metrics",
+            "type": "object"
+          },
+          "topk": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Topk",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id"
+        ],
+        "title": "BatchSummaryResponse",
+        "type": "object"
+      },
+      "BoundaryMismatchItem": {
+        "description": "Details of a single boundary mismatch.",
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "job_value": {
+            "title": "Job Value",
+            "type": "string"
+          },
+          "season_value": {
+            "title": "Season Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "field",
+          "season_value",
+          "job_value"
+        ],
+        "title": "BoundaryMismatchItem",
+        "type": "object"
+      },
+      "CandidateIdentity": {
+        "description": "Identity of a candidate.",
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "display_name": {
+            "default": "",
+            "title": "Display Name",
+            "type": "string"
+          },
+          "rank": {
+            "default": 1,
+            "title": "Rank",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "candidate_id"
+        ],
+        "title": "CandidateIdentity",
+        "type": "object"
+      },
+      "CandidateRef": {
+        "description": "SSOT pointer to a candidate within a job.",
+        "properties": {
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "candidate_key": {
+            "title": "Candidate Key",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "job_id",
+          "candidate_key"
+        ],
+        "title": "CandidateRef",
+        "type": "object"
+      },
+      "CandidateSource": {
+        "description": "Source information for a candidate.",
+        "properties": {
+          "artifact_type": {
+            "default": "winners.json",
+            "title": "Artifact Type",
+            "type": "string"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "extracted_at": {
+            "title": "Extracted At",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "extracted_at"
+        ],
+        "title": "CandidateSource",
+        "type": "object"
+      },
+      "ConstraintsReport": {
+        "properties": {
+          "max_per_dataset_truncated": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Max Per Dataset Truncated",
+            "type": "object"
+          },
+          "max_per_strategy_truncated": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Max Per Strategy Truncated",
+            "type": "object"
+          },
+          "max_weight_clipped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Max Weight Clipped",
+            "type": "array"
+          },
+          "min_weight_clipped": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Min Weight Clipped",
+            "type": "array"
+          },
+          "renormalization_applied": {
+            "default": false,
+            "title": "Renormalization Applied",
+            "type": "boolean"
+          },
+          "renormalization_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Renormalization Factor"
+          }
+        },
+        "title": "ConstraintsReport",
+        "type": "object"
+      },
+      "DatasetIndex": {
+        "description": "Complete registry of all available datasets.",
+        "properties": {
+          "datasets": {
+            "description": "List of all available dataset records",
+            "items": {
+              "$ref": "#/components/schemas/DatasetRecord"
+            },
+            "title": "Datasets",
+            "type": "array"
+          },
+          "generated_at": {
+            "description": "Timestamp when this index was generated",
+            "format": "date-time",
+            "title": "Generated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "generated_at"
+        ],
+        "title": "DatasetIndex",
+        "type": "object"
+      },
+      "DatasetRecord": {
+        "description": "Metadata for a single derived dataset.",
+        "properties": {
+          "end_date": {
+            "description": "Last date with data (inclusive)",
+            "format": "date",
+            "title": "End Date",
+            "type": "string"
+          },
+          "exchange": {
+            "description": "Exchange identifier, e.g. 'CME'",
+            "examples": [
+              "CME",
+              "TWF"
+            ],
+            "title": "Exchange",
+            "type": "string"
+          },
+          "fingerprint_sha1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "SHA1 hash of file content (binary), deterministic fingerprint (deprecated, use fingerprint_sha256_40)",
+            "title": "Fingerprint Sha1"
+          },
+          "fingerprint_sha256_40": {
+            "description": "SHA256 hash of file content (binary), first 40 hex chars, deterministic fingerprint",
+            "title": "Fingerprint Sha256 40",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique identifier, e.g. 'CME.MNQ.60m.2020-2024'",
+            "examples": [
+              "CME.MNQ.60m.2020-2024",
+              "TWF.MXF.15m.2018-2023"
+            ],
+            "title": "Id",
+            "type": "string"
+          },
+          "path": {
+            "description": "Relative path to derived file from data/derived/",
+            "examples": [
+              "CME.MNQ/60m/2020-2024.parquet"
+            ],
+            "title": "Path",
+            "type": "string"
+          },
+          "start_date": {
+            "description": "First date with data (inclusive)",
+            "format": "date",
+            "title": "Start Date",
+            "type": "string"
+          },
+          "symbol": {
+            "description": "Symbol identifier, e.g. 'CME.MNQ'",
+            "examples": [
+              "CME.MNQ",
+              "TWF.MXF"
+            ],
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "description": "Timeframe string, e.g. '60m'",
+            "examples": [
+              "60m",
+              "15m",
+              "5m",
+              "1D"
+            ],
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "tz_provider": {
+            "default": "IANA",
+            "description": "Timezone provider identifier",
+            "title": "Tz Provider",
+            "type": "string"
+          },
+          "tz_version": {
+            "default": "unknown",
+            "description": "Timezone database version",
+            "title": "Tz Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "symbol",
+          "exchange",
+          "timeframe",
+          "path",
+          "start_date",
+          "end_date",
+          "fingerprint_sha256_40"
+        ],
+        "title": "DatasetRecord",
+        "type": "object"
+      },
+      "DecisionOutcome": {
+        "description": "Decision outcome enum (used in evidence).",
+        "enum": [
+          "ADMIT",
+          "REJECT",
+          "HOLD"
+        ],
+        "title": "DecisionOutcome",
+        "type": "string"
+      },
+      "GovernanceParamsOverrides": {
+        "description": "Optional governance parameter overrides.",
+        "properties": {
+          "max_pairwise_correlation": {
+            "anyOf": [
+              {
+                "maximum": 1.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Pairwise Correlation"
+          },
+          "portfolio_risk_budget_max": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Portfolio Risk Budget Max"
+          }
+        },
+        "title": "GovernanceParamsOverrides",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HistogramV1": {
+        "description": "Histogram representation with bin edges and counts.",
+        "properties": {
+          "bin_edges": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Bin Edges",
+            "type": "array"
+          },
+          "counts": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "array"
+          }
+        },
+        "required": [
+          "bin_edges",
+          "counts"
+        ],
+        "title": "HistogramV1",
+        "type": "object"
+      },
+      "JobExplainCache": {
+        "properties": {
+          "hit": {
+            "title": "Hit",
+            "type": "boolean"
+          },
+          "ttl_s": {
+            "title": "Ttl S",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hit",
+          "ttl_s"
+        ],
+        "title": "JobExplainCache",
+        "type": "object"
+      },
+      "JobExplainCodes": {
+        "properties": {
+          "failure_code": {
+            "default": "",
+            "title": "Failure Code",
+            "type": "string"
+          },
+          "http_status": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Http Status"
+          },
+          "policy_stage": {
+            "default": "",
+            "title": "Policy Stage",
+            "type": "string"
+          }
+        },
+        "title": "JobExplainCodes",
+        "type": "object"
+      },
+      "JobExplainDebug": {
+        "properties": {
+          "cache": {
+            "$ref": "#/components/schemas/JobExplainCache"
+          },
+          "derived_from": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Derived From",
+            "type": "array"
+          }
+        },
+        "required": [
+          "derived_from",
+          "cache"
+        ],
+        "title": "JobExplainDebug",
+        "type": "object"
+      },
+      "JobExplainEvidence": {
+        "properties": {
+          "evidence_bundle_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Bundle Url"
+          },
+          "inputs_fingerprint_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inputs Fingerprint Url"
+          },
+          "manifest_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manifest Url"
+          },
+          "policy_check_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Check Url"
+          },
+          "stdout_tail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stdout Tail Url"
+          }
+        },
+        "title": "JobExplainEvidence",
+        "type": "object"
+      },
+      "JobExplainResponse": {
+        "description": "Response for GET /api/v1/jobs/{job_id}/explain.",
+        "properties": {
+          "action_hint": {
+            "title": "Action Hint",
+            "type": "string"
+          },
+          "codes": {
+            "$ref": "#/components/schemas/JobExplainCodes"
+          },
+          "debug": {
+            "$ref": "#/components/schemas/JobExplainDebug"
+          },
+          "decision_layer": {
+            "enum": [
+              "POLICY",
+              "INPUT",
+              "GOVERNANCE",
+              "ARTIFACT",
+              "SYSTEM",
+              "UNKNOWN"
+            ],
+            "title": "Decision Layer",
+            "type": "string"
+          },
+          "evidence": {
+            "$ref": "#/components/schemas/JobExplainEvidence"
+          },
+          "final_status": {
+            "title": "Final Status",
+            "type": "string"
+          },
+          "human_tag": {
+            "enum": [
+              "VIOLATION",
+              "MALFORMED",
+              "FROZEN",
+              "CORRUPTED",
+              "INFRA_FAILURE",
+              "UNKNOWN"
+            ],
+            "title": "Human Tag",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_type": {
+            "title": "Job Type",
+            "type": "string"
+          },
+          "recoverable": {
+            "title": "Recoverable",
+            "type": "boolean"
+          },
+          "schema_version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "job_type",
+          "final_status",
+          "decision_layer",
+          "human_tag",
+          "recoverable",
+          "summary",
+          "action_hint",
+          "codes",
+          "evidence",
+          "debug"
+        ],
+        "title": "JobExplainResponse",
+        "type": "object"
+      },
+      "JobListResponse": {
+        "description": "Response for GET /api/v1/jobs.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Seconds"
+          },
+          "error_details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error Details"
+          },
+          "failure_code": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Code"
+          },
+          "failure_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Message"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "instrument": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instrument"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "policy_stage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Stage"
+          },
+          "run_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Mode"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "season": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strategy Name"
+          },
+          "timeframe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeframe"
+          },
+          "type": {
+            "default": "strategy",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status",
+          "created_at"
+        ],
+        "title": "JobListResponse",
+        "type": "object"
+      },
+      "ParamSpec": {
+        "description": "Specification for a single strategy parameter.\n\nUsed by GUI to generate appropriate input widgets.",
+        "properties": {
+          "choices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Allowed choices (for enum type)",
+            "title": "Choices"
+          },
+          "default": {
+            "description": "Default value",
+            "title": "Default"
+          },
+          "help": {
+            "description": "Human-readable description/help text",
+            "title": "Help",
+            "type": "string"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Maximum value (for int/float types)",
+            "title": "Max"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Minimum value (for int/float types)",
+            "title": "Min"
+          },
+          "name": {
+            "description": "Parameter name (must match strategy implementation)",
+            "examples": [
+              "window",
+              "threshold",
+              "enabled"
+            ],
+            "title": "Name",
+            "type": "string"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Step size (for int/float sliders)",
+            "title": "Step"
+          },
+          "type": {
+            "description": "Parameter data type",
+            "enum": [
+              "int",
+              "float",
+              "enum",
+              "bool"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "default",
+          "help"
+        ],
+        "title": "ParamSpec",
+        "type": "object"
+      },
+      "PlanCreatePayload": {
+        "properties": {
+          "bucket_by": {
+            "items": {
+              "enum": [
+                "dataset_id",
+                "strategy_id"
+              ],
+              "type": "string"
+            },
+            "title": "Bucket By",
+            "type": "array"
+          },
+          "enrich_fields": {
+            "items": {
+              "enum": [
+                "batch_state",
+                "batch_counts",
+                "batch_metrics"
+              ],
+              "type": "string"
+            },
+            "title": "Enrich Fields",
+            "type": "array"
+          },
+          "enrich_with_batch_api": {
+            "default": true,
+            "title": "Enrich With Batch Api",
+            "type": "boolean"
+          },
+          "export_name": {
+            "title": "Export Name",
+            "type": "string"
+          },
+          "max_per_dataset": {
+            "default": 100,
+            "exclusiveMinimum": 0.0,
+            "maximum": 500.0,
+            "title": "Max Per Dataset",
+            "type": "integer"
+          },
+          "max_per_strategy": {
+            "default": 100,
+            "exclusiveMinimum": 0.0,
+            "maximum": 500.0,
+            "title": "Max Per Strategy",
+            "type": "integer"
+          },
+          "max_weight": {
+            "default": 0.2,
+            "exclusiveMinimum": 0.0,
+            "maximum": 1.0,
+            "title": "Max Weight",
+            "type": "number"
+          },
+          "min_weight": {
+            "default": 0.0,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Min Weight",
+            "type": "number"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "top_n": {
+            "default": 50,
+            "exclusiveMinimum": 0.0,
+            "maximum": 500.0,
+            "title": "Top N",
+            "type": "integer"
+          },
+          "weighting": {
+            "default": "bucket_equal",
+            "enum": [
+              "equal",
+              "score_weighted",
+              "bucket_equal"
+            ],
+            "title": "Weighting",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season",
+          "export_name"
+        ],
+        "title": "PlanCreatePayload",
+        "type": "object"
+      },
+      "PlanQualityReport": {
+        "description": "Complete quality report for a portfolio plan.",
+        "properties": {
+          "generated_at_utc": {
+            "title": "Generated At Utc",
+            "type": "string"
+          },
+          "grade": {
+            "enum": [
+              "GREEN",
+              "YELLOW",
+              "RED"
+            ],
+            "title": "Grade",
+            "type": "string"
+          },
+          "inputs": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Inputs",
+            "type": "object"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/QualityMetrics"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "source": {
+            "$ref": "#/components/schemas/QualitySourceRef"
+          },
+          "thresholds": {
+            "$ref": "#/components/schemas/QualityThresholds"
+          }
+        },
+        "required": [
+          "plan_id",
+          "generated_at_utc",
+          "source",
+          "grade",
+          "metrics",
+          "reasons",
+          "thresholds"
+        ],
+        "title": "PlanQualityReport",
+        "type": "object"
+      },
+      "PlanSummary": {
+        "additionalProperties": true,
+        "properties": {
+          "bucket_by": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bucket By"
+          },
+          "bucket_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Bucket Counts",
+            "type": "object"
+          },
+          "bucket_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bucket Coverage"
+          },
+          "bucket_coverage_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bucket Coverage Ratio"
+          },
+          "bucket_weights": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Bucket Weights",
+            "type": "object"
+          },
+          "concentration_herfindahl": {
+            "title": "Concentration Herfindahl",
+            "type": "number"
+          },
+          "concentration_top1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration Top1"
+          },
+          "concentration_top3": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Concentration Top3"
+          },
+          "num_buckets": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Buckets"
+          },
+          "num_selected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Selected"
+          },
+          "total_candidates": {
+            "title": "Total Candidates",
+            "type": "integer"
+          },
+          "total_weight": {
+            "title": "Total Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "total_candidates",
+          "total_weight",
+          "concentration_herfindahl"
+        ],
+        "title": "PlanSummary",
+        "type": "object"
+      },
+      "PlannedCandidate": {
+        "properties": {
+          "batch_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Counts"
+          },
+          "batch_metrics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Metrics"
+          },
+          "batch_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch State"
+          },
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "params": {
+            "additionalProperties": true,
+            "title": "Params",
+            "type": "object"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "source_batch": {
+            "title": "Source Batch",
+            "type": "string"
+          },
+          "source_export": {
+            "title": "Source Export",
+            "type": "string"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "strategy_id",
+          "dataset_id",
+          "params",
+          "score",
+          "season",
+          "source_batch",
+          "source_export"
+        ],
+        "title": "PlannedCandidate",
+        "type": "object"
+      },
+      "PlannedWeight": {
+        "properties": {
+          "candidate_id": {
+            "title": "Candidate Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "weight": {
+            "title": "Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "candidate_id",
+          "weight",
+          "reason"
+        ],
+        "title": "PlannedWeight",
+        "type": "object"
+      },
+      "PolicyGateModel": {
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "fail_reason": {
+            "title": "Fail Reason",
+            "type": "string"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "op": {
+            "title": "Op",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          }
+        },
+        "required": [
+          "metric",
+          "op",
+          "threshold",
+          "enabled",
+          "fail_reason"
+        ],
+        "title": "PolicyGateModel",
+        "type": "object"
+      },
+      "PolicyModesModel": {
+        "properties": {
+          "mode_b_enabled": {
+            "title": "Mode B Enabled",
+            "type": "boolean"
+          },
+          "scoring_guards_enabled": {
+            "title": "Scoring Guards Enabled",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode_b_enabled",
+          "scoring_guards_enabled"
+        ],
+        "title": "PolicyModesModel",
+        "type": "object"
+      },
+      "PortfolioAdmissionSummaryV1": {
+        "description": "Summary of portfolio admission decisions.",
+        "properties": {
+          "admitted_count": {
+            "title": "Admitted Count",
+            "type": "integer"
+          },
+          "rejected_count": {
+            "title": "Rejected Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "admitted_count",
+          "rejected_count"
+        ],
+        "title": "PortfolioAdmissionSummaryV1",
+        "type": "object"
+      },
+      "PortfolioArtifactsResponseV1": {
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}/artifacts.",
+        "properties": {
+          "files": {
+            "description": "List of all files",
+            "items": {
+              "$ref": "#/components/schemas/ArtifactFile"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "links": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "description": "Named links to key artifacts",
+            "title": "Links",
+            "type": "object"
+          },
+          "portfolio_id": {
+            "description": "Portfolio ID",
+            "title": "Portfolio Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "portfolio_id",
+          "links",
+          "files"
+        ],
+        "title": "PortfolioArtifactsResponseV1",
+        "type": "object"
+      },
+      "PortfolioBuildRequestV1": {
+        "description": "Request for POST /api/v1/portfolios/build.",
+        "properties": {
+          "candidate_run_ids": {
+            "description": "List of candidate run IDs to include",
+            "items": {
+              "type": "string"
+            },
+            "title": "Candidate Run Ids",
+            "type": "array"
+          },
+          "governance_params_overrides": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GovernanceParamsOverrides"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional governance parameter overrides"
+          },
+          "season": {
+            "description": "Season identifier (e.g., '2026Q1')",
+            "title": "Season",
+            "type": "string"
+          },
+          "timeframe": {
+            "description": "Timeframe (e.g., '60m')",
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season",
+          "timeframe",
+          "candidate_run_ids"
+        ],
+        "title": "PortfolioBuildRequestV1",
+        "type": "object"
+      },
+      "PortfolioBuildResponseV1": {
+        "description": "Response for POST /api/v1/portfolios/build.",
+        "properties": {
+          "job_id": {
+            "description": "Job ID for the portfolio build",
+            "title": "Job Id",
+            "type": "string"
+          },
+          "portfolio_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Portfolio ID (may be null initially)",
+            "title": "Portfolio Id"
+          },
+          "status": {
+            "description": "Job status (PENDING, RUNNING, etc.)",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "status"
+        ],
+        "title": "PortfolioBuildResponseV1",
+        "type": "object"
+      },
+      "PortfolioCorrelationV1": {
+        "description": "Correlation matrix and violations.",
+        "properties": {
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Labels",
+            "type": "array"
+          },
+          "matrix": {
+            "items": {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            "title": "Matrix",
+            "type": "array"
+          },
+          "violations": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Violations"
+          }
+        },
+        "required": [
+          "labels",
+          "matrix"
+        ],
+        "title": "PortfolioCorrelationV1",
+        "type": "object"
+      },
+      "PortfolioLinksV1": {
+        "description": "Links to related resources for a portfolio.",
+        "properties": {
+          "admission_decision_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admission Decision Url"
+          },
+          "correlation_matrix_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Matrix Url"
+          },
+          "correlation_violations_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correlation Violations Url"
+          },
+          "evidence_bundle_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Bundle Url"
+          },
+          "risk_budget_snapshot_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Budget Snapshot Url"
+          }
+        },
+        "title": "PortfolioLinksV1",
+        "type": "object"
+      },
+      "PortfolioPlan": {
+        "properties": {
+          "config": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlanCreatePayload"
+              },
+              {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            ],
+            "title": "Config"
+          },
+          "constraints_report": {
+            "$ref": "#/components/schemas/ConstraintsReport"
+          },
+          "generated_at_utc": {
+            "title": "Generated At Utc",
+            "type": "string"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "source": {
+            "$ref": "#/components/schemas/SourceRef"
+          },
+          "summaries": {
+            "$ref": "#/components/schemas/PlanSummary"
+          },
+          "universe": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedCandidate"
+            },
+            "title": "Universe",
+            "type": "array"
+          },
+          "weights": {
+            "items": {
+              "$ref": "#/components/schemas/PlannedWeight"
+            },
+            "title": "Weights",
+            "type": "array"
+          }
+        },
+        "required": [
+          "plan_id",
+          "generated_at_utc",
+          "source",
+          "config",
+          "universe",
+          "weights",
+          "summaries",
+          "constraints_report"
+        ],
+        "title": "PortfolioPlan",
+        "type": "object"
+      },
+      "PortfolioReportV1": {
+        "description": "Portfolio report v1 payload.",
+        "properties": {
+          "admission_summary": {
+            "$ref": "#/components/schemas/PortfolioAdmissionSummaryV1"
+          },
+          "admitted_strategies": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Admitted Strategies"
+          },
+          "correlation": {
+            "$ref": "#/components/schemas/PortfolioCorrelationV1"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "governance_params_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Governance Params Snapshot"
+          },
+          "links": {
+            "$ref": "#/components/schemas/PortfolioLinksV1"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parameters"
+          },
+          "portfolio_id": {
+            "title": "Portfolio Id",
+            "type": "string"
+          },
+          "rejected_strategies": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected Strategies"
+          },
+          "risk_budget_steps": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Budget Steps"
+          },
+          "version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "portfolio_id",
+          "created_at",
+          "admission_summary",
+          "correlation",
+          "links"
+        ],
+        "title": "PortfolioReportV1",
+        "type": "object"
+      },
+      "PortfolioResponseV1": {
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}.",
+        "properties": {
+          "admission_artifacts_index_url": {
+            "description": "URL to portfolio artifacts index",
+            "title": "Admission Artifacts Index Url",
+            "type": "string"
+          },
+          "admission_report_v1_url": {
+            "description": "URL to portfolio report v1",
+            "title": "Admission Report V1 Url",
+            "type": "string"
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Creation timestamp",
+            "title": "Created At"
+          },
+          "portfolio_id": {
+            "description": "Portfolio ID",
+            "title": "Portfolio Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "portfolio_id",
+          "admission_report_v1_url",
+          "admission_artifacts_index_url"
+        ],
+        "title": "PortfolioResponseV1",
+        "type": "object"
+      },
+      "QualityMetrics": {
+        "additionalProperties": true,
+        "description": "Contract goals:\n- Internal grading code historically uses: top1/top3/top5/bucket_coverage_ratio\n- Hardening tests expect: top1_score/effective_n/bucket_coverage\nWe support BOTH via real fields + deterministic properties.",
+        "properties": {
+          "bucket_by": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Bucket By",
+            "type": "array"
+          },
+          "bucket_count": {
+            "title": "Bucket Count",
+            "type": "integer"
+          },
+          "bucket_coverage_ratio": {
+            "default": 0.0,
+            "title": "Bucket Coverage Ratio",
+            "type": "number"
+          },
+          "constraints_pressure": {
+            "default": 0,
+            "title": "Constraints Pressure",
+            "type": "integer"
+          },
+          "effective_n": {
+            "title": "Effective N",
+            "type": "number"
+          },
+          "herfindahl": {
+            "title": "Herfindahl",
+            "type": "number"
+          },
+          "top1": {
+            "default": 0.0,
+            "title": "Top1",
+            "type": "number"
+          },
+          "top3": {
+            "default": 0.0,
+            "title": "Top3",
+            "type": "number"
+          },
+          "top5": {
+            "default": 0.0,
+            "title": "Top5",
+            "type": "number"
+          },
+          "total_candidates": {
+            "title": "Total Candidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_candidates",
+          "herfindahl",
+          "effective_n",
+          "bucket_count"
+        ],
+        "title": "QualityMetrics",
+        "type": "object"
+      },
+      "QualitySourceRef": {
+        "description": "Reference to the source of the plan.",
+        "properties": {
+          "candidates_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates Sha256"
+          },
+          "export_manifest_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Manifest Sha256"
+          },
+          "export_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Export Name"
+          },
+          "plan_id": {
+            "title": "Plan Id",
+            "type": "string"
+          },
+          "season": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          }
+        },
+        "required": [
+          "plan_id"
+        ],
+        "title": "QualitySourceRef",
+        "type": "object"
+      },
+      "QualityThresholds": {
+        "description": "Thresholds for grading.",
+        "properties": {
+          "green_bucket_coverage": {
+            "default": 0.9,
+            "title": "Green Bucket Coverage",
+            "type": "number"
+          },
+          "green_constraints_pressure": {
+            "default": 0,
+            "title": "Green Constraints Pressure",
+            "type": "integer"
+          },
+          "green_effective_n": {
+            "default": 7.0,
+            "title": "Green Effective N",
+            "type": "number"
+          },
+          "green_top1": {
+            "default": 0.9,
+            "title": "Green Top1",
+            "type": "number"
+          },
+          "green_top3": {
+            "default": 0.85,
+            "title": "Green Top3",
+            "type": "number"
+          },
+          "min_total_candidates": {
+            "default": 10,
+            "title": "Min Total Candidates",
+            "type": "integer"
+          },
+          "red_bucket_coverage": {
+            "default": 0.6,
+            "title": "Red Bucket Coverage",
+            "type": "number"
+          },
+          "red_constraints_pressure": {
+            "default": 2,
+            "title": "Red Constraints Pressure",
+            "type": "integer"
+          },
+          "red_effective_n": {
+            "default": 4.0,
+            "title": "Red Effective N",
+            "type": "number"
+          },
+          "red_top1": {
+            "default": 0.75,
+            "title": "Red Top1",
+            "type": "number"
+          },
+          "red_top3": {
+            "default": 0.7,
+            "title": "Red Top3",
+            "type": "number"
+          },
+          "yellow_bucket_coverage": {
+            "default": 0.7,
+            "title": "Yellow Bucket Coverage",
+            "type": "number"
+          },
+          "yellow_constraints_pressure": {
+            "default": 1,
+            "title": "Yellow Constraints Pressure",
+            "type": "integer"
+          },
+          "yellow_effective_n": {
+            "default": 5.0,
+            "title": "Yellow Effective N",
+            "type": "number"
+          },
+          "yellow_top1": {
+            "default": 0.8,
+            "title": "Yellow Top1",
+            "type": "number"
+          },
+          "yellow_top3": {
+            "default": 0.75,
+            "title": "Yellow Top3",
+            "type": "number"
+          }
+        },
+        "title": "QualityThresholds",
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "description": "Response for GET /api/v1/readiness/{season}/{dataset_id}/{timeframe}.",
+        "properties": {
+          "bars_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bars Path"
+          },
+          "bars_ready": {
+            "title": "Bars Ready",
+            "type": "boolean"
+          },
+          "dataset_id": {
+            "title": "Dataset Id",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "features_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Features Path"
+          },
+          "features_ready": {
+            "title": "Features Ready",
+            "type": "boolean"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          },
+          "timeframe": {
+            "title": "Timeframe",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season",
+          "dataset_id",
+          "timeframe",
+          "bars_ready",
+          "features_ready"
+        ],
+        "title": "ReadinessResponse",
+        "type": "object"
+      },
+      "RevealAdmissionPathResponse": {
+        "description": "Response for GET /api/v1/portfolios/{portfolio_id}/reveal_admission_path.",
+        "properties": {
+          "approved": {
+            "description": "Whether path access is approved",
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Absolute path to admission directory",
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approved",
+          "path"
+        ],
+        "title": "RevealAdmissionPathResponse",
+        "type": "object"
+      },
+      "RevealEvidencePathResponse": {
+        "description": "Response for GET /api/v1/jobs/{job_id}/reveal_evidence_path.",
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approved",
+          "path"
+        ],
+        "title": "RevealEvidencePathResponse",
+        "type": "object"
+      },
+      "SeasonAdmissionRequest": {
+        "description": "Request for season admission decisions (P2-C).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "candidate_refs": {
+            "items": {
+              "$ref": "#/components/schemas/CandidateRef"
+            },
+            "title": "Candidate Refs",
+            "type": "array"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAdmissionRequest",
+        "type": "object"
+      },
+      "SeasonAdmissionResponse": {
+        "description": "Response for season admission decisions (P2-C).",
+        "properties": {
+          "admitted_count": {
+            "default": 0,
+            "title": "Admitted Count",
+            "type": "integer"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/AdmissionDecision"
+            },
+            "title": "Decisions",
+            "type": "array"
+          },
+          "generated_at": {
+            "default": "",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "held_count": {
+            "default": 0,
+            "title": "Held Count",
+            "type": "integer"
+          },
+          "rejected_count": {
+            "default": 0,
+            "title": "Rejected Count",
+            "type": "integer"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "total_candidates": {
+            "default": 0,
+            "title": "Total Candidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAdmissionResponse",
+        "type": "object"
+      },
+      "SeasonAnalysisRequest": {
+        "description": "Request for season analysis (P2-B).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAnalysisRequest",
+        "type": "object"
+      },
+      "SeasonAnalysisResponse": {
+        "description": "Response for season analysis (P2-B).",
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "deterministic_order": {
+            "default": "score desc, candidate_id asc",
+            "title": "Deterministic Order",
+            "type": "string"
+          },
+          "generated_at": {
+            "default": "",
+            "title": "Generated At",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "season_state": {
+            "default": "",
+            "title": "Season State",
+            "type": "string"
+          },
+          "skipped_jobs": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Skipped Jobs",
+            "type": "array"
+          },
+          "total_jobs": {
+            "default": 0,
+            "title": "Total Jobs",
+            "type": "integer"
+          },
+          "valid_candidates": {
+            "default": 0,
+            "title": "Valid Candidates",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonAnalysisResponse",
+        "type": "object"
+      },
+      "SeasonArchiveResponse": {
+        "description": "Response after archiving a season.",
+        "properties": {
+          "new_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "New State",
+            "type": "string"
+          },
+          "previous_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "Previous State",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "previous_state",
+          "new_state",
+          "updated_at"
+        ],
+        "title": "SeasonArchiveResponse",
+        "type": "object"
+      },
+      "SeasonAttachRequest": {
+        "description": "Request to attach a job to a season.",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "title": "SeasonAttachRequest",
+        "type": "object"
+      },
+      "SeasonAttachResponse": {
+        "description": "Response after attempting to attach a job to a season.",
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "mismatches": {
+            "items": {
+              "$ref": "#/components/schemas/BoundaryMismatchItem"
+            },
+            "title": "Mismatches",
+            "type": "array"
+          },
+          "result": {
+            "enum": [
+              "ACCEPTED",
+              "REJECTED"
+            ],
+            "title": "Result",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "job_id",
+          "result"
+        ],
+        "title": "SeasonAttachResponse",
+        "type": "object"
+      },
+      "SeasonCandidate": {
+        "description": "A candidate in season analysis.",
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/CandidateIdentity"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "param_hash": {
+            "default": "",
+            "title": "Param Hash",
+            "type": "string"
+          },
+          "research_metrics": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "title": "Research Metrics",
+            "type": "object"
+          },
+          "source": {
+            "$ref": "#/components/schemas/CandidateSource"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          }
+        },
+        "required": [
+          "identity",
+          "strategy_id",
+          "source"
+        ],
+        "title": "SeasonCandidate",
+        "type": "object"
+      },
+      "SeasonCreateRequest": {
+        "description": "Request to create a new season.",
+        "properties": {
+          "hard_boundary": {
+            "$ref": "#/components/schemas/SeasonHardBoundary"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "hard_boundary"
+        ],
+        "title": "SeasonCreateRequest",
+        "type": "object"
+      },
+      "SeasonCreateResponse": {
+        "description": "Response after creating a season.",
+        "properties": {
+          "season": {
+            "$ref": "#/components/schemas/SeasonRecord"
+          }
+        },
+        "required": [
+          "season"
+        ],
+        "title": "SeasonCreateResponse",
+        "type": "object"
+      },
+      "SeasonDetailResponse": {
+        "description": "Response for getting season details.",
+        "properties": {
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Job Ids",
+            "type": "array"
+          },
+          "season": {
+            "$ref": "#/components/schemas/SeasonRecord"
+          }
+        },
+        "required": [
+          "season"
+        ],
+        "title": "SeasonDetailResponse",
+        "type": "object"
+      },
+      "SeasonExportCandidatesRequest": {
+        "description": "Request to export portfolio candidate set (P2-D).",
+        "properties": {
+          "actor": {
+            "default": "ui",
+            "title": "Actor",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id"
+        ],
+        "title": "SeasonExportCandidatesRequest",
+        "type": "object"
+      },
+      "SeasonExportCandidatesResponse": {
+        "description": "Response after exporting portfolio candidate set (P2-D).",
+        "properties": {
+          "artifact_path": {
+            "title": "Artifact Path",
+            "type": "string"
+          },
+          "candidate_count": {
+            "title": "Candidate Count",
+            "type": "integer"
+          },
+          "evidence": {
+            "additionalProperties": true,
+            "title": "Evidence",
+            "type": "object"
+          },
+          "export_id": {
+            "title": "Export Id",
+            "type": "string"
+          },
+          "generated_at": {
+            "title": "Generated At",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "export_id",
+          "candidate_count",
+          "artifact_path",
+          "generated_at"
+        ],
+        "title": "SeasonExportCandidatesResponse",
+        "type": "object"
+      },
+      "SeasonFreezeResponse": {
+        "description": "Response after freezing a season.",
+        "properties": {
+          "new_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "New State",
+            "type": "string"
+          },
+          "previous_state": {
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "Previous State",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "previous_state",
+          "new_state",
+          "updated_at"
+        ],
+        "title": "SeasonFreezeResponse",
+        "type": "object"
+      },
+      "SeasonHardBoundary": {
+        "description": "Hard boundary for a season - must match exactly for job attachment.",
+        "properties": {
+          "dataset_snapshot_id": {
+            "title": "Dataset Snapshot Id",
+            "type": "string"
+          },
+          "engine_constitution_id": {
+            "title": "Engine Constitution Id",
+            "type": "string"
+          },
+          "timeframes_fingerprint": {
+            "title": "Timeframes Fingerprint",
+            "type": "string"
+          },
+          "universe_fingerprint": {
+            "title": "Universe Fingerprint",
+            "type": "string"
+          }
+        },
+        "required": [
+          "universe_fingerprint",
+          "timeframes_fingerprint",
+          "dataset_snapshot_id",
+          "engine_constitution_id"
+        ],
+        "title": "SeasonHardBoundary",
+        "type": "object"
+      },
+      "SeasonListResponse": {
+        "description": "Response for listing seasons.",
+        "properties": {
+          "seasons": {
+            "items": {
+              "$ref": "#/components/schemas/SeasonRecord"
+            },
+            "title": "Seasons",
+            "type": "array"
+          }
+        },
+        "title": "SeasonListResponse",
+        "type": "object"
+      },
+      "SeasonMetadataUpdate": {
+        "description": "Request for updating season metadata.",
+        "properties": {
+          "frozen": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Frozen"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "tags": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags"
+          }
+        },
+        "title": "SeasonMetadataUpdate",
+        "type": "object"
+      },
+      "SeasonRecord": {
+        "description": "Season record as stored in DB.",
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "title": "Created By",
+            "type": "string"
+          },
+          "hard_boundary": {
+            "$ref": "#/components/schemas/SeasonHardBoundary"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "season_id": {
+            "title": "Season Id",
+            "type": "string"
+          },
+          "state": {
+            "default": "DRAFT",
+            "enum": [
+              "DRAFT",
+              "OPEN",
+              "FROZEN",
+              "DECIDING",
+              "ARCHIVED"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season_id",
+          "label",
+          "hard_boundary",
+          "created_at",
+          "created_by",
+          "updated_at"
+        ],
+        "title": "SeasonRecord",
+        "type": "object"
+      },
+      "SnapshotCreatePayload": {
+        "additionalProperties": false,
+        "description": "Payload for creating a data snapshot from raw bars.",
+        "properties": {
+          "raw_bars": {
+            "description": "List of raw bar dictionaries with timestamp, open, high, low, close, volume",
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "minItems": 1,
+            "title": "Raw Bars",
+            "type": "array"
+          },
+          "symbol": {
+            "description": "Trading symbol (e.g., 'MNQ')",
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "description": "Bar timeframe (e.g., '1m', '5m', '1h')",
+            "minLength": 1,
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "transform_version": {
+            "default": "v1",
+            "description": "Version of the normalization algorithm (e.g., 'v1')",
+            "minLength": 1,
+            "title": "Transform Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "raw_bars",
+          "symbol",
+          "timeframe"
+        ],
+        "title": "SnapshotCreatePayload",
+        "type": "object"
+      },
+      "SnapshotMetadata": {
+        "additionalProperties": false,
+        "description": "Immutable metadata of a data snapshot.",
+        "properties": {
+          "created_at": {
+            "description": "ISO 8601 UTC timestamp when snapshot was created (may include fractional seconds)",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?Z$",
+            "title": "Created At",
+            "type": "string"
+          },
+          "manifest_sha256": {
+            "description": "SHA256 of the manifest JSON (excluding this field)",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Manifest Sha256",
+            "type": "string"
+          },
+          "normalized_sha256": {
+            "description": "SHA256 of the normalized bars JSON",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Normalized Sha256",
+            "type": "string"
+          },
+          "raw_sha256": {
+            "description": "SHA256 of the raw bars JSON",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Raw Sha256",
+            "type": "string"
+          },
+          "snapshot_id": {
+            "description": "Deterministic snapshot identifier",
+            "minLength": 1,
+            "title": "Snapshot Id",
+            "type": "string"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/SnapshotStats",
+            "description": "Basic statistics of the snapshot"
+          },
+          "symbol": {
+            "description": "Trading symbol",
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "timeframe": {
+            "description": "Bar timeframe",
+            "minLength": 1,
+            "title": "Timeframe",
+            "type": "string"
+          },
+          "transform_version": {
+            "description": "Version of the normalization algorithm (e.g., 'v1')",
+            "minLength": 1,
+            "title": "Transform Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "symbol",
+          "timeframe",
+          "transform_version",
+          "created_at",
+          "raw_sha256",
+          "normalized_sha256",
+          "manifest_sha256",
+          "stats"
+        ],
+        "title": "SnapshotMetadata",
+        "type": "object"
+      },
+      "SnapshotStats": {
+        "additionalProperties": false,
+        "description": "Basic statistics of a snapshot.",
+        "properties": {
+          "count": {
+            "description": "Number of bars",
+            "minimum": 0.0,
+            "title": "Count",
+            "type": "integer"
+          },
+          "max_price": {
+            "description": "Highest high price across bars",
+            "minimum": 0.0,
+            "title": "Max Price",
+            "type": "number"
+          },
+          "max_timestamp": {
+            "description": "Latest bar timestamp (ISO 8601 UTC)",
+            "title": "Max Timestamp",
+            "type": "string"
+          },
+          "min_price": {
+            "description": "Lowest low price across bars",
+            "minimum": 0.0,
+            "title": "Min Price",
+            "type": "number"
+          },
+          "min_timestamp": {
+            "description": "Earliest bar timestamp (ISO 8601 UTC)",
+            "title": "Min Timestamp",
+            "type": "string"
+          },
+          "total_volume": {
+            "description": "Sum of volume across bars",
+            "minimum": 0.0,
+            "title": "Total Volume",
+            "type": "number"
+          }
+        },
+        "required": [
+          "count",
+          "min_timestamp",
+          "max_timestamp",
+          "min_price",
+          "max_price",
+          "total_volume"
+        ],
+        "title": "SnapshotStats",
+        "type": "object"
+      },
+      "SourceRef": {
+        "properties": {
+          "candidates_file_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates File Sha256"
+          },
+          "candidates_items_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidates Items Sha256"
+          },
+          "candidates_sha256": {
+            "title": "Candidates Sha256",
+            "type": "string"
+          },
+          "export_manifest_sha256": {
+            "title": "Export Manifest Sha256",
+            "type": "string"
+          },
+          "export_name": {
+            "title": "Export Name",
+            "type": "string"
+          },
+          "season": {
+            "title": "Season",
+            "type": "string"
+          }
+        },
+        "required": [
+          "season",
+          "export_name",
+          "export_manifest_sha256",
+          "candidates_sha256"
+        ],
+        "title": "SourceRef",
+        "type": "object"
+      },
+      "StrategyDistributionsV1": {
+        "description": "Distribution data for a strategy.",
+        "properties": {
+          "returns_histogram": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HistogramV1"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "StrategyDistributionsV1",
+        "type": "object"
+      },
+      "StrategyHeadlineMetricsV1": {
+        "description": "Headline metrics for a strategy run.",
+        "properties": {
+          "downstream_admissible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Downstream Admissible"
+          },
+          "max_drawdown": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown"
+          },
+          "net_profit": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Profit"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "trades": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trades"
+          },
+          "win_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Rate"
+          }
+        },
+        "title": "StrategyHeadlineMetricsV1",
+        "type": "object"
+      },
+      "StrategyLinksV1": {
+        "description": "Links to related resources for a strategy.",
+        "properties": {
+          "artifacts_index_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifacts Index Url"
+          },
+          "evidence_bundle_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Bundle Url"
+          },
+          "policy_check_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Policy Check Url"
+          },
+          "stdout_tail_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stdout Tail Url"
+          }
+        },
+        "title": "StrategyLinksV1",
+        "type": "object"
+      },
+      "StrategyRegistryResponse": {
+        "description": "Response model for /meta/strategies endpoint.",
+        "properties": {
+          "strategies": {
+            "items": {
+              "$ref": "#/components/schemas/StrategySpecForGUI"
+            },
+            "title": "Strategies",
+            "type": "array"
+          }
+        },
+        "required": [
+          "strategies"
+        ],
+        "title": "StrategyRegistryResponse",
+        "type": "object"
+      },
+      "StrategyReportV1": {
+        "description": "Strategy report v1 payload.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "distributions": {
+            "$ref": "#/components/schemas/StrategyDistributionsV1"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "headline_metrics": {
+            "$ref": "#/components/schemas/StrategyHeadlineMetricsV1"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "links": {
+            "$ref": "#/components/schemas/StrategyLinksV1"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "title": "Parameters",
+            "type": "object"
+          },
+          "series": {
+            "$ref": "#/components/schemas/StrategySeriesV1"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "strategy_name": {
+            "title": "Strategy Name",
+            "type": "string"
+          },
+          "tables": {
+            "$ref": "#/components/schemas/StrategyTablesV1"
+          },
+          "version": {
+            "const": "1.0",
+            "default": "1.0",
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "strategy_name",
+          "parameters",
+          "created_at",
+          "status",
+          "headline_metrics",
+          "series",
+          "distributions",
+          "tables",
+          "links"
+        ],
+        "title": "StrategyReportV1",
+        "type": "object"
+      },
+      "StrategySeriesV1": {
+        "description": "Time series data for a strategy.",
+        "properties": {
+          "drawdown": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TimePointV1"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Drawdown"
+          },
+          "equity": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TimePointV1"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equity"
+          },
+          "rolling_metric": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TimePointV1"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Metric"
+          },
+          "rolling_metric_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rolling Metric Name"
+          }
+        },
+        "title": "StrategySeriesV1",
+        "type": "object"
+      },
+      "StrategySpecForGUI": {
+        "description": "Strategy specification for GUI consumption.\n\nContains metadata and parameter schema for automatic UI generation.\nGUI must NOT hardcode any strategy parameters.",
+        "properties": {
+          "content_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Content Id"
+          },
+          "params": {
+            "items": {
+              "$ref": "#/components/schemas/ParamSpec"
+            },
+            "title": "Params",
+            "type": "array"
+          },
+          "strategy_id": {
+            "title": "Strategy Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "strategy_id",
+          "params"
+        ],
+        "title": "StrategySpecForGUI",
+        "type": "object"
+      },
+      "StrategyTablesV1": {
+        "description": "Tabular data for a strategy.",
+        "properties": {
+          "trade_list": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/TradeRowV1"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade List"
+          },
+          "trade_summary": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trade Summary"
+          }
+        },
+        "title": "StrategyTablesV1",
+        "type": "object"
+      },
+      "TimePointV1": {
+        "description": "A timestamp-value pair for time series data.",
+        "properties": {
+          "timestamp": {
+            "format": "date-time",
+            "title": "Timestamp",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "timestamp",
+          "value"
+        ],
+        "title": "TimePointV1",
+        "type": "object"
+      },
+      "TradeRowV1": {
+        "description": "Minimal trade row representation.",
+        "properties": {
+          "entry_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Time"
+          },
+          "exit_time": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exit Time"
+          },
+          "mae": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mae"
+          },
+          "mfe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mfe"
+          },
+          "pnl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pnl"
+          }
+        },
+        "title": "TradeRowV1",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      },
+      "WfsPolicyRegistryEntry": {
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "gates": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/PolicyGateModel"
+            },
+            "title": "Gates",
+            "type": "object"
+          },
+          "hash": {
+            "title": "Hash",
+            "type": "string"
+          },
+          "modes": {
+            "$ref": "#/components/schemas/PolicyModesModel"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resolved_source": {
+            "title": "Resolved Source",
+            "type": "string"
+          },
+          "selector": {
+            "title": "Selector",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "selector",
+          "name",
+          "version",
+          "hash",
+          "source",
+          "resolved_source",
+          "modes",
+          "gates",
+          "description"
+        ],
+        "title": "WfsPolicyRegistryEntry",
+        "type": "object"
+      },
+      "WfsPolicyRegistryResponse": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/WfsPolicyRegistryEntry"
+            },
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "WfsPolicyRegistryResponse",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "B5-C Mission Control API",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/v1/batches/{batch_id}/artifacts": {
+      "get": {
+        "description": "List artifacts tree for a batch (read-only).",
+        "operationId": "get_batch_artifacts_api_v1_batches__batch_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Batch Artifacts Api V1 Batches  Batch Id  Artifacts Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Artifacts"
+      }
+    },
+    "/api/v1/batches/{batch_id}/freeze": {
+      "post": {
+        "description": "Freeze a batch (irreversible).",
+        "operationId": "freeze_batch_api_v1_batches__batch_id__freeze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Freeze Batch Api V1 Batches  Batch Id  Freeze Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Batch"
+      }
+    },
+    "/api/v1/batches/{batch_id}/index": {
+      "get": {
+        "description": "Get batch index.json (read-only).",
+        "operationId": "get_batch_index_api_v1_batches__batch_id__index_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Batch Index Api V1 Batches  Batch Id  Index Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Index"
+      }
+    },
+    "/api/v1/batches/{batch_id}/metadata": {
+      "get": {
+        "description": "Get batch metadata.",
+        "operationId": "get_batch_metadata_api_v1_batches__batch_id__metadata_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchMetadata"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Metadata"
+      },
+      "patch": {
+        "description": "Update batch metadata (enforcing frozen rules).",
+        "operationId": "update_batch_metadata_api_v1_batches__batch_id__metadata_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BatchMetadataUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchMetadata"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Batch Metadata"
+      }
+    },
+    "/api/v1/batches/{batch_id}/status": {
+      "get": {
+        "description": "Get batch execution status (read-only).",
+        "operationId": "get_batch_status_api_v1_batches__batch_id__status_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchStatusResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Status"
+      }
+    },
+    "/api/v1/batches/{batch_id}/summary": {
+      "get": {
+        "description": "Get batch summary (read-only).",
+        "operationId": "get_batch_summary_api_v1_batches__batch_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Batch Summary"
+      }
+    },
+    "/api/v1/datasets/registry/register_snapshot": {
+      "post": {
+        "description": "Register an existing snapshot as a dataset (controlled mutation).\n\nContract:\n- snapshot_id must exist under snapshots root\n- Dataset registry is append\u2011only (no overwrites)\n- Conflict detection: if snapshot already registered \u2192 409\n- Returns dataset_id (deterministic) and registry entry",
+        "operationId": "register_snapshot_endpoint_api_v1_datasets_registry_register_snapshot_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Payload",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Register Snapshot Endpoint Api V1 Datasets Registry Register Snapshot Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Register Snapshot Endpoint"
+      }
+    },
+    "/api/v1/datasets/snapshots": {
+      "get": {
+        "description": "List all snapshots (read\u2011only).\n\nReturns:\n    {\n        \"snapshots\": [\n            {\n                \"snapshot_id\": \"...\",\n                \"symbol\": \"...\",\n                \"timeframe\": \"...\",\n                \"created_at\": \"...\",\n                \"raw_sha256\": \"...\",\n                \"normalized_sha256\": \"...\",\n                \"manifest_sha256\": \"...\",\n            },\n            ...\n        ]\n    }",
+        "operationId": "list_snapshots_api_v1_datasets_snapshots_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Snapshots Api V1 Datasets Snapshots Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Snapshots"
+      },
+      "post": {
+        "description": "Create a deterministic snapshot from raw bars.\n\nContract:\n- Input: raw bars (list of dicts) + symbol + timeframe + optional transform_version\n- Deterministic: same input \u2192 same snapshot_id and normalized_sha256\n- Immutable: snapshot directory is write\u2011once (atomic temp\u2011file replace)\n- Timezone\u2011aware: uses UTC timestamps (datetime.now(timezone.utc))\n- Returns SnapshotMetadata with raw_sha256, normalized_sha256, manifest_sha256 chain",
+        "operationId": "create_snapshot_endpoint_api_v1_datasets_snapshots_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SnapshotCreatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotMetadata"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Snapshot Endpoint"
+      }
+    },
+    "/api/v1/exports/seasons/{season}/compare/batches": {
+      "get": {
+        "description": "Batch-level compare cards from exported season package (read-only).\n- Reads exports/seasons/{season}/replay_index.json\n- Does NOT require artifacts/ directory",
+        "operationId": "export_season_compare_batches_api_v1_exports_seasons__season__compare_batches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Season Compare Batches Api V1 Exports Seasons  Season  Compare Batches Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season Compare Batches"
+      }
+    },
+    "/api/v1/exports/seasons/{season}/compare/leaderboard": {
+      "get": {
+        "description": "Grouped leaderboard from exported season package (read-only).\n- Reads exports/seasons/{season}/replay_index.json\n- Does NOT require artifacts/ directory",
+        "operationId": "export_season_compare_leaderboard_api_v1_exports_seasons__season__compare_leaderboard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "default": "strategy_id",
+              "title": "Group By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_group",
+            "required": false,
+            "schema": {
+              "default": 3,
+              "title": "Per Group",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Season Compare Leaderboard Api V1 Exports Seasons  Season  Compare Leaderboard Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season Compare Leaderboard"
+      }
+    },
+    "/api/v1/exports/seasons/{season}/compare/topk": {
+      "get": {
+        "description": "Cross-batch TopK from exported season package (read-only).\n- Reads exports/seasons/{season}/replay_index.json\n- Does NOT require artifacts/ directory\n- Missing/corrupt summaries are skipped (never 500 the whole season)",
+        "operationId": "export_season_compare_topk_api_v1_exports_seasons__season__compare_topk_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "k",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "K",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Season Compare Topk Api V1 Exports Seasons  Season  Compare Topk Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season Compare Topk"
+      }
+    },
+    "/api/v1/identity": {
+      "get": {
+        "description": "Service identity endpoint for topology observability.",
+        "operationId": "identity_api_v1_identity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Identity Api V1 Identity Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Identity"
+      }
+    },
+    "/api/v1/jobs": {
+      "get": {
+        "operationId": "list_jobs_endpoint_api_v1_jobs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/JobListResponse"
+                  },
+                  "title": "Response List Jobs Endpoint Api V1 Jobs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Jobs Endpoint"
+      },
+      "post": {
+        "description": "Create a job (thin proxy to supervisor).\n\nAccepts GUI params format:\n{\n    \"strategy_id\": \"...\",\n    \"instrument\": \"...\",\n    \"timeframe\": \"...\",\n    \"run_mode\": \"...\",  # \"backtest\", \"research\", \"optimize\"\n    \"season\": \"...\",\n    \"dataset\": \"...\"  # optional\n}",
+        "operationId": "submit_job_endpoint_api_v1_jobs_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Payload",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Submit Job Endpoint Api V1 Jobs Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_endpoint_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/abort": {
+      "post": {
+        "description": "Request abort of a job (QUEUED or RUNNING).\nSets abort_requested flag; supervisor will handle killing and transition.",
+        "operationId": "abort_job_endpoint_api_v1_jobs__job_id__abort_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Abort Job Endpoint Api V1 Jobs  Job Id  Abort Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Abort Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/explain": {
+      "get": {
+        "description": "Provide a semantic explanation for why the job finished in its final state.",
+        "operationId": "explain_job_endpoint_api_v1_jobs__job_id__explain_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobExplainResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Explain Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/reveal_evidence_path": {
+      "get": {
+        "description": "Return the absolute path to the job evidence directory after containment check.\n\nSecurity:\n- Must ensure job_id does not contain path traversal.\n- Must ensure the resolved path is within the locked evidence root (outputs/jobs/).\n- Returns 404 if evidence directory does not exist.",
+        "operationId": "reveal_evidence_path_api_v1_jobs__job_id__reveal_evidence_path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealEvidencePathResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Evidence Path"
+      }
+    },
+    "/api/v1/meta/datasets": {
+      "get": {
+        "description": "Read-only endpoint for GUI.\n\nContract:\n- GET only\n- Must not access filesystem during request handling\n- If registries are not preloaded: return 503\n- Deterministic ordering: datasets sorted by id",
+        "operationId": "meta_datasets_api_v1_meta_datasets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DatasetIndex"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Meta Datasets"
+      }
+    },
+    "/api/v1/meta/prime": {
+      "post": {
+        "description": "Prime registries cache (explicit trigger).\n\nThis endpoint allows the UI to manually trigger registry loading\nwhen the automatic startup preload fails (e.g., missing files).\n\nReturns detailed feedback about what succeeded/failed.",
+        "operationId": "prime_registries_api_v1_meta_prime_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Prime Registries Api V1 Meta Prime Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Prime Registries"
+      }
+    },
+    "/api/v1/meta/strategies": {
+      "get": {
+        "description": "Read-only endpoint for GUI.\n\nContract:\n- GET only\n- Must not access filesystem during request handling\n- If registries are not preloaded: return 503\n- Deterministic ordering: strategies sorted by strategy_id; params sorted by name",
+        "operationId": "meta_strategies_api_v1_meta_strategies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyRegistryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Meta Strategies"
+      }
+    },
+    "/api/v1/outputs/summary": {
+      "get": {
+        "description": "Return a human-usable summary of outputs (jobs and portfolios) for clean UI navigation.\n\nContract:\n- Version 1.0 schema\n- No filesystem scanning (use supervisor job store)\n- No filesystem paths returned\n- Dumb client: UI must use this endpoint, not scan filesystem",
+        "operationId": "get_outputs_summary_api_v1_outputs_summary_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Outputs Summary Api V1 Outputs Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Outputs Summary"
+      }
+    },
+    "/api/v1/portfolio/plans": {
+      "get": {
+        "description": "List all portfolio plans (read\u2011only).\n\nReturns:\n    {\n        \"plans\": [\n            {\n                \"plan_id\": \"...\",\n                \"generated_at_utc\": \"...\",\n                \"source\": {...},\n                \"config\": {...},\n                \"summaries\": {...},\n                \"checksums\": {...},\n            },\n            ...\n        ]\n    }",
+        "operationId": "list_portfolio_plans_api_v1_portfolio_plans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Portfolio Plans Api V1 Portfolio Plans Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Portfolio Plans"
+      },
+      "post": {
+        "description": "Create a deterministic portfolio plan from an export (controlled mutation).\n\nContract:\n- Read\u2011only over exports tree (no artifacts, no engine)\n- Deterministic tie\u2011break ordering\n- Controlled mutation: writes only under outputs/portfolio/plans/{plan_id}/\n- Hash chain audit (plan_manifest.json with self\u2011hash)\n- Idempotent: if plan already exists, returns existing plan (200).\n- Returns full plan (including weights, summary, constraints report)",
+        "operationId": "create_portfolio_plan_api_v1_portfolio_plans_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PlanCreatePayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioPlan"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Portfolio Plan"
+      }
+    },
+    "/api/v1/portfolio/plans/{plan_id}": {
+      "get": {
+        "description": "Get a portfolio plan by ID (read\u2011only).\n\nReturns:\n    Full portfolio_plan.json content (including universe, weights, summaries).",
+        "operationId": "get_portfolio_plan_api_v1_portfolio_plans__plan_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Portfolio Plan Api V1 Portfolio Plans  Plan Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portfolio Plan"
+      }
+    },
+    "/api/v1/portfolio/plans/{plan_id}/quality": {
+      "get": {
+        "description": "Compute quality metrics for a portfolio plan (read\u2011only).\n\nContract:\n- Zero\u2011write: only reads plan package files, never writes\n- Deterministic: same plan \u2192 same quality report\n- Returns PlanQualityReport with grade (GREEN/YELLOW/RED) and reasons",
+        "operationId": "get_plan_quality_api_v1_portfolio_plans__plan_id__quality_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanQualityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Plan Quality"
+      },
+      "post": {
+        "description": "Compute quality metrics and write quality files (controlled mutation).\n\nContract:\n- Read\u2011only over plan package files\n- Controlled mutation: writes only three files under plan_dir:\n    - plan_quality.json\n    - plan_quality_checksums.json\n    - plan_quality_manifest.json\n- Idempotent: identical content \u2192 no mtime change\n- Returns PlanQualityReport (same as GET endpoint)",
+        "operationId": "write_plan_quality_api_v1_portfolio_plans__plan_id__quality_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "plan_id",
+            "required": true,
+            "schema": {
+              "title": "Plan Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlanQualityReport"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Write Plan Quality"
+      }
+    },
+    "/api/v1/portfolios/build": {
+      "post": {
+        "description": "Submit a portfolio build request.\n\nCreates a BUILD_PORTFOLIO_V2 job and returns job_id immediately.\nThe portfolio_id may be null initially and will be discoverable from job evidence.",
+        "operationId": "post_portfolio_build_api_v1_portfolios_build_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PortfolioBuildRequestV1"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioBuildResponseV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Portfolio Build",
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}": {
+      "get": {
+        "description": "Get basic portfolio metadata.\n\nReturns portfolio ID, creation timestamp (if available), and URLs to\nreport and artifacts.",
+        "operationId": "get_portfolio_api_v1_portfolios__portfolio_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portfolio_id",
+            "required": true,
+            "schema": {
+              "title": "Portfolio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioResponseV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portfolio",
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/artifacts": {
+      "get": {
+        "description": "Get artifact index for a portfolio admission.\n\nLists all files under outputs/portfolios/<portfolio_id>/admission/\nwith metadata and download URLs.",
+        "operationId": "get_portfolio_artifacts_api_v1_portfolios__portfolio_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portfolio_id",
+            "required": true,
+            "schema": {
+              "title": "Portfolio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioArtifactsResponseV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portfolio Artifacts",
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/artifacts/{filename}": {
+      "get": {
+        "description": "Serve a single artifact file from the portfolio admission directory.\n\nSecurity:\n- filename must be a simple basename (no slashes, no path traversal) -> 403\n- Must enforce containment within outputs/portfolios/<portfolio_id>/admission/ -> 403\n- Returns 404 if file not found (valid basename but missing)\n- Returns 404 if admission directory does not exist (portfolio unknown)",
+        "operationId": "get_portfolio_artifact_file_api_v1_portfolios__portfolio_id__artifacts__filename__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portfolio_id",
+            "required": true,
+            "schema": {
+              "title": "Portfolio Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portfolio Artifact File",
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/api/v1/portfolios/{portfolio_id}/reveal_admission_path": {
+      "get": {
+        "description": "Return the absolute path to the portfolio admission directory after containment check.\n\nSecurity:\n- Must ensure portfolio_id does not contain path traversal.\n- Must ensure the resolved path is within the locked evidence root (outputs/portfolios/).\n- Returns 404 if admission directory does not exist.",
+        "operationId": "reveal_portfolio_admission_path_api_v1_portfolios__portfolio_id__reveal_admission_path_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portfolio_id",
+            "required": true,
+            "schema": {
+              "title": "Portfolio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RevealAdmissionPathResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reveal Portfolio Admission Path",
+        "tags": [
+          "portfolios"
+        ]
+      }
+    },
+    "/api/v1/readiness": {
+      "get": {
+        "description": "Readiness endpoint for UI gates.",
+        "operationId": "readiness_api_v1_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Readiness Api V1 Readiness Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Readiness"
+      }
+    },
+    "/api/v1/readiness/{season}/{dataset_id}/{timeframe}": {
+      "get": {
+        "description": "Check if bars and features are ready for a given season, dataset, and timeframe.\n\nContract:\n- Returns readiness status without performing any writes.\n- If bars/features files exist, returns paths (relative to outputs root).\n- If missing, returns false with optional error.\n- Must not construct filesystem paths in UI; UI must call this endpoint.",
+        "operationId": "readiness_check_api_v1_readiness__season___dataset_id___timeframe__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dataset_id",
+            "required": true,
+            "schema": {
+              "title": "Dataset Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "timeframe",
+            "required": true,
+            "schema": {
+              "title": "Timeframe",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Readiness Check"
+      }
+    },
+    "/api/v1/registry/datasets": {
+      "get": {
+        "description": "Return list of dataset IDs (simple strings).\n\nContract:\n- Returns simple array of strings, e.g., [\"None\", \"VX\", \"ZN\", ...]\n- If dataset registry not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_datasets_api_v1_registry_datasets_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Datasets Api V1 Registry Datasets Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Datasets"
+      }
+    },
+    "/api/v1/registry/instruments": {
+      "get": {
+        "description": "Return list of instrument symbols (keys from instruments config).\n\nContract:\n- Returns simple array of strings, e.g., [\"MNQ\", \"MES\", ...]\n- If instruments config not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_instruments_api_v1_registry_instruments_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Instruments Api V1 Registry Instruments Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Instruments"
+      }
+    },
+    "/api/v1/registry/strategies": {
+      "get": {
+        "description": "Return list of strategy IDs (simple strings).\n\nContract:\n- Returns simple array of strings, e.g., [\"s1_v1\", \"s2_v1\", ...]\n- If strategy registry not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_strategies_api_v1_registry_strategies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Strategies Api V1 Registry Strategies Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Strategies"
+      }
+    },
+    "/api/v1/registry/timeframes": {
+      "get": {
+        "description": "Return list of timeframe display names (simple strings).\n\nContract:\n- Returns simple array of strings, e.g., [\"15m\", \"30m\", \"60m\", \"120m\", \"240m\"]\n- If timeframe registry not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_timeframes_api_v1_registry_timeframes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Timeframes Api V1 Registry Timeframes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Timeframes"
+      }
+    },
+    "/api/v1/reports/portfolio/{portfolio_id}": {
+      "get": {
+        "description": "Return precomputed PortfolioReportV1 JSON for a portfolio admission.\n\nContract:\n- If outputs/portfolios/<portfolio_id>/admission/portfolio_report_v1.json exists:\n  - return its JSON content with application/json\n- Else:\n  - 404 with clear message: \"portfolio_report_v1.json not found; run portfolio build or upgrade workers\"\n- No heavy compute inside request handler.",
+        "operationId": "get_portfolio_report_v1_api_v1_reports_portfolio__portfolio_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "portfolio_id",
+            "required": true,
+            "schema": {
+              "title": "Portfolio Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioReportV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Portfolio Report V1"
+      }
+    },
+    "/api/v1/reports/strategy/{job_id}": {
+      "get": {
+        "description": "Return precomputed StrategyReportV1 JSON for a job.\n\nContract:\n- If outputs/jobs/<job_id>/strategy_report_v1.json exists:\n  - return its JSON content with application/json\n- Else:\n  - 404 with clear message: \"strategy_report_v1.json not found; run job or upgrade workers\"\n- No heavy compute inside request handler.",
+        "operationId": "get_strategy_report_v1_api_v1_reports_strategy__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrategyReportV1"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strategy Report V1"
+      }
+    },
+    "/api/v1/run_status": {
+      "get": {
+        "description": "Read-only endpoint for run status observability via HTTP pull (Heartbeat Pattern).\n\nContract:\n- GET only, no mutation\n- If run_status.json exists \u2192 return JSON\n- If missing \u2192 return default IDLE state\n- No partial JSON ever observed (atomic writes guarantee)\n- No Socket.IO / WebSocket / SSE",
+        "operationId": "get_run_status_api_v1_run_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Run Status Api V1 Run Status Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Run Status"
+      }
+    },
+    "/api/v1/seasons/ssot": {
+      "get": {
+        "description": "List all Season SSOT entities.\n\nContract:\n- Returns all seasons sorted by created_at descending\n- Includes summary information (not full details)",
+        "operationId": "list_seasons_ssot_api_v1_seasons_ssot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Seasons Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/create": {
+      "post": {
+        "description": "Create a new Season SSOT entity with hard boundary validation.\n\nContract:\n- Creates a new season in the SSOT database (jobs_v2.db)\n- Season ID must be unique (409 conflict if exists)\n- Initial state: DRAFT\n- Boundary fields are required and immutable after creation\n- Returns SeasonCreateResponse with created season details",
+        "operationId": "create_season_ssot_api_v1_seasons_ssot_create_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonCreateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}": {
+      "get": {
+        "description": "Get detailed information about a Season SSOT entity.\n\nContract:\n- Returns full season details including boundary and state\n- Includes attached job IDs\n- 404 if season not found",
+        "operationId": "get_season_ssot_api_v1_seasons_ssot__season_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonDetailResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/admit": {
+      "post": {
+        "description": "P2-C: Season Admission Decisions.\n\nContract:\n- Season must be FROZEN (403 if not FROZEN)\n- Validates candidate identities (candidate_id or rank:N format)\n- Makes ADMIT/REJECT/HOLD decisions based on governance rules\n- Writes decisions to season_admissions table with evidence\n- Returns decision summary with counts",
+        "operationId": "admit_season_candidates_ssot_api_v1_seasons_ssot__season_id__admit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAdmissionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAdmissionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Admit Season Candidates Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/analyze": {
+      "post": {
+        "description": "P2-B: Season Analysis Aggregator (Hybrid BC Season Viewer).\n\nContract:\n- Season must be FROZEN (403 if not FROZEN)\n- Reads attached job artifacts (winners.json) and aggregates candidate performance\n- Returns aggregated analysis with candidate rankings and metrics\n- Writes evidence to outputs/_dp_evidence/season_analysis/",
+        "operationId": "analyze_season_ssot_api_v1_seasons_ssot__season_id__analyze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAnalysisResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Analyze Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/archive": {
+      "post": {
+        "description": "Archive a Season SSOT (transition from FROZEN/DECIDING to ARCHIVED).\n\nContract:\n- Only FROZEN or DECIDING seasons can be archived (403 if not)\n- Archived seasons are read-only\n- Returns updated season state",
+        "operationId": "archive_season_ssot_api_v1_seasons_ssot__season_id__archive_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonArchiveResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/attach": {
+      "post": {
+        "description": "Attach a job to a Season SSOT with hard boundary validation.\n\nContract:\n- Validates job boundary matches season boundary (all 4 fields must match exactly)\n- If mismatch: returns 422 with BoundaryMismatchErrorPayload\n- If match: attaches job to season, writes evidence, returns success\n- Season must be in DRAFT or OPEN state (403 if FROZEN/DECIDING/ARCHIVED)\n- Job must exist in supervisor DB (404 if not found)\n- Idempotent: if already attached, returns success (200)",
+        "operationId": "attach_job_to_season_ssot_api_v1_seasons_ssot__season_id__attach_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonAttachRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonAttachResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach Job To Season Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/export_candidates": {
+      "post": {
+        "description": "P2-D: Export Portfolio Candidate Set.\n\nContract:\n- Season must be in DECIDING state (403 if not DECIDING)\n- Reads admission decisions from season_admissions table\n- Exports ADMITTED candidates as portfolio candidate set artifact\n- Writes versioned artifact to outputs/portfolio/candidates/\n- Returns export summary with artifact path and SHA256",
+        "operationId": "export_season_candidates_ssot_api_v1_seasons_ssot__season_id__export_candidates_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonExportCandidatesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonExportCandidatesResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season Candidates Ssot"
+      }
+    },
+    "/api/v1/seasons/ssot/{season_id}/freeze": {
+      "post": {
+        "description": "Freeze a Season SSOT (transition from OPEN to FROZEN).\n\nContract:\n- Only OPEN seasons can be frozen (403 if not OPEN)\n- Frozen seasons cannot accept new job attachments\n- Returns updated season state",
+        "operationId": "freeze_season_ssot_api_v1_seasons_ssot__season_id__freeze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season_id",
+            "required": true,
+            "schema": {
+              "title": "Season Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SeasonFreezeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Season Ssot"
+      }
+    },
+    "/api/v1/seasons/{season}/compare/batches": {
+      "get": {
+        "description": "Batch-level compare cards for a season (read-only).\nSource of truth:\n  - season_index/{season}/season_index.json\n  - artifacts/{batch_id}/summary.json (best-effort)",
+        "operationId": "season_compare_batches_api_v1_seasons__season__compare_batches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Season Compare Batches Api V1 Seasons  Season  Compare Batches Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Compare Batches"
+      }
+    },
+    "/api/v1/seasons/{season}/compare/leaderboard": {
+      "get": {
+        "description": "Grouped leaderboard for a season (read-only).\ngroup_by: strategy_id | dataset_id\nper_group: keep top N items per group",
+        "operationId": "season_compare_leaderboard_api_v1_seasons__season__compare_leaderboard_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "group_by",
+            "required": false,
+            "schema": {
+              "default": "strategy_id",
+              "title": "Group By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "per_group",
+            "required": false,
+            "schema": {
+              "default": 3,
+              "title": "Per Group",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Season Compare Leaderboard Api V1 Seasons  Season  Compare Leaderboard Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Compare Leaderboard"
+      }
+    },
+    "/api/v1/seasons/{season}/compare/topk": {
+      "get": {
+        "description": "Cross-batch TopK for a season (read-only).\n- Reads season_index/{season}/season_index.json\n- Reads artifacts/{batch_id}/summary.json for each batch\n- Missing/corrupt summaries are skipped (never 500 the whole season)",
+        "operationId": "season_compare_topk_api_v1_seasons__season__compare_topk_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "k",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "title": "K",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Season Compare Topk Api V1 Seasons  Season  Compare Topk Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Season Compare Topk"
+      }
+    },
+    "/api/v1/seasons/{season}/export": {
+      "post": {
+        "description": "Export a frozen season into outputs/exports/seasons/{season}/ (controlled mutation).\nRequirements:\n  - season must be frozen (403 if not)\n  - season_index must exist (404 if missing)",
+        "operationId": "export_season_api_v1_seasons__season__export_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Export Season Api V1 Seasons  Season  Export Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export Season"
+      }
+    },
+    "/api/v1/seasons/{season}/freeze": {
+      "post": {
+        "description": "Freeze a season (irreversible).",
+        "operationId": "freeze_season_api_v1_seasons__season__freeze_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Freeze Season Api V1 Seasons  Season  Freeze Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Freeze Season"
+      }
+    },
+    "/api/v1/seasons/{season}/index": {
+      "get": {
+        "description": "Get season_index.json (read-only).",
+        "operationId": "get_season_index_api_v1_seasons__season__index_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Season Index Api V1 Seasons  Season  Index Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season Index"
+      }
+    },
+    "/api/v1/seasons/{season}/metadata": {
+      "get": {
+        "description": "Get season metadata.",
+        "operationId": "get_season_metadata_api_v1_seasons__season__metadata_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Season Metadata Api V1 Seasons  Season  Metadata Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Season Metadata"
+      },
+      "patch": {
+        "description": "Update season metadata (controlled mutation).\nFrozen rules:\n- cannot unfreeze a frozen season\n- tags/note allowed",
+        "operationId": "update_season_metadata_api_v1_seasons__season__metadata_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SeasonMetadataUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Update Season Metadata Api V1 Seasons  Season  Metadata Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Season Metadata"
+      }
+    },
+    "/api/v1/seasons/{season}/rebuild_index": {
+      "post": {
+        "description": "Rebuild season index (controlled mutation).\n- Reads artifacts/* metadata/index/summary (read-only)\n- Writes season_index/{season}/season_index.json (atomic)\n- If season is frozen -> 403",
+        "operationId": "rebuild_season_index_api_v1_seasons__season__rebuild_index_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "season",
+            "required": true,
+            "schema": {
+              "title": "Season",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rebuild Season Index Api V1 Seasons  Season  Rebuild Index Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rebuild Season Index"
+      }
+    },
+    "/api/v1/wfs/policies": {
+      "get": {
+        "description": "Enumerate available WFS policy YAMLs.",
+        "operationId": "list_wfs_policies_endpoint_api_v1_wfs_policies_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WfsPolicyRegistryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Wfs Policies Endpoint"
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    }
+  }
+}

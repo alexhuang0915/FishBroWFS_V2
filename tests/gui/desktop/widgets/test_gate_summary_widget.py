@@ -3,6 +3,8 @@ GUI tests for GateSummaryWidget.
 """
 
 import pytest
+pytest.importorskip("PySide6")
+
 from unittest.mock import Mock, patch
 from datetime import datetime, timezone
 
@@ -13,6 +15,7 @@ from gui.services.gate_summary_service import (
     GateSummary, GateResult, GateStatus, fetch_gate_summary
 )
 from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget, GateCard
+from contracts.portfolio.gate_summary_schemas import GateSummaryV1, GateItemV1
 
 
 @pytest.fixture
@@ -276,6 +279,166 @@ class TestGateSummaryWidget:
             widget.refresh()
             assert signal_called
             assert captured_summary is sample_summary_pass
+
+    def test_widget_with_job_id_shows_job_title(self, app):
+        """GateSummaryWidget with job_id shows job-specific group title."""
+        with patch('gui.desktop.widgets.gate_summary_widget.fetch_gate_summary') as mock_fetch:
+            mock_fetch.return_value = GateSummary(
+                gates=[],
+                timestamp="2026-01-12T12:00:00Z",
+                overall_status=GateStatus.PASS,
+                overall_message="Test"
+            )
+            widget = GateSummaryWidget(job_id="test_job_1234567890")
+            # Group title should include job ID truncated
+            assert "Gates for Job:" in widget.group.title()
+            assert "test_job_1234567890"[:8] in widget.group.title()
+
+    def test_widget_without_job_id_shows_system_gates(self, app):
+        """GateSummaryWidget without job_id shows 'System Gates' title."""
+        with patch('gui.desktop.widgets.gate_summary_widget.fetch_gate_summary') as mock_fetch:
+            mock_fetch.return_value = GateSummary(
+                gates=[],
+                timestamp="2026-01-12T12:00:00Z",
+                overall_status=GateStatus.PASS,
+                overall_message="Test"
+            )
+            widget = GateSummaryWidget()
+            assert widget.group.title() == "System Gates"
+
+    def test_refresh_with_job_id_uses_consolidated_service(self, app):
+        """When job_id is provided, refresh uses consolidated service."""
+        from gui.services.consolidated_gate_summary_service import get_consolidated_gate_summary_service
+        
+        mock_consolidated_summary = GateSummaryV1(
+            schema_version="v1",
+            overall_status=GateStatus.PASS,
+            overall_message="Test",
+            gates=[
+                GateItemV1(
+                    gate_id="ranking_explain",
+                    gate_name="Ranking Explain",
+                    status=GateStatus.PASS,
+                    message="Ranking explain report available",
+                    evaluator="ranking_explain_builder",
+                    evaluated_at_utc="2026-01-12T12:00:00Z",
+                )
+            ],
+            evaluated_at_utc="2026-01-12T12:00:00Z",
+            source="consolidated",
+            evaluator="consolidated_gate_summary_service",
+            counts={"pass": 1, "warn": 0, "reject": 0, "skip": 0, "unknown": 0},
+        )
+        
+        with patch('gui.desktop.widgets.gate_summary_widget.get_consolidated_gate_summary_service') as mock_get_service:
+            mock_service = Mock()
+            mock_service.fetch_consolidated_summary.return_value = mock_consolidated_summary
+            mock_get_service.return_value = mock_service
+            
+            widget = GateSummaryWidget(job_id="test_job")
+            # Constructor calls refresh() once, reset mock to count only the manual refresh
+            mock_service.fetch_consolidated_summary.reset_mock()
+            
+            widget.refresh()
+            
+            # Should call consolidated service with job_id (once for manual refresh)
+            mock_service.fetch_consolidated_summary.assert_called_once_with(job_id="test_job")
+            # Should have converted and created at least one gate card
+            assert len(widget.gate_cards) > 0
+
+    def test_convert_consolidated_to_gate_summary(self, app):
+        """Test _convert_consolidated_to_gate_summary helper method."""
+        from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
+        
+        consolidated_summary = GateSummaryV1(
+            schema_version="v1",
+            overall_status=GateStatus.PASS,
+            overall_message="Test",
+            gates=[
+                GateItemV1(
+                    gate_id="ranking_explain",
+                    gate_name="Ranking Explain",
+                    status=GateStatus.PASS,
+                    message="Ranking explain report available",
+                    evaluator="ranking_explain_builder",
+                    evaluated_at_utc="2026-01-12T12:00:00Z",
+                )
+            ],
+            evaluated_at_utc="2026-01-12T12:00:00Z",
+            source="consolidated",
+            evaluator="consolidated_gate_summary_service",
+            counts={"pass": 1, "warn": 0, "reject": 0, "skip": 0, "unknown": 0},
+        )
+        
+        widget = GateSummaryWidget()
+        result = widget._convert_consolidated_to_gate_summary(consolidated_summary)
+        
+        assert isinstance(result, GateSummary)
+        assert len(result.gates) == 1
+        gate = result.gates[0]
+        assert gate.gate_id == "ranking_explain"
+        assert gate.gate_name == "Ranking Explain"
+        assert gate.status == GateStatus.PASS
+        assert gate.message == "Ranking explain report available"
+        # Note: GateItemV1 doesn't have actions field, so actions will be empty
+        # The conversion method doesn't add actions unless they exist in the GateItemV1
+
+    def test_on_gate_clicked_ranking_explain_triggers_open(self, app):
+        """Clicking ranking_explain gate triggers opener seam with correct path."""
+        from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
+        from pathlib import Path
+        
+        gate_result = GateResult(
+            gate_id="ranking_explain",
+            gate_name="Ranking Explain",
+            status=GateStatus.PASS,
+            message="Test",
+            timestamp="2026-01-12T12:00:00Z",
+        )
+        
+        # Create widget with job_id
+        widget = GateSummaryWidget(job_id="test_job")
+        
+        # Mock opener that records calls
+        mock_calls = []
+        def mock_opener(path: Path) -> None:
+            mock_calls.append(path)
+        
+        # Set the mock opener via the seam
+        widget.set_ranking_explain_opener(mock_opener)
+        
+        # Trigger gate click
+        widget._on_gate_clicked(gate_result)
+        
+        # Verify opener was called with correct path
+        assert len(mock_calls) == 1
+        expected_path = Path("outputs") / "jobs" / "test_job" / "ranking_explain_report.json"
+        assert mock_calls[0] == expected_path
+        
+        # Also verify that the default opener is not used (property is set)
+        assert widget.property('ranking_explain_opener') is mock_opener
+
+    def test_on_gate_clicked_regular_gate_opens_dialog(self, app):
+        """Clicking regular gate opens GateExplanationDialog."""
+        from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget, GateExplanationDialog
+        
+        gate_result = GateResult(
+            gate_id="api_health",
+            gate_name="API Health",
+            status=GateStatus.PASS,
+            message="Test",
+            timestamp="2026-01-12T12:00:00Z",
+        )
+        
+        with patch('gui.desktop.widgets.gate_summary_widget.GateExplanationDialog') as mock_dialog_class:
+            mock_dialog = Mock()
+            mock_dialog_class.return_value = mock_dialog
+            
+            widget = GateSummaryWidget()
+            widget._on_gate_clicked(gate_result)
+            
+            mock_dialog_class.assert_called_once_with(gate_result, parent=widget)
+            mock_dialog.exec.assert_called_once()
 
 
 if __name__ == "__main__":

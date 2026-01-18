@@ -21,7 +21,7 @@ from src.core.portfolio.evidence_aggregator import (
     GateStatus,
     JobLifecycle,
     DataStatus,
-    GateSummaryV1,
+    GatekeeperMetricsV1,
     DataStateV1,
 )
 
@@ -54,7 +54,7 @@ def create_mock_evidence_index(tmp_path: Path) -> Path:
             timeframe=timeframe,
             run_mode="research",
             gate_status=gate_status,
-            gate_summary=GateSummaryV1(
+            gatekeeper_metrics=GatekeeperMetricsV1(
                 total_permutations=100 + i * 10,
                 valid_candidates=20 + i * 2,
                 plateau_check="Pass",
@@ -171,7 +171,7 @@ def test_candidate_selector_top_performers():
             timeframe="5m",
             run_mode="research",
             gate_status=gate_status,
-            gate_summary=GateSummaryV1(),
+            gatekeeper_metrics=GatekeeperMetricsV1(),
             data_state=DataStateV1(
                 data1_status=DataStatus.READY,
                 data2_status=DataStatus.READY,
@@ -231,7 +231,7 @@ def test_candidate_selector_diversified():
             timeframe=timeframes[i],
             run_mode="research",
             gate_status=GateStatus.PASS,
-            gate_summary=GateSummaryV1(),
+            gatekeeper_metrics=GatekeeperMetricsV1(),
             data_state=DataStateV1(
                 data1_status=DataStatus.READY,
                 data2_status=DataStatus.READY,

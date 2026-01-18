@@ -24,7 +24,12 @@ from pydantic import BaseModel, Field, ValidationError
 
 from ..paths import get_outputs_root
 from control.artifacts import canonical_json_bytes, compute_sha256
-from contracts.portfolio.gate_summary_schemas import GateSummaryV1
+from contracts.portfolio.gate_summary_schemas import (
+    GateSummaryV1,
+    safe_gate_summary_from_raw,
+    GateReasonCode,
+    sanitize_raw,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -302,10 +307,32 @@ class BundleResolver:
             
             # Store in appropriate manifest field based on artifact type
             if artifact.artifact_type == "gate_summary_v1" and artifact.content:
-                try:
-                    manifest.gate_summary = GateSummaryV1(**artifact.content)
-                except ValidationError as e:
-                    logger.warning(f"Failed to parse gate_summary_v1: {e}")
+                # Use safe helper to parse gate summary with telemetry
+                error_path = f"core.deployment.bundle_resolver._load_key_artifacts.{artifact.artifact_id}"
+                safe_summary = safe_gate_summary_from_raw(
+                    artifact.content,
+                    error_path=error_path,
+                )
+                manifest.gate_summary = safe_summary
+                
+                # Log telemetry if the summary contains error gates
+                error_gates = [g for g in safe_summary.gates if g.status.value == "REJECT"]
+                if error_gates:
+                    logger.warning(
+                        f"Gate summary parsed with {len(error_gates)} error gates: "
+                        f"{[g.gate_id for g in error_gates]}"
+                    )
+                    # Add telemetry to artifact metadata
+                    if artifact.metadata is None:
+                        artifact.metadata = {}
+                    artifact.metadata["parse_errors"] = [
+                        {
+                            "gate_id": g.gate_id,
+                            "reason_codes": g.reason_codes,
+                            "details": sanitize_raw(g.details),
+                        }
+                        for g in error_gates
+                    ]
             
             elif artifact.artifact_type == "strategy_report_v1" and artifact.content:
                 manifest.strategy_report = artifact.content

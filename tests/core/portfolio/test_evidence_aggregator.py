@@ -16,7 +16,7 @@ from src.core.portfolio.evidence_aggregator import (
     GateStatus,
     JobLifecycle,
     DataStatus,
-    GateSummaryV1,
+    GatekeeperMetricsV1,
     DataStateV1,
 )
 
@@ -32,7 +32,7 @@ def test_evidence_index_model():
         timeframe="5m",
         run_mode="research",
         gate_status=GateStatus.PASS,
-        gate_summary=GateSummaryV1(
+        gatekeeper_metrics=GatekeeperMetricsV1(
             total_permutations=100,
             valid_candidates=25,
             plateau_check="Pass",

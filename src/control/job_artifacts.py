@@ -53,6 +53,11 @@ def stdout_tail_url(job_id: str) -> Optional[str]:
     return None
 
 
+def get_job_artifact_path(job_id: str, filename: str) -> Path:
+    """Return the Path to a job artifact file."""
+    return get_job_evidence_dir(job_id) / filename
+
+
 def evidence_bundle_url(job_id: str) -> Optional[str]:
     """Return the evidence bundle reveal endpoint when evidence exists."""
     if job_evidence_dir_exists(job_id):

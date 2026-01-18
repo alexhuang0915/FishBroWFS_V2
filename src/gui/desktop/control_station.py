@@ -22,6 +22,7 @@ from .tabs.registry_tab import RegistryTab
 from .tabs.allocation_tab import AllocationTab
 from .tabs.audit_tab import AuditTab
 from .tabs.portfolio_admission_tab import PortfolioAdmissionTab
+from .tabs.gate_summary_dashboard_tab import GateSummaryDashboardTab
 from .supervisor_lifecycle import (
     ensure_supervisor_running,
     SupervisorStatus,
@@ -144,6 +145,7 @@ class ControlStation(QMainWindow):
         self.allocation_tab = AllocationTab()
         self.audit_tab = AuditTab()
         self.portfolio_admission_tab = PortfolioAdmissionTab()
+        self.gate_summary_dashboard_tab = GateSummaryDashboardTab()
         
         # Add tabs
         self.tab_widget.addTab(self.op_tab, "Operation")
@@ -152,6 +154,7 @@ class ControlStation(QMainWindow):
         self.tab_widget.addTab(self.allocation_tab, "Allocation")
         self.tab_widget.addTab(self.audit_tab, "Audit")
         self.tab_widget.addTab(self.portfolio_admission_tab, "Portfolio Admission")
+        self.tab_widget.addTab(self.gate_summary_dashboard_tab, "Gate Dashboard")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -181,6 +184,7 @@ class ControlStation(QMainWindow):
         self.allocation_tab.allocation_changed.connect(self.handle_allocation_change)
         self.audit_tab.log_signal.connect(self.handle_log)
         self.portfolio_admission_tab.log_signal.connect(self.handle_log)
+        self.gate_summary_dashboard_tab.log_signal.connect(self.handle_log)
         
         # Tab change events
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
@@ -229,7 +233,7 @@ class ControlStation(QMainWindow):
     @Slot(int)
     def on_tab_changed(self, index: int):
         """Handle tab change events."""
-        tab_names = ["OP", "Report", "Registry", "Allocation", "Audit", "Portfolio Admission"]
+        tab_names = ["OP", "Report", "Registry", "Allocation", "Audit", "Portfolio Admission", "Gate Dashboard"]
         if 0 <= index < len(tab_names):
             self.handle_log(f"Switched to {tab_names[index]} tab")
     

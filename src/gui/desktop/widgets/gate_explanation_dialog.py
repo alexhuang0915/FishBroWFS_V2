@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (  # type: ignore
 from PySide6.QtGui import QFont, QTextCursor, QKeySequence, QShortcut, QColor  # type: ignore
 
 from gui.services.gate_summary_service import GateResult
+from contracts.portfolio.gate_reason_explain import get_gate_reason_explanation
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,7 @@ class GateExplanationDialog(QDialog):
         
         main_layout.addLayout(header_layout)
         
-        # Explanation section
+        # Explanation section with structured view
         explanation_group = QGroupBox("Explanation")
         explanation_group.setStyleSheet("""
             QGroupBox {
@@ -104,10 +105,37 @@ class GateExplanationDialog(QDialog):
         """)
         explanation_layout = QVBoxLayout(explanation_group)
         
-        explanation_text = QTextEdit()
-        explanation_text.setReadOnly(True)
-        explanation_text.setPlainText(self.gate_result.message)
-        explanation_text.setStyleSheet("""
+        # Create tab widget for structured explanation
+        from PySide6.QtWidgets import QTabWidget, QWidget, QVBoxLayout as QVBoxLayout2, QLabel as QLabel2
+        
+        explanation_tabs = QTabWidget()
+        explanation_tabs.setStyleSheet("""
+            QTabWidget::pane {
+                border: 1px solid #555555;
+                background-color: #1E1E1E;
+            }
+            QTabBar::tab {
+                background-color: #2D2D2D;
+                color: #E6E6E6;
+                padding: 6px 12px;
+                margin-right: 2px;
+            }
+            QTabBar::tab:selected {
+                background-color: #3A8DFF;
+                color: #FFFFFF;
+            }
+            QTabBar::tab:hover {
+                background-color: #3D3D3D;
+            }
+        """)
+        
+        # Tab 1: Summary (original message)
+        summary_widget = QWidget()
+        summary_layout = QVBoxLayout2(summary_widget)
+        summary_text = QTextEdit()
+        summary_text.setReadOnly(True)
+        summary_text.setPlainText(self.gate_result.message)
+        summary_text.setStyleSheet("""
             QTextEdit {
                 background-color: #1E1E1E;
                 color: #E6E6E6;
@@ -116,9 +144,89 @@ class GateExplanationDialog(QDialog):
                 padding: 4px;
             }
         """)
-        explanation_text.setMaximumHeight(80)
-        explanation_layout.addWidget(explanation_text)
+        summary_text.setMaximumHeight(100)
+        summary_layout.addWidget(summary_text)
+        explanation_tabs.addTab(summary_widget, "Summary")
         
+        # Tab 2: Structured Explanation (if reason codes exist)
+        if self.gate_result.details and "reason_codes" in self.gate_result.details:
+            reason_codes = self.gate_result.details.get("reason_codes", [])
+            if reason_codes:
+                structured_widget = QWidget()
+                structured_layout = QVBoxLayout2(structured_widget)
+                
+                # Build structured explanation from dictionary
+                structured_text = QTextEdit()
+                structured_text.setReadOnly(True)
+                structured_text.setStyleSheet("""
+                    QTextEdit {
+                        background-color: #1E1E1E;
+                        color: #E6E6E6;
+                        border: none;
+                        font-size: 12px;
+                        padding: 4px;
+                    }
+                """)
+                
+                explanation_html = "<div style='font-family: monospace; font-size: 12px;'>"
+                
+                for i, reason_code in enumerate(reason_codes):
+                    try:
+                        # Get explanation from dictionary
+                        explanation = get_gate_reason_explanation(reason_code)
+                        
+                        explanation_html += f"""
+                        <div style='margin-bottom: 15px; border-left: 3px solid #3A8DFF; padding-left: 10px;'>
+                            <h4 style='color: #3A8DFF; margin: 0;'>Reason Code: {reason_code}</h4>
+                            <p style='margin: 5px 0;'><strong>Developer View:</strong> {explanation['developer_explanation']}</p>
+                            <p style='margin: 5px 0;'><strong>Business Impact:</strong> {explanation['business_impact']}</p>
+                            <p style='margin: 5px 0;'><strong>Recommended Action:</strong> {explanation['recommended_action']}</p>
+                            <p style='margin: 5px 0;'><strong>Severity:</strong> <span style='color: {'#F44336' if explanation['severity'] == 'ERROR' else '#FF9800' if explanation['severity'] == 'WARN' else '#4CAF50'}'>
+                                {explanation['severity']}
+                            </span></p>
+                        </div>
+                        """
+                    except Exception as e:
+                        explanation_html += f"""
+                        <div style='margin-bottom: 15px; border-left: 3px solid #FF9800; padding-left: 10px;'>
+                            <h4 style='color: #FF9800; margin: 0;'>Reason Code: {reason_code}</h4>
+                            <p style='margin: 5px 0; color: #FF9800;'>Could not load explanation: {str(e)}</p>
+                        </div>
+                        """
+                
+                explanation_html += "</div>"
+                structured_text.setHtml(explanation_html)
+                structured_layout.addWidget(structured_text)
+                explanation_tabs.addTab(structured_widget, "Structured Explanation")
+        
+        # Tab 3: Details (raw details if available)
+        if self.gate_result.details:
+            details_widget = QWidget()
+            details_layout = QVBoxLayout2(details_widget)
+            details_text = QTextEdit()
+            details_text.setReadOnly(True)
+            details_text.setStyleSheet("""
+                QTextEdit {
+                    background-color: #1E1E1E;
+                    color: #E6E6E6;
+                    border: none;
+                    font-size: 12px;
+                    padding: 4px;
+                    font-family: 'Monospace';
+                }
+            """)
+            
+            # Format details as JSON
+            try:
+                details_json = json.dumps(self.gate_result.details, indent=2, ensure_ascii=False)
+                details_text.setPlainText(details_json)
+            except (TypeError, ValueError):
+                details_text.setPlainText(str(self.gate_result.details))
+            
+            details_layout.addWidget(details_text)
+            explanation_tabs.addTab(details_widget, "Details")
+        
+        explanation_layout.addWidget(explanation_tabs)
         main_layout.addWidget(explanation_group)
         
         # Raw evidence section (collapsible)

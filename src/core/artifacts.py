@@ -12,6 +12,11 @@ from pathlib import Path
 from typing import Any, Dict
 
 from core.winners_schema import build_winners_v2_dict, is_winners_v2
+from gui.services.ranking_explain_builder import (
+    build_and_write_ranking_explain_report,
+    RankingExplainContext,
+)
+from wfs.scoring_guards import ScoringGuardConfig
 
 
 def _write_json(path: Path, obj: Any) -> None:
@@ -127,5 +132,41 @@ def write_run_artifacts(
     
     # Write logs.txt (empty initially)
     (run_dir / "logs.txt").write_text("", encoding="utf-8")
+    
+    # DP6 Phase I: Generate ranking explain artifact if winners exist
+    if winners and winners.get("topk"):
+        try:
+            # Determine context based on stage name
+            stage_name = metrics.get("stage_name", "").lower()
+            if "final" in stage_name or "selection" in stage_name:
+                context = RankingExplainContext.FINAL_SELECTION
+            else:
+                context = RankingExplainContext.CANDIDATE
+            
+            # Use default scoring guard config
+            scoring_config = ScoringGuardConfig()
+            
+            # Build and write ranking explain report
+            success = build_and_write_ranking_explain_report(
+                job_dir=run_dir,
+                context=context,
+                scoring_guard_cfg=scoring_config,
+            )
+            
+            if not success:
+                # Log warning but don't fail the artifact writing
+                warning_path = run_dir / "ranking_explain_warning.txt"
+                warning_path.write_text(
+                    "Failed to generate ranking_explain_report.json artifact\n",
+                    encoding="utf-8"
+                )
+        except Exception as e:
+            # Catch all exceptions to ensure artifact writing doesn't fail
+            # due to ranking explain generation issues
+            error_path = run_dir / "ranking_explain_error.txt"
+            error_path.write_text(
+                f"Error generating ranking_explain_report.json: {str(e)}\n",
+                encoding="utf-8"
+            )
 
 

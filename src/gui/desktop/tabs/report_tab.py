@@ -98,6 +98,7 @@ class ReportTab(QWidget):
             ("report.json", "Comprehensive analysis report"),
             ("governance_summary.json", "Governance compliance snapshot"),
             ("scoring_breakdown.json", "Detailed scoring breakdown"),
+            ("ranking_explain_report.json", "Ranking explanations and reason cards"),
         ]
         
         for artifact_name, description in artifact_defs:
@@ -294,11 +295,31 @@ class ReportTab(QWidget):
         """)
         self.scoring_breakdown_btn.setEnabled(False)
 
+        self.ranking_explain_btn = QPushButton("Open ranking_explain_report.json")
+        self.ranking_explain_status = QLabel("Not available")
+        self.ranking_explain_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 2px 6px;
+                font-size: 10px;
+            }
+            QPushButton:disabled {
+                color: #777777;
+            }
+        """)
+        self.ranking_explain_btn.setEnabled(False)
+
         governance_layout.addWidget(_build_row(
             "governance_summary.json", self.gov_summary_btn, self.gov_summary_status
         ))
         governance_layout.addWidget(_build_row(
             "scoring_breakdown.json", self.scoring_breakdown_btn, self.scoring_breakdown_status
+        ))
+        governance_layout.addWidget(_build_row(
+            "ranking_explain_report.json", self.ranking_explain_btn, self.ranking_explain_status
         ))
 
         # Policy info display
@@ -337,6 +358,7 @@ class ReportTab(QWidget):
         self.preview_report_btn.clicked.connect(lambda: self.preview_file("report.json"))
         self.gov_summary_btn.clicked.connect(lambda: self.preview_file("governance_summary.json"))
         self.scoring_breakdown_btn.clicked.connect(lambda: self.preview_file("scoring_breakdown.json"))
+        self.ranking_explain_btn.clicked.connect(lambda: self.preview_file("ranking_explain_report.json"))
     
     def create_checklist_item(self, artifact_name: str, description: str) -> QWidget:
         """Create a checklist item widget for an artifact."""
@@ -453,6 +475,7 @@ class ReportTab(QWidget):
             "report_json": "report.json",
             "governance_summary_json": "governance_summary.json",
             "scoring_breakdown_json": "scoring_breakdown.json",
+            "ranking_explain_report_json": "ranking_explain_report.json",
         }
         
         for diag_key, artifact_name in diagnostic_map.items():
@@ -482,18 +505,23 @@ class ReportTab(QWidget):
         if not active_run_state.run_dir:
             self.gov_summary_status.setText("Not available")
             self.scoring_breakdown_status.setText("Not available")
+            self.ranking_explain_status.setText("Not available")
             self.gov_summary_btn.setEnabled(False)
             self.scoring_breakdown_btn.setEnabled(False)
+            self.ranking_explain_btn.setEnabled(False)
             self.update_policy_display()
             return
 
         summary_ready = active_run_state.diagnostics.get("governance_summary_json") == "READY"
         scoring_ready = active_run_state.diagnostics.get("scoring_breakdown_json") == "READY"
+        ranking_explain_ready = active_run_state.diagnostics.get("ranking_explain_report_json") == "READY"
 
         self.gov_summary_status.setText(_normalize_status("governance_summary_json"))
         self.scoring_breakdown_status.setText(_normalize_status("scoring_breakdown_json"))
+        self.ranking_explain_status.setText(_normalize_status("ranking_explain_report_json"))
         self.gov_summary_btn.setEnabled(summary_ready)
         self.scoring_breakdown_btn.setEnabled(scoring_ready)
+        self.ranking_explain_btn.setEnabled(ranking_explain_ready)
         self.update_policy_display()
 
     def update_policy_display(self):

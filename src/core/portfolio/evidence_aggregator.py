@@ -49,8 +49,8 @@ class DataStatus(str, Enum):
     UNKNOWN = "UNKNOWN"
 
 
-class GateSummaryV1(BaseModel):
-    """Gate summary from gatekeeper."""
+class GatekeeperMetricsV1(BaseModel):
+    """Gatekeeper metrics (total permutations, valid candidates, plateau check)."""
     total_permutations: Optional[int] = None
     valid_candidates: Optional[int] = None
     plateau_check: Optional[str] = None  # "Pass", "Fail", "N/A"
@@ -78,7 +78,7 @@ class JobEvidenceSummaryV1(BaseModel):
     
     # Gate status
     gate_status: GateStatus = GateStatus.UNKNOWN
-    gate_summary: GateSummaryV1 = Field(default_factory=lambda: GateSummaryV1())
+    gatekeeper_metrics: GatekeeperMetricsV1 = Field(default_factory=lambda: GatekeeperMetricsV1())
     
     # Data state
     data_state: DataStateV1 = Field(default_factory=lambda: DataStateV1())
@@ -199,20 +199,20 @@ class EvidenceAggregator:
         
         return GateStatus.UNKNOWN
     
-    def extract_gate_summary(self, job_dir: Path) -> GateSummaryV1:
-        """Extract gate summary from job artifacts."""
+    def extract_gatekeeper_metrics(self, job_dir: Path) -> GatekeeperMetricsV1:
+        """Extract gatekeeper metrics from job artifacts."""
         report_path = job_dir / "strategy_report_v1.json"
         report = self.read_json_if_exists(report_path)
         
         if report:
             gatekeeper = report.get("gatekeeper", {})
-            return GateSummaryV1(
+            return GatekeeperMetricsV1(
                 total_permutations=gatekeeper.get("total_permutations"),
                 valid_candidates=gatekeeper.get("valid_candidates"),
                 plateau_check=gatekeeper.get("plateau_check"),
             )
         
-        return GateSummaryV1()
+        return GatekeeperMetricsV1()
     
     def extract_data_state(self, job_dir: Path) -> DataStateV1:
         """Extract data state from job artifacts."""
@@ -304,7 +304,7 @@ class EvidenceAggregator:
             # Extract all information
             lifecycle = self.infer_lifecycle(job_dir)
             gate_status = self.extract_gate_status(job_dir)
-            gate_summary = self.extract_gate_summary(job_dir)
+            gatekeeper_metrics = self.extract_gatekeeper_metrics(job_dir)
             data_state = self.extract_data_state(job_dir)
             context = self.extract_job_context(job_dir)
             artifacts = self.list_artifacts(job_dir)
@@ -318,7 +318,7 @@ class EvidenceAggregator:
                 timeframe=context["timeframe"],
                 run_mode=context["run_mode"],
                 gate_status=gate_status,
-                gate_summary=gate_summary,
+                gatekeeper_metrics=gatekeeper_metrics,
                 data_state=data_state,
                 artifacts_present=artifacts,
                 created_at=created_at,
@@ -413,9 +413,12 @@ class EvidenceAggregator:
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
         
-        # Convert jobs dict
+        # Convert jobs dict - handle backward compatibility for gate_summary -> gatekeeper_metrics
         jobs = {}
         for job_id, job_data in data.get("jobs", {}).items():
+            # If old data has 'gate_summary' field, rename it to 'gatekeeper_metrics'
+            if 'gate_summary' in job_data:
+                job_data['gatekeeper_metrics'] = job_data.pop('gate_summary')
             jobs[job_id] = JobEvidenceSummaryV1(**job_data)
         
         data["jobs"] = jobs

@@ -6,6 +6,9 @@ from typing import Any, Dict, Iterable, Optional, Sequence
 
 from fastapi import HTTPException
 
+import json
+from pathlib import Path
+
 from control.job_artifacts import artifact_url_if_exists, evidence_bundle_url, job_artifact_url, stdout_tail_url
 from control.reporting.io import read_job_artifact
 from control.supervisor import get_job as supervisor_get_job
@@ -229,6 +232,56 @@ def _select_rule(context: _ExplainContext) -> Dict[str, Any]:
     return TAXONOMY_RULES[-1]
 
 
+def _get_ranking_explain(job_id: str) -> Dict[str, Any]:
+    """
+    Load ranking explain report if available.
+    
+    Returns:
+        Dict with ranking explain data or fallback message
+    """
+    try:
+        # Try to read the ranking_explain_report.json artifact (canonical filename)
+        ranking_explain_data = read_job_artifact(job_id, "ranking_explain_report.json")
+        if ranking_explain_data:
+            return {
+                "available": True,
+                "artifact": ranking_explain_data,
+                "message": "Ranking explain report available",
+            }
+        
+        # Check if ranking_explain_report.json exists but couldn't be read
+        from control.job_artifacts import get_job_artifact_path
+        artifact_path = get_job_artifact_path(job_id, "ranking_explain_report.json")
+        if artifact_path.exists():
+            # Try direct file read as fallback
+            try:
+                with open(artifact_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                return {
+                    "available": True,
+                    "artifact": data,
+                    "message": "Ranking explain report available (direct read)",
+                }
+            except (json.JSONDecodeError, OSError):
+                pass
+        
+        # No ranking explain artifact found
+        return {
+            "available": False,
+            "artifact": None,
+            "message": "Ranking explain report not available for this job",
+            "action": "Run WFS with ranking explain enabled",
+        }
+    except Exception:
+        # Catch all exceptions to ensure explain service doesn't fail
+        return {
+            "available": False,
+            "artifact": None,
+            "message": "Error loading ranking explain report",
+            "action": "Check artifact permissions and format",
+        }
+
+
 def build_job_explain(job_id: str) -> dict[str, Any]:
     job = supervisor_get_job(job_id)
     if job is None:
@@ -329,6 +382,13 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         cards = build_reason_cards_for_gate(gate_key, job.job_id)
         gate_reason_cards[gate_key] = [card.__dict__ for card in cards]
 
+    # DP6 Phase I: Get ranking explain data
+    ranking_explain = _get_ranking_explain(job.job_id)
+    
+    # Add ranking explain URL to evidence if available
+    if ranking_explain.get("available"):
+        evidence["ranking_explain_url"] = artifact_url_if_exists(job_id, "ranking_explain_report.json")
+
     payload: dict[str, Any] = {
         "schema_version": "1.0",
         "job_id": job.job_id,
@@ -352,6 +412,8 @@ def build_job_explain(job_id: str) -> dict[str, Any]:
         "admission_status": asdict(admission_status),
         "admission_reason_cards": admission_reason_cards_dict,
         "gate_reason_cards": gate_reason_cards,
+        # DP6 Phase I: Add ranking explain
+        "ranking_explain": ranking_explain,
         "debug": {
             "derived_from": DEBUG_DERIVED_FROM,
             "cache": {"hit": False, "ttl_s": int(CACHE_TTL_SECONDS)},

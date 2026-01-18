@@ -133,27 +133,41 @@ class TestConsolidatedGateSummaryService:
                     assert "api_health" in gate_ids
                     assert "job_123" in gate_ids
     
+    def test_with_prefixed_gate_id_returns_copy(self):
+        """Ensure gate_id prefixes without mutating the original gate."""
+        service = ConsolidatedGateSummaryService()
+        gate = GateItemV1(
+            gate_id="api_health",
+            gate_name="API Health",
+            status=GateStatus.PASS,
+            message="Fresh gate",
+            evaluator="gate_summary_service",
+        )
+        prefixed_gate = service._with_prefixed_gate_id(gate)
+        assert prefixed_gate.gate_id == "system_api_health"
+        assert gate.gate_id == "api_health"
+        assert prefixed_gate is not gate
+    
     def test_fetch_consolidated_summary(self):
         """Test fetching consolidated summary."""
         service = ConsolidatedGateSummaryService()
         
         with patch.object(service, 'fetch_all_gates') as mock_fetch:
-            mock_fetch.return_value = [
-                GateItemV1(
-                    gate_id="system_api_health",
-                    gate_name="API Health",
-                    status=GateStatus.PASS,
-                    message="API health endpoint responds with status ok.",
-                    evaluator="gate_summary_service",
-                ),
-                GateItemV1(
-                    gate_id="gatekeeper_job_123",
-                    gate_name="Gatekeeper: test",
-                    status=GateStatus.WARN,
-                    message="Job test_job_123: 85/100 valid",
-                    evaluator="evidence_aggregator",
-                ),
-            ]
+            gate_a = GateItemV1(
+                gate_id="api_health",
+                gate_name="API Health",
+                status=GateStatus.PASS,
+                message="API health endpoint responds with status ok.",
+                evaluator="gate_summary_service",
+            )
+            gate_b = GateItemV1(
+                gate_id="job_123",
+                gate_name="Gatekeeper: test",
+                status=GateStatus.WARN,
+                message="Job test_job_123: 85/100 valid",
+                evaluator="evidence_aggregator",
+            )
+            mock_fetch.return_value = [gate_a, gate_b]
             
             summary = service.fetch_consolidated_summary()
             
@@ -163,6 +177,11 @@ class TestConsolidatedGateSummaryService:
             assert summary.total_gates == 2
             assert summary.counts["pass"] == 1
             assert summary.counts["warn"] == 1
+            gate_ids = {g.gate_id for g in summary.gates}
+            assert gate_ids == {"system_api_health", "gatekeeper_job_123"}
+            # Original gate instances should remain unchanged
+            assert gate_a.gate_id == "api_health"
+            assert gate_b.gate_id == "job_123"
     
     def test_singleton(self):
         """Test singleton get_consolidated_gate_summary_service."""

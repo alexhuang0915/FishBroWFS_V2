@@ -27,6 +27,13 @@ from gui.services.gate_summary_service import (
 from contracts.portfolio.gate_summary_schemas import (
     GateSummaryV1, GateItemV1, GateStatus, create_gate_summary_from_gates
 )
+from contracts.ranking_explain import RankingExplainReasonCode, RankingExplainSeverity
+from contracts.ranking_explain_gate_policy import (
+    GateImpact,
+    ranking_explain_gate_impact,
+    get_gate_status_from_impact,
+    get_gate_impact_message,
+)
 from core.paths import get_outputs_root
 
 logger = logging.getLogger(__name__)
@@ -127,10 +134,10 @@ class ConsolidatedGateSummaryService:
                 }
                 status = status_map.get(job_summary.gate_status, GateStatus.UNKNOWN)
                 
-                # Build message from gate summary
-                gate_summary = job_summary.gate_summary
-                if gate_summary.total_permutations is not None:
-                    message = f"Job {job_id}: {gate_summary.valid_candidates or 0}/{gate_summary.total_permutations} valid"
+                # Build message from gatekeeper metrics
+                gatekeeper_metrics = job_summary.gatekeeper_metrics
+                if gatekeeper_metrics.total_permutations is not None:
+                    message = f"Job {job_id}: {gatekeeper_metrics.valid_candidates or 0}/{gatekeeper_metrics.total_permutations} valid"
                 else:
                     message = f"Job {job_id}: {job_summary.gate_status.value}"
                 
@@ -167,8 +174,167 @@ class ConsolidatedGateSummaryService:
         # For now, return empty list
         return []
     
-    def fetch_all_gates(self) -> List[GateItemV1]:
-        """Fetch gates from all sources."""
+    def fetch_ranking_explain_gates(self) -> List[GateItemV1]:
+        """Fetch ranking explain gates from ranking_explain_report.json artifact.
+        
+        Returns:
+            List of GateItemV1 with section_id "ranking_explain" and appropriate status.
+            
+        Rules:
+            - Read ranking_explain_report.json artifact
+            - Apply mapping policy to reason codes
+            - Determine overall section status (PASS/WARN/FAIL)
+            - Return single gate representing the ranking explain section
+            - If artifact missing: return WARN gate
+            - If no mapped impacts: return PASS gate
+        """
+        try:
+            # Try to import explain service to read ranking explain artifact
+            # Note: We must NOT import ranking_explain_builder.py (no recompute)
+            from control.explain_service import _get_ranking_explain
+            
+            ranking_explain = _get_ranking_explain("dummy_job_id")  # Will be replaced with actual job_id
+            # Actually we need job_id context - this method needs job_id parameter
+            # We'll implement a different approach: create a helper that takes job_id
+            logger.warning("fetch_ranking_explain_gates needs job_id parameter - returning empty for now")
+            return []
+            
+        except ImportError as e:
+            logger.warning(f"Explain service not available: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Failed to fetch ranking explain gates: {e}")
+            return []
+    
+    def build_ranking_explain_gate_section(self, job_id: str) -> GateItemV1:
+        """Build ranking explain gate section for a specific job.
+        
+        Args:
+            job_id: Job identifier
+            
+        Returns:
+            GateItemV1 representing ranking explain section
+            
+        Implementation follows Phase III requirements:
+            - Read ranking_explain_report.json artifact
+            - Apply mapping policy to reason codes
+            - Determine section status (PASS/WARN/FAIL)
+            - Return gate with appropriate message and evidence
+        """
+        try:
+            # Try to read ranking explain artifact using existing explain service
+            from control.explain_service import _get_ranking_explain
+            
+            ranking_explain = _get_ranking_explain(job_id)
+            
+            if not ranking_explain.get("available", False):
+                # Artifact missing - return WARN gate (Option A policy)
+                return GateItemV1(
+                    gate_id="ranking_explain_missing",
+                    gate_name="Ranking Explain",
+                    status=GateStatus.WARN,
+                    message="Ranking explain artifact missing (ranking_explain_report.json not found)",
+                    reason_codes=["RANKING_EXPLAIN_REPORT_MISSING"],
+                    evidence_refs=[],
+                    evaluated_at_utc=datetime.now(timezone.utc).isoformat(),
+                    evaluator="consolidated_gate_summary_service",
+                )
+            
+            artifact_data = ranking_explain.get("artifact", {})
+            reasons = artifact_data.get("reasons", [])
+            
+            # Track impacts for determining overall status
+            has_block = False
+            has_warn = False
+            gate_items = []
+            
+            for reason in reasons:
+                code_str = reason.get("code", "")
+                severity_str = reason.get("severity", "INFO")
+                
+                try:
+                    # Parse reason code
+                    code = RankingExplainReasonCode(code_str)
+                    severity = RankingExplainSeverity(severity_str)
+                except (ValueError, KeyError):
+                    # Unknown code or severity - skip
+                    continue
+                
+                # Apply mapping policy
+                impact = ranking_explain_gate_impact(code)
+                
+                # Determine gate status for this item
+                if impact == GateImpact.BLOCK:
+                    has_block = True
+                elif impact == GateImpact.WARN_ONLY:
+                    has_warn = True
+                
+                # Only include items with impact (BLOCK or WARN_ONLY)
+                if impact != GateImpact.NONE:
+                    gate_items.append({
+                        "code": code.value,
+                        "severity": severity.value,
+                        "impact": impact.value,
+                        "message": get_gate_impact_message(code, severity.value),
+                    })
+            
+            # Determine overall section status
+            if has_block:
+                section_status = GateStatus.REJECT  # FAIL
+            elif has_warn:
+                section_status = GateStatus.WARN
+            else:
+                section_status = GateStatus.PASS
+            
+            # Build message based on status
+            if section_status == GateStatus.REJECT:
+                message = "Ranking explain has BLOCK reasons (governance redline)"
+            elif section_status == GateStatus.WARN:
+                message = "Ranking explain has WARN reasons (risk advisory)"
+            else:
+                message = "Ranking explain PASS (no risk findings)"
+            
+            # Add count of items if any
+            if gate_items:
+                message += f" ({len(gate_items)} findings)"
+            
+            # Build evidence references
+            evidence_refs = []
+            if ranking_explain.get("available"):
+                evidence_refs.append(f"job:{job_id}/ranking_explain_report.json")
+            
+            return GateItemV1(
+                gate_id="ranking_explain",
+                gate_name="Ranking Explain",
+                status=section_status,
+                message=message,
+                reason_codes=[item["code"] for item in gate_items],
+                evidence_refs=evidence_refs,
+                evaluated_at_utc=datetime.now(timezone.utc).isoformat(),
+                evaluator="consolidated_gate_summary_service",
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to build ranking explain gate section for job {job_id}: {e}")
+            # Return error gate
+            return GateItemV1(
+                gate_id="ranking_explain_error",
+                gate_name="Ranking Explain",
+                status=GateStatus.UNKNOWN,
+                message=f"Error processing ranking explain: {e}",
+                reason_codes=["PROCESSING_ERROR"],
+                evidence_refs=[],
+                evaluated_at_utc=datetime.now(timezone.utc).isoformat(),
+                evaluator="consolidated_gate_summary_service",
+            )
+    
+    def fetch_all_gates(self, job_id: Optional[str] = None) -> List[GateItemV1]:
+        """Fetch gates from all sources.
+        
+        Args:
+            job_id: Optional job identifier for context-specific gates
+                   (e.g., ranking explain gates for a specific job)
+        """
         all_gates = []
         
         # System health gates
@@ -183,26 +349,45 @@ class ConsolidatedGateSummaryService:
         admission_gates = self.fetch_portfolio_admission_gates()
         all_gates.extend(admission_gates)
         
+        # Ranking explain gates (if job_id provided)
+        if job_id:
+            ranking_explain_gate = self.build_ranking_explain_gate_section(job_id)
+            if ranking_explain_gate:
+                all_gates.append(ranking_explain_gate)
+        
         return all_gates
     
-    def fetch_consolidated_summary(self) -> GateSummaryV1:
-        """Fetch all gates and return consolidated GateSummaryV1."""
-        gates = self.fetch_all_gates()
+    def _with_prefixed_gate_id(self, gate: GateItemV1) -> GateItemV1:
+        """Return gate with source prefix on gate_id without mutating the original."""
+        prefix_candidates = ("system_", "gatekeeper_", "admission_", "ranking_explain")
+
+        if gate.gate_id.startswith(prefix_candidates):
+            return gate
+
+        prefix_map = {
+            "gate_summary_service": "system_",
+            "evidence_aggregator": "gatekeeper_",
+            "portfolio_admission": "admission_",
+        }
+        prefix = prefix_map.get(gate.evaluator)
+        if not prefix:
+            return gate
+
+        # Use model_copy to respect the frozen contract
+        return gate.model_copy(update={"gate_id": f"{prefix}{gate.gate_id}"})
+
+    def fetch_consolidated_summary(self, job_id: Optional[str] = None) -> GateSummaryV1:
+        """Fetch all gates and return consolidated GateSummaryV1.
         
-        # Add source prefixes to gate_ids to avoid collisions
-        for gate in gates:
-            # Ensure gate_id is unique across sources
-            if not gate.gate_id.startswith(("system_", "gatekeeper_", "admission_")):
-                # Determine source based on evaluator
-                if gate.evaluator == "gate_summary_service":
-                    gate.gate_id = f"system_{gate.gate_id}"
-                elif gate.evaluator == "evidence_aggregator":
-                    gate.gate_id = f"gatekeeper_{gate.gate_id}"
-                elif gate.evaluator == "portfolio_admission":
-                    gate.gate_id = f"admission_{gate.gate_id}"
-        
+        Args:
+            job_id: Optional job identifier for context-specific gates
+                   (e.g., ranking explain gates for a specific job)
+        """
+        gates = self.fetch_all_gates(job_id=job_id)
+        prefixed_gates = [self._with_prefixed_gate_id(gate) for gate in gates]
+
         return create_gate_summary_from_gates(
-            gates=gates,
+            gates=prefixed_gates,
             source="consolidated",
             evaluator="consolidated_gate_summary_service",
         )

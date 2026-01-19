@@ -1,16 +1,20 @@
 """
-Smoke test for Route 2 Card-Based OP Tab UI.
-Route 3 Cutover: Tests that card-based components exist and can be instantiated.
+OpTab Master Console tests (SSOT v1.2).
 """
+import json
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
 import pytest
 
 from PySide6.QtWidgets import QApplication
 from gui.desktop.tabs.op_tab import OpTab
+from gui.desktop.tabs import op_tab_refactored
+from gui.services.dataset_resolver import GateStatus
 
 
 @pytest.fixture
 def app():
-    """Create QApplication instance for GUI tests."""
     app = QApplication.instance()
     if app is None:
         app = QApplication([])
@@ -18,88 +22,114 @@ def app():
 
 
 @pytest.fixture
-def op_tab(app):
-    """Create OpTab instance for testing."""
+def op_tab(app, monkeypatch, tmp_path):
+    monkeypatch.setattr(op_tab_refactored, "get_registry_strategies", lambda: [{"id": "s1", "name": "S1"}])
+    monkeypatch.setattr(op_tab_refactored, "list_seasons_ssot", lambda: {"seasons": [{"season_id": "2026Q1"}]})
+    monkeypatch.setattr(op_tab_refactored, "get_jobs", lambda limit=50: [])
     tab = OpTab()
+    impl = tab._impl
+    impl.dataset_resolver.evaluate_run_readiness_with_prepare_status = (
+        lambda **kwargs: GateStatus(level="PASS", title="Run Readiness Gate", detail="OK")
+    )
+    impl.prepared_index_path = tmp_path / "bar_prepare_index.json"
+    impl.prepared_index_path.write_text(json.dumps({
+        "instruments": {
+            "CME.MNQ": {
+                "timeframes": {
+                    "60": {"status": "built"}
+                },
+                "parquet_status": {"path": ""}
+            }
+        }
+    }))
+    impl.refresh_prepared_index()
     yield tab
     tab.deleteLater()
 
 
-def test_op_tab_has_card_components(op_tab):
-    """Verify OP tab has Route 2 card-based components."""
-    # Check that card components exist
-    assert op_tab.strategy_deck is not None, "StrategyCardDeck should exist"
-    assert op_tab.timeframe_deck is not None, "TimeframeCardDeck should exist"
-    assert op_tab.instrument_list is not None, "InstrumentCardList should exist"
-    assert op_tab.mode_pills is not None, "ModePillCards should exist"
-    assert op_tab.dataset_panel is not None, "DerivedDatasetPanel should exist"
-    assert op_tab.date_range_selector is not None, "DateRangeSelector should exist"
-    assert op_tab.run_readiness_panel is not None, "RunReadinessPanel should exist"
-    
-    # Check that RUN button exists
-    assert hasattr(op_tab, 'run_button'), "RUN button should exist"
-    assert op_tab.run_button.text() == "RUN STRATEGY", "RUN button should have correct text"
+def test_op_tab_has_master_console_controls(op_tab):
+    impl = op_tab._impl
+    assert impl.strategy_combo is not None
+    assert impl.timeframe_combo is not None
+    assert impl.instrument_combo is not None
+    assert impl.run_mode_combo is not None
+    assert impl.season_combo is not None
+    assert impl.run_button.text() == "RUN STRATEGY"
 
 
-def test_op_tab_has_launch_pad_group(op_tab):
-    """Verify OP tab has Launch Pad group."""
-    from PySide6.QtWidgets import QGroupBox
-    
-    # Find Launch Pad group
-    groups = op_tab.findChildren(QGroupBox)
-    launch_pad_found = False
-    for group in groups:
-        if "Launch Pad" in group.title():
-            launch_pad_found = True
-            break
-    
-    assert launch_pad_found, "Launch Pad group should exist"
+def test_run_gating_requires_prepared_index(op_tab):
+    impl = op_tab._impl
+    impl.strategy_combo.setCurrentIndex(1)
+    impl.timeframe_combo.setCurrentText("60")
+    impl.on_timeframe_changed()
+    impl.instrument_combo.setCurrentIndex(1)
+    impl.run_mode_combo.setCurrentText("backtest")
+    impl.coverage_cache["CME.MNQ"] = op_tab_refactored.CoverageRange("2020-01-01", "2020-12-31")
+    impl.update_date_range()
+    impl.update_run_state()
+    assert impl.run_button.isEnabled()
+
+    impl.prepared_index["instruments"]["CME.MNQ"]["timeframes"] = {}
+    impl.refresh_instrument_options()
+    impl.instrument_combo.setCurrentIndex(0)
+    impl.update_run_state()
+    assert not impl.run_button.isEnabled()
 
 
-def test_op_tab_has_job_tracker_group(op_tab):
-    """Verify OP tab has Job Tracker group."""
-    from PySide6.QtWidgets import QGroupBox
-    
-    # Find Job Tracker group
-    groups = op_tab.findChildren(QGroupBox)
-    job_tracker_found = False
-    for group in groups:
-        if "Job Tracker" in group.title():
-            job_tracker_found = True
-            break
-    
-    assert job_tracker_found, "Job Tracker group should exist"
+def test_full_date_range_resolution(op_tab):
+    impl = op_tab._impl
+    impl.coverage_cache["CME.MNQ"] = op_tab_refactored.CoverageRange("2020-01-01", "2020-12-31")
+    impl.timeframe_combo.setCurrentText("60")
+    impl.on_timeframe_changed()
+    impl.instrument_combo.setCurrentIndex(1)
+    impl.update_date_range()
+    assert impl.start_date_edit.text() == "2020-01-01"
+    assert impl.end_date_edit.text() == "2020-12-31"
 
 
-def test_op_tab_has_gate_summary(op_tab):
-    """Verify OP tab has Gate Summary widget."""
-    assert hasattr(op_tab, 'gate_summary_widget'), "GateSummaryWidget should exist"
+def test_season_selection_overrides_date_range(op_tab):
+    impl = op_tab._impl
+    impl.timeframe_combo.setCurrentText("60")
+    impl.on_timeframe_changed()
+    impl.instrument_combo.setCurrentIndex(1)
+    impl.season_combo.setCurrentIndex(1)
+    impl.update_date_range()
+    assert impl.start_date_edit.text().startswith("2026-01")
+    assert impl.end_date_edit.text().startswith("2026-03")
 
 
-def test_op_tab_has_splitter_layout(op_tab):
-    """Verify OP tab uses splitter layout."""
-    from PySide6.QtWidgets import QSplitter
-    
-    splitters = op_tab.findChildren(QSplitter)
-    assert len(splitters) > 0, "Should have at least one QSplitter"
+def test_polling_refresh_updates_job_list(op_tab):
+    impl = op_tab._impl
+    fake_jobs = [{
+        "job_id": "job-123",
+        "status": "RUNNING",
+        "created_at": "2026-01-01T00:00:00Z",
+        "instrument": "CME.MNQ",
+        "timeframe": "60",
+        "run_mode": "backtest",
+        "season": "2026Q1",
+    }]
+    impl.on_jobs_loaded(fake_jobs)
+    assert impl.jobs_table.rowCount() == 1
+    assert impl.jobs_table.item(0, 1).text() == "job-123"
 
 
-def test_no_legacy_dropdowns(op_tab):
-    """Verify no legacy dropdowns exist (Route 3 cutover)."""
-    from PySide6.QtWidgets import QComboBox
-    
-    # Find all comboboxes
-    comboboxes = op_tab.findChildren(QComboBox)
-    
-    # Count comboboxes that are NOT part of card components
-    # (some card components might use internal comboboxes, but main UI shouldn't)
-    legacy_dropdowns = []
-    for cb in comboboxes:
-        # Check if this combobox is visible and not part of a card component
-        if cb.isVisible():
-            legacy_dropdowns.append(cb)
-    
-    # We should have minimal comboboxes (if any)
-    # The test passes as long as we don't have the old dropdown-based UI
-    # For now, just log the count
-    print(f"Found {len(legacy_dropdowns)} visible comboboxes")
+def test_stall_detection_labels(op_tab):
+    impl = op_tab._impl
+    job = {
+        "job_id": "job-456",
+        "status": "RUNNING",
+        "created_at": "2026-01-01T00:00:00Z",
+    }
+    impl.on_jobs_loaded([job])
+    impl.job_last_change["job-456"] = datetime.now(timezone.utc) - timedelta(seconds=40)
+    impl.focused_job_id = "job-456"
+    impl.update_focus_job()
+    assert "STALLED?" in impl.stall_label.text()
+
+
+def test_progress_bar_phase_mapping(op_tab):
+    impl = op_tab._impl
+    phase_text, pct = impl._progress_for_job({"status": "RUNNING", "policy_stage": "preflight"})
+    assert "Preflight" in phase_text
+    assert pct > 0

@@ -176,7 +176,7 @@ class TestResearchNarrativeBuilder:
         # Verify builder has explain dictionary version
         info = builder.get_builder_info()
         assert "builder_version" in info
-        assert info["builder_version"] == "v2.1.0"
+        assert info["builder_version"] == "v2.4.0"
         assert "explain_dict_version" in info
     
     def test_build_narrative_from_flow_state(self):

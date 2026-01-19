@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Optional
 
-from PySide6.QtCore import Qt, QUrl, Signal
-from PySide6.QtGui import QColor, QDesktopServices, QFont
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -27,6 +27,7 @@ from gui.services.artifact_navigator_vm import (
     EXPLAIN_TARGET_PREFIX,
 )
 from gui.desktop.widgets.gate_summary_widget import GateSummaryWidget
+from gui.services.action_router_service import get_action_router_service
 
 
 class ArtifactNavigatorDialog(QDialog):
@@ -196,7 +197,8 @@ class ArtifactNavigatorDialog(QDialog):
         target = Path(path)
         if not target.exists():
             QMessageBox.information(self, "Path Missing", f"Expected artifact path:\n{path}")
-        QDesktopServices.openUrl(QUrl.fromLocalFile(path))
+        router = get_action_router_service()
+        router.handle_action(f"file://{path}")
 
     def _job_identifier(self) -> str:
         return str(self.property("job_id") or "")

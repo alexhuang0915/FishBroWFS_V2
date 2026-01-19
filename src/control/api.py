@@ -175,6 +175,7 @@ _DATASET_INDEX: Any | None = None
 _STRATEGY_REGISTRY: Any | None = None
 _INSTRUMENTS_CONFIG: Any | None = None  # InstrumentsConfig from portfolio.instruments
 _TIMEFRAME_REGISTRY: Any | None = None  # TimeframeRegistry from config.registry.timeframes
+_RAW_FILES: list[str] | None = None  # Raw file names from FishBroData/raw/
 
 
 def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
@@ -372,16 +373,78 @@ def load_timeframe_registry() -> Any:
     return _load_timeframe_registry_from_file()
 
 
+def _get_repo_root() -> Path:
+    """Return the repository root directory (FishBroWFS_V2/)."""
+    # src/control/api.py → src/control/ → src/ → repo root
+    return Path(__file__).resolve().parents[2]
+
+
+def _load_raw_files_from_fs() -> list[str]:
+    """Private implementation: scan FishBroData/raw directory for .txt files."""
+    repo_root = _get_repo_root()
+    raw_dir = repo_root / "FishBroData" / "raw"
+    if not raw_dir.exists():
+        # Defensive: log warning? For now just return empty
+        return []
+    # Sanity check: ensure raw_dir is under repo_root
+    try:
+        raw_dir.resolve().relative_to(repo_root.resolve())
+    except ValueError:
+        # This should never happen with correct repo_root computation
+        raise RuntimeError(
+            f"Raw directory {raw_dir} is not under repo root {repo_root}"
+        )
+    files = []
+    for entry in raw_dir.iterdir():
+        if entry.is_file() and entry.suffix.lower() == ".txt":
+            files.append(entry.name)
+    return sorted(files)
+
+
+def _get_raw_files() -> list[str]:
+    """Return cached raw files, loading if necessary."""
+    global _RAW_FILES
+    if _RAW_FILES is None:
+        _RAW_FILES = _load_raw_files_from_fs()
+    return _RAW_FILES
+
+
+def _reload_raw_files() -> list[str]:
+    """Force rescan raw directory and update cache."""
+    global _RAW_FILES
+    _RAW_FILES = _load_raw_files_from_fs()
+    return _RAW_FILES
+
+
+def load_raw_files() -> list[str]:
+    """Load raw files. Supports monkeypatching."""
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_raw_files")
+
+    # If monkeypatched, call patched function
+    if current is not _LOAD_RAW_FILES_ORIGINAL:
+        return current()
+
+    # If cache is available, return it
+    if _RAW_FILES is not None:
+        return _RAW_FILES
+
+    # Fallback for CLI/unit-test paths (may touch filesystem)
+    return _load_raw_files_from_fs()
+
+
 # Original function references for monkeypatch detection (must be after function definitions)
 _LOAD_DATASET_INDEX_ORIGINAL = load_dataset_index
 _LOAD_STRATEGY_REGISTRY_ORIGINAL = load_strategy_registry
 _LOAD_INSTRUMENTS_CONFIG_ORIGINAL = load_instruments_config
 _LOAD_TIMEFRAME_REGISTRY_ORIGINAL = load_timeframe_registry
+_LOAD_RAW_FILES_ORIGINAL = load_raw_files
 
 
 def _try_prime_registries() -> None:
     """Prime cache on startup (per‑load tolerance)."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY, _RAW_FILES
     # Try each load independently; if one fails, set its cache to None but continue.
     try:
         _DATASET_INDEX = load_dataset_index()
@@ -399,20 +462,26 @@ def _try_prime_registries() -> None:
         _TIMEFRAME_REGISTRY = load_timeframe_registry()
     except Exception:
         _TIMEFRAME_REGISTRY = None
+    try:
+        _RAW_FILES = load_raw_files()
+    except Exception:
+        _RAW_FILES = None
 
 
 def _prime_registries_with_feedback() -> dict[str, Any]:
     """Prime registries and return detailed feedback."""
-    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY
+    global _DATASET_INDEX, _STRATEGY_REGISTRY, _INSTRUMENTS_CONFIG, _TIMEFRAME_REGISTRY, _RAW_FILES
     result = {
         "dataset_loaded": False,
         "strategy_loaded": False,
         "instruments_loaded": False,
         "timeframe_loaded": False,
+        "raw_loaded": False,
         "dataset_error": None,
         "strategy_error": None,
         "instruments_error": None,
         "timeframe_error": None,
+        "raw_error": None,
     }
     
     # Try dataset
@@ -447,7 +516,15 @@ def _prime_registries_with_feedback() -> dict[str, Any]:
         _TIMEFRAME_REGISTRY = None
         result["timeframe_error"] = str(e)
     
-    result["success"] = result["dataset_loaded"] and result["strategy_loaded"] and result["instruments_loaded"] and result["timeframe_loaded"]
+    # Try raw files
+    try:
+        _RAW_FILES = load_raw_files()
+        result["raw_loaded"] = True
+    except Exception as e:
+        _RAW_FILES = None
+        result["raw_error"] = str(e)
+    
+    result["success"] = result["dataset_loaded"] and result["strategy_loaded"] and result["instruments_loaded"] and result["timeframe_loaded"] and result["raw_loaded"]
     return result
 
 
@@ -703,6 +780,30 @@ async def registry_timeframes() -> list[str]:
     # Return sorted display names for consistency
     display_names = registry.get_display_names()
     return sorted(display_names)
+
+
+@api_v1.get("/registry/raw")
+async def registry_raw() -> list[str]:
+    """
+    Return list of raw file names (simple strings) from FishBroData/raw/.
+    
+    Contract:
+    - Returns simple array of strings, e.g., ["MNQ HOT-Minute-Trade.txt", ...]
+    - If raw files cache not loaded, returns 503.
+    - Must not access filesystem during request handling.
+    """
+    import sys
+    module = sys.modules[__name__]
+    current = getattr(module, "load_raw_files")
+
+    # Enforce no filesystem access during request handling
+    if _RAW_FILES is None and current is _LOAD_RAW_FILES_ORIGINAL:
+        raise HTTPException(status_code=503, detail="Raw files registry not preloaded")
+
+    files = load_raw_files()
+    # Return sorted file names for consistency
+    return sorted(files)
+
 
 @api_v1.get("/wfs/policies", response_model=WfsPolicyRegistryResponse)
 async def list_wfs_policies_endpoint() -> WfsPolicyRegistryResponse:

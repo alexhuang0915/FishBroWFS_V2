@@ -43,6 +43,12 @@ from core.resampler import (
     compute_safe_recompute_start,
     SessionSpecTaipei,
 )
+from core.bars_contract import (
+    validate_bars_with_raise,
+    BarsValidationResult,
+    BarsManifestEntry,
+    create_bars_manifest_entry,
+)
 from core.features import compute_features_for_tf
 from control.features_store import (
     features_dir,
@@ -526,9 +532,18 @@ def _build_bars_cache(
     norm_path = normalized_bars_path(outputs_root, season, dataset_id)
     write_npz_atomic(norm_path, normalized)
     
+    # 4a. 驗證 normalized bars 符合 bars contract (Gate A/B/C)
+    try:
+        norm_validation = validate_bars_with_raise(norm_path)
+        norm_bars_count = norm_validation.bars_count
+        norm_file_hash = norm_validation.computed_hash
+    except Exception as e:
+        raise ValueError(f"Normalized bars validation failed: {e}")
+    
     # 5. 對每個 timeframe 進行 resample
     safe_recompute_start_by_tf = {}
     files_sha256 = {}
+    validation_results = {}
     
     # 計算 normalized bars 的第一筆時間（用於 safe point 計算）
     if len(normalized["ts"]) > 0:
@@ -561,6 +576,19 @@ def _build_bars_cache(
         resampled_path = resampled_bars_path(outputs_root, season, dataset_id, tf)
         write_npz_atomic(resampled_path, resampled)
         
+        # 驗證 resampled bars 符合 bars contract (Gate A/B/C)
+        try:
+            resampled_validation = validate_bars_with_raise(resampled_path)
+            validation_results[f"resampled_{tf}m"] = {
+                "gate_a_passed": resampled_validation.gate_a_passed,
+                "gate_b_passed": resampled_validation.gate_b_passed,
+                "gate_c_passed": resampled_validation.gate_c_passed,
+                "bars_count": resampled_validation.bars_count,
+                "file_hash": resampled_validation.computed_hash,
+            }
+        except Exception as e:
+            raise ValueError(f"Resampled bars validation failed for {tf}m: {e}")
+        
         # 計算 SHA256
         files_sha256[f"resampled_{tf}m.npz"] = sha256_file(resampled_path)
     
@@ -582,6 +610,16 @@ def _build_bars_cache(
         "append_range": diff["append_range"],
         "safe_recompute_start_by_tf": safe_recompute_start_by_tf,
         "files": files_sha256,
+        "bars_contract_validation": {
+            "normalized_bars": {
+                "gate_a_passed": True,  # 已通過 validate_bars_with_raise
+                "gate_b_passed": True,
+                "gate_c_passed": True,
+                "bars_count": norm_bars_count,
+                "file_hash": norm_file_hash,
+            },
+            "resampled_bars": validation_results,
+        },
     }
     
     # 8. 寫入 bars manifest（稍後由 caller 處理）

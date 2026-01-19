@@ -5121,6 +5121,29 @@
         "summary": "Registry Instruments"
       }
     },
+    "/api/v1/registry/raw": {
+      "get": {
+        "description": "Return list of raw file names (simple strings) from FishBroData/raw/.\n\nContract:\n- Returns simple array of strings, e.g., [\"MNQ HOT-Minute-Trade.txt\", ...]\n- If raw files cache not loaded, returns 503.\n- Must not access filesystem during request handling.",
+        "operationId": "registry_raw_api_v1_registry_raw_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "title": "Response Registry Raw Api V1 Registry Raw Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Registry Raw"
+      }
+    },
     "/api/v1/registry/strategies": {
       "get": {
         "description": "Return list of strategy IDs (simple strings).\n\nContract:\n- Returns simple array of strings, e.g., [\"s1_v1\", \"s2_v1\", ...]\n- If strategy registry not loaded, returns 503.\n- Must not access filesystem during request handling.",

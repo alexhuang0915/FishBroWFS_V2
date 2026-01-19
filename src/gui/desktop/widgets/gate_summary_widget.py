@@ -19,8 +19,7 @@ from PySide6.QtCore import Qt, Signal, Slot, QTimer  # type: ignore
 from PySide6.QtWidgets import (  # type: ignore
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QGroupBox, QPushButton, QSizePolicy
 )
-from PySide6.QtGui import QFont, QColor, QPalette, QDesktopServices, QMouseEvent  # type: ignore
-from PySide6.QtCore import QUrl
+from PySide6.QtGui import QFont, QColor, QPalette, QMouseEvent  # type: ignore
 
 from gui.services.gate_summary_service import (
     GateSummary, GateResult, GateStatus, fetch_gate_summary
@@ -40,6 +39,7 @@ from contracts.portfolio.gate_summary_schemas import (
     sanitize_raw
 )
 from .gate_explanation_dialog import GateExplanationDialog
+from gui.services.action_router_service import get_action_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -215,9 +215,8 @@ class GateCard(QWidget):
         """Open URL in default browser (or internal navigation)."""
         # If it's a relative path, we could open in internal UI, but for now just log.
         logger.info(f"Gate card action clicked: {url}")
-        # For simplicity, we'll just emit a signal that parent can handle.
-        # We'll implement later if needed.
-        pass
+        router = get_action_router_service()
+        router.handle_action(url)
 
     def mousePressEvent(self, event: QMouseEvent):
         """Emit clicked signal when card is clicked."""
@@ -295,8 +294,9 @@ class GateSummaryWidget(QWidget):
                 )
                 return
             
-            # Open the file with default application
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(artifact_path)))
+            # Open the file with router to preserve governance
+            router = get_action_router_service()
+            router.handle_action(f"file://{artifact_path}")
         
         self.setProperty('ranking_explain_opener', default_opener)
     

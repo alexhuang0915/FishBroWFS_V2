@@ -26,9 +26,8 @@ from PySide6.QtWidgets import (  # type: ignore
     QStackedWidget, QFrame, QSplitter
 )
 from PySide6.QtGui import (  # type: ignore
-    QPainter, QPixmap, QDesktopServices, QColor, QFont, QPen, QBrush
+    QPainter, QPixmap, QColor, QFont, QPen, QBrush
 )
-from PySide6.QtCore import QUrl  # type: ignore
 
 from ...widgets.metric_cards import MetricCard, MetricRow
 from ...widgets.charts.line_chart import LineChartWidget
@@ -37,6 +36,8 @@ from ...widgets.charts.monthly_heatmap import MonthlyHeatmapWidget
 from ...services.supervisor_client import (
     get_strategy_report_v1, get_reveal_evidence_path, SupervisorClientError
 )
+from gui.services.action_router_service import get_action_router_service
+from gui.desktop.state.export_state import export_state
 
 logger = logging.getLogger(__name__)
 
@@ -841,6 +842,11 @@ class StrategyReportWidget(QWidget):
                     json.dump(self.report_data, f, indent=2, ensure_ascii=False)
                 
                 self.log_signal.emit(f"Report exported to {file_path}")
+                export_state.update_state(
+                    last_export_path=file_path,
+                    last_export_label="Strategy Report JSON",
+                    confirmed=True,
+                )
                 QMessageBox.information(
                     self,
                     "Export Successful",
@@ -944,6 +950,11 @@ class StrategyReportWidget(QWidget):
             pixmap.save(file_path, "PNG")
             
             self.log_signal.emit(f"Charts exported to {file_path}")
+            export_state.update_state(
+                last_export_path=file_path,
+                last_export_label="Strategy Report PNG",
+                confirmed=True,
+            )
             QMessageBox.information(
                 self,
                 "Export Successful",
@@ -966,7 +977,8 @@ class StrategyReportWidget(QWidget):
             
             if evidence_path:
                 # Open folder in file explorer
-                QDesktopServices.openUrl(QUrl.fromLocalFile(evidence_path))
+                router = get_action_router_service()
+                router.handle_action(f"file://{evidence_path}")
                 self.log_signal.emit(f"Opened evidence folder: {evidence_path}")
             else:
                 QMessageBox.warning(

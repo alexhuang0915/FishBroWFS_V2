@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (  # type: ignore
     QApplication, QMessageBox, QStackedWidget,
     QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
-from PySide6.QtGui import QFont, QColor, QAction, QDesktopServices  # type: ignore
+from PySide6.QtGui import QFont, QColor, QAction  # type: ignore
 
 from ..widgets.metric_cards import MetricCard, MetricRow
 from ..widgets.report_host import ReportHostWidget
@@ -31,6 +31,7 @@ from ...services.supervisor_client import (
     get_jobs, get_strategy_report_v1, get_portfolio_report_v1,
     get_outputs_summary, SupervisorClientError
 )
+from gui.services.action_router_service import get_action_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -275,6 +276,7 @@ class AuditTab(QWidget):
         super().__init__()
         self.report_explorer_model = ReportExplorerModel()
         self.open_reports = {}  # job_id/portfolio_id -> widget
+        self.action_router = get_action_router_service()
         self.setup_ui()
         self.setup_connections()
         self.refresh_reports()
@@ -610,8 +612,9 @@ class AuditTab(QWidget):
             report_url = links.get('report_url')
             
             if report_url:
-                # Open strategy report
-                self.load_strategy_report(job_id)
+                # Route report opening through ActionRouterService
+                if job_id:
+                    self.action_router.handle_action(f"internal://report/strategy/{job_id}")
             else:
                 # Show logs dialog
                 self.show_logs_dialog(job_id)
@@ -622,8 +625,9 @@ class AuditTab(QWidget):
             report_url = links.get('report_url')
             
             if report_url:
-                # Open portfolio report
-                self.load_portfolio_report_by_id(portfolio_id)
+                # Route report opening through ActionRouterService
+                if portfolio_id:
+                    self.action_router.handle_action(f"internal://report/portfolio/{portfolio_id}")
             else:
                 # Show "Report not available" dialog
                 QMessageBox.information(
@@ -824,11 +828,11 @@ class AuditTab(QWidget):
         if item_type == 'job':
             job_id = item_data.get('job_id')
             if job_id:
-                self.load_strategy_report(job_id)
+                self.action_router.handle_action(f"internal://report/strategy/{job_id}")
         elif item_type == 'portfolio':
             portfolio_id = item_data.get('portfolio_id')
             if portfolio_id:
-                self.load_portfolio_report_by_id(portfolio_id)
+                self.action_router.handle_action(f"internal://report/portfolio/{portfolio_id}")
     
     def on_view_logs_clicked(self):
         """Handle View Logs button click."""
@@ -855,11 +859,10 @@ class AuditTab(QWidget):
             job_id = item_data.get('job_id')
             if job_id:
                 # Open job evidence folder
-                import subprocess
                 import os
                 path = os.path.join("outputs", "jobs", job_id)
                 if os.path.exists(path):
-                    subprocess.Popen(['xdg-open', path])
+                    self.action_router.handle_action(f"file://{path}")
                 else:
                     QMessageBox.warning(self, "Folder Not Found", f"Evidence folder not found: {path}")
         
@@ -867,11 +870,10 @@ class AuditTab(QWidget):
             portfolio_id = item_data.get('portfolio_id')
             if portfolio_id:
                 # Open portfolio admission folder
-                import subprocess
                 import os
                 path = os.path.join("outputs", "portfolios", portfolio_id, "admission")
                 if os.path.exists(path):
-                    subprocess.Popen(['xdg-open', path])
+                    self.action_router.handle_action(f"file://{path}")
                 else:
                     QMessageBox.warning(self, "Folder Not Found", f"Admission folder not found: {path}")
     
@@ -888,6 +890,8 @@ class AuditTab(QWidget):
         formatted_json = json.dumps(original_data, indent=2)
         self.advanced_text.setText(formatted_json)
         self.advanced_group.setChecked(True)
+        self.status_label.setText("JSON prepared in Advanced panel")
+        self.log_signal.emit("Export JSON: prepared in Advanced panel")
     
     # ===== Advanced Section =====
     

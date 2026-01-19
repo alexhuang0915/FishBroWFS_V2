@@ -24,6 +24,7 @@ def test_outputs_directory_structure():
         "_trash",            # Soft-deleted files (can be cleaned)
         "deployment",        # Deployment artifacts
         "deployments",       # Multiple deployment versions
+        "exports",           # Export artifacts
         "jobs",             # Job artifacts and metadata
         "research",         # Research artifacts
         "seasons",          # Season artifacts

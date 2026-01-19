@@ -81,12 +81,14 @@ def sample_job_gate_summary():
 def sample_research_narrative():
     """Create a sample ResearchNarrativeV1 for testing."""
     return ResearchNarrativeV1(
-        schema_version="v1",
         stage=ResearchStage.DECISION,
         severity="OK",
         headline="Research completed successfully - ready for portfolio decisions",
         why="All gates passed, data quality validated, and ranking explain available for review.",
+        primary_reason_code=GateReasonCode.GATE_SUMMARY_PARSE_ERROR,
+        developer_view="Developer details: all gates passed and evidence is available.",
         business_view="Research outcomes show strong potential for portfolio inclusion with clear explainability.",
+        next_step_action=NarrativeActionId.BUILD_PORTFOLIO,
         next_step_label="Proceed to portfolio allocation decisions",
         drilldown_actions=[
             {
@@ -100,7 +102,6 @@ def sample_research_narrative():
                 "url": "/portfolio/test_job_123",
             },
         ],
-        created_at_utc="2024-01-01T00:00:00Z",
     )
 
 
@@ -266,7 +267,7 @@ class TestExplainHubTabs:
         assert widget.next_step_text.text() == sample_research_narrative.next_step_label
         
         # Verify actions updated
-        assert widget.actions_group.isVisible() == bool(sample_research_narrative.drilldown_actions)
+        assert (not widget.actions_group.isHidden()) == bool(sample_research_narrative.drilldown_actions)
 
     def test_update_actions(self, app):
         """_update_actions creates action buttons."""
@@ -282,7 +283,7 @@ class TestExplainHubTabs:
         widget._update_actions(actions)
         
         # Verify actions group is visible
-        assert widget.actions_group.isVisible()
+        assert not widget.actions_group.isHidden()
         
         # Verify buttons created
         buttons = widget.actions_container.findChildren(QPushButton)

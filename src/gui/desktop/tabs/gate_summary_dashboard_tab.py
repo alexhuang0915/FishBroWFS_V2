@@ -27,7 +27,10 @@ from gui.services.action_router_service import get_action_router_service
 from gui.desktop.widgets.gate_drawer import GateDrawer
 from gui.desktop.widgets.sticky_verdict_bar import StickyVerdictBar
 from gui.desktop.widgets.explain_hub_tabs import ExplainHubTabs
+from gui.desktop.widgets.evidence_browser import EvidenceBrowserDialog
+from gui.desktop.widgets.gate_explanation_dialog import GateExplanationDialog
 from contracts.portfolio.gate_summary_schemas import GateStatus
+from gui.desktop.state.decision_gate_state import decision_gate_state
 
 logger = logging.getLogger(__name__)
 
@@ -38,14 +41,17 @@ class GateSummaryDashboardTab(QWidget):
     # Signal for logging
     log_signal = Signal(str)
     
-    def __init__(self):
+    def __init__(self, enable_local_router: bool = True):
         super().__init__()
         self.service = get_cross_job_gate_summary_service()
         self.action_router = get_action_router_service()
         self.current_matrix: Optional[CrossJobGateSummaryMatrix] = None
+        self.last_selected_job_id: Optional[str] = None
+        self.enable_local_router = enable_local_router
         self.setup_ui()
         self.setup_refresh_timer()
         self.refresh_data()
+
     
     def setup_ui(self):
         """Initialize the UI with a sticky verdict bar and gate drawer."""
@@ -121,6 +127,25 @@ class GateSummaryDashboardTab(QWidget):
         """)
         self.refresh_btn.clicked.connect(self.refresh_data)
         stats_layout.addWidget(self.refresh_btn)
+
+        self.confirm_decision_btn = QPushButton("Confirm Decision Review")
+        self.confirm_decision_btn.setEnabled(True)
+        self.confirm_decision_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #2A2A2A;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 3px;
+                padding: 4px 8px;
+                font-size: 10px;
+            }
+            QPushButton:hover:enabled {
+                background-color: #3A3A3A;
+                border: 1px solid #3A8DFF;
+            }
+        """)
+        self.confirm_decision_btn.clicked.connect(self.confirm_decision_review)
+        stats_layout.addWidget(self.confirm_decision_btn)
 
         header_layout.addWidget(stats_widget)
         expanded_layout.addWidget(header_widget)
@@ -220,6 +245,39 @@ class GateSummaryDashboardTab(QWidget):
         explain_group.setLayout(explain_layout)
         content_layout.addWidget(explain_group, 30)
 
+        details_group = QGroupBox("Job Details")
+        details_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 2px solid #455A64;
+                background-color: #1E1E1E;
+                margin-top: 5px;
+                padding-top: 8px;
+                font-size: 11px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 8px;
+                padding: 0 4px 0 4px;
+                color: #E6E6E6;
+            }
+        """)
+        details_layout = QVBoxLayout()
+        self.details_text = QTextEdit()
+        self.details_text.setReadOnly(True)
+        self.details_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #121212;
+                color: #E6E6E6;
+                border: 1px solid #333333;
+                font-family: monospace;
+                font-size: 10px;
+            }
+        """)
+        details_layout.addWidget(self.details_text)
+        details_group.setLayout(details_layout)
+        content_layout.addWidget(details_group, 20)
+
         expanded_layout.addWidget(content_widget)
 
         self.table_widget.itemSelectionChanged.connect(self.on_table_selection_changed)
@@ -257,35 +315,48 @@ class GateSummaryDashboardTab(QWidget):
         if not self.current_matrix:
             return
         
-        stats = self.current_matrix.summary_stats
+        stats = self.current_matrix.summary_stats or {}
+        total = self._safe_int(stats.get("total", 0))
+        passed = self._safe_int(stats.get("pass", 0))
+        warned = self._safe_int(stats.get("warn", 0))
+        failed = self._safe_int(stats.get("fail", 0))
+        unknown = self._safe_int(stats.get("unknown", 0))
         
         # Update labels with colors
-        self.total_label.setText(f"Total: {stats['total']}")
+        self.total_label.setText(f"Total: {total}")
         self.total_label.setStyleSheet("font-size: 11px; padding: 2px 6px; border-radius: 3px; background-color: #2A2A2A; color: #E6E6E6;")
         
-        self.pass_label.setText(f"PASS: {stats['pass']}")
+        self.pass_label.setText(f"PASS: {passed}")
         self.pass_label.setStyleSheet("font-size: 11px; padding: 2px 6px; border-radius: 3px; background-color: #2E7D32; color: #E6E6E6;")
         
-        self.warn_label.setText(f"WARN: {stats['warn']}")
+        self.warn_label.setText(f"WARN: {warned}")
         self.warn_label.setStyleSheet("font-size: 11px; padding: 2px 6px; border-radius: 3px; background-color: #F57C00; color: #E6E6E6;")
         
-        self.fail_label.setText(f"FAIL: {stats['fail']}")
+        self.fail_label.setText(f"FAIL: {failed}")
         self.fail_label.setStyleSheet("font-size: 11px; padding: 2px 6px; border-radius: 3px; background-color: #C62828; color: #E6E6E6;")
         
-        self.unknown_label.setText(f"UNKNOWN: {stats['unknown']}")
+        self.unknown_label.setText(f"UNKNOWN: {unknown}")
         self.unknown_label.setStyleSheet("font-size: 11px; padding: 2px 6px; border-radius: 3px; background-color: #616161; color: #E6E6E6;")
 
-        overall_status = "FAIL" if stats["fail"] > 0 else "WARN" if stats["warn"] > 0 else "PASS" if stats["pass"] > 0 else "UNKNOWN"
+        overall_status = "FAIL" if failed > 0 else "WARN" if warned > 0 else "PASS" if passed > 0 else "UNKNOWN"
         self.sticky_bar.set_overall_text(f"Overall: {overall_status}")
-        self.sticky_bar.set_status_text(f"Jobs: {stats['total']}")
+        self.sticky_bar.set_status_text(f"Jobs: {total}")
 
         if hasattr(self, "gate_drawer"):
             self.gate_drawer.set_summary_counts(
-                fail=stats["fail"],
-                warn=stats["warn"],
-                ok=stats["pass"],
-                total=stats["total"],
+                fail=failed,
+                warn=warned,
+                ok=passed,
+                total=total,
             )
+
+    @staticmethod
+    def _safe_int(value: Any) -> int:
+        """Safely coerce a value to int for UI display."""
+        try:
+            return int(value)
+        except Exception:
+            return 0
     
     def update_table(self):
         """Update the table with job data."""
@@ -357,6 +428,7 @@ class GateSummaryDashboardTab(QWidget):
         job_id = job_id_item.data(Qt.ItemDataRole.UserRole)
         if not job_id:
             job_id = job_id_item.text()
+        self.last_selected_job_id = job_id
         
         # Handle based on column
         if column == 5:  # Actions (Gate Summary)
@@ -369,12 +441,22 @@ class GateSummaryDashboardTab(QWidget):
                 f"job_admission://{job_id}",
                 context={"job_id": job_id}
             )
+
+    def confirm_decision_review(self):
+        """Confirm decision gate review for the selected job."""
+        decision_gate_state.update_state(
+            reviewed_job_id=self.last_selected_job_id,
+            confirmed=True,
+        )
+        self.log_signal.emit("Decision gate review confirmed")
     
     def on_table_selection_changed(self):
         """Handle table selection change to update Explain Hub Tabs."""
         selected_items = self.table_widget.selectedItems()
         if not selected_items:
             self.explain_hub_tabs.clear()
+            if hasattr(self, "details_text"):
+                self.details_text.setText("")
             return
         
         # Get the selected row
@@ -401,10 +483,14 @@ class GateSummaryDashboardTab(QWidget):
             self.explain_hub_tabs.clear()
             # Show error in Explain Hub
             self.explain_hub_tabs._show_error(f"Job {job_id} not found in current matrix")
+            if hasattr(self, "details_text"):
+                self.details_text.setText(f"Job {job_id} not found.")
             return
         
         # Update Explain Hub Tabs with job data
         self.explain_hub_tabs.update_for_job(job_id, job_summary)
+        if hasattr(self, "details_text"):
+            self.details_text.setText(self.build_job_details(job_summary))
     
     def build_job_details(self, job_summary: JobGateSummary) -> str:
         """Build detailed text for a job."""
@@ -463,6 +549,7 @@ class GateSummaryDashboardTab(QWidget):
             context: Action context dictionary with job_id, source, etc.
         """
         logger.info(f"Handling ExplainHub action: {target} with context: {context}")
+        self.log_signal.emit(f"Handling ExplainHub action: {target}")
         
         # Extract job_id from context or target
         job_id = context.get("job_id")
@@ -497,9 +584,6 @@ class GateSummaryDashboardTab(QWidget):
         # Get gate summary
         gate_summary = job_summary.gate_summary
         
-        # Import here to avoid circular imports
-        from gui.desktop.widgets.gate_explanation_dialog import GateExplanationDialog
-        
         # Show gate explanation dialog
         try:
             # For now, show explanation for first gate
@@ -519,10 +603,14 @@ class GateSummaryDashboardTab(QWidget):
     def _handle_evidence_action(self, job_id: str, context: Dict[str, Any]):
         """Handle evidence viewer action."""
         logger.info(f"Opening evidence viewer for job: {job_id}")
-        
-        # Import here to avoid circular imports
-        from gui.desktop.widgets.evidence_browser import EvidenceBrowserDialog
-        
+        local_context = dict(context or {})
+        local_context["local_only"] = True
+        handled = self.action_router.handle_action(f"evidence://{job_id}", local_context)
+        if not handled:
+            self._open_evidence_dialog(job_id)
+
+    def _open_evidence_dialog(self, job_id: str) -> None:
+        """Open evidence browser dialog locally."""
         try:
             dialog = EvidenceBrowserDialog(job_id, parent=self)
             dialog.exec()
@@ -534,6 +622,7 @@ class GateSummaryDashboardTab(QWidget):
     def _handle_artifact_action(self, job_id: str, context: Dict[str, Any]):
         """Handle artifact navigator action."""
         logger.info(f"Opening artifact navigator for job: {job_id}")
+        self.log_signal.emit("Opening artifact navigator")
         
         # Route through ActionRouterService
         self._route_through_action_router(f"artifact://{job_id}", context)
@@ -541,6 +630,7 @@ class GateSummaryDashboardTab(QWidget):
     def _handle_internal_action(self, target: str, context: Dict[str, Any]):
         """Handle internal navigation action."""
         logger.info(f"Handling internal navigation: {target}")
+        self.log_signal.emit("Handling internal navigation")
         
         # Route through ActionRouterService
         self._route_through_action_router(target, context)

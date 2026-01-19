@@ -8,7 +8,7 @@
 #   make acceptance run final acceptance gate
 #
 # OPS INTERNAL (not user entrypoints):
-#   make doctor / status / ports / logs
+#   make doctor / status / ports / logs / clear
 # =========================================================
 
 SHELL := /bin/bash
@@ -31,7 +31,7 @@ PYTEST ?= $(PYTHON) -m pytest
 PYTEST_ARGS ?= -q
 PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
 
-.PHONY: help up down check acceptance doctor status ports logs
+.PHONY: help up down check acceptance doctor status ports logs clear
 
 help:
 	@echo ""
@@ -46,6 +46,7 @@ help:
 	@echo "  make status      Backend health status"
 	@echo "  make ports       Port ownership"
 	@echo "  make logs        Tail logs"
+	@echo "  make clear       Remove Python caches (pycache, .pytest_cache, etc.)"
 	@echo ""
 
 # -----------------------------
@@ -66,6 +67,14 @@ ports:
 logs:
 	@echo "==> Logs..."
 	$(ENV) $(PYTHON) -B scripts/run_stack.py logs
+
+clear:
+	@echo "==> Clearing Python caches (pycache/pyc + tool caches)"
+	@test -f pyproject.toml -o -f setup.cfg -o -f requirements.txt || (echo "Refusing: not at repo root"; exit 1)
+	@find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
+	@find . -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.pyd" \) -delete 2>/dev/null || true
+	@rm -rf .pytest_cache .mypy_cache .ruff_cache .cache 2>/dev/null || true
+	@echo "==> Done"
 
 # -----------------------------
 # PRODUCT: up/down

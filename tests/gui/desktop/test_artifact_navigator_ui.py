@@ -4,7 +4,7 @@ pytest.importorskip("PySide6")
 
 from PySide6.QtWidgets import QApplication
 
-from gui.desktop.tabs.op_tab_legacy import OpTab
+from gui.desktop.tabs.op_tab import OpTab
 from gui.services.gate_summary_service import GateSummary, GateStatus
 
 
@@ -59,7 +59,7 @@ def test_artifacts_affordance_opens_navigator(monkeypatch, qapp):
             captured["opened"] = True
 
     monkeypatch.setattr(
-        "gui.desktop.tabs.op_tab_legacy.ArtifactNavigatorDialog",
+        "gui.desktop.widgets.artifact_navigator.ArtifactNavigatorDialog",
         StubDialog,
     )
 

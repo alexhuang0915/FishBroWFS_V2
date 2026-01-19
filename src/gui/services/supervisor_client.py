@@ -267,6 +267,10 @@ class SupervisorClient:
         """Return list of available timeframes."""
         return self._get("/api/v1/registry/timeframes")
 
+    def get_raw_files(self) -> List[str]:
+        """Return list of raw file names from FishBroData/raw/."""
+        return self._get("/api/v1/registry/raw")
+
     def get_wfs_policies(self) -> list[dict]:
         """Return WFS policy registry entries."""
         result = self._get("/api/v1/wfs/policies")
@@ -450,6 +454,11 @@ def get_registry_timeframes() -> List[str]:
     return _client.get_registry_timeframes()
 
 
+def get_raw_files() -> List[str]:
+    """Return list of raw file names from FishBroData/raw/."""
+    return _client.get_raw_files()
+
+
 def get_wfs_policies() -> list[dict]:
     """Return WFS policy registry entries."""
     return _client.get_wfs_policies()
@@ -539,6 +548,8 @@ __all__ = [
     "get_registry_instruments",
     "get_registry_datasets",
     "get_registry_timeframes",
+    "get_raw_files",
+    "get_wfs_policies",
     # Phase D additions
     "post_portfolio_build",
     "get_portfolio_artifacts",

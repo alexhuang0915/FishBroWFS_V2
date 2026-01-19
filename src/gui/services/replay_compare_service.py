@@ -18,6 +18,7 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import Signal, QObject, Slot
 from PySide6.QtWidgets import QMessageBox, QFileDialog, QWidget
+from gui.services.action_router_service import get_action_router_service
 
 from core.deployment.bundle_resolver import BundleResolver
 from core.deployment.diff_engine import DiffEngine, CompareReportV1
@@ -372,13 +373,9 @@ class ReplayCompareService(QObject):
             )
             
             if reply == QMessageBox.StandardButton.Yes:
-                # Open directory in file explorer
-                import subprocess
-                try:
-                    subprocess.run(["xdg-open", str(report.evidence_path)], check=False)
-                except Exception:
-                    # Fallback for different platforms
-                    pass
+                # Open directory via ActionRouterService
+                router = get_action_router_service()
+                router.handle_action(f"file://{report.evidence_path}")
     
     def _show_error(self, message: str):
         """Show an error message dialog."""

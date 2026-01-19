@@ -31,6 +31,7 @@ class ActionRouterService(QObject):
     open_artifact_navigator = Signal(str, str)  # job_id, artifact_path
     open_gate_summary = Signal(str)  # job_id
     open_explain = Signal(str)  # job_id
+    open_evidence_browser = Signal(str)  # job_id
     open_url = Signal(str)  # url
     
     def __init__(self):
@@ -61,6 +62,11 @@ class ActionRouterService(QObject):
             # TODO: Emit signal or show notification to user about disabled action
             return False
         
+        # Internal UI targets (handled by main window/router)
+        if target.startswith("internal://"):
+            self.open_url.emit(target)
+            return True
+
         # Special targets
         if target == GATE_SUMMARY_TARGET:
             job_id = self._extract_job_id(context)
@@ -78,6 +84,22 @@ class ActionRouterService(QObject):
             job_id = target[len("job_admission://"):]
             self._open_job_admission_decision(job_id)
             return True
+
+        # Artifact navigator target
+        elif target.startswith("artifact://"):
+            job_id = target[len("artifact://"):]
+            if job_id:
+                self.open_artifact_navigator.emit(job_id, "")
+                return True
+
+        # Evidence browser target
+        elif target.startswith("evidence://"):
+            job_id = target[len("evidence://"):]
+            if job_id:
+                if context and context.get("local_only"):
+                    return False
+                self.open_evidence_browser.emit(job_id)
+                return True
         
         # Gate summary dashboard target
         elif target == "gate_dashboard":

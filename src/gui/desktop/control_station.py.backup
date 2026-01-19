@@ -152,10 +152,11 @@ class ControlStation(QMainWindow):
         
         main_layout.addWidget(header_widget)
 
-        # Step flow header removed (single navigation layer)
-        self.step_flow_header = None
-
-        # Tab widget - compact, dense (only navigation layer)
+        # Step flow header (primary navigation)
+        self.step_flow_header = StepFlowHeader()
+        main_layout.addWidget(self.step_flow_header)
+        
+        # Tab widget - compact, dense
         self.tab_widget = QTabWidget()
         self.tab_widget.setTabPosition(QTabWidget.TabPosition.North)
         self.tab_widget.setMovable(False)
@@ -256,6 +257,10 @@ class ControlStation(QMainWindow):
         
         # Tab change events
         self.tab_widget.currentChanged.connect(self.on_tab_changed)
+
+        # Step flow header actions
+        self.step_flow_header.step_clicked.connect(self.on_step_clicked)
+        self.step_flow_header.tool_clicked.connect(self.on_tool_clicked)
 
         # Action router signals
         self.action_router.open_url.connect(self.handle_router_url)
@@ -486,9 +491,12 @@ class ControlStation(QMainWindow):
         dialog.exec()
 
     def refresh_step_flow_header(self):
-        """Update step header state and tools (no-op when step flow header removed)."""
-        # Step flow header removed, nothing to refresh
-        pass
+        """Update step header state and tools."""
+        current_step = step_flow_state.get_state().current_step
+        max_step = self._compute_max_enabled_step()
+        self.step_flow_header.set_step_state(current_step, max_step)
+        tools = self._step_tools.get(current_step, [])
+        self.step_flow_header.set_tools(tools)
 
     def _compute_max_enabled_step(self) -> StepId:
         """Compute max enabled step based on SSOT confirmations.

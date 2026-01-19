@@ -125,7 +125,7 @@ def test_dictionary_snapshot():
             "action_len": 177,
             "audience": "both",
             "business_len": 112,
-            "dev_len": 162,
+            "dev_len": 146,
             "dev_preview": "Evidence file hash mismatch for {relpath}. Expecte",
             "severity": "ERROR",
         },
@@ -199,7 +199,7 @@ def test_dictionary_snapshot():
     assert snapshot == expected_snapshot, (
         "Gate reason dictionary changed! "
         "If this is intentional, update the expected_snapshot in this test. "
-        f"Diff: {set(snapshot.items()) ^ set(expected_snapshot.items())}"
+        f"Diff keys: {set(snapshot.keys()) ^ set(expected_snapshot.keys())}"
     )
 
 

@@ -15,7 +15,7 @@ Key Features:
 import logging
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from gui.services.supervisor_client import get_jobs
 from gui.services.consolidated_gate_summary_service import (
@@ -37,7 +37,7 @@ class JobGateSummary:
     job_id: str
     job_data: Dict[str, Any]  # Raw job data from supervisor
     gate_summary: GateSummaryV1
-    fetched_at: datetime
+    fetched_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass

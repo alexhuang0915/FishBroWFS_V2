@@ -1,643 +1,1061 @@
 """
-Allocation Tab - Phase C Professional CTA Desktop UI.
-
-Portfolio Build + Viewer with PortfolioReportV1 integration.
+Portfolio Tab - Portfolio Backtest Master Console (SSOT v1.0).
 """
 
+from __future__ import annotations
+
+import json
 import logging
-import time
-from typing import Optional, List, Dict, Any
+from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
+from pathlib import Path
+from typing import List, Dict, Any, Optional, Tuple
 
-from PySide6.QtCore import Qt, Signal, Slot  # type: ignore
-from PySide6.QtWidgets import (  # type: ignore
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QFormLayout,
-    QLabel, QPushButton, QTableView, QSplitter,
-    QGroupBox, QHeaderView, QMessageBox, QDoubleSpinBox,
-    QLineEdit, QComboBox, QCheckBox, QScrollArea,
-    QApplication, QSizePolicy, QSpacerItem
+from PySide6.QtCore import Qt, Signal, QTimer, QThread
+from PySide6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
+    QLabel, QPushButton, QGroupBox, QSplitter,
+    QSizePolicy, QSpacerItem, QMessageBox, QProgressBar,
+    QComboBox, QLineEdit, QTableWidget, QTableWidgetItem,
+    QHeaderView, QAbstractItemView, QTextEdit,
+    QApplication
 )
-from PySide6.QtGui import QFont, QColor  # type: ignore
 
-from ..widgets.metric_cards import MetricCard, MetricRow
-from ..widgets.charts.heatmap import HeatmapWidget
-from ..widgets.report_widgets.portfolio_report_widget import PortfolioReportWidget
-from ...services.supervisor_client import (
-    get_portfolio_report_v1, SupervisorClientError,
-    get_registry_strategies, post_portfolio_build,
-    get_job, get_job_artifacts
+from config.registry.instruments import load_instruments
+from core.season_context import current_season, outputs_root
+from gui.services.action_router_service import get_action_router_service
+from gui.services.supervisor_client import (
+    SupervisorClientError,
+    get_outputs_summary,
+    post_portfolio_build,
+    get_job,
+    get_stdout_tail,
+    get_artifacts,
+    list_seasons_ssot,
 )
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class CoverageRange:
+    start: str
+    end: str
+
+
+class CoverageWorker(QThread):
+    coverage_ready = Signal(str, str, str)
+    error = Signal(str)
+
+    def __init__(self, instrument_id: str, parquet_path: str):
+        super().__init__()
+        self._instrument_id = instrument_id
+        self._parquet_path = parquet_path
+
+    def run(self):
+        try:
+            import pandas as pd
+            df = pd.read_parquet(self._parquet_path, columns=["ts"])
+            if df.empty:
+                self.error.emit("Parquet has no rows")
+                return
+            ts_min = df["ts"].min()
+            ts_max = df["ts"].max()
+            start = ts_min.date().isoformat() if hasattr(ts_min, "date") else str(ts_min)[:10]
+            end = ts_max.date().isoformat() if hasattr(ts_max, "date") else str(ts_max)[:10]
+            self.coverage_ready.emit(self._instrument_id, start, end)
+        except Exception as exc:
+            self.error.emit(f"Coverage read failed: {exc}")
+
+
+class PortfolioJobsPoller(QThread):
+    jobs_loaded = Signal(list)
+    error = Signal(str)
+
+    def __init__(self, limit: int):
+        super().__init__()
+        self._limit = limit
+
+    def run(self):
+        try:
+            summary = get_outputs_summary()
+            portfolios = summary.get("portfolios", {}).get("recent", []) if isinstance(summary, dict) else []
+            self.jobs_loaded.emit(portfolios[: self._limit])
+        except SupervisorClientError as exc:
+            self.error.emit(str(exc))
+
+
+class PortfolioDiagnosticsWorker(QThread):
+    diagnostics_ready = Signal(dict)
+    error = Signal(str)
+
+    def __init__(self, portfolio_job_id: str):
+        super().__init__()
+        self._portfolio_job_id = portfolio_job_id
+
+    def run(self):
+        try:
+            log_tail = get_stdout_tail(self._portfolio_job_id, n=50)
+            artifacts = get_artifacts(self._portfolio_job_id)
+            files = []
+            if isinstance(artifacts, dict):
+                files = artifacts.get("files", []) or []
+            elif isinstance(artifacts, list):
+                files = artifacts
+            payload = {
+                "job_id": self._portfolio_job_id,
+                "log_tail": log_tail,
+                "artifact_count": len(files),
+                "checked_at": datetime.now(timezone.utc).isoformat(),
+            }
+            self.diagnostics_ready.emit(payload)
+        except SupervisorClientError as exc:
+            self.error.emit(str(exc))
+
+
 class AllocationTab(QWidget):
-    """Allocation Tab - Phase C Professional CTA Portfolio Builder."""
-    
-    # Signals for communication with main window
+    """Portfolio Backtest Master Console."""
+
     log_signal = Signal(str)
-    allocation_changed = Signal(dict)  # audit_event
-    
+    allocation_changed = Signal(dict)
+
     def __init__(self):
         super().__init__()
+
+        self.action_router = get_action_router_service()
+        self.prepared_index_path = Path(outputs_root()) / "_runtime" / "bar_prepare_index.json"
+        self.prepared_index: Dict[str, Any] = {}
+        self.coverage_cache: Dict[str, CoverageRange] = {}
+        self.registry_instruments = [inst.id for inst in load_instruments().instruments]
+        self.coverage_workers: List[CoverageWorker] = []
+        self.diagnostic_workers: List[PortfolioDiagnosticsWorker] = []
+
+        self.available_components: List[dict] = []
+        self.selected_components: List[dict] = []
+        self.submitted_jobs: Dict[str, dict] = {}
+        self.portfolio_status: Dict[str, dict] = {}
+
+        self.poll_interval_ms = 2000
+        self.job_limit = 20
+        self.poller: Optional[PortfolioJobsPoller] = None
+        self.monitor_paused = False
+        self.portfolio_runs: List[dict] = []
+        self.focused_run_id: Optional[str] = None
+        self.run_snapshots: Dict[str, dict] = {}
+        self.run_last_change: Dict[str, datetime] = {}
+        self.run_last_seen: Dict[str, datetime] = {}
+        self.run_last_log_line: Dict[str, str] = {}
+        self.run_last_artifact_count: Dict[str, int] = {}
+
         self.setup_ui()
         self.setup_connections()
-        self.load_registry_data()
-    
+        self.load_season_options()
+        self.refresh_prepared_index()
+        self.refresh_components()
+        self.refresh_runs()
+        self.start_polling()
+
     def setup_ui(self):
-        """Initialize the UI components with QSplitter layout."""
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(8, 8, 8, 8)
         main_layout.setSpacing(8)
-        
-        # Create main splitter
+
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        main_splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #555555;
-                width: 1px;
+        main_splitter.setStyleSheet(self._splitter_style())
+
+        left_panel = QWidget()
+        left_panel.setStyleSheet("background-color: #121212;")
+        left_layout = QVBoxLayout(left_panel)
+        left_layout.setContentsMargins(8, 8, 8, 8)
+        left_layout.setSpacing(12)
+
+        components_group = QGroupBox("Portfolio Components")
+        components_group.setStyleSheet(self._group_style("#1a237e"))
+        components_layout = QVBoxLayout(components_group)
+        components_layout.setContentsMargins(12, 12, 12, 12)
+        components_layout.setSpacing(8)
+
+        self.available_table = QTableWidget()
+        self.available_table.setColumnCount(6)
+        self.available_table.setHorizontalHeaderLabels([
+            "Job ID", "Strategy", "Instrument", "Timeframe", "Season", "Score"
+        ])
+        self._configure_table(self.available_table)
+        components_layout.addWidget(QLabel("Available Components (completed jobs):"))
+        components_layout.addWidget(self.available_table)
+
+        add_row = QHBoxLayout()
+        self.add_component_btn = QPushButton("Add Selected")
+        self.add_component_btn.setStyleSheet(self._small_button_style())
+        add_row.addWidget(self.add_component_btn)
+        add_row.addStretch()
+        components_layout.addLayout(add_row)
+
+        self.selected_table = QTableWidget()
+        self.selected_table.setColumnCount(6)
+        self.selected_table.setHorizontalHeaderLabels([
+            "Job ID", "Strategy", "Instrument", "Timeframe", "Season", "Score"
+        ])
+        self._configure_table(self.selected_table)
+        components_layout.addWidget(QLabel("Selected Components:"))
+        components_layout.addWidget(self.selected_table)
+
+        remove_row = QHBoxLayout()
+        self.remove_component_btn = QPushButton("Remove Selected")
+        self.remove_component_btn.setStyleSheet(self._small_button_style())
+        remove_row.addWidget(self.remove_component_btn)
+        remove_row.addStretch()
+        components_layout.addLayout(remove_row)
+
+        left_layout.addWidget(components_group)
+
+        config_group = QGroupBox("Portfolio Run")
+        config_group.setStyleSheet(self._group_style("#1b5e20"))
+        config_layout = QFormLayout(config_group)
+        config_layout.setContentsMargins(12, 12, 12, 12)
+        config_layout.setSpacing(10)
+
+        season_row = QWidget()
+        season_layout = QHBoxLayout(season_row)
+        season_layout.setContentsMargins(0, 0, 0, 0)
+        season_layout.setSpacing(6)
+        self.season_combo = QComboBox()
+        self.season_combo.setStyleSheet(self._combo_style())
+        self.full_data_btn = QPushButton("Full Data")
+        self.full_data_btn.setStyleSheet(self._small_button_style())
+        season_layout.addWidget(self.season_combo)
+        season_layout.addWidget(self.full_data_btn)
+        config_layout.addRow("Season:", season_row)
+
+        self.start_date_edit = QLineEdit()
+        self.start_date_edit.setReadOnly(True)
+        self.start_date_edit.setStyleSheet(self._line_edit_style())
+        self.end_date_edit = QLineEdit()
+        self.end_date_edit.setReadOnly(True)
+        self.end_date_edit.setStyleSheet(self._line_edit_style())
+        config_layout.addRow("Start Date:", self.start_date_edit)
+        config_layout.addRow("End Date:", self.end_date_edit)
+
+        self.run_mode_combo = QComboBox()
+        self.run_mode_combo.setStyleSheet(self._combo_style())
+        self.run_mode_combo.addItems(["backtest", "research", "optimize", "wfs"])
+        config_layout.addRow("Portfolio Run Mode:", self.run_mode_combo)
+
+        left_layout.addWidget(config_group)
+
+        self.run_button = QPushButton("RUN PORTFOLIO")
+        self.run_button.setMinimumHeight(52)
+        self.run_button.setStyleSheet(self._primary_button_style())
+        left_layout.addWidget(self.run_button)
+
+        self.run_disabled_reason = QLabel("")
+        self.run_disabled_reason.setStyleSheet("color: #FFB74D; font-size: 11px;")
+        self.run_disabled_reason.setWordWrap(True)
+        left_layout.addWidget(self.run_disabled_reason)
+
+        left_layout.addSpacerItem(QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setStyleSheet(self._splitter_style(vertical=True))
+
+        live_group = QGroupBox("Live Status (Focused Portfolio Run)")
+        live_group.setStyleSheet(self._group_style("#4a148c"))
+        live_layout = QVBoxLayout(live_group)
+        live_layout.setContentsMargins(12, 12, 12, 12)
+        live_layout.setSpacing(8)
+
+        run_id_row = QHBoxLayout()
+        self.run_id_edit = QLineEdit()
+        self.run_id_edit.setReadOnly(True)
+        self.run_id_edit.setStyleSheet(self._line_edit_style())
+        self.copy_run_id_btn = QPushButton("Copy")
+        self.copy_run_id_btn.setStyleSheet(self._small_button_style())
+        run_id_row.addWidget(self.run_id_edit)
+        run_id_row.addWidget(self.copy_run_id_btn)
+        live_layout.addLayout(run_id_row)
+
+        self.status_label = QLabel("Status: —")
+        self.status_label.setStyleSheet("color: #E6E6E6; font-size: 12px; font-weight: bold;")
+        live_layout.addWidget(self.status_label)
+
+        self.submitted_label = QLabel("Submitted: —")
+        self.submitted_label.setStyleSheet("color: #9A9A9A; font-size: 11px;")
+        live_layout.addWidget(self.submitted_label)
+
+        self.last_seen_label = QLabel("Last update: —")
+        self.last_seen_label.setStyleSheet("color: #9A9A9A; font-size: 11px;")
+        live_layout.addWidget(self.last_seen_label)
+
+        self.phase_label = QLabel("Phase: —")
+        self.phase_label.setStyleSheet("color: #BDBDBD; font-size: 11px;")
+        live_layout.addWidget(self.phase_label)
+
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        live_layout.addWidget(self.progress_bar)
+
+        self.stall_label = QLabel("")
+        self.stall_label.setStyleSheet("color: #FF9800; font-size: 11px;")
+        live_layout.addWidget(self.stall_label)
+
+        self.error_label = QLabel("")
+        self.error_label.setStyleSheet("color: #F44336; font-size: 11px;")
+        self.error_label.setWordWrap(True)
+        live_layout.addWidget(self.error_label)
+
+        action_row = QHBoxLayout()
+        self.view_report_btn = QPushButton("View Portfolio Report")
+        self.view_report_btn.setStyleSheet(self._small_button_style())
+        self.view_gate_btn = QPushButton("View Explain / Gate")
+        self.view_gate_btn.setStyleSheet(self._small_button_style())
+        self.diagnose_btn = QPushButton("Diagnose")
+        self.diagnose_btn.setStyleSheet(self._small_button_style())
+        action_row.addWidget(self.view_report_btn)
+        action_row.addWidget(self.view_gate_btn)
+        action_row.addWidget(self.diagnose_btn)
+        action_row.addStretch()
+        live_layout.addLayout(action_row)
+
+        self.diagnostics_output = QTextEdit()
+        self.diagnostics_output.setReadOnly(True)
+        self.diagnostics_output.setMaximumHeight(120)
+        self.diagnostics_output.setStyleSheet(self._diagnostics_style())
+        live_layout.addWidget(self.diagnostics_output)
+
+        monitor_group = QGroupBox("Portfolio Runs Monitor")
+        monitor_group.setStyleSheet(self._group_style("#1b5e20"))
+        monitor_layout = QVBoxLayout(monitor_group)
+        monitor_layout.setContentsMargins(12, 12, 12, 12)
+        monitor_layout.setSpacing(8)
+
+        controls_row = QHBoxLayout()
+        self.pause_resume_btn = QPushButton("Pause")
+        self.pause_resume_btn.setStyleSheet(self._small_button_style())
+        self.refresh_btn = QPushButton("Refresh Now")
+        self.refresh_btn.setStyleSheet(self._small_button_style())
+        controls_row.addWidget(self.pause_resume_btn)
+        controls_row.addWidget(self.refresh_btn)
+        controls_row.addStretch()
+        monitor_layout.addLayout(controls_row)
+
+        self.runs_table = QTableWidget()
+        self.runs_table.setColumnCount(6)
+        self.runs_table.setHorizontalHeaderLabels([
+            "Created", "Run ID", "Components", "Run Mode", "Season/Range", "Status"
+        ])
+        self._configure_table(self.runs_table)
+        monitor_layout.addWidget(self.runs_table)
+
+        right_splitter.addWidget(live_group)
+        right_splitter.addWidget(monitor_group)
+        right_splitter.setStretchFactor(0, 2)
+        right_splitter.setStretchFactor(1, 3)
+        right_splitter.setCollapsible(0, False)
+        right_splitter.setCollapsible(1, False)
+
+        main_splitter.addWidget(left_panel)
+        main_splitter.addWidget(right_splitter)
+        main_splitter.setStretchFactor(0, 3)
+        main_splitter.setStretchFactor(1, 4)
+        main_splitter.setCollapsible(0, False)
+        main_splitter.setCollapsible(1, False)
+
+        main_layout.addWidget(main_splitter)
+
+    def setup_connections(self):
+        self.add_component_btn.clicked.connect(self.add_selected_component)
+        self.remove_component_btn.clicked.connect(self.remove_selected_component)
+        self.full_data_btn.clicked.connect(self.reset_full_data)
+        self.season_combo.currentIndexChanged.connect(self.on_season_changed)
+        self.run_mode_combo.currentIndexChanged.connect(self.update_run_state)
+        self.run_button.clicked.connect(self.run_portfolio)
+        self.pause_resume_btn.clicked.connect(self.toggle_pause)
+        self.refresh_btn.clicked.connect(self.refresh_runs)
+        self.runs_table.itemSelectionChanged.connect(self.on_run_selected)
+        self.copy_run_id_btn.clicked.connect(self.copy_run_id)
+        self.view_report_btn.clicked.connect(self.view_portfolio_report)
+        self.view_gate_btn.clicked.connect(self.view_gate_summary)
+        self.diagnose_btn.clicked.connect(self.run_diagnostics)
+
+    def _configure_table(self, table: QTableWidget):
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        table.verticalHeader().setVisible(False)
+        table.setStyleSheet("""
+            QTableWidget {
+                background-color: #121212;
+                color: #E6E6E6;
+                border: 1px solid #333333;
+                font-size: 11px;
             }
-            QSplitter::handle:hover {
-                background-color: #3A8DFF;
+            QHeaderView::section {
+                background-color: #1E1E1E;
+                color: #E6E6E6;
+                padding: 4px;
+                border: none;
+                font-weight: bold;
             }
         """)
-        
-        # Left panel: Build Controls
-        left_widget = QWidget()
-        left_widget.setStyleSheet("background-color: #121212;")
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(4, 4, 4, 4)
-        left_layout.setSpacing(8)
-        
-        # Build Controls group
-        build_group = QGroupBox("Portfolio Build Controls")
-        build_group.setStyleSheet("""
-            QGroupBox {
+
+    def _splitter_style(self, vertical: bool = False) -> str:
+        size_prop = "height" if vertical else "width"
+        return f"""
+            QSplitter::handle {{
+                background-color: #555555;
+                {size_prop}: 1px;
+            }}
+            QSplitter::handle:hover {{
+                background-color: #3A8DFF;
+            }}
+        """
+
+    def _group_style(self, border_color: str) -> str:
+        return f"""
+            QGroupBox {{
                 font-weight: bold;
-                border: 2px solid #FF9800;
+                border: 2px solid {border_color};
                 background-color: #1E1E1E;
                 margin-top: 5px;
                 padding-top: 8px;
                 font-size: 12px;
-            }
-            QGroupBox::title {
+            }}
+            QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 8px;
                 padding: 0 4px 0 4px;
                 color: #E6E6E6;
-            }
-        """)
-        
-        # Scroll area for form
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
+            }}
+        """
+
+    def _combo_style(self) -> str:
+        return """
+            QComboBox {
                 background-color: #1E1E1E;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 4px;
             }
-        """)
-        
-        form_widget = QWidget()
-        form_layout = QFormLayout(form_widget)
-        form_layout.setContentsMargins(12, 12, 12, 12)
-        form_layout.setSpacing(10)
-        form_layout.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        
-        # Season
-        self.season_input = QLineEdit()
-        self.season_input.setPlaceholderText("e.g., 2026Q1")
-        self.season_input.setText("2026Q1")
-        self.season_input.setToolTip("Season identifier (e.g., 2026Q1)")
-        form_layout.addRow("Season:", self.season_input)
-        
-        # Timeframe
-        self.timeframe_input = QLineEdit()
-        self.timeframe_input.setPlaceholderText("e.g., 60m")
-        self.timeframe_input.setText("60m")
-        self.timeframe_input.setToolTip("Timeframe (e.g., 60m)")
-        form_layout.addRow("Timeframe:", self.timeframe_input)
-        
-        # Risk budget
-        self.risk_budget_spin = QDoubleSpinBox()
-        self.risk_budget_spin.setRange(0.0, 1000000.0)
-        self.risk_budget_spin.setDecimals(2)
-        self.risk_budget_spin.setPrefix("$")
-        self.risk_budget_spin.setValue(100000.0)
-        self.risk_budget_spin.setToolTip("Total risk budget for portfolio")
-        form_layout.addRow("Risk Budget:", self.risk_budget_spin)
-        
-        # Correlation threshold
-        self.corr_threshold_spin = QDoubleSpinBox()
-        self.corr_threshold_spin.setRange(0.0, 1.0)
-        self.corr_threshold_spin.setDecimals(3)
-        self.corr_threshold_spin.setSingleStep(0.05)
-        self.corr_threshold_spin.setValue(0.7)
-        self.corr_threshold_spin.setToolTip("Maximum allowed correlation between strategies")
-        form_layout.addRow("Corr Threshold:", self.corr_threshold_spin)
-        
-        # Strategy whitelist (multi-select)
-        self.strategy_whitelist_label = QLabel("Select strategies to include:")
-        form_layout.addRow(self.strategy_whitelist_label)
-        
-        self.strategy_checkboxes = list()
-        strategy_checkbox_layout = QVBoxLayout()
-        
-        # Will be populated dynamically
-        self.strategy_checkbox_container = QWidget()
-        self.strategy_checkbox_container.setLayout(strategy_checkbox_layout)
-        
-        scroll_checkboxes = QScrollArea()
-        scroll_checkboxes.setWidgetResizable(True)
-        scroll_checkboxes.setMaximumHeight(150)
-        scroll_checkboxes.setWidget(self.strategy_checkbox_container)
-        form_layout.addRow(scroll_checkboxes)
-        
-        # Select all/none buttons
-        checkbox_buttons_layout = QHBoxLayout()
-        self.select_all_btn = QPushButton("Select All")
-        self.select_none_btn = QPushButton("Select None")
-        checkbox_buttons_layout.addWidget(self.select_all_btn)
-        checkbox_buttons_layout.addWidget(self.select_none_btn)
-        checkbox_buttons_layout.addStretch()
-        form_layout.addRow(checkbox_buttons_layout)
-        
-        # Add stretch to push button to bottom
-        form_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
-        
-        # BUILD PORTFOLIO button (enabled when strategies selected)
-        self.build_button = QPushButton("BUILD PORTFOLIO")
-        self.build_button.setEnabled(True)
-        self.build_button.setToolTip("Build portfolio from selected strategies")
-        self.build_button.setStyleSheet("""
+        """
+
+    def _line_edit_style(self) -> str:
+        return """
+            QLineEdit {
+                background-color: #1E1E1E;
+                color: #E6E6E6;
+                border: 1px solid #555555;
+                border-radius: 4px;
+                padding: 4px;
+            }
+            QLineEdit:read-only {
+                background-color: #2A2A2A;
+                color: #9A9A9A;
+            }
+        """
+
+    def _primary_button_style(self) -> str:
+        return """
             QPushButton {
-                background-color: #FF9800;
-                color: #121212;
+                background-color: #2D6CDF;
+                color: white;
                 font-weight: bold;
                 font-size: 14px;
                 padding: 12px;
                 border-radius: 6px;
-                border: 2px solid #FF9800;
+                border: 1px solid #2D6CDF;
             }
-            QPushButton:hover {
-                background-color: #FFB74D;
-                border: 2px solid #FFB74D;
-            }
+            QPushButton:hover { background-color: #2459B6; }
+            QPushButton:pressed { background-color: #1E4A9A; }
             QPushButton:disabled {
-                background-color: #424242;
+                background-color: #3A3A3A;
                 color: #9e9e9e;
-                border: 2px solid #616161;
+                border: 1px solid #616161;
             }
-        """)
-        self.build_button.setMinimumHeight(50)
-        form_layout.addRow(self.build_button)
-        
-        # Set form widget to scroll area
-        scroll.setWidget(form_widget)
-        
-        # Add scroll area to build group
-        build_layout = QVBoxLayout(build_group)
-        build_layout.addWidget(scroll)
-        
-        # Add build group to left panel
-        left_layout.addWidget(build_group)
-        
-        # Right panel: Portfolio Viewer
-        right_widget = QWidget()
-        right_widget.setStyleSheet("background-color: #121212;")
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(4, 4, 4, 4)
-        right_layout.setSpacing(8)
-        
-        # Portfolio Viewer group
-        viewer_group = QGroupBox("Portfolio Report Viewer")
-        viewer_group.setStyleSheet("""
-            QGroupBox {
-                font-weight: bold;
-                border: 2px solid #4CAF50;
-                background-color: #1E1E1E;
-                margin-top: 5px;
-                padding-top: 8px;
-                font-size: 12px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 4px 0 4px;
+        """
+
+    def _small_button_style(self) -> str:
+        return """
+            QPushButton {
+                background-color: #2A2A2A;
                 color: #E6E6E6;
-            }
-        """)
-        
-        # Portfolio ID input
-        portfolio_input_layout = QHBoxLayout()
-        portfolio_input_layout.addWidget(QLabel("Portfolio ID:"))
-        
-        self.portfolio_id_input = QLineEdit()
-        self.portfolio_id_input.setPlaceholderText("Enter portfolio ID...")
-        self.portfolio_id_input.setStyleSheet("""
-            QLineEdit {
-                background-color: #2a2a2a;
-                color: #E6E6E6;
-                border: 1px solid #555555;
+                font-size: 11px;
+                padding: 6px 10px;
                 border-radius: 4px;
-                padding: 6px;
-                font-size: 12px;
+                border: 1px solid #555555;
             }
-            QLineEdit:focus {
-                border: 1px solid #3A8DFF;
-            }
-        """)
-        portfolio_input_layout.addWidget(self.portfolio_id_input)
-        
-        self.load_portfolio_btn = QPushButton("Load Report")
-        self.load_portfolio_btn.setToolTip("Load portfolio report by ID")
-        portfolio_input_layout.addWidget(self.load_portfolio_btn)
-        
-        portfolio_input_layout.addStretch()
-        right_layout.addLayout(portfolio_input_layout)
-        
-        # Portfolio report display area
-        self.portfolio_display_area = QScrollArea()
-        self.portfolio_display_area.setWidgetResizable(True)
-        self.portfolio_display_area.setStyleSheet("""
-            QScrollArea {
+            QPushButton:hover { background-color: #333333; }
+            QPushButton:disabled { color: #888888; }
+        """
+
+    def _diagnostics_style(self) -> str:
+        return """
+            QTextEdit {
+                background-color: #121212;
+                color: #E6E6E6;
                 border: 1px solid #333333;
-                background-color: #1E1E1E;
+                font-family: monospace;
+                font-size: 10px;
             }
-        """)
-        
-        # Initial placeholder
-        self.portfolio_placeholder = QLabel("No portfolio report loaded.\nEnter a portfolio ID and click 'Load Report'.")
-        self.portfolio_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.portfolio_placeholder.setStyleSheet("color: #9e9e9e; font-size: 14px; padding: 40px;")
-        self.portfolio_display_area.setWidget(self.portfolio_placeholder)
-        
-        viewer_layout = QVBoxLayout(viewer_group)
-        viewer_layout.addWidget(self.portfolio_display_area)
-        right_layout.addWidget(viewer_group)
-        
-        # Status label
-        self.status_label = QLabel("Ready")
-        self.status_label.setStyleSheet("color: #9e9e9e; font-size: 10px;")
-        right_layout.addWidget(self.status_label)
-        
-        # Add panels to splitter
-        main_splitter.addWidget(left_widget)
-        main_splitter.addWidget(right_widget)
-        main_splitter.setSizes([350, 650])  # 35% left, 65% right
-        
-        # Add splitter to main layout
-        main_layout.addWidget(main_splitter)
-    
-    def setup_connections(self):
-        """Connect signals and slots."""
-        self.build_button.clicked.connect(self.build_portfolio)
-        self.load_portfolio_btn.clicked.connect(self.load_portfolio_report)
-        self.select_all_btn.clicked.connect(self.select_all_strategies)
-        self.select_none_btn.clicked.connect(self.select_none_strategies)
-    
-    def load_registry_data(self):
-        """Load registry strategies for whitelist."""
+        """
+
+    def load_season_options(self):
+        self.season_combo.clear()
+        self.season_combo.addItem("FULL DATA", "")
         try:
-            strategies = get_registry_strategies()
-            
-            # Clear existing checkboxes
-            for checkbox in self.strategy_checkboxes:
-                checkbox.setParent(None)
-            self.strategy_checkboxes.clear()
-            
-            # Get layout
-            layout = self.strategy_checkbox_container.layout()
-            
-            # Add checkboxes for each strategy
-            for strategy in strategies:
-                if isinstance(strategy, dict):
-                    strategy_id = strategy.get('id', '')
-                    strategy_name = strategy.get('name', strategy_id)
-                else:
-                    strategy_id = str(strategy)
-                    strategy_name = strategy_id
-                
-                checkbox = QCheckBox(strategy_name)
-                checkbox.setChecked(True)
-                checkbox.setToolTip(f"ID: {strategy_id}")
-                layout.addWidget(checkbox)
-                self.strategy_checkboxes.append(checkbox)
-            
-            self.status_label.setText(f"Loaded {len(self.strategy_checkboxes)} strategies")
-            
-        except SupervisorClientError as e:
-            self.status_label.setText(f"Failed to load registry: {e}")
-            logger.error(f"Failed to load registry data: {e}")
-    
-    def select_all_strategies(self):
-        """Select all strategy checkboxes."""
-        for checkbox in self.strategy_checkboxes:
-            checkbox.setChecked(True)
-    
-    def select_none_strategies(self):
-        """Deselect all strategy checkboxes."""
-        for checkbox in self.strategy_checkboxes:
-            checkbox.setChecked(False)
-    
-    def get_selected_strategies(self) -> List[str]:
-        """Get list of selected strategy IDs."""
-        selected = list()
-        for checkbox in self.strategy_checkboxes:
-            if checkbox.isChecked():
-                # Extract strategy ID from tooltip
-                tooltip = checkbox.toolTip()
-                if "ID: " in tooltip:
-                    strategy_id = tooltip.split("ID: ")[1]
-                    selected.append(strategy_id)
-                else:
-                    selected.append(checkbox.text())
-        return selected
-    
-    def build_portfolio(self):
-        """Build portfolio from selected strategies with guardrails."""
-        # Get selected strategies
-        selected_strategies = self.get_selected_strategies()
-        
-        # Guardrail B1: Empty portfolio build
-        if not selected_strategies:
-            QMessageBox.warning(self, "No Strategies Selected",
-                               "Please select at least one strategy to include in the portfolio.")
-            return
-        
-        # Guardrail B2: Check if all candidates are FAILED/REJECTED
-        # (We would need to fetch job statuses for each selected strategy,
-        # but for now we'll implement a simpler check)
+            response = list_seasons_ssot()
+            seasons = response.get("seasons", []) if isinstance(response, dict) else []
+            for season in seasons:
+                season_id = season.get("season_id") if isinstance(season, dict) else str(season)
+                if season_id:
+                    self.season_combo.addItem(season_id, season_id)
+        except SupervisorClientError as exc:
+            logger.warning("Season SSOT unavailable: %s", exc)
+            self.season_combo.addItem(current_season(), current_season())
+
+    def refresh_prepared_index(self):
+        if self.prepared_index_path.exists():
+            try:
+                self.prepared_index = json.loads(self.prepared_index_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                logger.error("Failed to load prepared index: %s", exc)
+                self.prepared_index = {}
+        else:
+            self.prepared_index = {}
+
+    def refresh_components(self):
+        self.available_components = []
         try:
-            from ...services.supervisor_client import get_jobs
-            recent_jobs = get_jobs(limit=100)
-            job_status_map = {}
-            for job in recent_jobs:
-                job_id = job.get("job_id")
-                if job_id:
-                    job_status_map[job_id] = job.get("status", "UNKNOWN")
-            
-            # Count failed/rejected among selected strategies
-            failed_count = 0
-            for strategy_id in selected_strategies:
-                status = job_status_map.get(strategy_id, "UNKNOWN")
-                if status in ["FAILED", "REJECTED"]:
-                    failed_count += 1
-            
-            if failed_count == len(selected_strategies):
-                reply = QMessageBox.warning(
-                    self,
-                    "All Candidates Failed",
-                    f"All {failed_count} selected strategies have FAILED or REJECTED status.\n\n"
-                    "Building a portfolio with only failed candidates is unlikely to succeed.\n"
-                    "Do you want to continue anyway?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No
-                )
-                if reply == QMessageBox.StandardButton.No:
-                    self.status_label.setText("Portfolio build cancelled (all candidates failed)")
-                    return
-        
-        except Exception as e:
-            # If we can't check job statuses, continue anyway
-            logger.warning(f"Failed to check candidate job statuses: {e}")
-        
-        # Get season and timeframe
-        season = self.season_input.text().strip()
-        timeframe = self.timeframe_input.text().strip()
-        if not season or not timeframe:
-            QMessageBox.warning(self, "Missing Parameters",
-                               "Please enter both season and timeframe.")
+            summary = get_outputs_summary()
+            jobs = summary.get("jobs", {}).get("recent", []) if isinstance(summary, dict) else []
+            for job in jobs:
+                status = job.get("status", "")
+                report_url = job.get("links", {}).get("report_url")
+                if status not in {"SUCCEEDED", "DONE", "COMPLETED"} and not report_url:
+                    continue
+                component = {
+                    "job_id": job.get("job_id"),
+                    "strategy": job.get("strategy_name", ""),
+                    "instrument": job.get("instrument", ""),
+                    "timeframe": job.get("timeframe", ""),
+                    "season": job.get("season", ""),
+                    "score": job.get("score"),
+                }
+                if component["job_id"]:
+                    self.available_components.append(component)
+        except SupervisorClientError as exc:
+            logger.warning("Failed to load components: %s", exc)
+
+        self._render_components_table(self.available_table, self.available_components)
+        self._render_components_table(self.selected_table, self.selected_components)
+        self.update_date_range()
+        self.update_run_state()
+
+    def _render_components_table(self, table: QTableWidget, components: List[dict]):
+        table.setRowCount(0)
+        for row, comp in enumerate(components):
+            table.insertRow(row)
+            values = [
+                comp.get("job_id", ""),
+                comp.get("strategy", ""),
+                comp.get("instrument", ""),
+                comp.get("timeframe", ""),
+                comp.get("season", ""),
+                comp.get("score") if comp.get("score") is not None else "—",
+            ]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if col == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, comp.get("job_id"))
+                table.setItem(row, col, item)
+
+    def add_selected_component(self):
+        selection = self.available_table.selectedItems()
+        if not selection:
             return
-        
-        # Get governance parameters
-        corr_threshold = float(self.corr_threshold_spin.value())
-        risk_budget = float(self.risk_budget_spin.value())
-        
-        # Guardrail C: Correlation/risk override sanity
-        warnings = list()
-        
-        if corr_threshold < 0.1 or corr_threshold > 0.99:
-            warnings.append(f"Correlation threshold ({corr_threshold}) is extreme (<0.1 or >0.99)")
-        
-        if risk_budget <= 0:
-            QMessageBox.critical(self, "Invalid Risk Budget",
-                               f"Risk budget must be positive (got ${risk_budget:.2f})")
+        job_id_item = selection[0]
+        job_id = job_id_item.data(Qt.ItemDataRole.UserRole)
+        if not job_id:
             return
-        
-        if risk_budget < 1000:
-            warnings.append(f"Risk budget (${risk_budget:.2f}) is very small")
-        
-        if warnings:
-            warning_msg = "Potential issues detected:\n\n" + "\n".join(f"• {w}" for w in warnings)
-            warning_msg += "\n\nDo you want to continue with these values?"
-            
-            reply = QMessageBox.warning(
-                self,
-                "Governance Parameter Warnings",
-                warning_msg,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No
-            )
-            
-            if reply == QMessageBox.StandardButton.No:
-                self.status_label.setText("Portfolio build cancelled (parameter warnings)")
+        component = next((c for c in self.available_components if c.get("job_id") == job_id), None)
+        if component and component not in self.selected_components:
+            self.selected_components.append(component)
+        self._render_components_table(self.selected_table, self.selected_components)
+        self.update_date_range()
+        self.update_run_state()
+
+    def remove_selected_component(self):
+        selection = self.selected_table.selectedItems()
+        if not selection:
+            return
+        job_id_item = selection[0]
+        job_id = job_id_item.data(Qt.ItemDataRole.UserRole)
+        if not job_id:
+            return
+        self.selected_components = [c for c in self.selected_components if c.get("job_id") != job_id]
+        self._render_components_table(self.selected_table, self.selected_components)
+        self.update_date_range()
+        self.update_run_state()
+
+    def reset_full_data(self):
+        self.season_combo.setCurrentIndex(0)
+        self.update_date_range()
+        self.update_run_state()
+
+    def on_season_changed(self):
+        self.update_date_range()
+        self.update_run_state()
+
+    def update_date_range(self):
+        season_id = self.season_combo.currentData()
+        if season_id:
+            season_range = self._resolve_season_range(season_id)
+            if season_range:
+                self.start_date_edit.setText(season_range.start)
+                self.end_date_edit.setText(season_range.end)
                 return
-        
-        governance_params_overrides = {
-            "max_pairwise_correlation": corr_threshold,
-            "portfolio_risk_budget_max": risk_budget
-        }
-        
-        # Compose request payload
-        request_payload = {
-            "season": season,
-            "timeframe": timeframe,
-            "candidate_run_ids": selected_strategies,
-            "governance_params_overrides": governance_params_overrides
-        }
-        
-        # Disable controls and show progress
-        self.build_button.setEnabled(False)
-        self.build_button.setText("BUILDING...")
-        self.status_label.setText("Submitting portfolio build request...")
-        QApplication.processEvents()
-        
+            self.start_date_edit.setText("")
+            self.end_date_edit.setText("")
+            return
+
+        coverage = self._resolve_component_intersection()
+        if coverage:
+            self.start_date_edit.setText(coverage.start)
+            self.end_date_edit.setText(coverage.end)
+        else:
+            self.start_date_edit.setText("")
+            self.end_date_edit.setText("")
+
+    def _resolve_component_intersection(self) -> Optional[CoverageRange]:
+        if not self.selected_components:
+            return None
+        starts = []
+        ends = []
+        for component in self.selected_components:
+            instrument = component.get("instrument")
+            if not instrument:
+                return None
+            coverage = self.coverage_cache.get(instrument)
+            if coverage is None:
+                parquet_path = self._find_parquet_path(instrument)
+                if parquet_path:
+                    worker = CoverageWorker(instrument, parquet_path)
+                    worker.coverage_ready.connect(self._on_coverage_ready)
+                    worker.error.connect(lambda msg: logger.warning("Coverage worker: %s", msg))
+                    self.coverage_workers.append(worker)
+                    worker.start()
+                return None
+            starts.append(coverage.start)
+            ends.append(coverage.end)
+
+        latest_start = max(starts)
+        earliest_end = min(ends)
+        if latest_start > earliest_end:
+            return None
+        return CoverageRange(start=latest_start, end=earliest_end)
+
+    def _on_coverage_ready(self, instrument_id: str, start: str, end: str):
+        self.coverage_cache[instrument_id] = CoverageRange(start=start, end=end)
+        self.update_date_range()
+        self.update_run_state()
+
+    def _resolve_season_range(self, season_id: str) -> Optional[CoverageRange]:
         try:
-            # Submit portfolio build request
+            if season_id and "Q" in season_id:
+                year_part = season_id.split("Q")[0]
+                q_part = season_id.split("Q")[1][:1]
+                if year_part.isdigit() and q_part.isdigit():
+                    year = int(year_part)
+                    quarter = int(q_part)
+                    if 1 <= quarter <= 4:
+                        start_month = (quarter - 1) * 3 + 1
+                        end_month = start_month + 2
+                        start_date = datetime(year, start_month, 1).date()
+                        if end_month == 12:
+                            end_date = datetime(year, 12, 31).date()
+                        else:
+                            end_date = datetime(year, end_month + 1, 1).date() - timedelta(days=1)
+                        return CoverageRange(start=start_date.isoformat(), end=end_date.isoformat())
+        except Exception:
+            return None
+        return None
+
+    def _find_parquet_path(self, instrument_id: str) -> Optional[str]:
+        entry = self.prepared_index.get("instruments", {}).get(instrument_id, {})
+        parquet_status = entry.get("parquet_status") if isinstance(entry, dict) else None
+        if parquet_status and parquet_status.get("path"):
+            return parquet_status.get("path")
+        return None
+
+    def update_run_state(self):
+        reasons = []
+        season_id = self.season_combo.currentData()
+        start_date = self.start_date_edit.text().strip()
+        end_date = self.end_date_edit.text().strip()
+
+        if not self.selected_components:
+            reasons.append("No components selected")
+
+        for component in self.selected_components:
+            instrument = component.get("instrument")
+            timeframe = component.get("timeframe")
+            if instrument and instrument not in self.registry_instruments:
+                reasons.append("Component not registered")
+                break
+            if instrument and not self._is_prepared(instrument, timeframe):
+                reasons.append("Component not prepared")
+                break
+
+        if start_date and end_date:
+            try:
+                start_dt = datetime.fromisoformat(start_date)
+                end_dt = datetime.fromisoformat(end_date)
+                if start_dt > end_dt:
+                    reasons.append("Date range invalid")
+            except ValueError:
+                reasons.append("Date range invalid")
+        else:
+            if self.selected_components:
+                reasons.append("Date range invalid")
+
+        if season_id is None:
+            season_id = ""
+
+        if reasons:
+            self.run_button.setEnabled(False)
+            self.run_disabled_reason.setText(" • " + "\n • ".join(dict.fromkeys(reasons)))
+        else:
+            self.run_button.setEnabled(True)
+            self.run_disabled_reason.setText("")
+
+    def _is_prepared(self, instrument_id: str, timeframe: str) -> bool:
+        if not instrument_id or not timeframe:
+            return False
+        entry = self.prepared_index.get("instruments", {}).get(instrument_id, {})
+        timeframes = entry.get("timeframes", {}) if isinstance(entry, dict) else {}
+        return str(timeframe) in timeframes
+
+    def run_portfolio(self):
+        if not self.run_button.isEnabled():
+            return
+
+        season_id = self.season_combo.currentData() or ""
+        if not season_id:
+            season_id = current_season()
+
+        timeframe = self.selected_components[0].get("timeframe", "") if self.selected_components else ""
+        candidate_run_ids = [c.get("job_id") for c in self.selected_components if c.get("job_id")]
+        components_count = len(candidate_run_ids)
+
+        request_payload = {
+            "season": season_id,
+            "timeframe": timeframe,
+            "candidate_run_ids": candidate_run_ids,
+        }
+
+        try:
             response = post_portfolio_build(request_payload)
             job_id = response.get("job_id")
-            
-            if not job_id:
-                raise SupervisorClientError(message="No job_id in response")
-            
-            self.status_label.setText(f"Portfolio build job created: {job_id}")
-            self.log_signal.emit(f"Portfolio build job created: {job_id}")
-            
-            # Poll job status
-            self.poll_job_status(job_id)
-            
-        except SupervisorClientError as e:
-            QMessageBox.critical(self, "Build Failed",
-                               f"Failed to submit portfolio build request: {e}")
-            self.status_label.setText(f"Build failed: {e}")
-            logger.error(f"Portfolio build failed: {e}")
-            self.reset_build_button()
-        except Exception as e:
-            QMessageBox.critical(self, "Unexpected Error",
-                               f"Unexpected error during portfolio build: {e}")
-            self.status_label.setText(f"Unexpected error: {e}")
-            logger.error(f"Unexpected error during portfolio build: {e}")
-            self.reset_build_button()
-    
-    def reset_build_button(self):
-        """Reset the build button to its initial state."""
-        self.build_button.setEnabled(True)
-        self.build_button.setText("BUILD PORTFOLIO")
-    
-    def poll_job_status(self, job_id: str):
-        """Poll job status until terminal state."""
-        import time
-        
-        max_polls = 300  # 5 minutes at 1 second intervals
-        poll_interval = 1.0  # seconds
-        
-        for poll_count in range(max_polls):
+            portfolio_id = response.get("portfolio_id")
+            if job_id:
+                portfolio_key = portfolio_id or job_id
+                self.submitted_jobs[job_id] = {
+                    "portfolio_id": portfolio_key,
+                    "components_count": components_count,
+                    "run_mode": self.run_mode_combo.currentText(),
+                    "season": season_id,
+                    "timeframe": timeframe,
+                }
+                self.focused_run_id = portfolio_key
+                self.log_signal.emit(f"Portfolio build job created: {job_id}")
+                self.allocation_changed.emit({
+                    "event_type": "portfolio_build_submitted",
+                    "job_id": job_id,
+                    "portfolio_id": portfolio_key,
+                    "season": season_id,
+                    "timeframe": timeframe,
+                    "components_count": components_count,
+                })
+                self.refresh_runs()
+        except SupervisorClientError as exc:
+            QMessageBox.critical(self, "Portfolio Build Failed", f"Failed to submit portfolio build: {exc}")
+            logger.error("Portfolio build failed: %s", exc)
+
+    def start_polling(self):
+        self.poll_timer = QTimer(self)
+        self.poll_timer.timeout.connect(self.refresh_runs)
+        self.poll_timer.start(self.poll_interval_ms)
+
+    def toggle_pause(self):
+        self.monitor_paused = not self.monitor_paused
+        self.pause_resume_btn.setText("Resume" if self.monitor_paused else "Pause")
+        if self.monitor_paused:
+            self.poll_timer.stop()
+        else:
+            self.poll_timer.start(self.poll_interval_ms)
+
+    def refresh_runs(self):
+        if self.poller and self.poller.isRunning():
+            return
+        self._refresh_submitted_jobs()
+        self.poller = PortfolioJobsPoller(self.job_limit)
+        self.poller.jobs_loaded.connect(self.on_runs_loaded)
+        self.poller.error.connect(self.on_runs_error)
+        self.poller.start()
+
+    def on_runs_error(self, message: str):
+        logger.warning("Portfolio runs refresh failed: %s", message)
+
+    def on_runs_loaded(self, runs: list):
+        merged_runs = list(runs or [])
+        known_portfolios = {r.get("portfolio_id") for r in merged_runs}
+        for job_id, meta in self.submitted_jobs.items():
+            portfolio_id = meta.get("portfolio_id")
+            if portfolio_id and portfolio_id not in known_portfolios:
+                merged_runs.append({
+                    "portfolio_id": portfolio_id,
+                    "created_at": self.portfolio_status.get(portfolio_id, {}).get("created_at"),
+                    "season": meta.get("season"),
+                    "timeframe": meta.get("timeframe"),
+                    "links": {},
+                })
+        self.portfolio_runs = merged_runs
+        now = datetime.now(timezone.utc)
+        for run in self.portfolio_runs:
+            run_id = run.get("portfolio_id")
+            if not run_id:
+                continue
+            status_snapshot = self.portfolio_status.get(run_id, {})
+            snapshot = {
+                "created_at": run.get("created_at"),
+                "season": run.get("season"),
+                "timeframe": run.get("timeframe"),
+                "status": status_snapshot.get("status"),
+                "policy_stage": status_snapshot.get("policy_stage"),
+                "failure_message": status_snapshot.get("failure_message"),
+            }
+            prev_snapshot = self.run_snapshots.get(run_id)
+            if prev_snapshot != snapshot:
+                self.run_last_change[run_id] = now
+                self.run_snapshots[run_id] = snapshot
+            self.run_last_seen[run_id] = now
+
+        self.update_runs_table()
+        self.update_focus_run()
+
+    def update_runs_table(self):
+        self.runs_table.setRowCount(0)
+        for row, run in enumerate(self.portfolio_runs):
+            self.runs_table.insertRow(row)
+            created = self._format_iso(run.get("created_at"))
+            run_id = run.get("portfolio_id", "")
+            meta = self._meta_for_portfolio(run_id)
+            components_count = str(meta.get("components_count", "—"))
+            run_mode = meta.get("run_mode", "portfolio")
+            season = run.get("season") or meta.get("season") or ""
+            status = self._display_status(self.portfolio_status.get(run_id, {}).get("status"))
+            if status == "UNKNOWN" and run.get("links", {}).get("report_url"):
+                status = "DONE"
+
+            values = [created, run_id, components_count, run_mode, season or "—", status]
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(str(value))
+                if col == 1:
+                    item.setData(Qt.ItemDataRole.UserRole, run_id)
+                self.runs_table.setItem(row, col, item)
+
+    def on_run_selected(self):
+        selection = self.runs_table.selectedItems()
+        if not selection:
+            return
+        run_id_item = selection[1]
+        run_id = run_id_item.data(Qt.ItemDataRole.UserRole)
+        if run_id:
+            self.focused_run_id = run_id
+            self.update_focus_run()
+
+    def update_focus_run(self):
+        if not self.portfolio_runs:
+            self._clear_live_status()
+            return
+
+        run_entry = None
+        if self.focused_run_id:
+            run_entry = next((r for r in self.portfolio_runs if r.get("portfolio_id") == self.focused_run_id), None)
+        if run_entry is None:
+            run_entry = self.portfolio_runs[0]
+            self.focused_run_id = run_entry.get("portfolio_id")
+
+        run_id = self.focused_run_id or ""
+        self.run_id_edit.setText(run_id)
+
+        status_text = "UNKNOWN"
+        job_status = self.portfolio_status.get(run_id)
+        if job_status:
+            status_text = self._display_status(job_status.get("status"))
+        if status_text == "UNKNOWN" and run_entry and run_entry.get("links", {}).get("report_url"):
+            status_text = "DONE"
+
+        self.status_label.setText(f"Status: {status_text}")
+        self.submitted_label.setText(f"Submitted: {self._format_iso(run_entry.get('created_at') if run_entry else '')}")
+
+        last_change = self.run_last_change.get(run_id)
+        if last_change:
+            seconds = int((datetime.now(timezone.utc) - last_change).total_seconds())
+            self.last_seen_label.setText(f"Last update: {seconds}s ago")
+            self._update_stall_label(status_text, seconds)
+        else:
+            self.last_seen_label.setText("Last update: —")
+            self.stall_label.setText("")
+
+        phase_text, progress = self._progress_for_job(job_status, status_text)
+        self.phase_label.setText(phase_text)
+        self.progress_bar.setValue(progress)
+        self.error_label.setText((job_status or {}).get("failure_message") or "")
+
+    def _job_id_for_portfolio(self, portfolio_id: str) -> Optional[str]:
+        for job_id, meta in self.submitted_jobs.items():
+            if meta.get("portfolio_id") == portfolio_id:
+                return job_id
+        return None
+
+    def _progress_for_job(self, job_status: Optional[dict], display_status: str) -> Tuple[str, int]:
+        if job_status:
+            progress = job_status.get("progress")
+            if isinstance(progress, (int, float)):
+                pct = max(0, min(100, int(progress * 100))) if progress <= 1 else max(0, min(100, int(progress)))
+                return f"Phase: progress {pct}%", pct
+
+        if display_status == "QUEUED":
+            return "Phase: Queued (1/4)", 0
+        if display_status == "RUNNING":
+            return "Phase: Running (2/4)", 50
+        if display_status == "DONE":
+            return "Phase: Complete (4/4)", 100
+        if display_status == "FAILED":
+            return "Phase: Failed (3/4)", 75
+        return "Phase: Unknown", 0
+
+    def _refresh_submitted_jobs(self):
+        now = datetime.now(timezone.utc)
+        for job_id, meta in self.submitted_jobs.items():
             try:
                 job = get_job(job_id)
-                status = job.get("status")
-                
-                self.status_label.setText(f"Job {job_id}: {status} (poll {poll_count+1}/{max_polls})")
-                QApplication.processEvents()
-                
-                if status in ["SUCCEEDED", "FAILED", "REJECTED"]:
-                    # Terminal state reached
-                    if status == "SUCCEEDED":
-                        # Extract portfolio_id from job artifacts
-                        portfolio_id = self.extract_portfolio_id_from_job(job_id)
-                        if portfolio_id:
-                            self.on_portfolio_build_success(portfolio_id)
-                        else:
-                            QMessageBox.warning(self, "Build Complete",
-                                             f"Portfolio build job {job_id} succeeded but portfolio_id not found.")
-                            self.status_label.setText(f"Build succeeded but portfolio_id missing")
-                    else:
-                        # Failed or rejected
-                        error_msg = f"Portfolio build job {job_id} {status.lower()}"
-                        QMessageBox.critical(self, "Build Failed", error_msg)
-                        self.status_label.setText(f"Build {status.lower()}")
-                    
-                    self.reset_build_button()
-                    return
-                
-                # Continue polling
-                time.sleep(poll_interval)
-                
-            except SupervisorClientError as e:
-                # If job not found after some polls, maybe it's still being created
-                if poll_count > 10:
-                    QMessageBox.warning(self, "Job Status Error",
-                                      f"Failed to get job status after multiple attempts: {e}")
-                    self.status_label.setText(f"Job status error: {e}")
-                    self.reset_build_button()
-                    return
-                time.sleep(poll_interval)
+            except SupervisorClientError as exc:
+                logger.warning("Failed to fetch portfolio job: %s", exc)
                 continue
-            except Exception as e:
-                QMessageBox.critical(self, "Polling Error",
-                                  f"Error while polling job status: {e}")
-                self.status_label.setText(f"Polling error: {e}")
-                self.reset_build_button()
-                return
-        
-        # Timeout
-        QMessageBox.warning(self, "Build Timeout",
-                          f"Portfolio build job {job_id} did not complete within timeout.")
-        self.status_label.setText(f"Build timeout")
-        self.reset_build_button()
-    
-    def extract_portfolio_id_from_job(self, job_id: str) -> Optional[str]:
-        """Extract portfolio_id from job artifacts."""
-        try:
-            artifacts = get_job_artifacts(job_id)
-            # Look for portfolio_id.json or other pointer files
-            files = artifacts.get("files", list())
-            for file_info in files:
-                filename = file_info.get("filename", "")
-                if filename == "portfolio_id.json":
-                    # Download and parse the file
-                    import json
-                    content = get_job_artifacts(job_id)  # This returns the index, not file content
-                    # Actually we need to get the file content
-                    # For now, try to find portfolio_id in job details
-                    pass
-            
-            # Alternative: check job config snapshot for portfolio_id
-            job = get_job(job_id)
-            config = job.get("spec", {}).get("config_snapshot", {})
-            portfolio_id = config.get("portfolio_id")
-            if portfolio_id:
-                return portfolio_id
-            
-            # Last resort: check if job has a portfolio_id field
-            portfolio_id = job.get("portfolio_id")
-            if portfolio_id:
-                return portfolio_id
-            
-        except Exception as e:
-            logger.error(f"Failed to extract portfolio_id from job {job_id}: {e}")
-        
-        return None
-    
-    def on_portfolio_build_success(self, portfolio_id: str):
-        """Handle successful portfolio build."""
-        self.status_label.setText(f"Portfolio build successful: {portfolio_id}")
-        self.log_signal.emit(f"Portfolio build successful: {portfolio_id}")
-        
-        # Update portfolio ID input field
-        self.portfolio_id_input.setText(portfolio_id)
-        
-        # Load and display the portfolio report
-        self.load_portfolio_report()
-        
-        # Signal to main window to open Audit tab with portfolio report
-        # This would require integration with main window signals
-        # For now, just show a success message
-        QMessageBox.information(self, "Build Successful",
-                              f"Portfolio {portfolio_id} built successfully.\n\n"
-                              f"The portfolio report has been loaded in the viewer.")
-    
-    def load_portfolio_report(self):
-        """Load and display portfolio report by ID."""
-        portfolio_id = self.portfolio_id_input.text().strip()
-        if not portfolio_id:
-            QMessageBox.warning(self, "Input Required", "Please enter a portfolio ID")
+
+            portfolio_id = meta.get("portfolio_id")
+            if not portfolio_id:
+                continue
+            snapshot = {
+                "status": job.get("status"),
+                "policy_stage": job.get("policy_stage"),
+                "failure_message": job.get("failure_message"),
+                "created_at": job.get("created_at"),
+                "progress": job.get("progress"),
+            }
+            prev_snapshot = self.portfolio_status.get(portfolio_id)
+            if prev_snapshot != snapshot:
+                self.run_last_change[portfolio_id] = now
+            self.run_last_seen[portfolio_id] = now
+            self.portfolio_status[portfolio_id] = snapshot
+
+    def _meta_for_portfolio(self, portfolio_id: str) -> dict:
+        for meta in self.submitted_jobs.values():
+            if meta.get("portfolio_id") == portfolio_id:
+                return meta
+        return {}
+
+    def _update_stall_label(self, status: str, seconds_since_change: int):
+        if status != "RUNNING":
+            self.stall_label.setText("")
             return
-        
+        if seconds_since_change >= 120:
+            self.stall_label.setText(f"LIKELY STALLED • {seconds_since_change}s since change")
+        elif seconds_since_change >= 30:
+            self.stall_label.setText(f"STALLED? • {seconds_since_change}s since change")
+        else:
+            self.stall_label.setText(f"Last update: {seconds_since_change}s ago")
+
+    def _clear_live_status(self):
+        self.run_id_edit.setText("")
+        self.status_label.setText("Status: —")
+        self.submitted_label.setText("Submitted: —")
+        self.last_seen_label.setText("Last update: —")
+        self.phase_label.setText("Phase: —")
+        self.progress_bar.setValue(0)
+        self.stall_label.setText("")
+        self.error_label.setText("")
+        self.diagnostics_output.setText("")
+
+    def run_diagnostics(self):
+        job_id = self._job_id_for_portfolio(self.focused_run_id or "")
+        if not job_id:
+            self.diagnostics_output.setText("Diagnostics unavailable: no job_id")
+            return
+        worker = PortfolioDiagnosticsWorker(job_id)
+        worker.diagnostics_ready.connect(self.on_diagnostics_ready)
+        worker.error.connect(lambda msg: self.diagnostics_output.setText(f"Diagnostics failed: {msg}"))
+        self.diagnostic_workers.append(worker)
+        worker.start()
+
+    def on_diagnostics_ready(self, payload: dict):
+        log_tail = payload.get("log_tail", "")
+        artifact_count = payload.get("artifact_count", 0)
+        checked_at = payload.get("checked_at", "")
+        last_line = log_tail.strip().splitlines()[-1] if log_tail else "No log output"
+        self.diagnostics_output.setText(
+            f"Checked at: {checked_at}\n"
+            f"Last log line: {last_line}\n"
+            f"Artifact count: {artifact_count}"
+        )
+        run_id = self.focused_run_id
+        if run_id:
+            prev_line = self.run_last_log_line.get(run_id)
+            if prev_line != last_line:
+                self.run_last_log_line[run_id] = last_line
+                self.run_last_change[run_id] = datetime.now(timezone.utc)
+            prev_count = self.run_last_artifact_count.get(run_id)
+            if prev_count != artifact_count:
+                self.run_last_artifact_count[run_id] = artifact_count
+                self.run_last_change[run_id] = datetime.now(timezone.utc)
+
+    def view_portfolio_report(self):
+        portfolio_id = self.focused_run_id
+        if portfolio_id:
+            self.action_router.handle_action(f"internal://report/portfolio/{portfolio_id}")
+
+    def view_gate_summary(self):
+        run_id = self.focused_run_id
+        if run_id:
+            self.action_router.handle_action("gate_summary", context={"job_id": run_id})
+
+    def copy_run_id(self):
+        if not self.run_id_edit.text():
+            return
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.run_id_edit.text())
+
+    def _format_iso(self, value: Optional[str]) -> str:
+        if not value:
+            return "—"
         try:
-            self.status_label.setText(f"Loading portfolio report {portfolio_id}...")
-            QApplication.processEvents()
-            
-            # Fetch report from supervisor
-            report_data = get_portfolio_report_v1(portfolio_id)
-            if not report_data:
-                QMessageBox.warning(self, "Report Not Found", f"No portfolio report found for ID {portfolio_id}")
-                self.status_label.setText(f"Report not found")
-                return
-            
-            # Create the new portfolio report widget
-            display_widget = PortfolioReportWidget(portfolio_id, report_data)
-            self.portfolio_display_area.setWidget(display_widget)
-            
-            self.status_label.setText(f"Portfolio report {portfolio_id} loaded")
-            self.log_signal.emit(f"Loaded portfolio report {portfolio_id}")
-            
-        except SupervisorClientError as e:
-            QMessageBox.critical(self, "Report Error", f"Failed to load portfolio report: {e}")
-            self.status_label.setText(f"Error: {e}")
-            logger.error(f"Failed to load portfolio report {portfolio_id}: {e}")
-    
-    
-    def log(self, message: str):
-        """Append message to log."""
-        self.log_signal.emit(message)
-        self.status_label.setText(message)
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            return value
+
+    def _display_status(self, status: Optional[str]) -> str:
+        status_value = (status or "").upper()
+        if status_value in {"PENDING", "CREATED", "QUEUED", "STARTED"}:
+            return "QUEUED"
+        if status_value in {"RUNNING"}:
+            return "RUNNING"
+        if status_value in {"SUCCEEDED", "DONE"}:
+            return "DONE"
+        if status_value in {"FAILED", "REJECTED", "ABORTED", "KILLED"}:
+            return "FAILED"
+        return status_value or "UNKNOWN"

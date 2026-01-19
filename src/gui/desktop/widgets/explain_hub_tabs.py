@@ -810,6 +810,7 @@ class ExplainHubTabs(QWidget):
             self.actions_container_layout.addWidget(btn)
         
         self.actions_group.setVisible(True)
+        self.actions_group.show()
     
     def _on_action_clicked(self, button: QPushButton):
         """Handle action button click - route through ActionRouterService."""

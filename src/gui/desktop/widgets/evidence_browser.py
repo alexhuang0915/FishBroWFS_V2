@@ -20,10 +20,10 @@ from PySide6.QtWidgets import (  # type: ignore
     QPushButton, QLabel, QSplitter, QTextEdit, QMessageBox,
     QFileDialog, QMenu, QApplication
 )
-from PySide6.QtGui import QAction, QDesktopServices, QFont  # type: ignore
-from PySide6.QtCore import QUrl  # type: ignore
+from PySide6.QtGui import QAction, QFont  # type: ignore
 
 from ..services.evidence_locator import list_evidence_files, EvidenceFile, get_evidence_root
+from gui.services.action_router_service import get_action_router_service
 
 logger = logging.getLogger(__name__)
 
@@ -285,7 +285,8 @@ class EvidenceBrowserDialog(QDialog):
     def open_file(self, file: EvidenceFile):
         """Open file with default application."""
         try:
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(file.path)))
+            router = get_action_router_service()
+            router.handle_action(f"file://{file.path}")
         except Exception as e:
             QMessageBox.critical(self, "Open File Error", f"Failed to open file:\n{file.path}\n\n{e}")
     
@@ -294,7 +295,8 @@ class EvidenceBrowserDialog(QDialog):
         root = get_evidence_root(self.job_id)
         if root:
             try:
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(root)))
+                router = get_action_router_service()
+                router.handle_action(f"file://{root}")
             except Exception as e:
                 QMessageBox.critical(self, "Open Folder Error", f"Failed to open folder:\n{root}\n\n{e}")
         else:

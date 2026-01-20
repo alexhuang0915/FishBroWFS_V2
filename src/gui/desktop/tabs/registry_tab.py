@@ -19,7 +19,6 @@ from PySide6.QtGui import QFont, QColor, QAction  # type: ignore
 from ...services.supervisor_client import (
     get_registry_strategies, SupervisorClientError
 )
-from gui.desktop.state.selected_strategies_state import selected_strategies_state
 
 logger = logging.getLogger(__name__)
 
@@ -335,20 +334,7 @@ class RegistryTab(QWidget):
         table_group.setLayout(table_layout)
         main_layout.addWidget(table_group)
 
-        # Selection confirmation
-        selection_bar = QHBoxLayout()
-        self.selection_label = QLabel("Selected strategy: —")
-        self.selection_label.setStyleSheet("color: #9e9e9e; font-size: 10px;")
-        selection_bar.addWidget(self.selection_label)
-
-        selection_bar.addStretch()
-
-        self.confirm_selection_btn = QPushButton("Confirm Selection")
-        self.confirm_selection_btn.setEnabled(False)
-        self.confirm_selection_btn.setToolTip("Commit selected strategy to SSOT")
-        selection_bar.addWidget(self.confirm_selection_btn)
-
-        main_layout.addLayout(selection_bar)
+        main_layout.addWidget(table_group)
         
         # Status bar
         self.status_label = QLabel("Ready")
@@ -360,8 +346,6 @@ class RegistryTab(QWidget):
         self.refresh_btn.clicked.connect(self.refresh_registry)
         self.search_input.textChanged.connect(self.on_search_changed)
         self.verification_filter.currentTextChanged.connect(self.on_filter_changed)
-        self.registry_table.selectionModel().selectionChanged.connect(self.on_selection_changed)
-        self.confirm_selection_btn.clicked.connect(self.confirm_selection)
     
     def refresh_registry(self):
         """Refresh registry data from supervisor."""
@@ -414,31 +398,6 @@ class RegistryTab(QWidget):
         else:
             self.status_label.setText(f"Showing all {total_count} strategies")
 
-    def on_selection_changed(self):
-        """Handle strategy selection changes."""
-        strategy = self.get_selected_strategy()
-        if strategy:
-            strategy_id = strategy.get("id", "")
-            self.selection_label.setText(f"Selected strategy: {strategy_id}")
-            self.confirm_selection_btn.setEnabled(bool(strategy_id))
-        else:
-            self.selection_label.setText("Selected strategy: —")
-            self.confirm_selection_btn.setEnabled(False)
-
-    def confirm_selection(self):
-        """Commit selected strategy to SSOT."""
-        strategy = self.get_selected_strategy()
-        if not strategy:
-            return
-        strategy_id = strategy.get("id", "")
-        if not strategy_id:
-            return
-
-        selected_strategies_state.update_state(
-            selected_strategy_ids=[strategy_id],
-            confirmed=True,
-        )
-        self.log_signal.emit(f"Strategy selection confirmed: {strategy_id}")
     
     def log(self, message: str):
         """Append message to log."""

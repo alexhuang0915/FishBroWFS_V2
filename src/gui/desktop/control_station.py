@@ -1,5 +1,5 @@
 """
-Desktop Control Station - Main window with 4-tab architecture.
+Desktop Control Station - Main window with 5-tab architecture.
 Matching historical product design with 1:1 functional parity.
 """
 
@@ -16,17 +16,13 @@ from PySide6.QtWidgets import (  # type: ignore
 )
 from PySide6.QtGui import QFont, QFontDatabase  # type: ignore
 
-from .tabs.op_tab import OpTab
-from .tabs.report_tab import ReportTab
-from .tabs.registry_tab import RegistryTab
-from .tabs.allocation_tab import AllocationTab
-from .tabs.audit_tab import AuditTab
-from .tabs.portfolio_admission_tab import PortfolioAdmissionTab
-from .tabs.gate_summary_dashboard_tab import GateSummaryDashboardTab
 from .tabs.bar_prepare_tab import BarPrepareTab
+from .tabs.registry_tab import RegistryTab
+from .tabs.op_tab import OpTab
+from .tabs.allocation_tab import AllocationTab
+from .tabs.ops_tab import OpsTab
 from .widgets.artifact_navigator import ArtifactNavigatorDialog
 from .widgets.evidence_browser import EvidenceBrowserDialog
-from .widgets.step_flow_header import StepFlowHeader
 from .supervisor_lifecycle import (
     ensure_supervisor_running,
     SupervisorStatus,
@@ -34,13 +30,8 @@ from .supervisor_lifecycle import (
 )
 from .config import SUPERVISOR_BASE_URL
 from gui.services.action_router_service import get_action_router_service
-from gui.desktop.state.step_flow_state import step_flow_state, StepId
 from gui.desktop.state.bar_prepare_state import bar_prepare_state
-from gui.desktop.state.operation_state import operation_page_state
-from gui.desktop.state.selected_strategies_state import selected_strategies_state
-from gui.desktop.state.portfolio_build_state import portfolio_build_state
-from gui.desktop.state.decision_gate_state import decision_gate_state
-from gui.desktop.state.export_state import export_state
+from gui.desktop.state.job_store import job_store
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +81,7 @@ def _apply_initial_geometry(window, target_w: int = 1920, target_h: int = 1080):
 
 
 class ControlStation(QMainWindow):
-    """Main control station window with 4-tab architecture."""
+    """Main control station window with 5-tab architecture."""
     
     def __init__(self):
         super().__init__()
@@ -113,9 +104,8 @@ class ControlStation(QMainWindow):
         self.update_timer.timeout.connect(self.update_status)
         self.update_timer.start(1000)  # 1 second
 
-        # Initial step header state
-        self.refresh_step_flow_header()
-        self._open_step_default_tool(step_flow_state.get_state().current_step, read_only=False)
+        # Default to Research/Backtest tab (index 2)
+        self.tab_widget.setCurrentIndex(2)
     
     def setup_ui(self):
         """Initialize the UI components."""
@@ -161,25 +151,19 @@ class ControlStation(QMainWindow):
         self.tab_widget.setMovable(False)
         self.tab_widget.tabBar().setVisible(True)
         
-        # Create tabs
-        self.op_tab = OpTab()
-        self.report_tab = ReportTab()
-        self.registry_tab = RegistryTab()
-        self.allocation_tab = AllocationTab()
-        self.audit_tab = AuditTab()
-        self.portfolio_admission_tab = PortfolioAdmissionTab()
-        self.gate_summary_dashboard_tab = GateSummaryDashboardTab(enable_local_router=False)
+        # Create exactly 5 main tabs per GO AI spec
         self.bar_prepare_tab = BarPrepareTab()
-        
-        # Add tabs
-        self.tab_widget.addTab(self.op_tab, "Operation")
-        self.tab_widget.addTab(self.report_tab, "Report")
-        self.tab_widget.addTab(self.registry_tab, "Strategy Library")
+        self.registry_tab = RegistryTab()
+        self.op_tab = OpTab()
+        self.allocation_tab = AllocationTab()
+        self.ops_tab = OpsTab()
+
+        # Insert into the visible widget
+        self.tab_widget.addTab(self.bar_prepare_tab, "Data Prepare")
+        self.tab_widget.addTab(self.registry_tab, "Registry")
+        self.tab_widget.addTab(self.op_tab, "Research / Backtest")
         self.tab_widget.addTab(self.allocation_tab, "Portfolio")
-        self.tab_widget.addTab(self.audit_tab, "Audit")
-        self.tab_widget.addTab(self.portfolio_admission_tab, "Portfolio Admission")
-        self.tab_widget.addTab(self.gate_summary_dashboard_tab, "Gate Dashboard")
-        self.tab_widget.addTab(self.bar_prepare_tab, "Bar Prepare")
+        self.tab_widget.addTab(self.ops_tab, "Ops / Jobs & Logs")
         
         main_layout.addWidget(self.tab_widget)
         
@@ -197,61 +181,29 @@ class ControlStation(QMainWindow):
 
         # Tab mapping for tool routing
         self._tab_index_by_tool = {
-            "operation": 0,
-            "report": 1,
-            "registry": 2,
+            "bar_prepare": 0,
+            "registry": 1,
+            "operation": 2,
             "allocation": 3,
-            "audit": 4,
-            "portfolio_admission": 5,
-            "gate_dashboard": 6,
-            "bar_prepare": 7,
+            "ops": 4,
         }
         self._tab_by_tool = {
-            "operation": self.op_tab,
-            "report": self.report_tab,
-            "registry": self.registry_tab,
-            "allocation": self.allocation_tab,
-            "audit": self.audit_tab,
-            "portfolio_admission": self.portfolio_admission_tab,
-            "gate_dashboard": self.gate_summary_dashboard_tab,
             "bar_prepare": self.bar_prepare_tab,
-        }
-
-        self._step_tools = {
-            StepId.DATA_PREP: [("Bar Prepare Tool", "bar_prepare")],
-            StepId.BACKTEST: [("Operation Tool", "operation")],
-            StepId.WFS: [("Operation Tool", "operation")],
-            StepId.STRATEGY: [("Strategy Library Tool", "registry")],
-            StepId.PORTFOLIO: [("Portfolio Tool", "allocation")],
-            StepId.DECISION: [("Gate Dashboard Tool", "gate_dashboard")],
-            StepId.EXPORT: [("Report Tool", "report"), ("Audit Tool", "audit")],
-        }
-
-        self._step_default_tool = {
-            StepId.DATA_PREP: "bar_prepare",
-            StepId.BACKTEST: "operation",
-            StepId.WFS: "operation",
-            StepId.STRATEGY: "registry",
-            StepId.PORTFOLIO: "allocation",
-            StepId.DECISION: "gate_dashboard",
-            StepId.EXPORT: "report",
+            "registry": self.registry_tab,
+            "operation": self.op_tab,
+            "allocation": self.allocation_tab,
+            "ops": self.ops_tab,
         }
     
     def setup_connections(self):
         """Connect signals and slots."""
-        # Connect tab signals to main window
+        # Connect tab signals to main window (all tabs, including hidden)
         self.op_tab.log_signal.connect(self.handle_log)
         self.op_tab.progress_signal.connect(self.handle_progress)
         self.op_tab.artifact_state_changed.connect(self.handle_artifact_state)
-        self.op_tab.switch_to_audit_tab.connect(self.handle_open_report_request)
-        
-        self.report_tab.log_signal.connect(self.handle_log)
         self.registry_tab.log_signal.connect(self.handle_log)
         self.allocation_tab.log_signal.connect(self.handle_log)
         self.allocation_tab.allocation_changed.connect(self.handle_allocation_change)
-        self.audit_tab.log_signal.connect(self.handle_log)
-        self.portfolio_admission_tab.log_signal.connect(self.handle_log)
-        self.gate_summary_dashboard_tab.log_signal.connect(self.handle_log)
         self.bar_prepare_tab.log_signal.connect(self.handle_log)
         
         # Tab change events
@@ -302,9 +254,8 @@ class ControlStation(QMainWindow):
     @Slot(int)
     def on_tab_changed(self, index: int):
         """Handle tab change events."""
-        tab_names = ["OP", "Report", "Registry", "Portfolio", "Audit", "Portfolio Admission", "Gate Dashboard", "Bar Prepare"]
-        if 0 <= index < len(tab_names):
-            self.handle_log(f"Switched to {tab_names[index]} tab")
+        # logger.debug(f"Tab changed to index {index}")
+        pass
     
     def start_supervisor(self):
         """Ensure supervisor is running at desktop startup."""
@@ -382,12 +333,8 @@ class ControlStation(QMainWindow):
 
     @Slot()
     def update_status(self):
-        """Periodic status update."""
         # Update supervisor status indicator
         self.update_supervisor_status_indicator()
-
-        # Refresh step header state
-        self.refresh_step_flow_header()
         
         # If supervisor is not running, try to restart periodically
         if self.supervisor_status in [SupervisorStatus.NOT_RUNNING, SupervisorStatus.ERROR]:
@@ -411,31 +358,10 @@ class ControlStation(QMainWindow):
         
         event.accept()
 
-    # ------------------------------------------------------------------
-    # Step flow routing and gating
-    # ------------------------------------------------------------------
-
-    @Slot(int)
-    def on_step_clicked(self, step_id: int):
-        """Route step navigation through ActionRouterService."""
-        self.action_router.handle_action(f"internal://step/{step_id}")
-
-    @Slot(str)
-    def on_tool_clicked(self, tool_id: str):
-        """Route tool opening through ActionRouterService."""
-        self.action_router.handle_action(f"internal://tool/{tool_id}")
-
-    @Slot(str)
     def handle_router_url(self, target: str):
         """Handle internal router targets."""
         if target.startswith("internal://step/"):
-            step_str = target[len("internal://step/"):]
-            try:
-                step_id = StepId(int(step_str))
-            except (ValueError, KeyError):
-                logger.warning(f"Invalid step id: {step_str}")
-                return
-            self._attempt_step_transition(step_id)
+            # Step transitions are no longer supported in tab mode (free navigation instead)
             return
 
         if target.startswith("internal://tool/"):
@@ -445,68 +371,47 @@ class ControlStation(QMainWindow):
 
         if target.startswith("internal://report/strategy/"):
             job_id = target[len("internal://report/strategy/"):]
-            self._open_tool_tab("audit")
-            self.audit_tab.open_strategy_report(job_id)
+            self._open_tool_tab("operation")
+            self.op_tab.show_strategy_report_summary(job_id)
             return
 
         if target.startswith("internal://report/portfolio/"):
             portfolio_id = target[len("internal://report/portfolio/"):]
-            self._open_tool_tab("audit")
-            self.audit_tab.load_portfolio_report_by_id(portfolio_id)
+            self._open_tool_tab("allocation")
+            self.allocation_tab.show_portfolio_report_summary(portfolio_id)
             return
 
         if target == "internal://gate_dashboard":
-            self._open_tool_tab("gate_dashboard")
+            self._open_tool_tab("ops")
+            # Redirect to focus selection if applicable
             return
 
         if target.startswith("internal://job/"):
             job_id = target[len("internal://job/"):]
             if job_id:
-                self.handle_log(f"Job selected: {job_id[:8]}...")
+                self.handle_log(f"Routing to job: {job_id[:8]}")
+                job_store.set_selected(job_id)
+                self._open_tool_tab("ops")
             return
-
 
         logger.info(f"Unhandled internal target: {target}")
 
-    @Slot(str)
-    def handle_open_gate_dashboard(self, job_id: str):
-        """Open gate dashboard when routed from ActionRouterService."""
-        self._open_tool_tab("gate_dashboard")
+    @Slot()
+    def handle_open_gate_dashboard(self):
+        """Handle request to open the gate dashboard."""
+        self._open_tool_tab("ops")
 
-    @Slot(str, str)
-    def handle_open_artifact_navigator(self, job_id: str, artifact_path: str):
-        """Open artifact navigator dialog for a job."""
-        dialog = ArtifactNavigatorDialog(job_id, self)
+    @Slot()
+    def handle_open_artifact_navigator(self):
+        """Handle request to open the artifact navigator."""
+        dialog = ArtifactNavigatorDialog(self)
         dialog.exec()
 
-    @Slot(str)
-    def handle_open_evidence_browser(self, job_id: str):
-        """Open evidence browser dialog for a job."""
-        dialog = EvidenceBrowserDialog(job_id, parent=self)
+    @Slot()
+    def handle_open_evidence_browser(self):
+        """Handle request to open the evidence browser."""
+        dialog = EvidenceBrowserDialog(self)
         dialog.exec()
-
-    def refresh_step_flow_header(self):
-        """Update step header state and tools (no-op when step flow header removed)."""
-        # Step flow header removed, nothing to refresh
-        pass
-
-    def _compute_max_enabled_step(self) -> StepId:
-        """Compute max enabled step based on SSOT confirmations.
-        
-        In Tab Workstation mode, all steps are enabled for free navigation.
-        """
-        return StepId.EXPORT  # All steps enabled
-
-    def _attempt_step_transition(self, step_id: StepId) -> None:
-        """Move to a step immediately (Tab Workstation mode - free navigation)."""
-        step_flow_state.update_state(current_step=step_id)
-        self.refresh_step_flow_header()
-        self._open_step_default_tool(step_id, read_only=False)
-
-    def _open_step_default_tool(self, step_id: StepId, read_only: bool) -> None:
-        tool_id = self._step_default_tool.get(step_id)
-        if tool_id:
-            self._open_tool_tab(tool_id, read_only=read_only)
 
     def _open_tool_tab(self, tool_id: str, read_only: bool = False) -> None:
         """Open tool tab (Tab Workstation mode - all tools always accessible)."""

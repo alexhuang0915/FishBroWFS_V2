@@ -95,6 +95,7 @@ def normalize_job_type(job_type: str | JobType) -> JobType:
         "RUN_FREEZE": JobType.RUN_FREEZE_V2,
         "RUN_COMPILE": JobType.RUN_COMPILE_V2,
         "BUILD_PORTFOLIO": JobType.BUILD_PORTFOLIO_V2,
+        "BUILD_DATA": JobType.BUILD_DATA,
     }
     
     # Check legacy map first

@@ -4,6 +4,7 @@ base_currency: TWD
 fx_rates:
   USD: 32.0
   TWD: 1.0
+  JPY: 0.01
 
 instruments:
   CME.MNQ:
@@ -24,3 +25,51 @@ instruments:
     margin_basis: conservative_over_exchange
     initial_margin_per_contract: 88000.0
     maintenance_margin_per_contract: 80000.0
+
+  CFE.VX:
+    exchange: CFE
+    currency: USD
+    multiplier: 1000.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 10000.0
+    maintenance_margin_per_contract: 9000.0
+
+  CME.CL:
+    exchange: CME
+    currency: USD
+    multiplier: 1000.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 5000.0
+    maintenance_margin_per_contract: 4500.0
+
+  CME.ES:
+    exchange: CME
+    currency: USD
+    multiplier: 50.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 10000.0
+    maintenance_margin_per_contract: 9000.0
+
+  CME.6J:
+    exchange: CME
+    currency: USD
+    multiplier: 125000.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 2000.0
+    maintenance_margin_per_contract: 1800.0
+
+  CME.MGC:
+    exchange: CME
+    currency: USD
+    multiplier: 10.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 1500.0
+    maintenance_margin_per_contract: 1300.0
+
+  OSE.NK225M:
+    exchange: OSE
+    currency: JPY
+    multiplier: 1000.0
+    margin_basis: exchange_maintenance
+    initial_margin_per_contract: 20000.0
+    maintenance_margin_per_contract: 18000.0

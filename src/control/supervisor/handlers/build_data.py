@@ -13,6 +13,7 @@ from ..job_handler import BaseJobHandler, JobContext
 from control.artifacts import write_json_atomic
 from control.supervisor.models import get_job_artifact_dir
 from core.paths import get_outputs_root
+from core.season_context import current_season
 from core.timeframe_aggregator import TimeframeAggregator
 from core.data_aligner import DataAligner
 from control.bars_store import normalized_bars_path, resampled_bars_path, load_npz
@@ -121,6 +122,7 @@ class BuildDataHandler(BaseJobHandler):
             if alignment_path:
                 produced_paths.append(alignment_path)
             
+            manifest_path = self._write_build_manifest(params, context, result)
             return {
                 "ok": True,
                 "job_type": "BUILD_DATA",
@@ -130,6 +132,7 @@ class BuildDataHandler(BaseJobHandler):
                 "stdout_path": str(result_path),
                 "stderr_path": None,
                 "produced_paths": produced_paths,
+                "manifest_path": str(manifest_path) if manifest_path else None,
                 "result": result
             }
             
@@ -183,6 +186,7 @@ class BuildDataHandler(BaseJobHandler):
                 # Try to parse output to get produced paths
                 produced_paths = self._extract_produced_paths(stdout_path)
                 
+                manifest_path = self._write_build_manifest(params, context, {"ok": True})
                 return {
                     "ok": True,
                     "job_type": "BUILD_DATA",
@@ -192,9 +196,11 @@ class BuildDataHandler(BaseJobHandler):
                     "stdout_path": str(stdout_path),
                     "stderr_path": str(stderr_path),
                     "produced_paths": produced_paths,
-                    "returncode": process.returncode
+                    "returncode": process.returncode,
+                    "manifest_path": str(manifest_path) if manifest_path else None,
                 }
             else:
+                manifest_path = self._write_build_manifest(params, context, {"ok": False, "error": "cli_failed"})
                 return {
                     "ok": False,
                     "job_type": "BUILD_DATA",
@@ -205,7 +211,8 @@ class BuildDataHandler(BaseJobHandler):
                     "stderr_path": str(stderr_path),
                     "produced_paths": [],
                     "returncode": process.returncode,
-                    "error": f"CLI failed with return code {process.returncode}"
+                    "error": f"CLI failed with return code {process.returncode}",
+                    "manifest_path": str(manifest_path) if manifest_path else None,
                 }
                 
         except Exception as e:
@@ -213,6 +220,7 @@ class BuildDataHandler(BaseJobHandler):
             # Write error to stderr file
             stderr_path.write_text(f"Failed to execute command: {e}\nCommand: {' '.join(cmd)}")
             
+            manifest_path = self._write_build_manifest(params, context, {"ok": False, "error": "cli_exception"})
             return {
                 "ok": False,
                 "job_type": "BUILD_DATA",
@@ -222,8 +230,74 @@ class BuildDataHandler(BaseJobHandler):
                 "stdout_path": None,
                 "stderr_path": str(stderr_path),
                 "produced_paths": [],
-                "error": str(e)
+                "error": str(e),
+                "manifest_path": str(manifest_path) if manifest_path else None,
             }
+
+    def _write_build_manifest(self, params: Dict[str, Any], context: JobContext, result: Dict[str, Any]) -> Optional[Path]:
+        """Write a minimal build manifest into job artifacts."""
+        dataset_id = params.get("dataset_id")
+        timeframe_min = params.get("timeframe_min", 60)
+        season = params.get("season") or current_season()
+        outputs_root = get_outputs_root()
+
+        if not dataset_id:
+            return None
+
+        produced_bars_path = None
+        if dataset_id:
+            try:
+                candidate_path = resampled_bars_path(outputs_root, season, dataset_id, timeframe_min)  # type: ignore[arg-type]
+                produced_bars_path = str(candidate_path)
+            except Exception:
+                produced_bars_path = None
+
+        manifest = {
+            "schema_version": "1.0",
+            "job_id": context.job_id,
+            "job_type": "BUILD_DATA",
+            "dataset_id": dataset_id,
+            "timeframe_min": timeframe_min,
+            "season": season,
+            "outputs_root": str(outputs_root),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "produced_bars_path": produced_bars_path,
+            "result": {
+                "ok": bool(result.get("ok", False)),
+                "error": result.get("error"),
+            },
+            "inventory_rows": [],
+        }
+
+        try:
+            bar_path = resampled_bars_path(outputs_root, season, dataset_id, timeframe_min)  # type: ignore[arg-type]
+            if bar_path.exists():
+                stat = bar_path.stat()
+                size_mb = stat.st_size / (1024 * 1024)
+                manifest["inventory_rows"].append({
+                    "instrument": dataset_id,
+                    "timeframe": f"{timeframe_min}m",
+                    "date_range": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    "size": f"{size_mb:.1f} MB",
+                    "status": "READY",
+                    "path": str(bar_path),
+                })
+            else:
+                manifest["inventory_rows"].append({
+                    "instrument": dataset_id,
+                    "timeframe": f"{timeframe_min}m",
+                    "date_range": "—",
+                    "size": "—",
+                    "status": "MISSING",
+                    "path": str(bar_path),
+                })
+        except Exception as exc:
+            logger.warning("Failed to build manifest inventory row: %s", exc)
+
+        artifact_dir = Path(context.artifacts_dir)
+        manifest_path = artifact_dir / "build_data_manifest.json"
+        write_json_atomic(manifest_path, manifest)
+        return manifest_path
     
     def _extract_produced_paths(self, stdout_path: Path) -> list[str]:
         """Extract produced file paths from CLI stdout."""

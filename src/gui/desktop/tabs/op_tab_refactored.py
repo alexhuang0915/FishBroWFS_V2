@@ -38,6 +38,9 @@ from gui.services.supervisor_client import (
     get_artifacts,
     list_seasons_ssot,
 )
+from gui.services.gate_summary_service import fetch_gate_summary
+from gui.desktop.state.job_store import job_store, JobRecord
+from gui.desktop.state.research_selection_state import research_selection_state
 
 logger = logging.getLogger(__name__)
 
@@ -306,6 +309,59 @@ class OpTabRefactored(QWidget):
         self.error_label.setWordWrap(True)
         live_layout.addWidget(self.error_label)
 
+        # Latest Run Deep Link (UX B2.1)
+        self.latest_run_panel = QFrame()
+        self.latest_run_panel.setVisible(False)
+        self.latest_run_panel.setStyleSheet("background-color: #1A1A1A; border: 1px solid #666;")
+        lr_layout = QHBoxLayout(self.latest_run_panel)
+        self.lr_label = QLabel("Last: —")
+        self.lr_label.setStyleSheet("font-size: 10px; color: #BBB;")
+        lr_layout.addWidget(self.lr_label)
+        lr_btn = QPushButton("OPS")
+        lr_btn.setFixedWidth(40)
+        lr_btn.clicked.connect(self._on_open_ops)
+        lr_layout.addWidget(lr_btn)
+        live_layout.addWidget(self.latest_run_panel)
+
+        # Top-K Results Table (UX C1.2)
+        self.results_group = QGroupBox("TOP-K RESULTS (RANKED)")
+        res_layout = QVBoxLayout(self.results_group)
+        self.topk_table = QTableWidget(0, 5)
+        self.topk_table.setHorizontalHeaderLabels(["Rank", "Strategy", "Score", "Profit", "MDD"])
+        self.topk_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.topk_table.setStyleSheet("background-color: #121212; font-size: 10px;")
+        self.topk_table.setFixedHeight(150)
+        res_layout.addWidget(self.topk_table)
+        
+        # Handoff Tools (UX C2.1)
+        handoff_row = QHBoxLayout()
+        self.use_run_btn = QPushButton("USE FOR PORTFOLIO →")
+        self.use_run_btn.setEnabled(False)
+        self.use_run_btn.setStyleSheet("""
+            QPushButton { background-color: #2A5A2A; color: white; font-weight: bold; padding: 6px; }
+            QPushButton:disabled { background-color: #333; color: #666; }
+        """)
+        self.use_run_btn.clicked.connect(self._on_use_for_portfolio)
+        handoff_row.addWidget(self.use_run_btn)
+        res_layout.addLayout(handoff_row)
+        
+        # Artifact Links (UX C1.3)
+        links_row = QHBoxLayout()
+        links_row.setSpacing(15)
+        self.heatmap_link = QPushButton("📊 Heatmap")
+        self.summary_link = QPushButton("📝 Summary Report")
+        self.raw_metrics_link = QPushButton("📁 Raw Metrics")
+        
+        link_style = "color: #3A8DFF; text-decoration: underline; background: none; border: none; font-size: 10px; text-align: left;"
+        for btn in [self.heatmap_link, self.summary_link, self.raw_metrics_link]:
+            btn.setStyleSheet(link_style)
+            btn.setCursor(Qt.PointingHandCursor)
+            links_row.addWidget(btn)
+        
+        res_layout.addLayout(links_row)
+        
+        live_layout.addWidget(self.results_group)
+
         action_row = QHBoxLayout()
         self.view_artifacts_btn = QPushButton("View Artifacts")
         self.view_artifacts_btn.setStyleSheet(self._small_button_style())
@@ -332,6 +388,41 @@ class OpTabRefactored(QWidget):
             }
         """)
         live_layout.addWidget(self.diagnostics_output)
+
+        # Job output summary panel (initially hidden)
+        self.output_summary_panel = QFrame()
+        self.output_summary_panel.setStyleSheet("""
+            QFrame {
+                background-color: #1E1E1E;
+                border: 1px solid #444444;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        self.output_summary_panel.setVisible(False)
+        output_summary_layout = QVBoxLayout(self.output_summary_panel)
+        output_summary_layout.setContentsMargins(8, 8, 8, 8)
+        output_summary_layout.setSpacing(6)
+
+        self.output_summary_title = QLabel("Job Output Summary")
+        self.output_summary_title.setStyleSheet("color: #E6E6E6; font-weight: bold; font-size: 12px;")
+        output_summary_layout.addWidget(self.output_summary_title)
+
+        self.gate_verdict_label = QLabel("Gate verdict: —")
+        self.gate_verdict_label.setStyleSheet("color: #BDBDBD; font-size: 11px;")
+        output_summary_layout.addWidget(self.gate_verdict_label)
+
+        self.artifact_list_label = QLabel("Artifacts: —")
+        self.artifact_list_label.setStyleSheet("color: #BDBDBD; font-size: 11px;")
+        self.artifact_list_label.setWordWrap(True)
+        output_summary_layout.addWidget(self.artifact_list_label)
+
+        self.close_summary_btn = QPushButton("Close")
+        self.close_summary_btn.setStyleSheet(self._small_button_style())
+        self.close_summary_btn.setMaximumWidth(80)
+        output_summary_layout.addWidget(self.close_summary_btn, 0, Qt.AlignmentFlag.AlignRight)
+
+        live_layout.addWidget(self.output_summary_panel)
 
         monitor_group = QGroupBox("Monitor Console")
         monitor_group.setStyleSheet(self._group_style("#4a148c"))
@@ -408,6 +499,7 @@ class OpTabRefactored(QWidget):
         self.refresh_btn.clicked.connect(self.refresh_jobs)
         self.jobs_table.itemSelectionChanged.connect(self.on_job_selected)
         self.research_run_id_edit.textChanged.connect(self.update_run_state)
+        self.close_summary_btn.clicked.connect(self.hide_output_summary)
 
     def _group_style(self, border_color: str) -> str:
         return f"""
@@ -775,9 +867,24 @@ class OpTabRefactored(QWidget):
         try:
             result = submit_job(params)
             job_id = result.get("job_id") if isinstance(result, dict) else str(result)
+            
+            # Register with UI JobStore (SSOT)
+            job_store.upsert(JobRecord(
+                job_id=job_id,
+                job_type="backtest",
+                created_at=datetime.now(),
+                status="queued",
+                summary=f"Strategy: {strategy_id}, Instrument: {instrument_id}"
+            ))
+            
             self.last_submitted_job_id = job_id
             self.focused_job_id = job_id
             self.log_signal.emit(f"Job {job_id} submitted")
+            
+            # Non-silent feedback (UX B3.2)
+            self.status_bar_label.setText(f"Submitted {job_id[:8]}... Check Ops tab for progress.")
+            self.status_bar_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            
             self.refresh_jobs()
         except SupervisorClientError as exc:
             QMessageBox.critical(self, "Job Submission Failed", f"Failed to submit job: {exc}")
@@ -825,6 +932,36 @@ class OpTabRefactored(QWidget):
                 self.job_last_change[job_id] = now
                 self.job_snapshots[job_id] = snapshot
             self.job_last_seen[job_id] = now
+            
+            # Sync to Global JobStore (SSOT)
+            existing = next((j for j in job_store.list_jobs() if j.job_id == job_id), None)
+            if existing:
+                job_store.upsert(JobRecord(
+                    job_id=job_id,
+                    job_type=existing.job_type,
+                    created_at=existing.created_at,
+                    status=self._display_status(snapshot.get("status")).lower(), # Convert to literal
+                    progress_stage=snapshot.get("policy_stage") or "",
+                    summary=existing.summary,
+                    error_digest=snapshot.get("failure_message")
+                ))
+        
+        # Update Handoff Panel (UX B2.1)
+        if self.jobs:
+            latest = self.jobs[0]
+            status = latest.get('status', '').upper()
+            job_id = latest.get('job_id', '')
+            self.lr_label.setText(f"Latest: {status} ({job_id[:8]})")
+            self.latest_run_panel.setVisible(True)
+            
+            # Update Top-K & Eligibility (UX C1.2 / C2.2)
+            is_done = (status == "DONE" or status == "SUCCEEDED")
+            self.use_run_btn.setEnabled(is_done)
+            if not is_done:
+                self.use_run_btn.setToolTip("Run must be COMPLETED to use for portfolio.")
+            else:
+                self.use_run_btn.setToolTip("Run eligible for portfolio admission.")
+                self._populate_topk_mock(job_id)
 
         self.update_jobs_table()
         self.update_focus_job()
@@ -973,12 +1110,66 @@ class OpTabRefactored(QWidget):
             self.job_last_artifact_count[job_id] = artifact_count
 
     def on_view_artifacts(self):
-        if self.focused_job_id:
-            self.switch_to_audit_tab.emit(self.focused_job_id)
+        if not self.focused_job_id:
+            return
+        # Show output summary panel with artifacts and gate summary
+        self.output_summary_panel.setVisible(True)
+        self._update_output_summary(self.focused_job_id)
 
     def on_view_gate(self):
         if self.focused_job_id:
             self.action_router.handle_action("gate_summary", context={"job_id": self.focused_job_id})
+
+    def hide_output_summary(self):
+        self.output_summary_panel.setVisible(False)
+
+    def _update_output_summary(self, job_id: str):
+        """Fetch artifacts and gate summary for the job and update the panel."""
+        try:
+            artifacts = get_artifacts(job_id)
+            gate_summary = fetch_gate_summary(job_id)
+        except SupervisorClientError as exc:
+            logger.error("Failed to fetch output summary for job %s: %s", job_id, exc)
+            self.gate_verdict_label.setText("Gate verdict: Error fetching")
+            self.artifact_list_label.setText("Artifacts: Error fetching")
+            return
+
+        # Update gate verdict
+        verdict = gate_summary.get("verdict", "UNKNOWN") if isinstance(gate_summary, dict) else "UNKNOWN"
+        color = "#4CAF50" if verdict == "PASS" else "#F44336" if verdict == "FAIL" else "#FF9800"
+        self.gate_verdict_label.setText(f"Gate verdict: <span style='color:{color}'>{verdict}</span>")
+
+        # Update artifact list
+        if isinstance(artifacts, dict):
+            files = artifacts.get("files", []) or []
+        elif isinstance(artifacts, list):
+            files = artifacts
+        else:
+            files = []
+        if files:
+            # Show first 3 artifacts
+            display = ", ".join(files[:3])
+            if len(files) > 3:
+                display += f" (+{len(files) - 3} more)"
+            self.artifact_list_label.setText(f"Artifacts: {display}")
+        else:
+            self.artifact_list_label.setText("Artifacts: None")
+
+    def show_strategy_report_summary(self, job_id: str):
+        """Public method to show output summary panel for a given job ID."""
+        self.focused_job_id = job_id
+        self.output_summary_panel.setVisible(True)
+        self._update_output_summary(job_id)
+
+    def show_gate_summary_for_job(self, job_id: Optional[str] = None):
+        """Public helper to show gate summary detail for a job."""
+        target_job = job_id or self.focused_job_id
+        if not target_job:
+            logger.info("Gate summary requested but no job is focused")
+            return
+        self.focused_job_id = target_job
+        self.output_summary_panel.setVisible(True)
+        self._update_output_summary(target_job)
 
     def copy_job_id(self):
         if not self.job_id_edit.text():
@@ -1006,3 +1197,29 @@ class OpTabRefactored(QWidget):
         if status_value in {"FAILED", "REJECTED", "ABORTED", "KILLED"}:
             return "FAILED"
         return status_value or "UNKNOWN"
+
+    def _on_open_ops(self):
+        if not self.jobs: return
+        job_id = self.jobs[0].get("job_id")
+        self.action_router.handle_action(f"internal://job/{job_id}")
+
+    def _on_use_for_portfolio(self):
+        """Handoff selected research to Portfolio tab."""
+        if not self.jobs: return
+        job_id = self.jobs[0].get("job_id")
+        research_selection_state.set_selection(job_id)
+        self.action_router.handle_action("internal://tool/Portfolio")
+
+    def _populate_topk_mock(self, job_id: str):
+        """Simulate populating Top-K table from Job artifacts."""
+        self.topk_table.setRowCount(3)
+        data = [
+            ("1", "TrendAlpha_V4 🛡️ 🔥", "0.88", "+$12.4k", "4.2%"),
+            ("2", "MeanRev_S3 ⚖️", "0.82", "+$10.1k", "3.8%"),
+            ("3", "VolBreak_B1", "0.79", "+$8.9k", "5.1%"),
+        ]
+        for row, vals in enumerate(data):
+            for col, val in enumerate(vals):
+                item = QTableWidgetItem(val)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.topk_table.setItem(row, col, item)

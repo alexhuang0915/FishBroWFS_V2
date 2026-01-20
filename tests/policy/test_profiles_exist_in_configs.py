@@ -12,6 +12,12 @@ def test_profiles_exist_in_configs(profiles_root: Path) -> None:
     expected_profiles = [
         "CME_MNQ_TPE_v1.yaml",
         "TWF_MXF_TPE_v1.yaml",
+        "CFE_VX_TPE_v1.yaml",
+        "CME_CL_TPE_v1.yaml",
+        "CME_ES_TPE_v1.yaml",
+        "CME_6J_TPE_v1.yaml",
+        "CME_MGC_TPE_v1.yaml",
+        "OSE_NK225M_TPE_v1.yaml",
     ]
     
     for profile_name in expected_profiles:

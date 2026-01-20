@@ -184,6 +184,7 @@ class SupervisorClient:
 
     def submit_job(self, payload: dict) -> dict:
         """Submit a job."""
+        logger.info("submit_job payload: %s", payload)
         return self._post("/api/v1/jobs", payload)
 
     def abort_job(self, job_id: str) -> dict:
@@ -387,6 +388,7 @@ def get_job_explain(job_id: str) -> dict:
 
 def submit_job(payload: dict) -> dict:
     """Submit a job."""
+    logger.info("submit_job payload (public): %s", payload)
     return _client.submit_job(payload)
 
 

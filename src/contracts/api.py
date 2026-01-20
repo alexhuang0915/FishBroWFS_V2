@@ -67,6 +67,7 @@ class JobListResponse(BaseModel):
     """Response for GET /api/v1/jobs."""
     job_id: str
     type: str = "strategy"  # default type
+    job_type: Optional[str] = None
     status: str
     created_at: str
     finished_at: Optional[str] = None
@@ -128,6 +129,7 @@ class ArtifactIndexResponse(BaseModel):
     job_id: str
     links: dict[str, Optional[str]]
     files: list[dict[str, Any]]
+    artifacts: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class RevealEvidencePathResponse(BaseModel):

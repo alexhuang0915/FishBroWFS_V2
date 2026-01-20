@@ -21,7 +21,6 @@ from ...services.supervisor_client import (
     get_portfolio_artifacts, reveal_portfolio_admission_path
 )
 from gui.services.action_router_service import get_action_router_service
-from gui.desktop.state.export_state import export_state
 
 logger = logging.getLogger(__name__)
 
@@ -622,11 +621,6 @@ class PortfolioReportWidget(QWidget):
                     json.dump(self.report_data, f, indent=2, ensure_ascii=False)
                 
                 self.log_signal.emit(f"JSON exported to {file_path}")
-                export_state.update_state(
-                    last_export_path=file_path,
-                    last_export_label="Portfolio Report JSON",
-                    confirmed=True,
-                )
                 QMessageBox.information(self, "Export Successful", f"Report exported to {file_path}")
                 
         except Exception as e:
@@ -647,11 +641,6 @@ class PortfolioReportWidget(QWidget):
                 pixmap.save(file_path, "PNG")
                 
                 self.log_signal.emit(f"PNG exported to {file_path}")
-                export_state.update_state(
-                    last_export_path=file_path,
-                    last_export_label="Portfolio Report PNG",
-                    confirmed=True,
-                )
                 QMessageBox.information(self, "Export Successful", f"Chart exported to {file_path}")
                 
         except Exception as e:

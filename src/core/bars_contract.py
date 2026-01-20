@@ -14,7 +14,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple, Union, Any, Iterable
 import numpy as np
@@ -751,7 +751,7 @@ def create_bars_manifest_entry(
         season=season,
         dataset_id=dataset_id,
         timeframe_min=timeframe_min,
-        generated_at_utc=datetime.utcnow().isoformat() + "Z",
+        generated_at_utc=datetime.now(timezone.utc).isoformat() + "Z",
     )
 
 

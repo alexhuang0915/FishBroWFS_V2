@@ -12,6 +12,7 @@ instruments:
     tick_value: 0.50
     timezone: "America/Chicago"
     trade_date_roll_time_local: "17:00"
+
   - id: "TWF.MXF"
     display_name: "Taiwan Futures Exchange Mini-TAIEX"
     type: "future"
@@ -23,5 +24,83 @@ instruments:
     tick_size: 1.0
     tick_value: 50.0
     timezone: "Asia/Taipei"
+    trade_date_roll_time_local: "15:00"
+
+  - id: "CFE.VX"
+    display_name: "VIX Futures"
+    type: "future"
+    default_profile: "CFE_VX_TPE_v1"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CFE"
+    multiplier: 1000.0
+    tick_size: 0.05
+    tick_value: 50.0
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
+
+  - id: "CME.6J"
+    display_name: "Japanese Yen Futures (6J)"
+    type: "future"
+    default_profile: "CME_6J_TPE_v1"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CME"
+    multiplier: 12500000.0
+    tick_size: 0.0000005
+    tick_value: 6.25
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
+
+  - id: "CME.CL"
+    display_name: "Crude Oil Futures (CL)"
+    type: "future"
+    default_profile: "CME_CL_TPE_v1"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CME"
+    multiplier: 1000.0
+    tick_size: 0.01
+    tick_value: 10.0
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
+
+  - id: "CME.ES"
+    display_name: "E-mini S&P 500 Futures (ES)"
+    type: "future"
+    default_profile: "CME_ES_TPE_v1"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CME"
+    multiplier: 50.0
+    tick_size: 0.25
+    tick_value: 12.5
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
+
+  - id: "CME.MGC"
+    display_name: "Micro Gold Futures (MGC)"
+    type: "future"
+    default_profile: "CME_MGC_TPE_v1"
+    currency: "USD"
+    default_timeframe: 60
+    exchange: "CME"
+    multiplier: 10.0
+    tick_size: 0.1
+    tick_value: 1.0
+    timezone: "America/Chicago"
+    trade_date_roll_time_local: "17:00"
+
+  - id: "OSE.NK225M"
+    display_name: "Nikkei 225 Mini Futures (NK225M)"
+    type: "future"
+    default_profile: "OSE_NK225M_TPE_v1"
+    currency: "JPY"
+    default_timeframe: 60
+    exchange: "OSE"
+    multiplier: 100.0
+    tick_size: 5.0
+    tick_value: 500.0
+    timezone: "Asia/Tokyo"
     trade_date_roll_time_local: "15:00"
 default: "CME.MNQ"

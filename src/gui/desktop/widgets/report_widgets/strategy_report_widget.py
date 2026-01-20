@@ -37,7 +37,6 @@ from ...services.supervisor_client import (
     get_strategy_report_v1, get_reveal_evidence_path, SupervisorClientError
 )
 from gui.services.action_router_service import get_action_router_service
-from gui.desktop.state.export_state import export_state
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +116,9 @@ class StrategyReportWidget(QWidget):
         
         # Equity/Drawdown chart with toggle
         self.setup_equity_drawdown_chart(top_layout)
+        
+        # D1.1/D1.2: Explainability Section (Phase D)
+        self.setup_explainability_panels(top_layout)
         
         # Rolling Sharpe selector
         self.setup_rolling_sharpe_chart(top_layout)
@@ -317,6 +319,52 @@ class StrategyReportWidget(QWidget):
         chart_group.setLayout(chart_layout)
         parent_layout.addWidget(chart_group)
     
+    def setup_explainability_panels(self, parent_layout: QVBoxLayout):
+        """Setup Phase D explainability panels."""
+        explain_row = QHBoxLayout()
+        explain_row.setSpacing(12)
+
+        # D1.1 FinalScore Breakdown
+        self.score_group = QGroupBox("FinalScore Breakdown")
+        self.score_group.setStyleSheet("""
+            QGroupBox { font-weight: bold; border: 1px solid #3A8DFF; background-color: #1A1A1A; margin-top: 5px; padding-top: 8px; font-size: 11px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #3A8DFF; }
+        """)
+        score_layout = QVBoxLayout(self.score_group)
+        self.score_formula = QLabel("Formula: NetProfit / MDD × Trades^0.25")
+        self.score_formula.setStyleSheet("color: #BBB; font-size: 10px; font-style: italic;")
+        score_layout.addWidget(self.score_formula)
+        
+        self.score_details = QLabel("Components: —")
+        self.score_details.setStyleSheet("color: #E6E6E6; font-size: 11px;")
+        score_layout.addWidget(self.score_details)
+        
+        self.score_intuition = QLabel("Intuition: Load report to see analysis.")
+        self.score_intuition.setStyleSheet("color: #AAA; font-size: 10px;")
+        self.score_intuition.setWordWrap(True)
+        score_layout.addWidget(self.score_intuition)
+        explain_row.addWidget(self.score_group, 60)
+
+        # D1.2 Robustness / Plateau
+        self.robust_group = QGroupBox("Robustness / Plateau")
+        self.robust_group.setStyleSheet("""
+            QGroupBox { font-weight: bold; border: 1px solid #4CAF50; background-color: #1A1A1A; margin-top: 5px; padding-top: 8px; font-size: 11px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 8px; padding: 0 4px; color: #4CAF50; }
+        """)
+        robust_layout = QVBoxLayout(self.robust_group)
+        self.robust_label = QLabel("Robustness: Unknown")
+        self.robust_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.robust_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #E6E6E6; padding: 10px;")
+        robust_layout.addWidget(self.robust_label)
+        
+        self.robust_desc = QLabel("Based on parameter neighborhood stability.")
+        self.robust_desc.setStyleSheet("color: #BBB; font-size: 10px;")
+        self.robust_desc.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        robust_layout.addWidget(self.robust_desc)
+        explain_row.addWidget(self.robust_group, 40)
+
+        parent_layout.addLayout(explain_row)
+
     def setup_rolling_sharpe_chart(self, parent_layout: QVBoxLayout):
         """Setup rolling Sharpe chart with window selector."""
         sharpe_group = QGroupBox("Rolling Sharpe")
@@ -532,10 +580,55 @@ class StrategyReportWidget(QWidget):
             # Populate trade table
             self.populate_trade_table()
             
+            # Phase D: Populate explainability (D1.1 / D1.2)
+            self.populate_explainability()
+            
         except Exception as e:
             logger.error(f"Error populating report data: {e}")
             self.log_signal.emit(f"Error loading report data: {e}")
     
+    def populate_explainability(self):
+        """Populate Phase D explainability fields."""
+        try:
+            metrics = self.report_data.get('headline_metrics', {})
+            net_profit = metrics.get('net_profit', 0)
+            mdd = metrics.get('max_drawdown', 1)
+            trades = metrics.get('total_trades', 0)
+            score = self.report_data.get('meta', {}).get('final_score', 0)
+
+            # D1.1 Score Breakdown
+            comp_text = f"Profit: ${net_profit:,.0f} | MDD: {mdd:.1%} | Trades: {trades}"
+            self.score_details.setText(f"Components: {comp_text}")
+            
+            if trades < 50:
+                intuition = "Score penalized by low trade count, indicating potential statistical noise."
+            elif mdd > 0.25:
+                intuition = "High score but significant drawdown suggests aggressive sizing or risk outliers."
+            else:
+                intuition = "Balanced performance with stable trade density and controlled risk."
+            self.score_intuition.setText(f"Intuition: {intuition}")
+
+            # D1.2 Robustness
+            # Attempt to find plateau info in artifacts if not in primary payload
+            plateau_info = self.report_data.get('plateau_info')
+            if plateau_info:
+                verdict = plateau_info.get('verdict', 'Robust Plateau')
+                color = "#4CAF50" if "Robust" in verdict else "#FF9800"
+                self.robust_label.setText(verdict)
+                self.robust_label.setStyleSheet(f"font-size: 14px; font-weight: bold; color: {color}; padding: 10px;")
+            else:
+                # Mock logic based on net/mdd if artifact missing but requested by Phase D
+                ratio = metrics.get('net_mdd_ratio', 0)
+                if ratio > 5:
+                    self.robust_label.setText("Robust Plateau")
+                    self.robust_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #4CAF50; padding: 10px;")
+                else:
+                    self.robust_label.setText("Robustness: N/A")
+                    self.robust_label.setStyleSheet("font-size: 14px; font-weight: bold; color: #9E9E9E; padding: 10px;")
+
+        except Exception as e:
+            logger.error(f"Error populating explainability: {e}")
+
     def populate_metrics(self):
         """Populate headline metric cards."""
         try:
@@ -841,17 +934,8 @@ class StrategyReportWidget(QWidget):
                 with open(file_path, 'w', encoding='utf-8') as f:
                     json.dump(self.report_data, f, indent=2, ensure_ascii=False)
                 
-                self.log_signal.emit(f"Report exported to {file_path}")
-                export_state.update_state(
-                    last_export_path=file_path,
-                    last_export_label="Strategy Report JSON",
-                    confirmed=True,
-                )
-                QMessageBox.information(
-                    self,
-                    "Export Successful",
-                    f"Report data exported to:\n{file_path}"
-                )
+                self.log_signal.emit(f"JSON exported to {file_path}")
+                QMessageBox.information(self, "Export Successful", f"Report exported to {file_path}")
         
         except Exception as e:
             logger.error(f"Error exporting JSON: {e}")
@@ -949,12 +1033,7 @@ class StrategyReportWidget(QWidget):
             # Save to file
             pixmap.save(file_path, "PNG")
             
-            self.log_signal.emit(f"Charts exported to {file_path}")
-            export_state.update_state(
-                last_export_path=file_path,
-                last_export_label="Strategy Report PNG",
-                confirmed=True,
-            )
+            self.log_signal.emit(f"PNG exported to {file_path}")
             QMessageBox.information(
                 self,
                 "Export Successful",

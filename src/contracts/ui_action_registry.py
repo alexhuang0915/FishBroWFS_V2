@@ -20,7 +20,7 @@ Governance Rules:
 from enum import Enum
 from typing import Dict, List, Optional, Set, Any
 from pydantic import BaseModel, Field, ConfigDict
-from datetime import datetime
+from datetime import datetime, timezone
 
 from contracts.ui_api_coverage import ApiEndpointClassification, ApiEndpointMetadata
 
@@ -111,7 +111,7 @@ class UiActionRegistry(BaseModel):
     statistics: Dict[str, int] = Field(default_factory=dict, description="Registry statistics")
     
     # Metadata
-    generated_at: datetime = Field(default_factory=datetime.utcnow, description="When registry was generated")
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="When registry was generated")
     version: str = Field(default="1.0.0", description="Registry version")
     
     model_config = ConfigDict(frozen=True)

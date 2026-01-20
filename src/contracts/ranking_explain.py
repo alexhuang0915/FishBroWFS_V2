@@ -8,7 +8,7 @@ Phase II adds WARN/ERROR severity for governance/risk layer.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field, field_validator
@@ -141,7 +141,7 @@ class RankingExplainReport(BaseModel):
     )
     
     generated_at: str = Field(
-        default_factory=lambda: datetime.utcnow().isoformat() + "Z",
+        default_factory=lambda: datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         description="ISO 8601 timestamp of report generation"
     )
     

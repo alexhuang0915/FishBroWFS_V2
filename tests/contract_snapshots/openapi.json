@@ -126,6 +126,52 @@
         "title": "ArtifactFile",
         "type": "object"
       },
+      "ArtifactIndexResponse": {
+        "description": "Response for GET /api/v1/jobs/{job_id}/artifacts.",
+        "properties": {
+          "artifacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Artifacts",
+            "type": "array"
+          },
+          "files": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "links": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Links",
+            "type": "object"
+          }
+        },
+        "required": [
+          "job_id",
+          "links",
+          "files"
+        ],
+        "title": "ArtifactIndexResponse",
+        "type": "object"
+      },
       "BatchMetadata": {
         "properties": {
           "batch_id": {
@@ -964,6 +1010,17 @@
           "job_id": {
             "title": "Job Id",
             "type": "string"
+          },
+          "job_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Type"
           },
           "policy_stage": {
             "anyOf": [
@@ -4433,6 +4490,93 @@
           }
         },
         "summary": "Abort Job Endpoint"
+      }
+    },
+    "/api/v1/jobs/{job_id}/artifacts": {
+      "get": {
+        "description": "List artifacts for a job evidence directory.",
+        "operationId": "get_job_artifacts_api_v1_jobs__job_id__artifacts_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtifactIndexResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Artifacts"
+      }
+    },
+    "/api/v1/jobs/{job_id}/artifacts/{filename}": {
+      "get": {
+        "description": "Serve a single artifact file from the job evidence directory.",
+        "operationId": "get_job_artifact_file_api_v1_jobs__job_id__artifacts__filename__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Artifact File"
       }
     },
     "/api/v1/jobs/{job_id}/explain": {

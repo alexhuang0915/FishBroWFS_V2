@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone # timezone imported here
 import traceback
 from fastapi import FastAPI, HTTPException, APIRouter, Request # Request imported here
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 from collections import deque
 from urllib.parse import unquote
@@ -954,9 +955,27 @@ def _supervisor_job_to_response(job: Any) -> JobListResponse:
                 "phase": "api"
             }
     
+    # Map job_type to category for UI filtering
+    job_type_raw = job.job_type
+    category_map = {
+        "RUN_RESEARCH_V2": "research",
+        "RUN_RESEARCH_WFS": "research",
+        "RUN_PLATEAU_V2": "plateau",
+        "RUN_FREEZE_V2": "freeze",
+        "RUN_COMPILE_V2": "compile",
+        "BUILD_PORTFOLIO_V2": "portfolio",
+        "BUILD_DATA": "data",
+        "RUN_PORTFOLIO_ADMISSION": "portfolio",
+        "CLEAN_CACHE": "maintenance",
+        "GENERATE_REPORTS": "report",
+        "PING": "ping",
+    }
+    category = category_map.get(job_type_raw, "strategy")
+
     return JobListResponse(
         job_id=job_id,
-        type="strategy",
+        type=category,
+        job_type=job_type_raw,
         status=status,
         created_at=created_at,
         finished_at=finished_at,
@@ -1294,32 +1313,70 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
         "dataset": "..."  # optional
     }
     """
+    # Extract common fields
     strategy_id = payload.get("strategy_id")
     run_mode = str(payload.get("run_mode", "")).lower()
-
+    
+    # Check if job_type is explicitly provided (e.g., BUILD_DATA)
+    explicit_job_type = payload.get("job_type")
+    logger = logging.getLogger(__name__)
+    logger.info("submit_job_endpoint: explicit_job_type=%s, payload=%s", explicit_job_type, payload)
+    if explicit_job_type:
+        try:
+            canonical = normalize_job_type(explicit_job_type)
+            job_type = canonical.value
+            logger.info("submit_job_endpoint: explicit_job_type=%s normalized to %s", explicit_job_type, job_type)
+        except ValueError as e:
+            # Invalid explicit job_type; reject with 422
+            logger.warning(
+                "submit_job_endpoint: invalid explicit job_type=%s, rejecting with 422: %s",
+                explicit_job_type, str(e)
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid job_type: {explicit_job_type}. {str(e)}"
+            )
+    else:
+        # No explicit job_type, fallback to run_mode mapping
+        logger.warning(
+            "submit_job_endpoint: no explicit job_type, falling back to run_mode=%s",
+            run_mode
+        )
+        if run_mode == "research":
+            job_type = JobType.RUN_RESEARCH_V2.value
+        elif run_mode == "optimize":
+            job_type = JobType.RUN_PLATEAU_V2.value
+        elif run_mode == "wfs":
+            job_type = JobType.RUN_RESEARCH_WFS.value
+        elif run_mode == "backtest":
+            job_type = JobType.RUN_RESEARCH_V2.value  # Default to research for backtest
+        else:
+            job_type = JobType.RUN_RESEARCH_V2.value  # Default
+    logger.info("submit_job_endpoint: final job_type=%s", job_type)
     instrument = payload.get("instrument")
     timeframe = payload.get("timeframe")
     season = payload.get("season")
     dataset = payload.get("dataset")
-
     start_date = payload.get("start_date")
     end_date = payload.get("end_date")
     research_run_id = payload.get("research_run_id")
     
-    # Map run_mode to canonical supervisor job_type
-    if run_mode == "research":
-        job_type = JobType.RUN_RESEARCH_V2.value
-    elif run_mode == "optimize":
-        job_type = JobType.RUN_PLATEAU_V2.value
-    elif run_mode == "wfs":
-        job_type = JobType.RUN_RESEARCH_WFS.value
-    elif run_mode == "backtest":
-        job_type = JobType.RUN_RESEARCH_V2.value  # Default to research for backtest
-    else:
-        job_type = JobType.RUN_RESEARCH_V2.value  # Default
-    
     # Build supervisor params based on job_type
-    if job_type == JobType.RUN_RESEARCH_V2.value:
+    if job_type == JobType.BUILD_DATA.value:
+        # BUILD_DATA jobs use params directly from payload
+        params = {
+            "dataset_id": payload.get("dataset_id"),
+            "timeframe_min": payload.get("timeframe_min", 60),
+            "mode": payload.get("mode", "FULL"),
+            "force_rebuild": payload.get("force_rebuild", False),
+        }
+        # Validate required field
+        if not params["dataset_id"]:
+            raise HTTPException(
+                status_code=422,
+                detail="Missing required field for BUILD_DATA: dataset_id",
+            )
+    elif job_type == JobType.RUN_RESEARCH_V2.value:
         if not all([strategy_id, instrument, timeframe, season]):
             raise HTTPException(
                 status_code=422,
@@ -1368,10 +1425,15 @@ async def submit_job_endpoint(payload: dict[str, Any]) -> dict[str, Any]:
     
     # Build metadata
     metadata = {
-        "season": season,
         "source": "api_v1",
         "submitted_via": "gui"
     }
+    # Add season if available (not required for all job types)
+    if season:
+        metadata["season"] = season
+    # For BUILD_DATA, add dataset_id to metadata if available
+    if job_type == JobType.BUILD_DATA.value and params.get("dataset_id"):
+        metadata["dataset_id"] = params["dataset_id"]
     
     # Submit to supervisor
     try:
@@ -1429,6 +1491,55 @@ async def reveal_evidence_path(job_id: str) -> RevealEvidencePathResponse:
         approved=True,
         path=str(job_dir.resolve()),
     )
+
+
+@api_v1.get("/jobs/{job_id}/artifacts", response_model=ArtifactIndexResponse)
+async def get_job_artifacts(job_id: str) -> ArtifactIndexResponse:
+    """List artifacts for a job evidence directory."""
+    job_dir = get_job_evidence_dir(job_id)
+    if not job_dir.exists():
+        raise HTTPException(status_code=404, detail="Job evidence directory not found")
+
+    files = _list_artifacts(job_id)
+    links = {
+        "self": f"/api/v1/jobs/{job_id}/artifacts",
+        "reveal_path": f"/api/v1/jobs/{job_id}/reveal_evidence_path",
+    }
+    return ArtifactIndexResponse(job_id=job_id, links=links, files=files, artifacts=files)
+
+
+@api_v1.get("/jobs/{job_id}/artifacts/{filename:path}")
+async def get_job_artifact_file(job_id: str, filename: str):
+    """
+    Serve a single artifact file from the job evidence directory.
+    """
+    filename = _validate_artifact_filename_or_403(filename)
+    job_dir = get_job_evidence_dir(job_id)
+    if not job_dir.exists():
+        raise HTTPException(status_code=404, detail="Job evidence directory not found")
+
+    job_root = job_dir.resolve()
+    target = (job_dir / filename).resolve()
+    if not target.is_relative_to(job_root):
+        raise HTTPException(status_code=403, detail="Invalid artifact filename.")
+    if not target.is_file():
+        raise HTTPException(status_code=404, detail="Artifact not found.")
+
+    if Path(filename).name == "build_data_manifest.json":
+        try:
+            payload = json.loads(target.read_text(encoding="utf-8"))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to parse manifest: {exc}")
+        manifest_response = {
+            "inventory_rows": payload.get("inventory_rows") or [],
+            "produced_bars_path": payload.get("produced_bars_path"),
+        }
+        return JSONResponse(content=manifest_response, media_type="application/json")
+
+    content_type, _ = mimetypes.guess_type(str(target))
+    if content_type is None:
+        content_type = "application/octet-stream"
+    return FileResponse(path=target, media_type=content_type, filename=Path(filename).name)
 
 
 # Worker management removed - supervisor handles its own workers

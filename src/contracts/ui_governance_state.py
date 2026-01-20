@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from enum import Enum
 from typing import Dict, List, Optional, Set, Any, TypedDict
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, ConfigDict
 
 from contracts.ui_action_registry import UiActionType
@@ -111,7 +111,7 @@ class UiGovernanceState(BaseModel):
     
     # Timestamps
     last_state_update: datetime = Field(
-        default_factory=datetime.utcnow,
+        default_factory=lambda: datetime.now(timezone.utc),
         description="When state was last updated"
     )
     
@@ -403,7 +403,7 @@ class UiGovernanceStateHolder:
         # Create new state with updated values
         current_dict = self._state.model_dump()
         current_dict.update(kwargs)
-        current_dict["last_state_update"] = datetime.utcnow()
+        current_dict["last_state_update"] = datetime.now(timezone.utc)
         
         # Create new state object
         new_state = UiGovernanceState(**current_dict)

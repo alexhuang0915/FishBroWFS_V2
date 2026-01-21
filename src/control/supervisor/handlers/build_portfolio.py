@@ -10,7 +10,7 @@ import traceback
 
 from ..job_handler import BaseJobHandler, JobContext
 from contracts.supervisor.build_portfolio import BuildPortfolioPayload
-from control.paths import get_outputs_root
+from core.paths import get_artifacts_root
 from control.artifacts import write_json_atomic
 from portfolio.governance.params import load_governance_params
 from control.portfolio.evidence_reader import RunEvidenceReader
@@ -50,7 +50,7 @@ class BuildPortfolioHandler(BaseJobHandler):
             }
         
         # Determine outputs root
-        outputs_root = get_outputs_root()
+        outputs_root = get_artifacts_root()
         if payload.outputs_root:
             outputs_root = Path(payload.outputs_root)
         

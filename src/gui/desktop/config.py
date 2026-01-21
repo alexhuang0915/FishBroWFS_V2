@@ -21,5 +21,6 @@ SUPERVISOR_STARTUP_RETRY_COUNT = 3
 SUPERVISOR_STARTUP_RETRY_DELAY_SEC = 1.0
 
 # Log file paths for supervisor runtime logs
-SUPERVISOR_RUNTIME_LOG = "outputs/_dp_evidence/desktop_supervisor_runtime.log"
-SUPERVISOR_ENTRYPOINT_LOG = "outputs/_dp_evidence/phase_d_supervisor_entrypoint.txt"
+from core.paths import get_runtime_root
+SUPERVISOR_RUNTIME_LOG = str(get_runtime_root() / "logs" / "desktop_supervisor_runtime.log")
+SUPERVISOR_ENTRYPOINT_LOG = str(get_runtime_root() / "logs" / "phase_d_supervisor_entrypoint.txt")

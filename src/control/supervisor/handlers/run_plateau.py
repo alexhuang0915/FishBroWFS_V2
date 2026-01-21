@@ -146,6 +146,8 @@ class RunPlateauHandler(BaseJobHandler):
         try:
             # Execute plateau logic
             result = self._execute_plateau(payload, context, candidates_path, plateau_dir)
+            if not result.get("ok", False):
+                return result
             
             # Generate manifest
             self._generate_manifest(context.job_id, payload, plateau_dir, candidates_path)
@@ -260,6 +262,25 @@ class RunPlateauHandler(BaseJobHandler):
             
             # Check result
             if process.returncode == 0:
+                # [GUARD] Universal Artifact Check
+                from contracts.artifact_guard import get_contract_for_job, assert_artifacts_present
+                from control.control_types import ReasonCode
+
+                contract = get_contract_for_job("RUN_PLATEAU_V2")
+                if contract:
+                    missing = assert_artifacts_present(plateau_dir, contract)
+                    if missing:
+                        logger.error(f"Artifact Guard Failed for RUN_PLATEAU_V2: {missing}")
+                        return {
+                            "ok": False,
+                            "job_type": "RUN_PLATEAU_V2",
+                            "returncode": 0,
+                            "stdout_path": str(stdout_path),
+                            "stderr_path": str(stderr_path),
+                            "error": f"{ReasonCode.ERR_PLATEAU_ARTIFACTS_MISSING}: {missing}",
+                            "missing_artifacts": missing
+                        }
+
                 context.heartbeat(progress=0.9, phase="finalizing")
                 
                 # Parse output to extract results

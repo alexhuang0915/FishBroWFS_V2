@@ -1,7 +1,0 @@
-{
-  "strategy": "S1",
-  "total_configs_loaded": 1,
-  "configs": [
-    "strategies/S1.yaml"
-  ]
-}

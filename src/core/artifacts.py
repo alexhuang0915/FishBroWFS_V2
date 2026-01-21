@@ -42,6 +42,7 @@ def write_run_artifacts(
     metrics: Dict[str, Any],
     winners: Dict[str, Any] | None = None,
     plateau_candidates: List[Dict[str, Any]] | None = None,
+    warnings: List[str] | None = None,
 ) -> None:
     """
     Write all standard artifacts for a run.
@@ -63,6 +64,7 @@ def write_run_artifacts(
             Must follow v2 schema (see core.winners_schema).
             Legacy winners are no longer supported.
         plateau_candidates: Optional list of broad candidates for plateau stage.
+        warnings: Optional list of runtime warnings (ranking explain reason codes).
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -147,8 +149,8 @@ def write_run_artifacts(
     # Write logs.txt (empty initially)
     (run_dir / "logs.txt").write_text("", encoding="utf-8")
     
-    # DP6 Phase I: Generate ranking explain artifact if winners exist
-    if winners and winners.get("topk"):
+    # DP6 Phase I: Generate ranking explain artifact if winners exist or if explicit warnings
+    if (winners and winners.get("topk")) or warnings:
         try:
             # Determine context based on stage name
             stage_name = metrics.get("stage_name", "").lower()
@@ -165,6 +167,8 @@ def write_run_artifacts(
                 job_dir=run_dir,
                 context=context,
                 scoring_guard_cfg=scoring_config,
+
+                warnings=warnings,
             )
             
             if not success:

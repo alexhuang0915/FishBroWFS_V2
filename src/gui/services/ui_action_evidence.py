@@ -107,16 +107,11 @@ def write_abort_request_evidence(job_id: str, reason: Optional[str] = None) -> p
     )
     
     # Determine output path
-    # Use outputs/jobs/<job_id>/ui_actions/abort_request.json
-    outputs_root = pathlib.Path("outputs")
-    try:
-        if not outputs_root.exists():
-            # In test environments, outputs might not exist; create it
-            outputs_root.mkdir(parents=True, exist_ok=True)
-    except (OSError, PermissionError) as e:
-        raise EvidenceWriteError(f"Cannot create outputs directory {outputs_root}: {e}")
+    # Use outputs/artifacts/jobs/<job_id>/ui_actions/abort_request.json
+    from core.paths import get_jobs_dir
     
-    job_dir = outputs_root / "jobs" / job_id
+    # We don't check outputs root explicitly, we trust get_jobs_dir() structure
+    job_dir = get_jobs_dir() / job_id
     ui_actions_dir = job_dir / "ui_actions"
     
     try:
@@ -149,7 +144,8 @@ def verify_evidence_write_possible() -> bool:
     Returns:
         bool: True if evidence writing appears possible
     """
-    outputs_root = pathlib.Path("outputs")
+    from core.paths import get_artifacts_root
+    outputs_root = get_artifacts_root()
     
     # Check if outputs exists or can be created
     if outputs_root.exists():

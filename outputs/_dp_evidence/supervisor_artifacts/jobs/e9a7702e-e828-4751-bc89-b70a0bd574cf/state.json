@@ -1,1 +1,0 @@
-{"error":"Failed to execute compile: Compile CLI failed with return code 1\nStderr: /home/fishbro/FishBroWFS_V2/.venv/bin/python: No module named scripts.run_phase3c_compile\n","job_id":"e9a7702e-e828-4751-bc89-b70a0bd574cf","phase":null,"progress":null,"status":"FAILED","timestamp":"2026-01-14T09:25:55.071944+00:00"}

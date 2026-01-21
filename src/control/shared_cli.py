@@ -317,8 +317,26 @@ def _print_human_summary(report: dict):
 # 注意：這個模組應該由 fishbro CLI 主程式導入並註冊
 # 我們在這裡提供一個方便的功能來註冊命令
 
+
+
 def register_commands(cli_group: click.Group):
     """註冊 shared 命令到 fishbro CLI"""
     cli_group.add_command(shared_cli)
+
+
+def main() -> int:
+    """CLI entry point."""
+    try:
+        shared_cli()
+        return 0
+    except SystemExit as e:
+        return e.code if isinstance(e.code, int) else 1
+    except Exception as e:
+        click.echo(click.style(f"❌ Unexpected error: {e}", fg="red"), err=True)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
 
 

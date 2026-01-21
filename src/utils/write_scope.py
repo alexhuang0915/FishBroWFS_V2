@@ -202,7 +202,8 @@ def create_season_export_scope(export_root: Path) -> WriteScope:
         ()   (none – we allow any file under the export_root)
     """
     # Ensure export_root is under the exports tree
-    exports_root = Path(os.environ.get("FISHBRO_EXPORTS_ROOT", "outputs/exports"))
+    from core.paths import get_exports_root
+    exports_root = Path(os.environ.get("FISHBRO_EXPORTS_ROOT", str(get_exports_root())))
     if not export_root.is_relative_to(exports_root):
         raise ValueError(
             f"export_root {export_root} must be under exports root {exports_root}"

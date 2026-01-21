@@ -199,7 +199,8 @@ def get_snapshot_timestamp() -> str:
     then outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md.
     Returns ISO UTC string or "UNKNOWN".
     """
-    manifest_path = Path("outputs/snapshots/full/MANIFEST.json")
+    # Updated to point to runtime/snapshots as per Logic-Only Constitution
+    manifest_path = Path("outputs/runtime/snapshots/full/MANIFEST.json")
     if manifest_path.exists():
         try:
             with open(manifest_path, encoding='utf-8') as f:
@@ -210,7 +211,7 @@ def get_snapshot_timestamp() -> str:
         except Exception:
             pass
     
-    snapshot_path = Path("outputs/snapshots/SYSTEM_FULL_SNAPSHOT.md")
+    snapshot_path = Path("outputs/runtime/snapshots/SYSTEM_FULL_SNAPSHOT.md")
     if snapshot_path.exists():
         try:
             mtime = snapshot_path.stat().st_mtime
@@ -368,7 +369,7 @@ def write_runtime_context(
     
     # Snapshot Policy Binding
     lines.append("## Snapshot Policy Binding")
-    policy_path = Path("outputs/snapshots/full/LOCAL_SCAN_RULES.json")
+    policy_path = Path("outputs/runtime/snapshots/full/LOCAL_SCAN_RULES.json")
     if policy_path.exists():
         policy_hash = get_policy_hash(policy_path)
         lines.append(f"- Local scan rules sha256: {policy_hash}")

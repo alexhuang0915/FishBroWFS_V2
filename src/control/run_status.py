@@ -14,8 +14,10 @@ from typing import Dict, Any, Optional, Literal
 
 from control.artifacts import write_atomic_json
 
+from core.paths import get_runtime_root
+
 # File location (MANDATORY)
-RUN_STATUS_PATH = Path("outputs/run_status.json")
+RUN_STATUS_PATH = get_runtime_root() / "run_status.json"
 
 # JSON Contract (STRICT)
 RunState = Literal["IDLE", "RUNNING", "DONE", "FAILED", "CANCELED"]
@@ -47,8 +49,8 @@ def get_default_status() -> Dict[str, Any]:
         "updated_at": now,
         "eta_seconds": 0,
         "artifacts": {
-            "op_config": "outputs/op_config.json",
-            "audit_log": "outputs/audit/events.jsonl"
+            "op_config": str(get_runtime_root() / "op_config.json"),
+            "audit_log": str(get_runtime_root() / "audit" / "events.jsonl")
         },
         "error": None
     }
@@ -121,8 +123,8 @@ def write_status(
     # Use provided artifacts or default
     if artifacts is None:
         artifacts = {
-            "op_config": "outputs/op_config.json",
-            "audit_log": "outputs/audit/events.jsonl"
+            "op_config": str(get_runtime_root() / "op_config.json"),
+            "audit_log": str(get_runtime_root() / "audit" / "events.jsonl")
         }
     
     payload = {

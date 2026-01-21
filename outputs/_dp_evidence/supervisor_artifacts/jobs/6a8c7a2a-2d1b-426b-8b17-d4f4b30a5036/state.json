@@ -1,1 +1,0 @@
-{"error":"Failed to execute plateau: Plateau CLI failed with return code 1\nStderr: /home/fishbro/FishBroWFS_V2/.venv/bin/python: No module named scripts.run_phase3a_plateau\n","job_id":"6a8c7a2a-2d1b-426b-8b17-d4f4b30a5036","phase":null,"progress":null,"status":"FAILED","timestamp":"2026-01-14T03:12:19.555891+00:00"}

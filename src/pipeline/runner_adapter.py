@@ -15,6 +15,9 @@ from pipeline.runner_grid import run_grid
 from pipeline.stage0_runner import run_stage0
 from pipeline.stage2_runner import run_stage2
 from pipeline.topk import select_topk
+from strategy import registry
+from engine import engine_jit
+from contracts.ranking_explain import RankingExplainReasonCode
 
 
 def _coerce_1d_float64(x):
@@ -227,29 +230,71 @@ def _run_stage1_job(cfg: dict) -> dict:
             
         # P0: Produce plateau_candidates (broad set, e.g. Top-1000)
         plateau_list = []
-        # Use SSOT param names for this strategy
-        param_names = ["channel_len", "atr_len", "stop_mult"]
+        warnings = []
         
-        limit = 1000
-        for idx in sort_indices[:limit]:
-            params_row = params_matrix[idx]
-            plateau_list.append({
-                "param_id": int(idx),
-                "params": {
-                    param_names[0]: int(params_row[0]),
-                    param_names[1]: int(params_row[1]),
-                    param_names[2]: float(params_row[2]),
-                },
-                "score": float(metrics_array[idx, 0]), # net_profit
-                "metrics": {
-                    "net_profit": float(metrics_array[idx, 0]),
-                    "trades": int(metrics_array[idx, 1]),
-                    "max_dd": float(metrics_array[idx, 2]),
-                }
-            })
+        # Check environment for potential issues
+        # Simple check: Ensure critical env vars are plausible
+        # This is a placeholder for more complex env validation
+        import os
+        if "PYTHONPATH" not in os.environ and "VIRTUAL_ENV" not in os.environ:
+             # If neither PYTHONPATH nor VIRTUAL_ENV is set, it might be a malformed env
+             # causing import errors later.
+             warnings.append(RankingExplainReasonCode.WARN_ENV_MALFORMED.value)
+
+        # Check Numba status
+        if engine_jit.nb is None:
+            warnings.append(RankingExplainReasonCode.WARN_NUMBA_MISSING.value)
+        
+        # Use SSOT param names for this strategy
+        strategy_id = cfg.get("strategy_id")
+        if not strategy_id:
+            raise ValueError("strategy_id must be provided in stage configuration")
+            
+        try:
+            spec = registry.get(strategy_id)
+            # Use GUI spec to get guaranteed order and types
+            gui_spec = registry.convert_to_gui_spec(spec)
+            param_specs = gui_spec.params
+        except Exception as e:
+            raise ValueError(f"Failed to resolve schema for strategy '{strategy_id}': {e}")
+        
+        try:
+            limit = 1000
+            for idx in sort_indices[:limit]:
+                params_row = params_matrix[idx]
+                resolved_params = {}
+                
+                for i, p_spec in enumerate(param_specs):
+                    if i < len(params_row):
+                        val = params_row[i]
+                        if p_spec.type in ("int", "bool"):
+                            resolved_params[p_spec.name] = int(val)
+                        else:
+                            resolved_params[p_spec.name] = float(val)
+                
+                plateau_list.append({
+                    "param_id": int(idx),
+                    "params": resolved_params,
+                    "score": float(metrics_array[idx, 0]), # net_profit
+                    "metrics": {
+                        "net_profit": float(metrics_array[idx, 0]),
+                        "trades": int(metrics_array[idx, 1]),
+                        "max_dd": float(metrics_array[idx, 2]),
+                    }
+                })
+        except Exception as e:
+            # Fallback if plateau generation fails
+            warnings.append(RankingExplainReasonCode.WARN_PLATEAU_FALLBACK.value)
+            # We might intentionally leave plateau_list partial or empty?
+            # Or log the error? Since we can't log easily here, the warning is the log.
+            # Best to keep what we have or clear it?
+            # If partial, might be confusing. Let's clear it to be safe (fail to empty list).
+            plateau_list = []
+
     else:
         winners_list = []
         plateau_list = []
+        warnings = []
     
     winners = {
         "topk": winners_list,
@@ -263,7 +308,8 @@ def _run_stage1_job(cfg: dict) -> dict:
     return {
         "metrics": metrics, 
         "winners": winners,
-        "plateau_candidates": plateau_list
+        "plateau_candidates": plateau_list,
+        "warnings": warnings,  # P2: Return warnings
     }
 
 
@@ -320,33 +366,58 @@ def _run_stage2_job(cfg: dict) -> dict:
     # Convert to winners format
     winners_list = []
     plateau_list = []
-    param_names = ["channel_len", "atr_len", "stop_mult"]
+    warnings = []
+
+    # Check Numba status
+    if engine_jit.nb is None:
+        warnings.append(RankingExplainReasonCode.WARN_NUMBA_MISSING.value)
     
-    for r in stage2_results:
-        # For Stage 2, Winners is the same as the full result list
-        winners_list.append({
-            "param_id": int(r.param_id),
-            "net_profit": float(r.net_profit),
-            "trades": int(r.trades),
-            "max_dd": float(r.max_dd),
-        })
+    strategy_id = cfg.get("strategy_id")
+    if not strategy_id:
+        raise ValueError("strategy_id must be provided in stage configuration")
         
-        # Also include in plateau_candidates
-        params_row = params_matrix[r.param_id]
-        plateau_list.append({
-            "param_id": int(r.param_id),
-            "params": {
-                param_names[0]: int(params_row[0]),
-                param_names[1]: int(params_row[1]),
-                param_names[2]: float(params_row[2]),
-            },
-            "score": float(r.net_profit),
-            "metrics": {
+    try:
+        spec = registry.get(strategy_id)
+        gui_spec = registry.convert_to_gui_spec(spec)
+        param_specs = gui_spec.params
+    except Exception as e:
+        raise ValueError(f"Failed to resolve schema for strategy '{strategy_id}': {e}")
+    
+    try:
+        for r in stage2_results:
+            # For Stage 2, Winners is the same as the full result list
+            winners_list.append({
+                "param_id": int(r.param_id),
                 "net_profit": float(r.net_profit),
                 "trades": int(r.trades),
                 "max_dd": float(r.max_dd),
-            }
-        })
+            })
+            
+            # Also include in plateau_candidates
+            params_row = params_matrix[r.param_id]
+            
+            resolved_params = {}
+            for i, p_spec in enumerate(param_specs):
+                if i < len(params_row):
+                    val = params_row[i]
+                    if p_spec.type in ("int", "bool"):
+                        resolved_params[p_spec.name] = int(val)
+                    else:
+                        resolved_params[p_spec.name] = float(val)
+
+            plateau_list.append({
+                "param_id": int(r.param_id),
+                "params": resolved_params,
+                "score": float(r.net_profit),
+                "metrics": {
+                    "net_profit": float(r.net_profit),
+                    "trades": int(r.trades),
+                    "max_dd": float(r.max_dd),
+                }
+            })
+    except Exception as e:
+        warnings.append(RankingExplainReasonCode.WARN_PLATEAU_FALLBACK.value)
+        plateau_list = []
     
     winners = {
         "topk": winners_list,
@@ -360,7 +431,8 @@ def _run_stage2_job(cfg: dict) -> dict:
     return {
         "metrics": metrics, 
         "winners": winners,
-        "plateau_candidates": plateau_list
+        "plateau_candidates": plateau_list,
+        "warnings": warnings,  # P2: Return warnings
     }
 
 

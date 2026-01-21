@@ -16,6 +16,27 @@ import numpy as np
 import pytest
 
 from pipeline.funnel_runner import run_funnel
+from strategy.spec import StrategySpec
+from strategy import registry
+
+TEST_STRAT_ID = "test_strat_oom"
+
+def setup_module():
+    spec = StrategySpec(
+        strategy_id=TEST_STRAT_ID,
+        version="1.0.0",
+        param_schema={
+            "p0": {"type": "float"},
+        },
+        fn=lambda x: x,
+        defaults={}
+    )
+    registry._registry_by_id[TEST_STRAT_ID] = spec
+
+def teardown_module():
+    if TEST_STRAT_ID in registry._registry_by_id:
+        del registry._registry_by_id[TEST_STRAT_ID]
+
 
 
 def test_funnel_metrics_include_oom_gate_fields():
@@ -38,6 +59,7 @@ def test_funnel_metrics_include_oom_gate_fields():
             "slip": 0.0,
             "order_qty": 1,
             "mem_limit_mb": 10000.0,  # High limit to ensure PASS
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -136,6 +158,7 @@ def test_auto_downsample_updates_snapshot_and_hash(monkeypatch):
             # Dynamic limit calculation
             "mem_limit_mb": 0.65,  # Will trigger auto-downsample for some stages
             "allow_auto_downsample": True,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -222,6 +245,7 @@ def test_oom_gate_fields_in_readme():
             "slip": 0.0,
             "order_qty": 1,
             "mem_limit_mb": 10000.0,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -265,6 +289,7 @@ def test_block_action_raises_error():
             "order_qty": 1,
             "mem_limit_mb": 1.0,  # Very low limit
             "allow_auto_downsample": False,  # Disable auto-downsample to force BLOCK
+            "strategy_id": TEST_STRAT_ID,
         }
         
         # Should raise RuntimeError

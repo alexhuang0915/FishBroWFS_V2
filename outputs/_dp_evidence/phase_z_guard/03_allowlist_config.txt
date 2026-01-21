@@ -1,7 +1,0 @@
-# Version: V1
-# Purpose: Top-level allowlist for configs/ to prevent drift beyond Phase Z baseline.
-dimensions_registry.json
-funnel_min.json
-portfolio
-profiles
-strategies

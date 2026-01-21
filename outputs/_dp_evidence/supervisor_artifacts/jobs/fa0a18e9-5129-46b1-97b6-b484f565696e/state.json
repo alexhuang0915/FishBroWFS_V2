@@ -1,1 +1,0 @@
-{"error":"Failed to execute compile: Compile CLI failed with return code 1\nStderr: /usr/bin/python3: No module named scripts.run_phase3c_compile\n","job_id":"fa0a18e9-5129-46b1-97b6-b484f565696e","phase":null,"progress":null,"status":"FAILED","timestamp":"2026-01-12T13:05:38.315042+00:00"}

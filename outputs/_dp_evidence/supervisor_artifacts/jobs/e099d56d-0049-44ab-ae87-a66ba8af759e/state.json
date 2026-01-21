@@ -1,1 +1,0 @@
-{"error":"Failed to execute freeze: Freeze CLI failed with return code 1\nStderr: Error locating default files: Could not locate dataset registry\nPlease specify explicit paths using command line arguments.\n","job_id":"e099d56d-0049-44ab-ae87-a66ba8af759e","phase":null,"progress":null,"status":"FAILED","timestamp":"2026-01-12T08:11:25.654988+00:00"}

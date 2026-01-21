@@ -21,7 +21,11 @@ class DatasetCatalog:
         Args:
             index_path: Path to dataset index JSON file. If None, uses default.
         """
-        self.index_path = index_path or Path("outputs/datasets/datasets_index.json")
+        if index_path is None:
+            from core.paths import get_runtime_root
+            index_path = get_runtime_root() / "datasets" / "datasets_index.json"
+        
+        self.index_path = index_path
         self._index: Optional[DatasetIndex] = None
     
     def load_index(self) -> DatasetIndex:

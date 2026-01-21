@@ -26,6 +26,13 @@ class StopMode(StrEnum):
     KILL = "KILL"
 
 
-
-
-
+class ReasonCode(StrEnum):
+    """Reason codes for job status."""
+    
+    # Generic
+    ERR_JOB_FAILED = "ERR_JOB_FAILED"
+    
+    # Artifact Guard Failures (Fail-Closed)
+    ERR_FEATURE_ARTIFACTS_MISSING = "ERR_FEATURE_ARTIFACTS_MISSING"
+    ERR_RESEARCH_ARTIFACTS_MISSING = "ERR_RESEARCH_ARTIFACTS_MISSING"
+    ERR_PLATEAU_ARTIFACTS_MISSING = "ERR_PLATEAU_ARTIFACTS_MISSING"

@@ -16,6 +16,34 @@ import numpy as np
 import pytest
 
 from pipeline.runner_adapter import run_stage_job
+from strategy.spec import StrategySpec
+from strategy import registry
+
+TEST_STRAT_ID = "test_strat_contract"
+
+def setup_module():
+    """Register a test strategy for the duration of tests."""
+    spec = StrategySpec(
+        strategy_id=TEST_STRAT_ID,
+        version="1.0.0",
+        param_schema={
+            "p0": {"type": "float"},
+            "p1": {"type": "float"},
+            "p2": {"type": "float"}
+        },
+        fn=lambda x: x, # Dummy fn
+        defaults={}
+    )
+    # Register purely for lookup (content_id generation happens inside register if not provided? No, Spec needs immutable_id?)
+    # StrategySpec computes immutable_id in __init__? 
+    # Let's check StrategySpec definition if needed. Assuming it works for now or I try to mock registry.register logic.
+    # Actually, simpler to just inject into registry._registry_by_id directly to avoid strict content checks if they are complex.
+    registry._registry_by_id[TEST_STRAT_ID] = spec
+
+def teardown_module():
+    if TEST_STRAT_ID in registry._registry_by_id:
+        del registry._registry_by_id[TEST_STRAT_ID]
+
 
 
 def test_runner_adapter_returns_no_files_written():
@@ -36,6 +64,7 @@ def test_runner_adapter_returns_no_files_written():
             "params_matrix": np.random.randn(100, 3).astype(np.float64),
             "params_total": 100,
             "proxy_name": "ma_proxy_v0",
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result = run_stage_job(cfg)
@@ -75,6 +104,7 @@ def test_winners_schema_is_stable():
             "topk": 5,
             "commission": 0.0,
             "slip": 0.0,
+            "strategy_id": TEST_STRAT_ID,
         },
         {
             "stage_name": "stage2_confirm",
@@ -86,6 +116,7 @@ def test_winners_schema_is_stable():
             "params_total": 100,
             "commission": 0.0,
             "slip": 0.0,
+            "strategy_id": TEST_STRAT_ID,
         },
     ]
     
@@ -124,6 +155,7 @@ def test_metrics_structure_is_consistent():
             "topk": 5,
             "commission": 0.0,
             "slip": 0.0,
+            "strategy_id": TEST_STRAT_ID,
         },
     ]
     

@@ -11,6 +11,29 @@ import numpy as np
 import pytest
 
 from pipeline.runner_adapter import run_stage_job
+from strategy.spec import StrategySpec
+from strategy import registry
+
+TEST_STRAT_ID = "test_strat_coercion"
+
+def setup_module():
+    spec = StrategySpec(
+        strategy_id=TEST_STRAT_ID,
+        version="1.0.0",
+        param_schema={
+            "p0": {"type": "float"},
+            "p1": {"type": "float"},
+            "p2": {"type": "float"}
+        },
+        fn=lambda x: x,
+        defaults={}
+    )
+    registry._registry_by_id[TEST_STRAT_ID] = spec
+
+def teardown_module():
+    if TEST_STRAT_ID in registry._registry_by_id:
+        del registry._registry_by_id[TEST_STRAT_ID]
+
 
 
 def test_stage0_coercion_with_lists() -> None:
@@ -62,6 +85,7 @@ def test_stage1_coercion_with_lists() -> None:
         "params_total": 2,
         "commission": 0.0,
         "slip": 0.0,
+        "strategy_id": TEST_STRAT_ID,
     }
     
     # Should not raise AttributeError: 'list' object has no attribute 'shape'
@@ -95,6 +119,7 @@ def test_stage2_coercion_with_lists() -> None:
         "params_total": 2,
         "commission": 0.0,
         "slip": 0.0,
+        "strategy_id": TEST_STRAT_ID,
     }
     
     # Should not raise AttributeError: 'list' object has no attribute 'shape'
@@ -153,6 +178,7 @@ def test_coercion_handles_mixed_inputs() -> None:
         "params_total": 2,
         "commission": 0.0,
         "slip": 0.0,
+        "strategy_id": TEST_STRAT_ID,
     }
     
     # Should not raise errors

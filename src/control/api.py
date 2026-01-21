@@ -202,7 +202,8 @@ def read_tail(path: Path, n: int = 200) -> tuple[list[str], bool]:
 
 def _load_dataset_index_from_file() -> DatasetIndex:
     """Private implementation: load dataset index from file (fail fast)."""
-    index_path = Path("outputs/datasets/datasets_index.json")
+    from core.paths import get_runtime_root
+    index_path = get_runtime_root() / "datasets" / "datasets_index.json"
     if not index_path.exists():
         # Return empty dataset index (headless-safe)
         # This ensures registry preload succeeds even without derived data.

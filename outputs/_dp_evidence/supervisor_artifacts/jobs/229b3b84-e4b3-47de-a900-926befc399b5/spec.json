@@ -1,1 +1,0 @@
-{"job_type":"RUN_RESEARCH_V2","metadata":{"season":"2026Q1","source":"api_v1","submitted_via":"gui"},"params":{"end_date":"2021-01-01","params_override":{"instrument":"CME.MNQ","run_mode":"backtest","season":"2026Q1","timeframe":"1h"},"profile_name":"default","start_date":"2020-01-01","strategy_id":"S1"}}

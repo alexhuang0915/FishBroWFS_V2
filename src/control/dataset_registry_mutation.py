@@ -24,7 +24,9 @@ def _get_dataset_registry_root() -> Path:
       - FISHBRO_DATASET_REGISTRY_ROOT (default: outputs/datasets)
     """
     import os
-    return Path(os.environ.get("FISHBRO_DATASET_REGISTRY_ROOT", "outputs/datasets"))
+    from core.paths import get_runtime_root
+    default_root = get_runtime_root() / "datasets"
+    return Path(os.environ.get("FISHBRO_DATASET_REGISTRY_ROOT", str(default_root)))
 
 
 def _compute_dataset_id(symbol: str, timeframe: str, normalized_sha256: str) -> str:

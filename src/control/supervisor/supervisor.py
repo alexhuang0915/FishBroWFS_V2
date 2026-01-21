@@ -17,16 +17,12 @@ class Supervisor:
     """Main supervisor loop."""
     
     def __init__(
-        self,
-        db_path: Optional[Path] = None,
-        max_workers: int = 4,
-        tick_interval: float = 1.0,
-        artifacts_root: Optional[Path] = None
     ):
+        from core.paths import get_artifacts_root
         self.db_path = db_path or get_default_db_path()
         self.max_workers = max_workers
         self.tick_interval = tick_interval
-        self.artifacts_root = artifacts_root or Path("outputs/_dp_evidence/supervisor_artifacts")
+        self.artifacts_root = artifacts_root or get_artifacts_root()
         
         self.db = SupervisorDB(self.db_path)
         self.children: Dict[int, subprocess.Popen] = {}  # pid -> Popen

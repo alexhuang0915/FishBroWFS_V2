@@ -22,6 +22,27 @@ from core.audit_schema import compute_params_effective
 from pipeline.funnel_plan import build_default_funnel_plan
 from pipeline.funnel_runner import run_funnel
 from pipeline.funnel_schema import StageName
+from strategy.spec import StrategySpec
+from strategy import registry
+
+TEST_STRAT_ID = "test_strat_funnel"
+
+def setup_module():
+    spec = StrategySpec(
+        strategy_id=TEST_STRAT_ID,
+        version="1.0.0",
+        param_schema={
+            "p0": {"type": "float"},
+        },
+        fn=lambda x: x,
+        defaults={}
+    )
+    registry._registry_by_id[TEST_STRAT_ID] = spec
+
+def teardown_module():
+    if TEST_STRAT_ID in registry._registry_by_id:
+        del registry._registry_by_id[TEST_STRAT_ID]
+
 
 
 def test_funnel_build_default_plan_has_three_stages():
@@ -102,6 +123,7 @@ def test_each_stage_creates_run_dir_with_artifacts():
             "commission": 0.0,
             "slip": 0.0,
             "order_qty": 1,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         # Run funnel
@@ -153,6 +175,7 @@ def test_param_subsample_rate_visible_in_artifacts():
             "commission": 0.0,
             "slip": 0.0,
             "order_qty": 1,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -203,6 +226,7 @@ def test_params_effective_floor_rule_consistent():
             "commission": 0.0,
             "slip": 0.0,
             "order_qty": 1,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -247,6 +271,7 @@ def test_funnel_result_index_contains_all_stages():
             "commission": 0.0,
             "slip": 0.0,
             "order_qty": 1,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)
@@ -281,6 +306,7 @@ def test_config_snapshot_is_json_serializable_and_small():
             "commission": 0.0,
             "slip": 0.0,
             "order_qty": 1,
+            "strategy_id": TEST_STRAT_ID,
         }
         
         result_index = run_funnel(cfg, outputs_root)

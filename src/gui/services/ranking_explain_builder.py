@@ -34,6 +34,7 @@ def build_ranking_explain_report(
     plateau_report: dict | None,
     scoring_guard_cfg: ScoringGuardConfig,
     ranking_explain_config: Optional[Any] = None,
+    warnings: List[str] | None = None,
 ) -> RankingExplainReport:
     """
     Build ranking explain report from SSOT artifacts.
@@ -70,6 +71,7 @@ def build_ranking_explain_report(
         plateau_report=plateau_report,
         scoring_guard_cfg=scoring_guard_cfg,
         ranking_explain_config=ranking_explain_config,
+        warnings=warnings,
     )
     
     # Create the report
@@ -90,6 +92,7 @@ def _build_reason_cards(
     plateau_report: dict | None,
     scoring_guard_cfg: ScoringGuardConfig,
     ranking_explain_config: Any,
+    warnings: List[str] | None,
 ) -> List[RankingExplainReasonCard]:
     """Build context-aware reason cards from SSOT artifacts."""
     reason_cards = []
@@ -138,6 +141,12 @@ def _build_reason_cards(
         # Phase II: Add plateau missing artifact reason (WARN severity)
         reason_cards.append(
             _build_plateau_missing_artifact_reason(context)
+        )
+    
+    # 4. Runtime warnings (P2)
+    if warnings:
+        reason_cards.extend(
+            _build_warning_reasons(context, warnings)
         )
     
     return reason_cards
@@ -571,6 +580,82 @@ def _build_robustness_reasons(
     return reasons
 
 
+def _build_warning_reasons(
+    context: RankingExplainContext,
+    warnings: List[str],
+) -> List[RankingExplainReasonCard]:
+    """Build reason cards for runtime warnings."""
+    reasons = []
+    
+    # WARN_NUMBA_MISSING
+    if RankingExplainReasonCode.WARN_NUMBA_MISSING.value in warnings:
+        title, summary = get_context_wording(
+            context=context,
+            code=RankingExplainReasonCode.WARN_NUMBA_MISSING,
+        )
+        reasons.append(RankingExplainReasonCard(
+            code=RankingExplainReasonCode.WARN_NUMBA_MISSING,
+            severity=RankingExplainSeverity.WARN,
+            title=title,
+            summary=summary,
+            actions=get_research_actions(RankingExplainReasonCode.WARN_NUMBA_MISSING),
+        ))
+        
+    # WARN_ENV_MALFORMED
+    if RankingExplainReasonCode.WARN_ENV_MALFORMED.value in warnings:
+        # We might have details in the warning string? For now assuming simple code match
+        metric_details = {"details": "Check logs for specifics"}
+        title, summary = get_context_wording(
+            context=context,
+            code=RankingExplainReasonCode.WARN_ENV_MALFORMED,
+            metric_values=metric_details
+        )
+        reasons.append(RankingExplainReasonCard(
+            code=RankingExplainReasonCode.WARN_ENV_MALFORMED,
+            severity=RankingExplainSeverity.WARN,
+            title=title,
+            summary=summary,
+            actions=get_research_actions(RankingExplainReasonCode.WARN_ENV_MALFORMED),
+            details=metric_details
+        ))
+
+    # WARN_PLATEAU_FALLBACK
+    if RankingExplainReasonCode.WARN_PLATEAU_FALLBACK.value in warnings:
+         metric_details = {"count": "unknown"}
+         title, summary = get_context_wording(
+            context=context,
+            code=RankingExplainReasonCode.WARN_PLATEAU_FALLBACK,
+            metric_values=metric_details
+         )
+         reasons.append(RankingExplainReasonCard(
+            code=RankingExplainReasonCode.WARN_PLATEAU_FALLBACK,
+            severity=RankingExplainSeverity.WARN,
+            title=title,
+            summary=summary,
+            actions=get_research_actions(RankingExplainReasonCode.WARN_PLATEAU_FALLBACK),
+            details=metric_details
+         ))
+         
+    # ERR_EVIDENCE_LOOKUP (handled via banner usually, but if passed here)
+    if RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP.value in warnings:
+         metric_details = {"error_msg": "See logs"}
+         title, summary = get_context_wording(
+            context=context,
+            code=RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP,
+            metric_values=metric_details
+         )
+         reasons.append(RankingExplainReasonCard(
+            code=RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP,
+            severity=RankingExplainSeverity.ERROR,
+            title=title,
+            summary=summary,
+            actions=get_research_actions(RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP),
+            details=metric_details
+         ))
+
+    return reasons
+
+
 def load_winners_from_file(job_dir: Path) -> Optional[Dict[str, Any]]:
     """Load winners.json from job directory."""
     winners_path = job_dir / "winners.json"
@@ -602,6 +687,7 @@ def build_and_write_ranking_explain_report(
     context: RankingExplainContext,
     scoring_guard_cfg: Optional[ScoringGuardConfig] = None,
     ranking_explain_config: Optional[Any] = None,
+    warnings: List[str] | None = None,
 ) -> bool:
     """
     Build and write ranking_explain.json artifact to job directory.
@@ -638,6 +724,7 @@ def build_and_write_ranking_explain_report(
         plateau_report=plateau_report,
         scoring_guard_cfg=scoring_guard_cfg,
         ranking_explain_config=ranking_explain_config,
+        warnings=warnings,
     )
     
     # Write the artifact with canonical filename ranking_explain_report.json

@@ -53,14 +53,23 @@ class JobLifecycleService:
     """Service for managing job lifecycle (archive/restore/purge)."""
     
     def __init__(self, outputs_root: Optional[Path] = None):
-        self.outputs_root = outputs_root or Path("outputs")
-        self.jobs_root = self.outputs_root / "jobs"
+        from core.paths import get_artifacts_root, get_runtime_root, get_jobs_dir
+        
+        self.outputs_root = outputs_root or Path("outputs") # Kept for reference but we use specific roots
+        
+        # New structure:
+        # jobs -> outputs/artifacts/jobs
+        # trash -> outputs/artifacts/jobs/_trash (co-located with jobs for atomic moves)
+        # runtime -> outputs/runtime/job_lifecycle
+        
+        self.jobs_root = get_jobs_dir()
         self.trash_root = self.jobs_root / "_trash"
-        self.runtime_root = self.outputs_root / "_runtime" / "job_lifecycle"
+        self.runtime_root = get_runtime_root() / "job_lifecycle"
         self.tombstones_dir = self.runtime_root / "tombstones"
         self.index_path = self.runtime_root / "index.json"
         
         # Ensure directories exist
+        self.jobs_root.mkdir(parents=True, exist_ok=True)
         self.trash_root.mkdir(parents=True, exist_ok=True)
         self.tombstones_dir.mkdir(parents=True, exist_ok=True)
         self.runtime_root.mkdir(parents=True, exist_ok=True)

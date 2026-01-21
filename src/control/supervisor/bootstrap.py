@@ -65,7 +65,8 @@ def main() -> int:
     
     # Default artifacts directory: canonical job artifact root
     if args.artifacts_root is None:
-        args.artifacts_root = get_outputs_root()
+        from core.paths import get_artifacts_root
+        args.artifacts_root = get_artifacts_root()
     
     # Create canonical artifact directory for this job
     from .models import get_job_artifact_dir

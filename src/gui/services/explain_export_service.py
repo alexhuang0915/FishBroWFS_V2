@@ -62,7 +62,8 @@ class ExplainExportService:
             export_root: Root directory for exports (defaults to outputs/exports/)
         """
         if export_root is None:
-            export_root = Path("outputs") / "exports"
+            from core.paths import get_exports_root
+            export_root = get_exports_root()
         self.export_root = export_root
         self.export_root.mkdir(parents=True, exist_ok=True)
         

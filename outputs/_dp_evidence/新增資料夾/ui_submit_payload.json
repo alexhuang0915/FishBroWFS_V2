@@ -1,23 +1,0 @@
-Note: Unnecessary use of -X or --request, POST is already inferred.
-  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
-                                 Dload  Upload   Total   Spent    Left  Speed
-  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1:8000...
-* Connected to 127.0.0.1 (127.0.0.1) port 8000
-> POST /api/v1/jobs HTTP/1.1
-> Host: 127.0.0.1:8000
-> User-Agent: curl/8.5.0
-> Accept: */*
-> Content-Type: application/json
-> Content-Length: 96
-> 
-} [96 bytes data]
-< HTTP/1.1 500 Internal Server Error
-< date: Thu, 08 Jan 2026 13:15:34 GMT
-< server: uvicorn
-< content-length: 156
-< content-type: application/json
-< 
-{ [156 bytes data]
-100   252  100   156  100    96  44545  27412 --:--:-- --:--:-- --:--:-- 84000
-* Connection #0 to host 127.0.0.1 left intact
-{"detail":"Failed to submit job to supervisor: Invalid run_research payload: RunResearchPayload.__init__() got an unexpected keyword argument 'instrument'"}

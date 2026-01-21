@@ -24,10 +24,11 @@ class DuplicateJobError(Exception):
 
 
 def get_default_db_path(outputs_root: Optional[Path] = None) -> Path:
-    """Return default DB path under outputs/jobs_v2.db."""
-    if outputs_root is None:
-        outputs_root = get_outputs_root()
-    return outputs_root / "jobs_v2.db"
+    """Return default DB path under outputs/runtime/jobs_v2.db."""
+    # We ignore outputs_root to enforce the single source of truth from paths.py
+    # regarding the runtime root location.
+    from core.paths import get_db_path
+    return get_db_path()
 
 
 class SupervisorDB:

@@ -61,6 +61,12 @@ class RankingExplainReasonCode(str, Enum):
     MDD_INVALID_OR_ZERO = "MDD_INVALID_OR_ZERO"
     TRADES_TOO_LOW_FOR_RANKING = "TRADES_TOO_LOW_FOR_RANKING"
     METRICS_MISSING_REQUIRED_FIELDS = "METRICS_MISSING_REQUIRED_FIELDS"
+    
+    # Runtime warnings (P2)
+    WARN_NUMBA_MISSING = "WARN_NUMBA_MISSING"
+    WARN_ENV_MALFORMED = "WARN_ENV_MALFORMED"
+    WARN_PLATEAU_FALLBACK = "WARN_PLATEAU_FALLBACK"
+    ERR_EVIDENCE_LOOKUP = "ERR_EVIDENCE_LOOKUP"
 
 
 class RankingExplainReasonCard(BaseModel):
@@ -354,6 +360,47 @@ def get_context_wording(
                 "Required metrics fields missing (勝出)",
                 "Missing required fields: {missing_fields}"
             )
+        },
+        # Runtime warnings (P2)
+        RankingExplainReasonCode.WARN_NUMBA_MISSING: {
+            "CANDIDATE": (
+                "Performance Warning: Numba Missing (候選)",
+                "System is running in pure Python mode (slow). Install numba for 10-100x speedup."
+            ),
+            "FINAL_SELECTION": (
+                "Performance Warning: Numba Missing (勝出)",
+                "System is running in pure Python mode (slow). Install numba for 10-100x speedup."
+            )
+        },
+        RankingExplainReasonCode.WARN_ENV_MALFORMED: {
+            "CANDIDATE": (
+                "Environment Configuration Warning (候選)",
+                "Environment variables format incorrect: {details}"
+            ),
+            "FINAL_SELECTION": (
+                "Environment Configuration Warning (勝出)",
+                "Environment variables format incorrect: {details}"
+            )
+        },
+        RankingExplainReasonCode.WARN_PLATEAU_FALLBACK: {
+            "CANDIDATE": (
+                "Plateau Confirmation Fallback (候選)",
+                "Plateau generation skipped or failed (count: {count}). Falling back to simple winners list."
+            ),
+            "FINAL_SELECTION": (
+                "Plateau Confirmation Fallback (勝出)",
+                "Plateau generation skipped or failed (count: {count}). Falling back to simple winners list."
+            )
+        },
+        RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP: {
+            "CANDIDATE": (
+                "Evidence Lookup Error (候選)",
+                "Failed to locate evidence files: {error_msg}"
+            ),
+            "FINAL_SELECTION": (
+                "Evidence Lookup Error (勝出)",
+                "Failed to locate evidence files: {error_msg}"
+            )
         }
     }
     
@@ -453,6 +500,23 @@ def get_research_actions(code: RankingExplainReasonCode) -> List[str]:
         RankingExplainReasonCode.METRICS_MISSING_REQUIRED_FIELDS: [
             "review metrics artifact completeness",
             "inspect required fields validation"
+        ],
+        # Runtime warnings (P2)
+        RankingExplainReasonCode.WARN_NUMBA_MISSING: [
+            "validate numba installation",
+            "inspect python environment"
+        ],
+        RankingExplainReasonCode.WARN_ENV_MALFORMED: [
+            "inspect environment variables",
+            "validate .env file format"
+        ],
+        RankingExplainReasonCode.WARN_PLATEAU_FALLBACK: [
+            "inspect plateau generation logs",
+            "validate plateau candidate count"
+        ],
+        RankingExplainReasonCode.ERR_EVIDENCE_LOOKUP: [
+            "validate job output directory",
+            "inspect evidence file paths"
         ]
     }
     

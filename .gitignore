@@ -39,10 +39,27 @@ FishBroData/
 .qdrant_storage/
 
 # === FishBro: volatile outputs ignore (DO NOT COMMIT) ===
-# FishBro: volatile outputs ignore
-outputs/_dp_evidence/supervisor_artifacts/jobs/
-outputs/_runtime/
-outputs/_trash/
-outputs/jobs_v2.db-wal
-outputs/jobs_v2.db-shm
+outputs/
 *.log
+
+# === DP evidence hygiene: keep only INDEX + human summaries ===
+docs/_dp_evidence/**
+!docs/_dp_evidence/INDEX.md
+!docs/_dp_evidence/**/REPORT.md
+!docs/_dp_evidence/**/DISCOVERY.md
+!docs/_dp_evidence/**/DISCOVERY_NOTES.txt
+!docs/_dp_evidence/**/DIFFSTAT.txt
+!docs/_dp_evidence/**/PYTEST_SUMMARY.txt
+!docs/_dp_evidence/**/SMOKE_*.txt
+
+# Explicitly ignore machine dump patterns even if exceptions overlap
+docs/_dp_evidence/**/*.json
+docs/_dp_evidence/**/*.patch
+docs/_dp_evidence/**/SYSTEM_FULL_SNAPSHOT.md
+docs/_dp_evidence/**/CALLCHAIN_MAP*.md
+docs/_dp_evidence/**/VERIFY*.md
+docs/_dp_evidence/**/ops_pids.json
+docs/_dp_evidence/**/loaded_*report.json
+docs/_dp_evidence/**/audit_*report.json
+docs/_dp_evidence/**/s1_*.json
+docs/_dp_evidence/**/findings.csv

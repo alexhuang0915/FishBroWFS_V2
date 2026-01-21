@@ -1,0 +1,28 @@
+
+LOGIC AUDIT TESTS SUMMARY
+=========================
+tests/logic_audit/test_l1_engine.py::test_jit_import_failure_warning PASSED
+tests/logic_audit/test_l1_engine.py::test_jit_strict_mode_failure PASSED
+tests/logic_audit/test_l1_runner.py::test_runner_bad_env_var_warning PASSED
+tests/logic_audit/test_l1_runner.py::test_runner_strict_env_var_failure PASSED
+tests/logic_audit/test_l2_plateau.py::test_load_candidates_rejects_small_topk PASSED
+tests/logic_audit/test_l2_plateau.py::test_load_candidates_accepts_plateau_candidates_list PASSED
+tests/logic_audit/test_l2_plateau.py::test_load_candidates_accepts_raw_list PASSED
+tests/logic_audit/test_l3_evidence.py::test_get_evidence_root_raises_not_found PASSED
+tests/logic_audit/test_l3_evidence.py::test_get_evidence_root_raises_error_response PASSED
+tests/logic_audit/test_l3_evidence.py::test_list_evidence_files_propagates_error PASSED
+tests/logic_audit/test_l3_portfolio.py::test_loader_preserves_types PASSED
+tests/logic_audit/test_l3_selection.py::test_selection_sync PASSED
+Total: 12 passed
+
+MAKE CHECK SUMMARY
+==================
+==> Running FULL suite (core + governance + legacy)...
+==> Running FAST developer loop (core + governance)...
+==> Running CORE-RUNTIME tests (R0)...
+1596 passed, 43 skipped, 3 deselected, 10 xfailed, 2 warnings in 54.77s
+==> Running GOVERNANCE tests (R1)...
+420 passed, 4 skipped, 2 xfailed, 4 warnings in 12.14s
+==> Running LEGACY tests (R2)...
+47 passed in 3.48s
+Exit code: 0

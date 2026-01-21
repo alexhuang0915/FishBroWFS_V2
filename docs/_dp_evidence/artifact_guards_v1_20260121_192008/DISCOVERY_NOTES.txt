@@ -1,0 +1,57 @@
+Universal Artifact Guards Discovery Notes
+=========================================
+
+1. Job Handlers
+---------------
+* Feature Build: `src/control/supervisor/handlers/build_data.py` (BuildDataHandler)
+  - JobType: `BUILD_DATA`
+  - Mode: `FULL` or `FEATURES_ONLY` triggers feature build.
+  - Subprocess: `shared_cli.py`
+
+* Research: `src/control/supervisor/handlers/run_research.py` (RunResearchHandler)
+  - JobType: `RUN_RESEARCH_V2`
+  - Subprocess: `scripts.generate_research` (Note: File likely in `scripts/tools/` or `scripts/`, invocation assumes `scripts` package)
+  - Output Root: `seasons/current/{job_id}`
+  - Output Subdir: `research/`
+
+* Plateau: `src/control/supervisor/handlers/run_plateau.py` (RunPlateauHandler)
+  - JobType: `RUN_PLATEAU_V2`
+  - Subprocess: `scripts.run_phase3a_plateau` (Note: File missing in listing, possibly dynamic or `scripts/tools`)
+  - Output Root: `seasons/current/{research_run_id}/plateau`
+  - Output Subdir: `.` (direct in plateau dir)
+
+2. Artifact Contracts (Draft SSOT)
+----------------------------------
+A. Feature Build (JobType: BUILD_DATA)
+   - Root: `outputs/shared/{season}/{dataset_id}`
+   - Required:
+     1. `features/` (dir_nonempty)
+     2. `features/features_manifest.json` (file) - *If features built*
+
+B. Research (JobType: RUN_RESEARCH_V2)
+   - Root: `outputs/seasons/{season}/{job_id}`
+   - Required:
+     1. `manifest.json` (file)
+     2. `payload.json` (file)
+     3. `research/winners.json` OR `research/plateau_candidates.json` (file) - *Primary Result*
+
+C. Plateau (JobType: RUN_PLATEAU_V2)
+   - Root: `outputs/seasons/{season}/{research_run_id}/plateau`
+   - Required:
+     1. `manifest.json` (file)
+     2. `plateau_report.json` (file) - *Primary Result* (inferred from test mode and common patterns)
+
+3. Reason Codes
+---------------
+New codes to support:
+- `ERR_FEATURE_ARTIFACTS_MISSING`
+- `ERR_RESEARCH_ARTIFACTS_MISSING`
+- `ERR_PLATEAU_ARTIFACTS_MISSING`
+
+4. Implementation Strategy
+--------------------------
+- Create `src/contracts/artifact_guard.py`
+  - Checkers: `check_file`, `check_dir_nonempty`
+  - Registry: Map `JobType` -> `List[ArtifactSpec]`
+- Inject `check_artifacts` into handlers just before `DONE` state.
+- Fail-closed: If check fails, return `ok: False` and specific error code.

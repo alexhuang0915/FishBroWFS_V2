@@ -1,0 +1,12 @@
+
+==> Running FAST developer loop (core + governance)...
+tests/product/control/test_build_data_fail_closed_missing_bars.py::test_execute_via_cli_success PASSED [ 33%]
+tests/product/control/test_build_data_fail_closed_missing_bars.py::test_execute_via_cli_fail_closed_missing_artifacts PASSED [ 66%]
+tests/product/control/test_build_data_fail_closed_missing_bars.py::test_execute_via_cli_subprocess_failure PASSED [100%]
+============== 3 passed in 0.35s ==============
+...
+tests/product/control/test_root_hygiene_guard.py::test_root_hygiene_no_forbidden_files PASSED [100%]
+============== 1 passed in 0.03s ==============
+
+(Full make check-fast passed, see output snapshot above for details)
+ZEro failures.

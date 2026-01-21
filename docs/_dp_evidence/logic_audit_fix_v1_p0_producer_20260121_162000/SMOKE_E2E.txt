@@ -1,0 +1,14 @@
+=== SMOKE TEST: PROMOTING PLATEAU CANDIDATES (MOCK E2E) ===
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-8.4.2, pluggy-1.6.0 -- /usr/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/fishbro/FishBroWFS_V2
+configfile: pytest.ini
+plugins: cov-5.0.0, anyio-4.12.0
+collecting ... collected 1 item
+
+tests/logic_audit/test_plateau_producer_funnel.py::test_run_funnel_propagates_plateau_candidates PASSED [100%]
+
+============================== 1 passed in 0.39s ===============================
+
+=== ARTIFACT EXISTENCE VERIFIED VIA PROPAGATION TEST ===

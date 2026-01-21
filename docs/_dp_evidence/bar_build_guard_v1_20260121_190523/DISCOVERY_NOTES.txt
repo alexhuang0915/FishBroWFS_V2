@@ -1,0 +1,48 @@
+Bar Build Guard Discovery Notes
+=============================
+
+1. Build Job Handler
+--------------------
+File: src/control/supervisor/handlers/build_data.py
+Class: BuildDataHandler
+Method: execute -> _execute_via_cli
+
+Subprocess Command:
+    [sys.executable, "-B", "-m", "src.control.shared_cli", "build", ...]
+
+Job Status:
+    Returns dict with "ok": True if returncode == 0.
+    Consumes output blindly.
+
+2. Shared CLI
+-------------
+File: src/control/shared_cli.py
+Current Entry Point:
+    if __name__ == "__main__":
+        shared_cli()
+
+Issues:
+    - Direct invocation of click group.
+    - Uses sys.exit() deep in commands.
+
+3. Artifact Contracts
+---------------------
+Expected Artifact: Resampled Bars
+Function: control.bars_store.resampled_bars_path(outputs_root, season, dataset_id, timeframe_min)
+Manifest: build_data_manifest.json created by handler.
+
+4. Failure Mode
+---------------
+If shared_cli.py is missing entry point (fixed) or fails silently (e.g. valid args but logic error swallowed), returncode is 0.
+Handler marks job DONE.
+Inventory sees "MISSING" status because file check in _write_build_manifest fails, but job is technically "successful" in supervisor eyes.
+
+5. Guard Strategy
+-----------------
+In BuildDataHandler._execute_via_cli:
+After returncode == 0 check:
+    Verify resampled_bars_path exists.
+    If not:
+        Log error.
+        Return ok: False.
+        Error code: ERR_BUILD_ARTIFACTS_MISSING.

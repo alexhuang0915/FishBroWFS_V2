@@ -1,0 +1,63 @@
+
+import subprocess
+import sys
+from pathlib import Path
+import os
+import shutil
+
+# Make sure we're in the right directory
+os.chdir("/home/fishbro/FishBroWFS_V2")
+sys.path.append("src")
+
+# Set up dummy environment
+outputs_test = Path("outputs_smoke_bars")
+if outputs_test.exists():
+    shutil.rmtree(outputs_test)
+outputs_test.mkdir(exist_ok=True)
+
+# Create dummy TXT
+dummy_txt = Path("dummy_smoke.txt")
+dummy_txt.write_text("Date,Time,Open,High,Low,Close,TotalVolume\n2026/01/01,09:00:00,100,105,95,102,1000")
+
+print("Running Bar Build Smoke Test...")
+try:
+    cmd = [
+        sys.executable, "-B", "-m", "src.control.shared_cli",
+        "build",
+        "--season", "2026Q1",
+        "--dataset-id", "SMOKE.TEST",
+        "--txt-path", str(dummy_txt),
+        "--outputs-root", str(outputs_test),
+        "--build-bars",
+        "--no-build-features"
+    ]
+    print(f"Command: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    print("\n--- STDOUT ---")
+    print(result.stdout)
+    print("\n--- STDERR ---")
+    print(result.stderr)
+    
+    if result.returncode != 0:
+        print(f"FAILED: Return Code {result.returncode}")
+        sys.exit(1)
+        
+    # Verify artifacts
+    bars_dir = outputs_test / "shared" / "2026Q1" / "SMOKE.TEST" / "bars"
+    print(f"\nVerifying artifacts in: {bars_dir}")
+    if bars_dir.exists() and any(bars_dir.iterdir()):
+        print("SUCCESS: Bars directory exists and is not empty.")
+        # Listing files for evidence
+        for f in bars_dir.iterdir():
+            print(f"- {f.name}")
+    else:
+        print("FAILED: Bars directory missing or empty.")
+        sys.exit(1)
+
+finally:
+    # Cleanup
+    if dummy_txt.exists():
+        dummy_txt.unlink()
+    if outputs_test.exists():
+        shutil.rmtree(outputs_test)

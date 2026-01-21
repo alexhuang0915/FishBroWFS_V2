@@ -6,3 +6,4 @@ portfolio
 profiles
 registry
 strategies
+templates

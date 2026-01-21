@@ -22,7 +22,16 @@ MAX_FILLS_PER_BAR = 10  # Maximum fills per bar (sanity check)
 
 try:
     import numba as nb
-except Exception:  # pragma: no cover
+except Exception as e:  # pragma: no cover
+    # [L1-1 Fix] Observable fallback + Strict Mode
+    import os
+    if os.environ.get("FISHBRO_STRICT_JIT", "").strip() == "1":
+        raise RuntimeError(f"Numba import failed in STRICT mode: {e}") from e
+    
+    # Log warning only once to avoid spam (lazy logger)
+    logging.getLogger(__name__).warning(
+        f"Numba import failed: {e}. Falling back to Python reference engine (performance degraded)."
+    )
     nb = None  # type: ignore
 
 from engine.engine_types import (

@@ -73,7 +73,7 @@ class OpsTab(QWidget):
         self.job_table.setHorizontalHeaderLabels(["ID", "Type", "Status", "Started At"])
         self.job_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.job_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.job_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.job_table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.job_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
         self.job_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.job_table.verticalHeader().setVisible(False)
@@ -239,6 +239,18 @@ class OpsTab(QWidget):
             copy_art = QAction("Copy Artifact Dir", self)
             copy_art.triggered.connect(lambda: QApplication.clipboard().setText(self.artifact_field.text()))
             menu.addAction(copy_art)
+
+        menu.addSeparator()
+
+        copy_details = QAction("Copy Details (Summary)", self)
+        details_text = f"Job: {self.id_field.text()} | {self.status_label.text()} | {self.timeline_label.text()}"
+        copy_details.triggered.connect(lambda: QApplication.clipboard().setText(details_text))
+        menu.addAction(copy_details)
+
+        if self.error_digest.toPlainText():
+            copy_error = QAction("Copy Error Digest", self)
+            copy_error.triggered.connect(lambda: QApplication.clipboard().setText(self.error_digest.toPlainText()))
+            menu.addAction(copy_error)
 
         menu.exec_(self.job_table.viewport().mapToGlobal(position))
 

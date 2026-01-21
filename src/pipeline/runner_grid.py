@@ -6,6 +6,9 @@ from typing import Dict, Tuple, Optional
 import numpy as np
 import os
 import time
+import logging
+
+logger = logging.getLogger(__name__)
 
 from data.layout import normalize_bars
 from engine.engine_types import BarArrays, Fill, OrderIntent, OrderKind, OrderRole, Side
@@ -191,7 +194,13 @@ def run_grid(
             intent_sparse_rate = float(intent_sparse_rate_env)
             if not (0.0 <= intent_sparse_rate <= 1.0):
                 intent_sparse_rate = 1.0
-        except ValueError:
+        except ValueError as e:
+            # [L1 Audit Fix] Observable fallback
+            if os.environ.get("FISHBRO_STRICT_ENV", "").strip() == "1":
+                raise ValueError(f"Invalid FISHBRO_PERF_TRIGGER_RATE: {intent_sparse_rate_env}") from e
+            logger.warning(
+                f"Invalid FISHBRO_PERF_TRIGGER_RATE='{intent_sparse_rate_env}': {e}. Falling back to 1.0."
+            )
             intent_sparse_rate = 1.0
     
     # Stage P2-3: Param-subsample (deterministic selection)

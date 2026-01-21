@@ -387,6 +387,7 @@ class AllocationTab(QWidget):
         self.adm_reasons = QLabel("• Select a run to see reasoning.")
         self.adm_reasons.setStyleSheet("color: #BBB; font-size: 11px;")
         self.adm_reasons.setWordWrap(True)
+        self.adm_reasons.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         adm_layout.addWidget(self.adm_reasons)
         
         self.adm_confidence = QLabel("Confidence: Unknown")
@@ -489,8 +490,10 @@ class AllocationTab(QWidget):
 
     def _configure_table(self, table: QTableWidget):
         table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setContextMenuPolicy(Qt.CustomContextMenu)
+        table.customContextMenuRequested.connect(self._show_context_menu)
         table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         table.verticalHeader().setVisible(False)
         table.setStyleSheet("""
@@ -1301,3 +1304,28 @@ class AllocationTab(QWidget):
         except Exception as e:
             logger.error(f"Error updating admission explanation: {e}")
             self.adm_reasons.setText(f"• Error loading explanation: {e}")
+
+    def _show_context_menu(self, position):
+        from PySide6.QtWidgets import QMenu, QApplication
+        from PySide6.QtGui import QAction
+        
+        menu = QMenu()
+        copy_id = QAction("Copy Run ID", self)
+        
+        selected = self.runs_table.selectedItems()
+        if not selected:
+             return
+             
+        row = selected[0].row()
+        run_id = self.runs_table.item(row, 1).text()
+        
+        copy_id.triggered.connect(lambda: QApplication.clipboard().setText(run_id))
+        menu.addAction(copy_id)
+        
+        copy_row = QAction("Copy Row Info", self)
+        row_text = "\\t".join([self.runs_table.item(row, c).text() for c in range(self.runs_table.columnCount())])
+        copy_row.triggered.connect(lambda: QApplication.clipboard().setText(row_text))
+        menu.addAction(copy_row)
+        
+        menu.exec_(self.runs_table.viewport().mapToGlobal(position))
+

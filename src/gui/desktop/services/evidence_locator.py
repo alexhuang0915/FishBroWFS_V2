@@ -35,6 +35,11 @@ class EvidenceFile:
     size_bytes: Optional[int] = None
 
 
+class EvidenceLookupError(Exception):
+    """Raised when evidence path cannot be resolved."""
+    pass
+
+
 class EvidenceLocator:
     """Service that locates and categorizes evidence files for a job."""
 
@@ -67,10 +72,11 @@ class EvidenceLocator:
     }
     
     @staticmethod
-    def get_evidence_root(job_id: str) -> Optional[Path]:
+    def get_evidence_root(job_id: str) -> Path:
         """Get the evidence root directory for a job.
         
-        Returns None if the path is not available or invalid.
+        Raises:
+            EvidenceLookupError: If path resolution fails or path does not exist.
         """
         try:
             result = get_reveal_evidence_path(job_id)
@@ -81,21 +87,28 @@ class EvidenceLocator:
                     if path.exists():
                         return path
                     else:
-                        logger.warning(f"Evidence path does not exist: {path}")
-            return None
+                        raise EvidenceLookupError(f"Evidence path does not exist: {path}")
+            raise EvidenceLookupError(f"Supervisor returned invalid evidence path for {job_id}")
         except SupervisorClientError as e:
-            logger.error(f"Failed to get evidence path for job {job_id}: {e}")
-            return None
+            raise EvidenceLookupError(f"Failed to get evidence path for job {job_id}: {e}") from e
         except Exception as e:
-            logger.error(f"Unexpected error getting evidence path for job {job_id}: {e}")
-            return None
+            if isinstance(e, EvidenceLookupError):
+                raise
+            raise EvidenceLookupError(f"Unexpected error getting evidence path for job {job_id}: {e}") from e
     
     @staticmethod
     def list_evidence_files(job_id: str) -> List[EvidenceFile]:
         """List all evidence files for a job, categorized."""
-        root = EvidenceLocator.get_evidence_root(job_id)
-        if not root:
-            return list()
+        try:
+            root = EvidenceLocator.get_evidence_root(job_id)
+        except EvidenceLookupError as e:
+            logger.error(f"Evidence lookup failed: {e}")
+            # [L3-1 Fix] UI consumers should handle exception, but for backward compat
+            # we return empty list here IF the caller isn't ready.
+            # However, requirement says "EvidenceLocator returns empty list... is misleading".
+            # The pattern suggests we should let it bubble up or handle explicitly.
+            # For list_evidence_files, let's propagate the error so UI shows error state.
+            raise e
         
         evidence_files = list()
         
@@ -208,7 +221,11 @@ class EvidenceLocator:
 
 # Convenience functions for easy import
 def list_evidence_files(job_id: str) -> List[EvidenceFile]:
-    """List all evidence files for a job."""
+    """List all evidence files for a job.
+    
+    Raises:
+        EvidenceLookupError: If evidence cannot be located.
+    """
     return EvidenceLocator.list_evidence_files(job_id)
 
 
@@ -217,6 +234,6 @@ def get_structured_evidence(job_id: str) -> Dict[str, Any]:
     return EvidenceLocator.get_structured_evidence(job_id)
 
 
-def get_evidence_root(job_id: str) -> Optional[Path]:
+def get_evidence_root(job_id: str) -> Path:
     """Get evidence root directory."""
     return EvidenceLocator.get_evidence_root(job_id)

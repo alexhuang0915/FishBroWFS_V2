@@ -49,7 +49,35 @@ def load_instruments_config(path: Path) -> InstrumentsConfig:
     raw_bytes = path.read_bytes()
     sha256 = hashlib.sha256(raw_bytes).hexdigest()
     
-    # Parse YAML
+    # Load physical metadata from Registry SSOT
+    # Use local import to avoid circular dependency
+    from config.registry.instruments import load_instruments as load_registry
+    registry = load_registry()
+
+    # Load margins SSOT
+    from config.registry.instruments import get_registry_path
+    margins_path = get_registry_path("margins.yaml")
+    if not margins_path.exists():
+         # Fallback for tests or weird environments? 
+         # Try relative to the input path if absolute lookup fails
+         candidates = [
+             margins_path,
+             path.parent.parent / "registry" / "margins.yaml",
+             Path("configs/registry/margins.yaml").resolve()
+         ]
+         found = False
+         for c in candidates:
+             if c.exists():
+                 margins_path = c
+                 found = True
+                 break
+         if not found:
+             raise FileNotFoundError(f"Margins SSOT not found. Searched: {candidates}")
+    
+    margins_data = yaml.safe_load(margins_path.read_bytes())
+    margin_profiles = margins_data.get("margin_profiles", {})
+    
+    # Parse YAML (Portfolio Config)
     data = yaml.safe_load(raw_bytes)
     
     # Validate version
@@ -66,10 +94,6 @@ def load_instruments_config(path: Path) -> InstrumentsConfig:
     fx_rates = data.get("fx_rates", {})
     if not isinstance(fx_rates, dict):
         raise ValueError("'fx_rates' must be a dict")
-    if base_currency not in fx_rates:
-        raise ValueError(f"base_currency '{base_currency}' must be present in fx_rates")
-    if fx_rates.get(base_currency) != 1.0:
-        raise ValueError(f"fx_rates[{base_currency}] must be 1.0")
     
     # Validate instruments
     instruments_raw = data.get("instruments", {})
@@ -78,25 +102,28 @@ def load_instruments_config(path: Path) -> InstrumentsConfig:
     
     instruments = {}
     for instrument_key, spec_dict in instruments_raw.items():
-        # Validate required fields
-        required = ["currency", "multiplier", "initial_margin_per_contract", "maintenance_margin_per_contract"]
-        for field in required:
-            if field not in spec_dict:
-                raise KeyError(f"Instrument '{instrument_key}' missing field '{field}'")
+        # 1. Get physical metadata from Registry
+        reg_inst = registry.get_instrument_by_id(instrument_key)
+        if not reg_inst:
+             raise ValueError(f"Instrument '{instrument_key}' not found in Registry SSOT")
         
-        # Validate currency exists in fx_rates
-        currency = spec_dict["currency"]
-        if currency not in fx_rates:
-            raise ValueError(f"Instrument '{instrument_key}' currency '{currency}' not in fx_rates")
+        # 2. Get margin profile
+        margin_profile_id = spec_dict.get("margin_profile_id")
+        if not margin_profile_id:
+             raise KeyError(f"Instrument '{instrument_key}' missing 'margin_profile_id'")
         
-        # Create InstrumentSpec
+        margin_profile = margin_profiles.get(margin_profile_id)
+        if not margin_profile:
+             raise ValueError(f"Margin profile '{margin_profile_id}' not found in Margins SSOT")
+             
+        # 3. Create InstrumentSpec (Merge sources)
         spec = InstrumentSpec(
             instrument=instrument_key,
-            currency=currency,
-            multiplier=float(spec_dict["multiplier"]),
-            initial_margin_per_contract=float(spec_dict["initial_margin_per_contract"]),
-            maintenance_margin_per_contract=float(spec_dict["maintenance_margin_per_contract"]),
-            margin_basis=spec_dict.get("margin_basis", ""),
+            currency=reg_inst.currency,
+            multiplier=reg_inst.multiplier if reg_inst.multiplier is not None else 1.0,
+            initial_margin_per_contract=float(margin_profile["initial_margin_per_contract"]),
+            maintenance_margin_per_contract=float(margin_profile["maintenance_margin_per_contract"]),
+            margin_basis=margin_profile.get("margin_basis", ""),
         )
         instruments[instrument_key] = spec
     

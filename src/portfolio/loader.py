@@ -90,14 +90,11 @@ def load_portfolio_spec(path: Path) -> PortfolioSpec:
         if not isinstance(params, dict):
             raise ValueError(f"Leg '{leg_id}' params must be dict, got {type(params)}")
         
-        params_float = {}
+        params_typed = {}
         for key, value in params.items():
-            try:
-                params_float[key] = float(value)
-            except (ValueError, TypeError) as e:
-                raise ValueError(
-                    f"Leg '{leg_id}' param '{key}' must be numeric, got {type(value)}: {e}"
-                )
+            # [L3-3 Fix] Preserve original types (int/float/bool/str)
+            # Only cast if downstream requires it, or let validation handle type errors
+            params_typed[key] = value
         
         # Convert tags to list
         if not isinstance(tags, list):
@@ -110,7 +107,7 @@ def load_portfolio_spec(path: Path) -> PortfolioSpec:
             session_profile=session_profile,
             strategy_id=strategy_id,
             strategy_version=strategy_version,
-            params=params_float,
+            params=params_typed,
             enabled=bool(enabled),
             tags=list(tags),
         )

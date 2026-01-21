@@ -97,26 +97,40 @@ class RunPlateauHandler(BaseJobHandler):
             else:
                 raise ValueError(f"Research run directory not found: {research_run_dir}")
         
-        # Look for winners.json in research run directory
-        winners_path = research_run_dir / "winners.json"
-        if not winners_path.exists():
-            # Try research subdirectory
-            winners_path = research_run_dir / "research" / "winners.json"
+        # [L2-1 Fix] Prefer plateau_candidates.json (broad) over winners.json (top-k)
+        candidates_path = None
         
-        if not winners_path.exists():
+        # Priority order: 
+        # 1. plateau_candidates.json (broad set)
+        # 2. winners.json (legacy/fallback, likely sparse)
+        search_paths = [
+            research_run_dir / "plateau_candidates.json",
+            research_run_dir / "research" / "plateau_candidates.json",
+            research_run_dir / "winners.json",
+            research_run_dir / "research" / "winners.json"
+        ]
+        
+        for p in search_paths:
+            if p.exists():
+                candidates_path = p
+                logger.info(f"Using candidates file: {candidates_path}")
+                break
+        
+        if not candidates_path:
             if is_test:
-                # In test mode, create a minimal winners.json placeholder
-                winners_path.parent.mkdir(parents=True, exist_ok=True)
+                # In test mode, create a minimal winners.json placeholder (legacy name for compatibility)
+                candidates_path = research_run_dir / "winners.json"
+                candidates_path.parent.mkdir(parents=True, exist_ok=True)
                 winners_content = {
                     "test_mode": True,
                     "research_run_id": payload.research_run_id,
                     "note": "Placeholder winners.json created for test execution",
                     "winners": []
                 }
-                write_json_atomic(winners_path, winners_content)
-                logger.info(f"Created test winners.json at: {winners_path}")
+                write_json_atomic(candidates_path, winners_content)
+                logger.info(f"Created test winners.json at: {candidates_path}")
             else:
-                raise ValueError(f"winners.json not found in research run {payload.research_run_id}")
+                raise ValueError(f"No suitable candidates file (plateau_candidates.json or winners.json) found in {payload.research_run_id}")
         
         # Create plateau output directory (within research run directory)
         plateau_dir = research_run_dir / "plateau"
@@ -131,10 +145,10 @@ class RunPlateauHandler(BaseJobHandler):
         
         try:
             # Execute plateau logic
-            result = self._execute_plateau(payload, context, winners_path, plateau_dir)
+            result = self._execute_plateau(payload, context, candidates_path, plateau_dir)
             
             # Generate manifest
-            self._generate_manifest(context.job_id, payload, plateau_dir, winners_path)
+            self._generate_manifest(context.job_id, payload, plateau_dir, candidates_path)
             
             return {
                 "ok": True,
@@ -155,7 +169,7 @@ class RunPlateauHandler(BaseJobHandler):
             
             raise  # Re-raise to mark job as FAILED
     
-    def _execute_plateau(self, payload: RunPlateauPayload, context: JobContext, winners_path: Path, plateau_dir: Path) -> Dict[str, Any]:
+    def _execute_plateau(self, payload: RunPlateauPayload, context: JobContext, candidates_path: Path, plateau_dir: Path) -> Dict[str, Any]:
         """Execute the actual plateau identification logic."""
         # Check if we're in test mode
         is_test = _is_test_mode(context)
@@ -205,12 +219,12 @@ class RunPlateauHandler(BaseJobHandler):
         context.heartbeat(progress=0.3, phase="preparing_plateau")
         
         # Apply guardrails before heavy computation
-        self._apply_guardrails(winners_path, context)
+        self._apply_guardrails(candidates_path, context)
         
         # Build command for plateau execution
         cmd = [
             sys.executable, "-B", "-m", "scripts.run_phase3a_plateau",
-            str(winners_path)
+            str(candidates_path)
         ]
         
         # Add optional parameters

@@ -320,9 +320,10 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
         # Use stage_cfg which has final subsample (after auto-downsample if any)
         stage_out = run_stage_job(stage_cfg)
         
-        # Extract metrics and winners
+        # Extract metrics, winners and plateau candidates
         stage_metrics = dict(stage_out.get("metrics", {}))
         stage_winners = stage_out.get("winners", {"topk": [], "notes": {"schema": "v1"}})
+        stage_plateau_candidates = stage_out.get("plateau_candidates", [])
 
         # Ensure metrics include required fields
         stage_metrics["param_subsample_rate"] = effective_subsample  # Use final subsample
@@ -395,6 +396,7 @@ def run_funnel(cfg: dict, outputs_root: Path) -> FunnelResultIndex:
             config_snapshot=stage_snapshot,
             metrics=stage_metrics,
             winners=stage_winners,
+            plateau_candidates=stage_plateau_candidates,
         )
 
         # Record stage index

@@ -127,17 +127,37 @@ down:
 	echo "==> Done."
 
 # -----------------------------
-# GATES
+# GATES & PROFILES
 # -----------------------------
+test-core:
+	@echo "==> Running CORE-RUNTIME tests (R0)..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/product/ tests/gui_desktop/ tests/gui_services/ tests/boundary/ -m "$(PYTEST_MARK_EXPR_PRODUCT)"
+
+test-governance:
+	@echo "==> Running GOVERNANCE tests (R1)..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/contracts/
+
+test-legacy:
+	@echo "==> Running LEGACY tests (R2)..."
+	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/deprecated/
+
+check-fast:
+	@echo "==> Running FAST developer loop (core + governance)..."
+	@$(MAKE) test-core
+	@$(MAKE) test-governance
+
 check:
-	@echo "==> Running hardening tests (QTGUARD)..."
-	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/hardening/
-	@echo "==> Running product tests (mark expr: $(PYTEST_MARK_EXPR_PRODUCT))..."
-	$(ENV) $(PYTEST) $(PYTEST_ARGS) -m "$(PYTEST_MARK_EXPR_PRODUCT)"
+	@echo "==> Running FULL suite (core + governance + legacy)..."
+	@$(MAKE) check-fast
+	@$(MAKE) test-legacy
+
+check-gui:
+	@echo "==> Running GUI tests (headless)..."
+	QT_QPA_PLATFORM=offscreen $(ENV) $(PYTEST) $(PYTEST_ARGS) tests/gui_desktop/
 
 api-snapshot:
-	@mkdir -p tests/policy/api_contract
-	@$(PYTHON) -c "import json; from pathlib import Path; from control.api import app; out = Path('tests/policy/api_contract/openapi.json'); out.write_text(json.dumps(app.openapi(), indent=2, sort_keys=True), encoding='utf-8'); print(f'[api-snapshot] wrote: {out} ({out.stat().st_size} bytes)')"
+	@mkdir -p tests/contracts/policy/api_contract
+	@$(PYTHON) -c "import json; from pathlib import Path; from control.api import app; out = Path('tests/contracts/policy/api_contract/openapi.json'); out.write_text(json.dumps(app.openapi(), indent=2, sort_keys=True), encoding='utf-8'); print(f'[api-snapshot] wrote: {out} ({out.stat().st_size} bytes)')"
 
 acceptance:
 	@echo "==> Running final acceptance..."

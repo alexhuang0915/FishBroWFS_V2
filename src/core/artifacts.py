@@ -41,6 +41,7 @@ def write_run_artifacts(
     config_snapshot: Dict[str, Any],
     metrics: Dict[str, Any],
     winners: Dict[str, Any] | None = None,
+    plateau_candidates: List[Dict[str, Any]] | None = None,
 ) -> None:
     """
     Write all standard artifacts for a run.
@@ -61,6 +62,7 @@ def write_run_artifacts(
         winners: Optional winners dict. If None, uses empty v2 schema.
             Must follow v2 schema (see core.winners_schema).
             Legacy winners are no longer supported.
+        plateau_candidates: Optional list of broad candidates for plateau stage.
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     
@@ -90,6 +92,18 @@ def write_run_artifacts(
         )
     
     _write_json(run_dir / "winners.json", winners)
+    
+    # Write plateau_candidates.json if provided
+    if plateau_candidates:
+        plateau_artifact = {
+            "plateau_candidates": plateau_candidates,
+            "metadata": {
+                "source_stage": metrics.get("stage_name", "unknown"),
+                "count": len(plateau_candidates),
+                "schema_version": "v1",
+            }
+        }
+        _write_json(run_dir / "plateau_candidates.json", plateau_artifact)
     
     # Write README.md (human-readable summary)
     # Must prominently display param_subsample_rate

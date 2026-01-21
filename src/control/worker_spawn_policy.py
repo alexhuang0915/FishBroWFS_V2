@@ -74,8 +74,8 @@ def validate_pidfile(pidfile: Path, expected_db_path: Path) -> tuple[bool, str]:
         return True, "process alive (cmdline unverifiable)"
 
     # Verify cmdline contains worker_main and db_path
-    if "control.worker_main" not in cmdline:
-        return False, "process is not a worker_main"
+    if "control.supervisor.bootstrap" not in cmdline:
+        return False, "process is not a supervisor bootstrap"
     if str(expected_db_path) not in cmdline:
         return False, "process db_path mismatch"
 

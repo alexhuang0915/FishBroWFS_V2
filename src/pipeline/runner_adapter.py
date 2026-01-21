@@ -208,7 +208,13 @@ def _run_stage1_job(cfg: dict) -> dict:
     if metrics_array.size > 0:
         # Sort by net_profit (column 0)
         net_profits = metrics_array[:, 0]
-        top_indices = np.argsort(net_profits)[::-1][:topk]
+        # Sort indices: descending by net_profit, then ascending by param_id (tie-breaker)
+        # np.lexsort sorts by keys in reverse order (last key is primary)
+        # To sort primarily by net_profit DESC and secondarily by param_id ASC:
+        # We use -net_profits and param_ids
+        sort_indices = np.lexsort((np.arange(len(net_profits)), -net_profits))
+        
+        top_indices = sort_indices[:topk]
         
         winners_list = []
         for idx in top_indices:
@@ -218,8 +224,32 @@ def _run_stage1_job(cfg: dict) -> dict:
                 "trades": int(metrics_array[idx, 1]),
                 "max_dd": float(metrics_array[idx, 2]),
             })
+            
+        # P0: Produce plateau_candidates (broad set, e.g. Top-1000)
+        plateau_list = []
+        # Use SSOT param names for this strategy
+        param_names = ["channel_len", "atr_len", "stop_mult"]
+        
+        limit = 1000
+        for idx in sort_indices[:limit]:
+            params_row = params_matrix[idx]
+            plateau_list.append({
+                "param_id": int(idx),
+                "params": {
+                    param_names[0]: int(params_row[0]),
+                    param_names[1]: int(params_row[1]),
+                    param_names[2]: float(params_row[2]),
+                },
+                "score": float(metrics_array[idx, 0]), # net_profit
+                "metrics": {
+                    "net_profit": float(metrics_array[idx, 0]),
+                    "trades": int(metrics_array[idx, 1]),
+                    "max_dd": float(metrics_array[idx, 2]),
+                }
+            })
     else:
         winners_list = []
+        plateau_list = []
     
     winners = {
         "topk": winners_list,
@@ -230,7 +260,11 @@ def _run_stage1_job(cfg: dict) -> dict:
         },
     }
     
-    return {"metrics": metrics, "winners": winners}
+    return {
+        "metrics": metrics, 
+        "winners": winners,
+        "plateau_candidates": plateau_list
+    }
 
 
 def _run_stage2_job(cfg: dict) -> dict:
@@ -285,12 +319,33 @@ def _run_stage2_job(cfg: dict) -> dict:
     
     # Convert to winners format
     winners_list = []
+    plateau_list = []
+    param_names = ["channel_len", "atr_len", "stop_mult"]
+    
     for r in stage2_results:
+        # For Stage 2, Winners is the same as the full result list
         winners_list.append({
             "param_id": int(r.param_id),
             "net_profit": float(r.net_profit),
             "trades": int(r.trades),
             "max_dd": float(r.max_dd),
+        })
+        
+        # Also include in plateau_candidates
+        params_row = params_matrix[r.param_id]
+        plateau_list.append({
+            "param_id": int(r.param_id),
+            "params": {
+                param_names[0]: int(params_row[0]),
+                param_names[1]: int(params_row[1]),
+                param_names[2]: float(params_row[2]),
+            },
+            "score": float(r.net_profit),
+            "metrics": {
+                "net_profit": float(r.net_profit),
+                "trades": int(r.trades),
+                "max_dd": float(r.max_dd),
+            }
         })
     
     winners = {
@@ -302,6 +357,10 @@ def _run_stage2_job(cfg: dict) -> dict:
         },
     }
     
-    return {"metrics": metrics, "winners": winners}
+    return {
+        "metrics": metrics, 
+        "winners": winners,
+        "plateau_candidates": plateau_list
+    }
 
 

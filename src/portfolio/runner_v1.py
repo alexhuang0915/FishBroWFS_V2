@@ -66,7 +66,7 @@ def load_signal_series(
     # Try to find the signal series file
     # This is a placeholder - actual implementation needs to find the correct run directory
     pattern = f"**/{strategy_id}/**/signal_series.parquet"
-    matches = list(outputs_root.glob(pattern))
+    matches = sorted(list(outputs_root.glob(pattern)))
     
     if not matches:
         logger.warning(f"No signal series found for {strategy_id}/{instrument_id} in {season}")

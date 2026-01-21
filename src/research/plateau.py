@@ -111,6 +111,56 @@ def load_candidates_from_winners(winners_path: Path) -> List[PlateauCandidate]:
     return candidates
 
 
+def load_candidates_from_file(path: Path) -> List[PlateauCandidate]:
+    """
+    Load candidates from a file (winners.json or plateau_candidates.json).
+    
+    [L2-1 Fix] Supports broader candidate set.
+    """
+    if not path.exists():
+        raise FileNotFoundError(f"Candidate file not found at {path}")
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    # Detect format
+    candidates_list = []
+    if "plateau_candidates" in data:
+        # Preferred format: broad list
+        raw_list = data["plateau_candidates"]
+    elif "topk" in data:
+        # Legacy/Winners format
+        raw_list = data["topk"]
+        # [L2-1 Fix] Warn if using Top-K for plateau (likely too sparse)
+        if len(raw_list) < 50:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(
+                f"Plateau detection running on small candidate set (n={len(raw_list)}). "
+                "Result stability may be compromised. Recommend using broad grid candidates."
+            )
+    elif isinstance(data, list):
+        # Raw list
+        raw_list = data
+    else:
+        raise ValueError(f"Unknown candidate file format in {path}")
+
+    candidates = []
+    for item in raw_list:
+        candidate = PlateauCandidate(
+            candidate_id=item.get("candidate_id", ""),
+            strategy_id=item.get("strategy_id", ""),
+            symbol=item.get("symbol", ""),
+            timeframe=item.get("timeframe", ""),
+            params=item.get("params", {}),
+            score=float(item.get("score", 0.0)),
+            metrics=item.get("metrics", {})
+        )
+        candidates.append(candidate)
+
+    return candidates
+
+
 def _normalize_params(candidates: List[PlateauCandidate]) -> Tuple[np.ndarray, List[str], Dict[str, Tuple[float, float]]]:
     """
     Convert parameter dicts to a normalized numpy matrix (zero mean, unit variance per dimension).
@@ -297,7 +347,13 @@ def identify_plateau_from_winners(winners_path: Path, **kwargs) -> PlateauReport
 
     Keyword arguments are passed to _find_plateau (k_neighbors, score_threshold_rel).
     """
-    candidates = load_candidates_from_winners(winners_path)
+def identify_plateau_from_winners(winners_path: Path, **kwargs) -> PlateauReport:
+    """
+    High‑level entry point: load candidates and run plateau identification.
+    
+    [L2-1 Fix] Now accepts winners.json OR plateau_candidates.json.
+    """
+    candidates = load_candidates_from_file(winners_path)
     X, param_names, _ = _normalize_params(candidates)
     distances = _compute_pairwise_distances(X)
     return _find_plateau(candidates, X, param_names, distances, **kwargs)

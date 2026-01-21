@@ -329,6 +329,8 @@ class OpTabRefactored(QWidget):
         self.topk_table = QTableWidget(0, 5)
         self.topk_table.setHorizontalHeaderLabels(["Rank", "Strategy", "Score", "Profit", "MDD"])
         self.topk_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.topk_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.topk_table.customContextMenuRequested.connect(self._show_topk_context_menu)
         self.topk_table.setStyleSheet("background-color: #121212; font-size: 10px;")
         self.topk_table.setFixedHeight(150)
         res_layout.addWidget(self.topk_table)
@@ -377,6 +379,7 @@ class OpTabRefactored(QWidget):
 
         self.diagnostics_output = QTextEdit()
         self.diagnostics_output.setReadOnly(True)
+        self.diagnostics_output.setTextInteractionFlags(Qt.TextSelectableByMouse | Qt.TextSelectableByKeyboard)
         self.diagnostics_output.setMaximumHeight(120)
         self.diagnostics_output.setStyleSheet("""
             QTextEdit {
@@ -1223,3 +1226,28 @@ class OpTabRefactored(QWidget):
                 item = QTableWidgetItem(val)
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.topk_table.setItem(row, col, item)
+
+    def _show_topk_context_menu(self, position):
+        from PySide6.QtWidgets import QMenu, QApplication
+        from PySide6.QtGui import QAction
+
+        menu = QMenu()
+        copy_strat = QAction("Copy Strategy Name", self)
+
+        selected = self.topk_table.selectedItems()
+        if not selected:
+             return
+
+        row = selected[0].row()
+        strat_name = self.topk_table.item(row, 1).text()
+
+        copy_strat.triggered.connect(lambda: QApplication.clipboard().setText(strat_name))
+        menu.addAction(copy_strat)
+
+        copy_row = QAction("Copy Result Row", self)
+        row_text = "\\t".join([self.topk_table.item(row, c).text() for c in range(self.topk_table.columnCount())])
+        copy_row.triggered.connect(lambda: QApplication.clipboard().setText(row_text))
+        menu.addAction(copy_row)
+
+        menu.exec_(self.topk_table.viewport().mapToGlobal(position))
+

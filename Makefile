@@ -1,14 +1,15 @@
 # =========================================================
-# FishBroWFS Makefile (PRODUCT + GATES MINIMAL)
+# FishBroWFS Makefile (LOCAL RESEARCH OS)
 #
-# PRODUCT ENTRYPOINTS:
-#   make up         start backend (run_stack run) + launch Desktop UI
-#   make down       stop everything (guarantee port 8000 freed)
-#   make check      run product test gate
-#   make acceptance run final acceptance gate
+# Local mode:
+#   - no HTTP, no ports
+#   - single SSOT enqueue via control.supervisor.submit()
+#   - sqlite3 is storage + monitor only (TUI reads RO)
 #
-# OPS INTERNAL (not user entrypoints):
-#   make doctor / status / ports / logs / clear
+# Entry points:
+#   make worker   start local job orchestrator (poll QUEUED -> run handlers)
+#   make tui      start TUI control station (submit in-proc, monitor sqlite RO)
+#   make check    minimal sanity gate (no pytest suite; tests removed by design)
 # =========================================================
 
 SHELL := /bin/bash
@@ -16,149 +17,40 @@ SHELL := /bin/bash
 
 PYTHON ?= .venv/bin/python
 ENV ?= PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src
+CHECK_ENV ?= $(ENV) PYTHONWARNINGS=ignore::DeprecationWarning
 
-# Backend
-SUP_URL ?= http://127.0.0.1:8000
-SUP_HEALTH ?= $(SUP_URL)/health
-
-# Runtime files
-SUP_DIR := outputs/_trash
-SUP_PID := $(SUP_DIR)/stack.pid
-SUP_LOG := $(SUP_DIR)/stack_stdout.log
-
-# Testing
-PYTEST ?= $(PYTHON) -m pytest
-PYTEST_ARGS ?= -q
-PYTEST_MARK_EXPR_PRODUCT ?= not slow and not legacy_ui
-
-.PHONY: help up down check acceptance doctor status ports logs clear
+.PHONY: help worker tui check
 
 help:
 	@echo ""
-	@echo "FishBroWFS PRODUCT COMMANDS"
-	@echo "  make up          Start backend + launch Desktop UI"
-	@echo "  make down        Stop all processes (frees port 8000)"
-	@echo "  make check       Run product tests"
-	@echo "  make acceptance  Run final acceptance harness"
-	@echo ""
-	@echo "OPS INTERNAL"
-	@echo "  make doctor      Pre-flight checks"
-	@echo "  make status      Backend health status"
-	@echo "  make ports       Port ownership"
-	@echo "  make logs        Tail logs"
-	@echo "  make clear       Remove Python caches (pycache, .pytest_cache, etc.)"
+	@echo "FishBroWFS LOCAL RESEARCH OS"
+	@echo "  make worker   Start supervisor worker loop (no HTTP)"
+	@echo "  make tui      Start TUI (submit in-proc, monitor sqlite RO)"
+	@echo "  make check    Sanity checks (compile + import smoke)"
 	@echo ""
 
-# -----------------------------
-# OPS INTERNAL (canonical stack)
-# -----------------------------
-doctor:
-	@echo "==> Doctor..."
-	$(ENV) $(PYTHON) -B scripts/run_stack.py doctor
-
-status:
-	@echo "==> Status..."
-	$(ENV) $(PYTHON) -B scripts/run_stack.py status
-
-ports:
-	@echo "==> Ports..."
-	$(ENV) $(PYTHON) -B scripts/run_stack.py ports
-
-logs:
-	@echo "==> Logs..."
-	$(ENV) $(PYTHON) -B scripts/run_stack.py logs
-
-clear:
-	@echo "==> Clearing Python caches (pycache/pyc + tool caches)"
-	@test -f pyproject.toml -o -f setup.cfg -o -f requirements.txt || (echo "Refusing: not at repo root"; exit 1)
-	@find . -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
-	@find . -type f \( -name "*.pyc" -o -name "*.pyo" -o -name "*.pyd" \) -delete 2>/dev/null || true
-	@rm -rf .pytest_cache .mypy_cache .ruff_cache .cache 2>/dev/null || true
-	@echo "==> Done"
-
-# -----------------------------
-# PRODUCT: up/down
-# -----------------------------
-up:
-	@set -euo pipefail; \
-	echo "==> Checking backend health..."; \
-	if curl -s -f --connect-timeout 1 --max-time 2 $(SUP_HEALTH) >/dev/null 2>&1; then \
-		echo "✓ Backend already healthy"; \
+worker:
+	@if command -v gnome-terminal &> /dev/null; then \
+		gnome-terminal --title="FishBro Worker" -- bash -c "cd $(PWD) && $(ENV) $(PYTHON) -B -m control.supervisor.worker --max-workers 1 --tick-interval 0.2; exec bash"; \
 	else \
-		echo "==> Backend not healthy, starting stack..."; \
-		mkdir -p $(SUP_DIR); \
-		$(ENV) $(PYTHON) -B scripts/run_stack.py run >$(SUP_LOG) 2>&1 & \
-		pid=$$!; \
-		echo $$pid >$(SUP_PID); \
-		echo "==> Waiting for backend to become healthy (max 30s)..."; \
-		for i in $$(seq 1 30); do \
-			if curl -s -f --connect-timeout 1 --max-time 2 $(SUP_HEALTH) >/dev/null 2>&1; then \
-				echo "✓ Backend healthy after $$i seconds"; \
-				break; \
-			fi; \
-			sleep 1; \
-			if [ $$i -eq 30 ]; then \
-				echo "✗ Backend failed to start within 30s"; \
-				echo "---- tail $(SUP_LOG) ----"; \
-				tail -n 120 $(SUP_LOG) || true; \
-				echo "---- tail /tmp/fishbro_backend.log ----"; \
-				tail -n 120 /tmp/fishbro_backend.log 2>/dev/null || true; \
-				exit 2; \
-			fi; \
-		done; \
-	fi; \
-	echo "==> Launching Desktop UI..."; \
-	$(ENV) $(PYTHON) -B scripts/desktop_launcher.py
+		$(ENV) $(PYTHON) -B -m control.supervisor.worker --max-workers 1 --tick-interval 0.2; \
+	fi
 
-down:
-	@set -euo pipefail; \
-	echo "==> Stopping system..."; \
-	if [ -f $(SUP_PID) ]; then \
-		pid=$$(cat $(SUP_PID)); \
-		if kill -0 $$pid 2>/dev/null; then \
-			echo "==> Killing stack PID $$pid"; \
-			kill $$pid || true; \
-			sleep 2; \
-			kill -9 $$pid 2>/dev/null || true; \
-		fi; \
-		rm -f $(SUP_PID); \
-	fi; \
-	$(ENV) $(PYTHON) -B scripts/run_stack.py down || true; \
-	echo "==> Done."
+tui:
+	@if command -v gnome-terminal &> /dev/null; then \
+		gnome-terminal --title="FishBro TUI" -- bash -c "cd $(PWD) && $(ENV) $(PYTHON) -B src/gui/tui/app.py; exec bash"; \
+	else \
+		$(ENV) $(PYTHON) -B src/gui/tui/app.py; \
+	fi
 
-# -----------------------------
-# GATES & PROFILES
-# -----------------------------
-test-core:
-	@echo "==> Running CORE-RUNTIME tests (R0)..."
-	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/product/ tests/gui_desktop/ tests/gui_services/ tests/boundary/ -m "$(PYTEST_MARK_EXPR_PRODUCT)"
-
-test-governance:
-	@echo "==> Running GOVERNANCE tests (R1)..."
-	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/contracts/
-
-test-legacy:
-	@echo "==> Running LEGACY tests (R2)..."
-	$(ENV) $(PYTEST) $(PYTEST_ARGS) tests/deprecated/
-
-check-fast:
-	@echo "==> Running FAST developer loop (core + governance)..."
-	@$(MAKE) test-core
-	@$(MAKE) test-governance
+tui-inline:
+	@$(ENV) $(PYTHON) -B src/gui/tui/app.py
 
 check:
-	@echo "==> Running FULL suite (core + governance + legacy)..."
-	@$(MAKE) check-fast
-	@$(MAKE) test-legacy
-
-check-gui:
-	@echo "==> Running GUI tests (headless)..."
-	QT_QPA_PLATFORM=offscreen $(ENV) $(PYTEST) $(PYTEST_ARGS) tests/gui_desktop/
-
-api-snapshot:
-	@mkdir -p tests/contracts/policy/api_contract
-	@$(PYTHON) -c "import json; from pathlib import Path; from control.api import app; out = Path('tests/contracts/policy/api_contract/openapi.json'); out.write_text(json.dumps(app.openapi(), indent=2, sort_keys=True), encoding='utf-8'); print(f'[api-snapshot] wrote: {out} ({out.stat().st_size} bytes)')"
-
-acceptance:
-	@echo "==> Running final acceptance..."
-	$(ENV) bash scripts/acceptance/run_final_acceptance.sh
+	@set -euo pipefail; \
+	echo "==> Sanity: compileall"; \
+	$(CHECK_ENV) $(PYTHON) -m compileall -q src; \
+	echo "==> Sanity: import smoke"; \
+	$(CHECK_ENV) $(PYTHON) -c "from control.supervisor import submit; from control.supervisor.db import SupervisorDB; from control.supervisor.models import JobSpec; from gui.tui.services.bridge import Bridge; print('ok: imports')"; \
+	echo "==> Sanity: local OS e2e (unittest)"; \
+	$(CHECK_ENV) $(PYTHON) -m unittest discover -s tests -t . -p "test_*.py" -q

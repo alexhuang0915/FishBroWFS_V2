@@ -227,6 +227,8 @@ def build_command(
         
     except Exception as e:
         # 其他錯誤
+        import traceback
+        traceback.print_exc()
         error_msg = f"Build failed: {e}"
         if json_output:
             click.echo(json.dumps({"error": error_msg, "exit_code": 1}, indent=2))
@@ -338,5 +340,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
 

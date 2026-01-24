@@ -1,1 +1,0 @@
-../../../gui/services/supervisor_client.py

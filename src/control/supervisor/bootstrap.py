@@ -69,8 +69,8 @@ def main() -> int:
         args.artifacts_root = get_artifacts_root()
     
     # Create canonical artifact directory for this job
-    from .models import get_job_artifact_dir
-    artifacts_dir = get_job_artifact_dir(args.artifacts_root, args.job_id)
+    # Manually construct to avoid double-nesting if artifacts_root is passed
+    artifacts_dir = args.artifacts_root / "jobs" / args.job_id
     artifacts_dir.mkdir(parents=True, exist_ok=True)
     
     db = SupervisorDB(args.db)

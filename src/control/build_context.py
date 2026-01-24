@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Optional, Literal
-from config.registry.timeframes import load_timeframes
+# from config.registry.timeframes import load_timeframes # REMOVED
 
 
 BuildMode = Literal["FULL", "INCREMENTAL"]

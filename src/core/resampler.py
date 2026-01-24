@@ -489,10 +489,13 @@ def normalize_raw_bars(raw_ingest_result) -> Dict[str, np.ndarray]:
             open, high, low, close: float64 陣列
             volume: int64 陣列
     """
-    df = raw_ingest_result.df
+    df = raw_ingest_result.get_df()
     
-    # 將 ts_str 轉換為 datetime
-    ts_datetime = pd.to_datetime(df["ts_str"], format="%Y/%m/%d %H:%M:%S")
+    # ts should already be datetime from ingest
+    if not pd.api.types.is_datetime64_any_dtype(df["ts"]):
+         ts_datetime = pd.to_datetime(df["ts"])
+    else:
+         ts_datetime = df["ts"]
     
     # 轉換為 datetime64[s]
     ts_array = ts_datetime.to_numpy(dtype="datetime64[s]")

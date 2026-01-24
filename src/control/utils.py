@@ -7,8 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from config.registry.strategy_catalog import load_strategy_catalog
-from config import ConfigError
+# from config.registry.strategy_catalog import load_strategy_catalog # REMOVED
+# from config import ConfigError # REMOVED
 
 @dataclass
 class SystemSnapshot:

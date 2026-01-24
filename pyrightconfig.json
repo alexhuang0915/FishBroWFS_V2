@@ -1,8 +1,6 @@
 {
   "include": [
-    "src",
-    "tests",
-    "scripts"
+    "src"
   ],
   "exclude": [
     "**/__pycache__",

@@ -13,12 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Literal, Optional, Union
 import numpy as np
-from config.registry.timeframes import load_timeframes
-
-# Dynamically create Timeframe literal type based on timeframe registry
-_timeframe_registry = load_timeframes()
-_timeframe_values = tuple(_timeframe_registry.allowed_timeframes)
-Timeframe = Literal[_timeframe_values]  # type: ignore
+from contracts.data_models import TimeFrame
 
 
 def bars_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
@@ -62,7 +57,7 @@ def resampled_bars_path(
     outputs_root: Path, 
     season: str, 
     dataset_id: str, 
-    tf_min: Timeframe
+    tf_min: str
 ) -> Path:
     """
     取得 resampled bars 檔案路徑
@@ -209,3 +204,49 @@ def canonical_json(obj: dict) -> str:
     return json.dumps(obj, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
+def bars_path_parquet(
+    outputs_root: Path, 
+    season: str, 
+    dataset_id: str, 
+    tf_min: str
+) -> Path:
+    """
+    Get resampled bars parquet file path.
+    Location: outputs/shared/{season}/{dataset_id}/bars/resampled_{tf_min}m.parquet
+    """
+    dir_path = bars_dir(outputs_root, season, dataset_id)
+    return dir_path / f"resampled_{tf_min}m.parquet"
+
+
+def write_parquet_atomic(path: Path, df: pd.DataFrame) -> None:
+    """
+    Write DataFrame to Parquet via tmp + replace.
+    Requires pyarrow.
+    """
+    import pandas as pd
+    
+    # Ensure directory exists
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Temp file
+    temp_path = path.with_suffix(".tmp.parquet")
+    
+    try:
+        # Write to temp (using pyarrow engine)
+        df.to_parquet(temp_path, index=False, engine="pyarrow", compression="snappy")
+        
+        # Atomic replace
+        temp_path.replace(path)
+        
+    except Exception as e:
+        if temp_path.exists():
+            try: temp_path.unlink()
+            except OSError: pass
+        raise IOError(f"Failed to write Parquet {path}: {e}")
+    finally:
+        if temp_path.exists():
+            try: temp_path.unlink()
+            except OSError: pass
+
+
+# End of File

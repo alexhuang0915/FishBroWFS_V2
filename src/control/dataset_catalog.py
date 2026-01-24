@@ -33,7 +33,7 @@ class DatasetCatalog:
         if not self.index_path.exists():
             raise FileNotFoundError(
                 f"Dataset index not found at {self.index_path}. "
-                "Please run: python scripts/build_dataset_registry.py"
+                "Dataset registry builder was removed in Local Research OS mode."
             )
         
         data = json.loads(self.index_path.read_text(encoding="utf-8"))

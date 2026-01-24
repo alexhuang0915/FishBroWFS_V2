@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional, Literal
 from pydantic import BaseModel, Field
-from config.registry.timeframes import load_timeframes
+# from config.registry.timeframes import load_timeframes # REMOVED (Legacy)
 
 
 class FeatureSpec(BaseModel):
@@ -88,8 +88,9 @@ def default_feature_registry() -> FeatureRegistry:
     每個特徵都適用於所有 timeframe（來自 timeframe registry）
     """
     # 使用 timeframe registry 而不是硬編碼
-    timeframe_registry = load_timeframes()
-    timeframes = timeframe_registry.allowed_timeframes
+    # timeframe_registry = load_timeframes()
+    # timeframes = timeframe_registry.allowed_timeframes
+    timeframes = [15, 30, 60, 120, 240] # Stubbed for V2 Mainline
     
     specs = []
     

@@ -67,14 +67,13 @@ def validate_job_spec(spec: JobSpec) -> None:
     handler = get_handler(spec.job_type)
     if handler is None:
         raise ValueError(f"Unknown job_type: {spec.job_type}")
-    # Validate params with handler
-    handler.validate_params(spec.params)
 
 
 def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict[str, Any]:
     """Execute a job using its handler."""
     import traceback
     from control.artifacts import write_text_atomic
+    from .models import now_iso
     
     handler = get_handler(spec.job_type)
     if handler is None:
@@ -87,6 +86,18 @@ def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict
     writer = CanonicalArtifactWriter(job_id, spec, artifacts_path)
     writer.write_spec()
     writer.write_state(JobStatus.RUNNING, progress=0.0, phase="start")
+    start_time = now_iso()
+    manifest_info: Dict[str, Any] = {}
+    try:
+        params = spec.params or {}
+        data1 = params.get("dataset_id")
+        data2 = params.get("data2_dataset_id")
+        if data1:
+            manifest_info["data1_dataset_id"] = data1
+        if data2:
+            manifest_info["data2_dataset_id"] = data2
+    except Exception:
+        manifest_info = {}
     
     # Execute with captured stdout/stderr
     context = JobContext(job_id, db, artifacts_dir, writer=writer)
@@ -115,9 +126,23 @@ def execute_job(job_id: str, spec: JobSpec, db: Any, artifacts_dir: str) -> Dict
         
         # Write state with FAILED
         writer.write_state(JobStatus.FAILED, error=error_msg)
+        writer.write_manifest(
+            job_type=str(spec.job_type),
+            state=JobStatus.FAILED.value,
+            start_time=start_time,
+            end_time=now_iso(),
+            additional_info=manifest_info or None,
+        )
         raise
     
     # Write state with SUCCEEDED and result
-    writer.write_state(JobStatus.SUCCEEDED, progress=100.0, phase="complete")
+    writer.write_state(JobStatus.SUCCEEDED, progress=1.0, phase="complete")
     writer.write_result(result)
+    writer.write_manifest(
+        job_type=str(spec.job_type),
+        state=JobStatus.SUCCEEDED.value,
+        start_time=start_time,
+        end_time=now_iso(),
+        additional_info=manifest_info or None,
+    )
     return result

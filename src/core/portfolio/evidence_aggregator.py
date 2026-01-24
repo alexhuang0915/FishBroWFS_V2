@@ -1,7 +1,7 @@
 """
 Evidence Aggregator for Route 6 Closed Loop.
 
-Builds canonical evidence index from job artifacts in outputs/jobs/<job_id>/.
+Builds canonical evidence index from job artifacts in outputs/artifacts/jobs/<job_id>/.
 Excludes FAIL jobs by default, includes WARN only when requested.
 Skips folders starting with '_' or '.' (including _trash).
 No performance metrics in index (Hybrid BC v1.1 compliance).

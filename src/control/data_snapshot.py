@@ -42,7 +42,7 @@ def write_json_atomic_any(path: Path, obj: Any) -> None:
             f,
             sort_keys=True,
             ensure_ascii=False,
-            separators=(",", ":"),
+            indent=2,
             allow_nan=False,
         )
         tmp_path = Path(f.name)

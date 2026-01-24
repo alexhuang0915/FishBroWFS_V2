@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, Optional
 import logging
 
+from control.job_artifacts import get_job_evidence_dir
+
 from core.reporting.models import (
     StrategyReportV1,
     StrategyHeadlineMetricsV1,
@@ -27,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 def read_job_artifact(job_id: str, filename: str) -> Optional[Any]:
     """Read a job artifact JSON file."""
-    job_dir = Path("outputs/jobs") / job_id
+    job_dir = get_job_evidence_dir(job_id)
     artifact_path = job_dir / filename
     if not artifact_path.exists():
         return None
@@ -216,7 +218,7 @@ def build_portfolio_report_v1(portfolio_id: str) -> PortfolioReportV1:
 
 def write_job_report(job_id: str, model: StrategyReportV1) -> None:
     """Write a strategy report to the job evidence directory."""
-    job_dir = Path("outputs/jobs") / job_id
+    job_dir = get_job_evidence_dir(job_id)
     job_dir.mkdir(parents=True, exist_ok=True)
     
     report_path = job_dir / "strategy_report_v1.json"

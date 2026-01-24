@@ -16,7 +16,6 @@ import pandas as pd
 from contracts.dimensions import canonical_json
 from contracts.fingerprint import FingerprintIndex
 from contracts.features import FeatureRegistry, FeatureSpec, default_feature_registry
-from features.registry import get_default_registry
 from core.fingerprint import (
     build_fingerprint_index_from_raw_ingest,
     compare_fingerprint_indices,
@@ -26,7 +25,7 @@ from control.fingerprint_store import (
     load_fingerprint_index_if_exists,
     write_fingerprint_index,
 )
-from data.raw_ingest import RawIngestResult, ingest_raw_txt
+from core.data.raw_ingest import RawIngestResult, ingest_raw_txt
 from control.shared_manifest import write_shared_manifest
 from control.bars_store import (
     bars_dir,
@@ -132,11 +131,9 @@ def build_shared(
     if mode not in ("FULL", "INCREMENTAL"):
         raise ValueError(f"無效的 mode: {mode}，必須為 'FULL' 或 'INCREMENTAL'")
     
-    # 如果未提供 tfs，從 registry 載入預設值
+    # If tfs not provided, use defaults
     if tfs is None:
-        from config.registry.timeframes import load_timeframes
-        timeframe_registry = load_timeframes()
-        tfs = timeframe_registry.allowed_timeframes
+        tfs = [15, 30, 60, 120, 240]
     
     # 1. 載入舊指紋索引（如果存在）
     index_path = fingerprint_index_path(season, dataset_id, outputs_root)
@@ -212,7 +209,7 @@ def build_shared(
                 )
         
         # 使用預設或提供的 feature registry
-        registry = feature_registry or get_default_registry()
+        registry = feature_registry or default_feature_registry()
         
         features_cache_report = _build_features_cache(
             season=season,
@@ -482,9 +479,7 @@ def _build_bars_cache(
     
     # 如果未提供 tfs，從 registry 載入預設值
     if tfs is None:
-        from config.registry.timeframes import load_timeframes
-        timeframe_registry = load_timeframes()
-        tfs = timeframe_registry.allowed_timeframes
+        tfs = [15, 30, 60, 120, 240]
     
     # 1. 取得 session spec
     session_spec, dimension_found = get_session_spec_for_dataset(dataset_id)
@@ -682,9 +677,7 @@ def _build_features_cache(
     """
     # 如果未提供 tfs，從 registry 載入預設值
     if tfs is None:
-        from config.registry.timeframes import load_timeframes
-        timeframe_registry = load_timeframes()
-        tfs = timeframe_registry.allowed_timeframes
+        tfs = [15, 30, 60, 120, 240]
     
     # 如果沒有 session_spec，嘗試取得預設值
     if session_spec is None:

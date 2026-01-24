@@ -13,6 +13,7 @@ from typing import Any, Dict, Literal, Sequence
 from contracts.supervisor.evidence_schemas import now_iso
 from control.artifacts import write_json_atomic
 from core.paths import get_outputs_root
+from core.paths import get_jobs_dir
 from control.supervisor.models import JobSpec, JobType
 
 PolicyStage = Literal["preflight", "postflight"]
@@ -75,7 +76,6 @@ def _extract_param(spec: JobSpec, key: str) -> Any:
 def evaluate_preflight(spec: JobSpec) -> PolicyResult:
     """Run fast, deterministic checks before launching a worker."""
     if spec.job_type in {
-        JobType.RUN_RESEARCH_V2,
         JobType.RUN_RESEARCH_WFS,
     }:
         season = _extract_param(spec, "season")
@@ -96,13 +96,34 @@ def evaluate_preflight(spec: JobSpec) -> PolicyResult:
                 {"params_keys": list(spec.params.keys())},
             )
 
+        # Enforce stable, local-only formats (no HTTP assumptions).
+        import re
+
+        # Season: allow YYYYQ# only. (UI may use 'current' but must resolve before submit.)
+        if not re.fullmatch(r"\d{4}Q[1-4]", str(season).strip()):
+            return _forbidden(
+                "preflight",
+                "POLICY_REJECT_INVALID_SEASON_FORMAT",
+                "season must match YYYYQ#",
+                {"season": season},
+            )
+
+        # Timeframe: allow integer minutes or e.g. 60m / 2h
+        tf = str(timeframe).strip().lower()
+        if not re.fullmatch(r"\d+([mh])?", tf):
+            return _forbidden(
+                "preflight",
+                "POLICY_REJECT_INVALID_TIMEFRAME_FORMAT",
+                "timeframe must be like '60m', '2h', or integer minutes",
+                {"timeframe": timeframe},
+            )
+
     return _allowed("preflight")
 
 
 def evaluate_postflight(job_id: str, result: Dict[str, Any]) -> PolicyResult:
     """Validate artifacts/output after the worker completed."""
-    outputs_root = get_outputs_root()
-    job_dir = outputs_root / "jobs" / job_id
+    job_dir = get_jobs_dir() / job_id
     declared = result.get("output_files", [])
     if declared:
         if not job_dir.exists():
@@ -192,8 +213,7 @@ def write_policy_check_artifact(
 
     This is idempotent and preserves the original creation timestamp if present.
     """
-    outputs_root = get_outputs_root()
-    job_dir = outputs_root / "jobs" / job_id
+    job_dir = get_jobs_dir() / job_id
     job_dir.mkdir(parents=True, exist_ok=True)
     existing = _read_existing_policy_check(job_dir)
 

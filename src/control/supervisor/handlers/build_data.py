@@ -9,16 +9,17 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 
-from ..job_handler import BaseJobHandler, JobContext
+from ..job_handler import BaseJobHandler, JobContext, register_handler
 from control.artifacts import write_json_atomic
 from control.supervisor.models import get_job_artifact_dir
+from control.runtime_index import update_runtime_index
 from core.paths import get_outputs_root
 from core.season_context import current_season
 from core.timeframe_aggregator import TimeframeAggregator
 from core.data_aligner import DataAligner
 from control.bars_store import normalized_bars_path, resampled_bars_path, load_npz
-from config.registry.datasets import load_datasets
-from config.registry.instruments import load_instruments
+# from config.registry.datasets import load_datasets # REMOVED
+# from config.registry.instruments import load_instruments # REMOVED
 
 logger = logging.getLogger(__name__)
 
@@ -72,75 +73,22 @@ class BuildDataHandler(BaseJobHandler):
                 "timeframe_min": timeframe_min
             }
         
-        # Try to use the legacy prepare_with_data2_enforcement function
+        
+        # DEBUG TRACE
         try:
-            return self._execute_via_function(params, context)
-        except ImportError as e:
-            logger.warning(f"Failed to import prepare_with_data2_enforcement: {e}")
-            # Fallback to CLI invocation
-            return self._execute_via_cli(params, context)
-    
-    def _execute_via_function(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
-        """Execute BUILD_DATA using the legacy Python function."""
-        from control.prepare_orchestration import prepare_with_data2_enforcement
-        
-        dataset_id = params["dataset_id"]
-        timeframe_min = params.get("timeframe_min", 60)
-        force_rebuild = params.get("force_rebuild", False)
-        mode = params.get("mode", "FULL")
-        
-        # Map mode to prepare_orchestration parameters
-        # Note: prepare_with_data2_enforcement expects different parameters
-        # We need to adapt based on actual function signature
-        
-        # For now, use a simplified call
-        # In production, would need to map parameters properly
-        try:
-            # Call the legacy function
-            result = prepare_with_data2_enforcement(
-                mode=mode,
-                season="2026Q1",  # Default season
-                dataset_id=dataset_id,
-                timeframe_min=timeframe_min,
-                force_rebuild=force_rebuild
-            )
-            
-            # Write result to artifacts
-            result_path = Path(context.artifacts_dir) / "build_data_result.json"
-            write_json_atomic(result_path, result)
-            
-            # Extract produced paths from result
-            alignment_path = _write_data_alignment_report(context.job_id, params, result)
+            trace_path = Path(context.artifacts_dir) / "trace_debug.txt"
+            with open(trace_path, "a") as f:
+                f.write(f"Entering execute at {datetime.now()}\n")
+        except:
+            pass
 
-            produced_paths = []
-            if "data1_report" in result and "fingerprint_path" in result["data1_report"]:
-                produced_paths.append(result["data1_report"]["fingerprint_path"])
-            if "data2_reports" in result:
-                for feed_id, report in result["data2_reports"].items():
-                    if "fingerprint_path" in report:
-                        produced_paths.append(report["fingerprint_path"])
-            if alignment_path:
-                produced_paths.append(alignment_path)
-            
-            manifest_path = self._write_build_manifest(params, context, result)
-            return {
-                "ok": True,
-                "job_type": "BUILD_DATA",
-                "dataset_id": dataset_id,
-                "timeframe_min": timeframe_min,
-                "legacy_invocation": f"prepare_with_data2_enforcement(mode={mode}, dataset_id={dataset_id}, timeframe_min={timeframe_min})",
-                "stdout_path": str(result_path),
-                "stderr_path": None,
-                "produced_paths": produced_paths,
-                "manifest_path": str(manifest_path) if manifest_path else None,
-                "result": result
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to execute prepare_with_data2_enforcement: {e}")
-            # Fallback to CLI
-            return self._execute_via_cli(params, context)
-    
+        # ALWAYS execute via CLI for consistency and isolation (Unification)
+        # Using shared_cli ensure PYTHONPATH is handled correctly via _execute_via_cli logic
+        return self._execute_via_cli(params, context)
+
+        # Legacy direct function call removed to prevent stalls/crashes
+        # due to unmaintained prepare_orchestration.py
+
     def _execute_via_cli(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute BUILD_DATA via CLI subprocess."""
         dataset_id = params["dataset_id"]
@@ -152,19 +100,56 @@ class BuildDataHandler(BaseJobHandler):
         build_bars = mode in ["BARS_ONLY", "FULL"]
         build_features = mode in ["FEATURES_ONLY", "FULL"]
         
+        # Resolve TXT path
+        txt_path = self._resolve_txt_path(dataset_id)
+        if not txt_path:
+             return {
+                "ok": False,
+                "job_type": "BUILD_DATA",
+                "dataset_id": dataset_id,
+                "error": f"Could not find raw TXT file for {dataset_id}",
+                "produced_paths": []
+             }
+
         # Build command based on available CLI tools
         # Try to use shared_cli.py if available
+        # `control.shared_cli` is the canonical CLI module (PYTHONPATH is set to include `src/`).
+        # Map BUILD_DATA params to shared build contract:
+        # - BUILD_DATA.mode: FULL/BARS_ONLY/FEATURES_ONLY -> shared-cli build flags
+        # - shared-cli --mode is FULL/INCREMENTAL, not BUILD_DATA.mode
+        cli_mode = "full"
         cmd = [
-            sys.executable, "-B", "-m", "src.control.shared_cli",
+            sys.executable,
+            "-B",
+            "-m",
+            "control.shared_cli",
             "build",
-            "--season", season,
-            "--dataset-id", dataset_id,
-            "--tfs", str(timeframe_min),
-            "--mode", mode
+            "--season",
+            season,
+            "--dataset-id",
+            dataset_id,
+            "--tfs",
+            str(timeframe_min),
+            "--mode",
+            cli_mode,
+            "--outputs-root",
+            str(get_outputs_root()),
+            "--txt-path",
+            str(txt_path),
         ]
         
-        if force_rebuild:
-            cmd.append("--force-rebuild")
+        if build_bars:
+            cmd.append("--build-bars")
+        else:
+            cmd.append("--no-build-bars")
+            
+        if build_features:
+            cmd.append("--build-features")
+        else:
+            cmd.append("--no-build-features")
+        
+        # force_rebuild logic is handled by 'mode' (FULL vs INCREMENTAL) and shared_build internal logic
+        # shared_cli does not accept --force-rebuild flag
         
         # Set up stdout/stderr capture
         stdout_path = Path(context.artifacts_dir) / "build_data_stdout.txt"
@@ -172,19 +157,44 @@ class BuildDataHandler(BaseJobHandler):
         
         logger.info(f"Executing BUILD_DATA via CLI: {' '.join(cmd)}")
         
+        # DEBUG TRACE
+        try:
+            trace_path = Path(context.artifacts_dir) / "trace_debug.txt"
+            with open(trace_path, "a") as f:
+                f.write(f"Entering _execute_via_cli at {datetime.now()}\n")
+                f.write(f"Command: {cmd}\n")
+        except:
+            pass
+        
         try:
             with open(stdout_path, "w") as stdout_file, open(stderr_path, "w") as stderr_file:
                 # Send heartbeat before starting
                 context.heartbeat(progress=0.0, phase="starting_cli")
                 
+                # Prepare environment with validated PYTHONPATH
+                import os
+                env = os.environ.copy()
+                # Ensure src is in PYTHONPATH so subprocess can find modules
+                # Prepend to existing PYTHONPATH if any
+                src_path = str(Path.cwd() / "src")
+                env["PYTHONPATH"] = f"{src_path}:{env.get('PYTHONPATH', '')}"
+
                 # Run subprocess
                 process = subprocess.run(
                     cmd,
                     stdout=stdout_file,
                     stderr=stderr_file,
                     text=True,
-                    cwd=Path.cwd()
+                    cwd=Path.cwd(),
+                    env=env
                 )
+                
+                # DEBUG TRACE
+                try:
+                    with open(trace_path, "a") as f:
+                        f.write(f"Process finished with returncode {process.returncode} at {datetime.now()}\n")
+                except:
+                    pass
             
             # Check result
             if process.returncode == 0:
@@ -263,6 +273,13 @@ class BuildDataHandler(BaseJobHandler):
                            pass # Should fail via returncode if critical logic failed, but here we are strict.
 
                 manifest_path = self._write_build_manifest(params, context, {"ok": True})
+                
+                # [WIRE FIX] Update runtime index on success
+                try:
+                    update_runtime_index()
+                except Exception as e:
+                    logger.warning(f"Failed to update runtime index: {e}")
+
                 return {
                     "ok": True,
                     "job_type": "BUILD_DATA",
@@ -292,6 +309,14 @@ class BuildDataHandler(BaseJobHandler):
                 }
                 
         except Exception as e:
+            # [CRITICAL DIAGNOSTIC] Write crash log to artifacts
+            import traceback
+            crash_path = Path(context.artifacts_dir) / "crash_cli.txt"
+            try:
+                crash_path.write_text(f"Exception in _execute_via_cli:\n{traceback.format_exc()}")
+            except:
+                pass
+
             logger.error(f"Failed to execute CLI command: {e}")
             # Write error to stderr file
             stderr_path.write_text(f"Failed to execute command: {e}\nCommand: {' '.join(cmd)}")
@@ -422,6 +447,49 @@ class BuildDataHandler(BaseJobHandler):
             return True
         return False
 
+    def _resolve_txt_path(self, dataset_id: str) -> Optional[Path]:
+        """
+        Find TXT file path for a given dataset ID.
+        Looks in the standard raw data directory.
+        """
+        # Prefer core.paths.get_raw_root() (env override supported). Default is repo-relative FishBroData.
+        try:
+            from core.paths import get_raw_root  # local import to avoid circulars
+            raw_root = get_raw_root()
+        except Exception:
+            raw_root = get_outputs_root().parent / "FishBroData"
+
+        raw_dir = raw_root / "raw"
+        
+        if not raw_dir.exists():
+            return None
+        
+        # Try common patterns
+        # 1. Exact match (rare)
+        # 2. {ID} HOT-Minute-Trade.txt
+        # 3. {ID}.txt
+        
+        patterns = [
+            f"{dataset_id} HOT-Minute-Trade.txt",
+            f"{dataset_id}_SUBSET.txt",
+            f"{dataset_id}.txt",
+        ]
+        
+        for pattern in patterns:
+            candidate = raw_dir / pattern
+            if candidate.exists():
+                return candidate
+        
+        # Fallback: search for files containing dataset_id
+        for item in raw_dir.iterdir():
+            if not item.is_file():
+                continue
+            
+            if dataset_id in item.name:
+                return item
+        
+        return None
+
 
 def _npz_to_dataframe(npz_data: dict[str, Any]) -> pd.DataFrame:
     columns = ["ts", "open", "high", "low", "close", "volume"]
@@ -435,6 +503,9 @@ def _npz_to_dataframe(npz_data: dict[str, Any]) -> pd.DataFrame:
 
 
 def _write_data_alignment_report(job_id: str, params: Dict[str, Any], result: Dict[str, Any]) -> Optional[str]:
+    # Stub for Mainline reduction (datasets/instruments registries are purged)
+    return None
+
     data2_reports = (result.get("data2_reports") or {})
     if not data2_reports:
         logger.debug("No Data2 reports present; skipping alignment report.")
@@ -552,3 +623,4 @@ def _write_data_alignment_report(job_id: str, params: Dict[str, Any], result: Di
 
 # Register handler
 build_data_handler = BuildDataHandler()
+register_handler("BUILD_DATA", build_data_handler)

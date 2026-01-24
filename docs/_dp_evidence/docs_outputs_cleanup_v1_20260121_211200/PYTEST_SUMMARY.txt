@@ -1,1 +1,0 @@
-make check-fast: 420 passed, 4 skipped, 2 xfailed

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .dimensions import DimensionRegistry, InstrumentDimension, SessionSpec, canonical_json
-from config.profiles import ProfileConfig, load_profile
+# from config.profiles import ProfileConfig, load_profile # REMOVED
 
 
 def default_registry_path() -> Path:
@@ -104,102 +104,64 @@ def _load_dimension_registry_from_yaml(path: Path) -> DimensionRegistry:
 
 def _build_dimension_registry_from_profiles() -> DimensionRegistry:
     """
-    從 profiles 和 instruments registry 建立 DimensionRegistry
-    
-    Returns:
-        DimensionRegistry 包含所有已定義的 instrument 維度
+    Stubbed for Mainline: Returns hardcoded InstrumentDimension for MNQ/VX.
     """
-    project_root = Path(__file__).parent.parent.parent
-    profiles_dir = project_root / "configs" / "profiles"
-    instruments_path = project_root / "configs" / "registry" / "instruments.yaml"
+    from .dimensions import SessionSpec # Ensure imported
     
-    # Load instruments registry
-    if not instruments_path.exists():
-        return DimensionRegistry()
+    # Stub MNQ session
+    mnq_session = SessionSpec(
+        tz="Asia/Taipei",
+        open_taipei = "06:00",
+        close_taipei = "05:00",
+        breaks_taipei=[]
+    )
     
-    with open(instruments_path, "r", encoding="utf-8") as f:
-        instruments_data = yaml.safe_load(f)
-    
-    if not instruments_data or "instruments" not in instruments_data:
-        return DimensionRegistry()
-    
-    by_dataset_id = {}
-    by_symbol = {}
-    
-    for instrument in instruments_data["instruments"]:
-        symbol = instrument["id"]
-        profile_name = instrument.get("default_profile") or instrument.get("profile")
-        
-        if not profile_name:
-            continue
-            
-        # Load profile using profile_id (without .yaml)
-        try:
-            profile = load_profile(profile_name)
-        except Exception as e:
-            print(f"Warning: Failed to load profile {profile_name} for {symbol}: {e}")
-            continue
-        
-        # Build InstrumentDimension from profile
-        instrument_dim = _build_instrument_dimension(symbol, instrument, profile)
-        if instrument_dim:
-            by_symbol[symbol] = instrument_dim
-            
-            # Also add to by_dataset_id for common dataset patterns
-            # Create dataset_id pattern: {symbol}.60m.2020-2024
-            dataset_id = f"{symbol}.60m.2020-2024"
-            by_dataset_id[dataset_id] = instrument_dim
-    
-    return DimensionRegistry(by_dataset_id=by_dataset_id, by_symbol=by_symbol)
+    # Stub VX session
+    vx_session = SessionSpec(
+        tz="Asia/Taipei",
+        open_taipei="06:00",
+        close_taipei="05:00",
+        breaks_taipei=[]
+    )
 
-
-def _build_instrument_dimension(
-    symbol: str,
-    instrument: Dict[str, Any],
-    profile: ProfileConfig
-) -> Optional[InstrumentDimension]:
-    """
-    從 instrument registry 項目和 profile 建立 InstrumentDimension
-    """
-    # Parse symbol to get instrument_id and exchange
-    parts = symbol.split(".")
-    if len(parts) < 2:
-        return None
-    
-    exchange = parts[0]
-    instrument_id = parts[1]
-    
-    # Get tick_size and currency from profile (preferred) or instrument registry
-    tick_size = profile.tick_size if profile.tick_size is not None else instrument.get("tick_size", 0.25)
-    currency = profile.currency if profile.currency else instrument.get("currency", "")
-    
-    # Build session spec from profile
-    session_spec = None
-    if profile.session_taipei:
-        # Use session_taipei from profile
-        session_data = profile.session_taipei.model_dump()
-        session_spec = SessionSpec(**session_data)
-    else:
-        # Fallback: create minimal session spec
-        session_spec = SessionSpec(
-            tz="Asia/Taipei",
-            open_taipei="00:00",
-            close_taipei="23:59",
-            breaks_taipei=[],
-            notes=f"Auto-generated from profile {profile.symbol}"
-        )
-    
-    return InstrumentDimension(
-        instrument_id=instrument_id,
-        exchange=exchange,
-        market=instrument.get("market", ""),
-        currency=currency,
-        tick_size=tick_size,
-        session=session_spec,
-        source="profile_migration",
-        source_updated_at="2026-01-09T00:00:00Z",
+    mnq = InstrumentDimension(
+        instrument_id="MNQ",
+        exchange="CME",
+        market="FUTURE",
+        currency="USD",
+        tick_size=0.25,
+        session=mnq_session,
+        source="stub",
+        source_updated_at="2026-01-22T00:00:00Z",
         version="v2"
     )
+    
+    vx = InstrumentDimension(
+        instrument_id="VX",
+        exchange="CFE",
+        market="FUTURE",
+        currency="USD",
+        tick_size=0.05,
+        session=vx_session,
+        source="stub",
+        source_updated_at="2026-01-22T00:00:00Z",
+        version="v2"
+    )
+
+    by_symbol = {
+        "CME.MNQ": mnq,
+        "CFE.VX": vx
+    }
+    
+    by_dataset_id = {
+        # Catch-all or specific? The build command passes "CME.MNQ.60m.2020-2024"
+        "CME.MNQ.60m.2020-2024": mnq,
+        "CFE.VX.60m.2020-2024": vx
+    }
+
+    return DimensionRegistry(by_dataset_id=by_dataset_id, by_symbol=by_symbol)
+
+# Helper function _build_instrument_dimension Removed (unused)
 
 
 def write_dimension_registry(registry: DimensionRegistry, path: Path | None = None) -> None:

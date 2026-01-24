@@ -1,29 +1,7 @@
 [project]
-name = "FishBroWFS_V2"
-version = "0.1.0"
-description = "Speed-first backtesting engine"
+name = "fishbro-wfs"
+version = "0.0.0"
 requires-python = ">=3.10"
-dependencies = ["numpy", "PySide6", "requests"]
 
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
-
-[tool.setuptools.packages.find]
-where = ["src"]
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
-markers = [
-    "slow: research-grade tests",
-    "integration: integration tests requiring external services",
-    "ui_contract: UI style contract tests requiring Playwright and UI server",
-    "legacy_ui: legacy UI tests (gui.nicegui based) - excluded from product CI",
-    "research: research-grade / slow / exploratory tests (not part of product CI)"
-]
-addopts = "-m 'not slow and not legacy_ui'"
+# Tests/scripts were deleted by design (Local Research OS mode).
 

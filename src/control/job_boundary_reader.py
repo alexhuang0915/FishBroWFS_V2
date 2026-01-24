@@ -31,7 +31,7 @@ def extract_job_boundary(job_id: str, outputs_root: Path) -> JobBoundary:
     
     Looks for boundary information in:
     1. Job spec (spec.json) in supervisor DB
-    2. Job artifacts directory (outputs/jobs/{job_id}/)
+    2. Job artifacts directory (outputs/artifacts/jobs/{job_id}/)
     3. Research artifacts (if research job)
     
     Args:
@@ -57,7 +57,7 @@ def extract_job_boundary(job_id: str, outputs_root: Path) -> JobBoundary:
         pass  # Fall through to other methods
     
     # Try to get from job artifacts directory
-    job_dir = outputs_root / "jobs" / job_id
+    job_dir = outputs_root / "artifacts" / "jobs" / job_id
     if job_dir.exists():
         # Look for research artifacts
         research_dir = job_dir / "research"

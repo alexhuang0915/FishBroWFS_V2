@@ -31,7 +31,7 @@ outputs/test_artifacts/
 *.egg-info/
 
 # Raw data
-FishBroData/
+# FishBroData/
 *.txt
 
 # Tool-specific directories (must remain in root but not tracked)

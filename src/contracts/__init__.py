@@ -1,11 +1,7 @@
-
 """
-Contracts for GUI payload validation and boundary enforcement.
+FishBroWFS Contracts (The Constitution).
 
-These schemas define the allowed shape of GUI-originated requests,
-ensuring GUI cannot inject execution semantics or violate governance rules.
+This package contains the immutable data structures and interfaces that define
+the architecture. All models here must be Pydantic models with strict
+type checking enabled.
 """
-
-from __future__ import annotations
-
-

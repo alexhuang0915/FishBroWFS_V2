@@ -24,7 +24,7 @@ from core.fingerprint import (
     build_fingerprint_index_from_raw_ingest,
     compare_fingerprint_indices,
 )
-from data.raw_ingest import ingest_raw_txt
+from core.data.raw_ingest import ingest_raw_txt
 
 
 def scan_fingerprint(
@@ -278,5 +278,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
 

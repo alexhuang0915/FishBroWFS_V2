@@ -12,7 +12,19 @@ Follows the Logic-Only Constitution:
 from __future__ import annotations
 
 import os
+
 from pathlib import Path
+
+
+def get_raw_root() -> Path:
+    """
+    Single source of truth for raw data root.
+    - Default: ./FishBroData (repo relative)
+    - Override: env FISHBRO_RAW_ROOT
+    """
+    p = os.environ.get("FISHBRO_RAW_ROOT", "FishBroData")
+    return Path(p).resolve()
+
 
 
 def get_outputs_root() -> Path:

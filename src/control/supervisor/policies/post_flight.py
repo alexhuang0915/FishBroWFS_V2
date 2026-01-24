@@ -84,10 +84,6 @@ class QualityGate:
         """Check that required outputs exist (job-type aware)."""
         # Define required outputs per job type
         required_outputs = {
-            "RUN_RESEARCH_V2": ["manifest.json", "policy_check.json", "inputs_fingerprint.json"],
-            "RUN_PLATEAU_V2": ["manifest.json", "policy_check.json", "inputs_fingerprint.json"],
-            "RUN_FREEZE_V2": ["manifest.json", "policy_check.json", "inputs_fingerprint.json"],
-            "RUN_COMPILE_V2": ["manifest.json", "policy_check.json", "inputs_fingerprint.json"],
             "BUILD_PORTFOLIO_V2": ["manifest.json", "policy_check.json", "inputs_fingerprint.json"],
         }
         
@@ -126,10 +122,6 @@ class QualityGate:
         """Infer job type from handler name."""
         # Map handler class names to job types
         mapping = {
-            "RunResearchV2Handler": "RUN_RESEARCH_V2",
-            "RunPlateauV2Handler": "RUN_PLATEAU_V2",
-            "RunFreezeV2Handler": "RUN_FREEZE_V2",
-            "RunCompileV2Handler": "RUN_COMPILE_V2",
             "BuildPortfolioV2Handler": "BUILD_PORTFOLIO_V2",
         }
         

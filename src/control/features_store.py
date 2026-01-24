@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Dict, Literal, Optional
 import numpy as np
-from config.registry.timeframes import load_timeframes
+# from config.registry.timeframes import load_timeframes # REMOVED
 
 from control.bars_store import (
     write_npz_atomic,
@@ -20,8 +20,9 @@ from control.bars_store import (
 )
 
 # Dynamically create Timeframe literal type based on timeframe registry
-_timeframe_registry = load_timeframes()
-_timeframe_values = tuple(_timeframe_registry.allowed_timeframes)
+# _timeframe_registry = load_timeframes()
+# _timeframe_values = tuple(_timeframe_registry.allowed_timeframes)
+_timeframe_values = (15, 30, 60, 120, 240)
 Timeframe = Literal[_timeframe_values]  # type: ignore
 
 
@@ -179,7 +180,8 @@ def compute_features_sha256_dict(
     """
     if tfs is None:
         # Use all timeframes from registry
-        tfs = list(_timeframe_registry.allowed_timeframes)
+        # tfs = list(_timeframe_registry.allowed_timeframes)
+        tfs = [15, 30, 60, 120, 240]
     
     result = {}
     

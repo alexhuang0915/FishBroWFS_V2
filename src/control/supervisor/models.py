@@ -15,15 +15,13 @@ class JobType(StrEnum):
     """Canonical job types."""
     BUILD_DATA = "BUILD_DATA"
     BUILD_PORTFOLIO_V2 = "BUILD_PORTFOLIO_V2"
-    CLEAN_CACHE = "CLEAN_CACHE"
-    GENERATE_REPORTS = "GENERATE_REPORTS"
-    PING = "PING"
-    RUN_COMPILE_V2 = "RUN_COMPILE_V2"
-    RUN_FREEZE_V2 = "RUN_FREEZE_V2"
-    RUN_PLATEAU_V2 = "RUN_PLATEAU_V2"
-    RUN_RESEARCH_V2 = "RUN_RESEARCH_V2"
     RUN_RESEARCH_WFS = "RUN_RESEARCH_WFS"  # Phase4-A: Walk-Forward Simulation research
-    RUN_PORTFOLIO_ADMISSION = "RUN_PORTFOLIO_ADMISSION"  # Phase4-B: Portfolio Admission analysis
+    
+    # Legacy / Utility
+    RUN_RESEARCH_V2 = "RUN_RESEARCH_V2"
+    RUN_FREEZE_V2 = "RUN_FREEZE_V2"
+    RUN_COMPILE_V2 = "RUN_COMPILE_V2"
+    RUN_PLATEAU_V2 = "RUN_PLATEAU_V2"
 
 # JobStatus enum (matches JobState values)
 class JobStatus(StrEnum):
@@ -73,10 +71,6 @@ def normalize_job_type(job_type: str | JobType) -> JobType:
     Convert any job type string (including legacy aliases) to canonical JobType.
     
     Supported legacy aliases:
-      - "RUN_RESEARCH" -> JobType.RUN_RESEARCH_V2
-      - "RUN_PLATEAU" -> JobType.RUN_PLATEAU_V2
-      - "RUN_FREEZE" -> JobType.RUN_FREEZE_V2
-      - "RUN_COMPILE" -> JobType.RUN_COMPILE_V2
       - "BUILD_PORTFOLIO" -> JobType.BUILD_PORTFOLIO_V2
       - case-insensitive matching (uppercase/lowercase)
     
@@ -90,10 +84,6 @@ def normalize_job_type(job_type: str | JobType) -> JobType:
     
     # Legacy alias mapping
     legacy_map = {
-        "RUN_RESEARCH": JobType.RUN_RESEARCH_V2,
-        "RUN_PLATEAU": JobType.RUN_PLATEAU_V2,
-        "RUN_FREEZE": JobType.RUN_FREEZE_V2,
-        "RUN_COMPILE": JobType.RUN_COMPILE_V2,
         "BUILD_PORTFOLIO": JobType.BUILD_PORTFOLIO_V2,
         "BUILD_DATA": JobType.BUILD_DATA,
     }
@@ -196,7 +186,7 @@ def get_job_artifact_dir(outputs_root: Path, job_id: str) -> Path:
     Return canonical artifact directory for a job.
     
     Contract:
-      - returns outputs_root / "jobs" / job_id
+      - returns outputs_root / "artifacts" / "jobs" / job_id
       - job_id must be a valid UUID (or at least safe path component)
       - no path traversal allowed (job_id must not contain '/', '..', etc.)
       - caller should mkdir(parents=True, exist_ok=True) before writing.
@@ -204,4 +194,4 @@ def get_job_artifact_dir(outputs_root: Path, job_id: str) -> Path:
     # Basic sanitization: ensure job_id is a single path component
     if not job_id or "/" in job_id or "\\" in job_id or job_id in (".", ".."):
         raise ValueError(f"Invalid job_id for artifact directory: {job_id}")
-    return (outputs_root / "jobs" / job_id).resolve()
+    return (outputs_root / "artifacts" / "jobs" / job_id).resolve()

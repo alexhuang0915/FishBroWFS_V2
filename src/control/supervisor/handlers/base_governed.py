@@ -228,7 +228,7 @@ def governed_handler(evidence_base_dir: Path):
     Decorator to mark a handler as governed.
     
     Usage:
-        @governed_handler(Path("outputs/jobs"))
+        @governed_handler(Path("outputs/artifacts/jobs"))
         class MyHandler(BaseGovernedHandler):
             ...
     """

@@ -91,7 +91,7 @@ def write_json_atomic(path: Path, data: dict) -> None:
             f,
             sort_keys=True,
             ensure_ascii=False,
-            separators=(",", ":"),
+            indent=2,
             allow_nan=False,
         )
         tmp_path = Path(f.name)

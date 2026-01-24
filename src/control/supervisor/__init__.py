@@ -8,34 +8,17 @@ from pathlib import Path
 from .models import JobSpec, JobRow, SubmitResult, JobType, normalize_job_type
 from .db import SupervisorDB, get_default_db_path
 from .job_handler import register_handler, get_handler, validate_job_spec
-from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError, write_policy_check_artifact
-from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError
+from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError, write_policy_check_artifact, PolicyResult
 
 
-# Import and register built-in handlers
-from .handlers.ping import ping_handler
-from .handlers.clean_cache import clean_cache_handler
+# Import and register built-in handlers (Local Research OS mode: mainline only)
 from .handlers.build_data import build_data_handler
-from .handlers.generate_reports import generate_reports_handler
-from .handlers.run_research import run_research_handler
-from .handlers.run_plateau import run_plateau_handler
-from .handlers.run_freeze import run_freeze_handler
-from .handlers.run_compile import run_compile_handler
 from .handlers.build_portfolio import build_portfolio_handler
 from .handlers.run_research_wfs import run_research_wfs_handler
-from .handlers.run_portfolio_admission import run_portfolio_admission_handler
 
-register_handler("PING", ping_handler)
-register_handler("CLEAN_CACHE", clean_cache_handler)
 register_handler("BUILD_DATA", build_data_handler)
-register_handler("GENERATE_REPORTS", generate_reports_handler)
-register_handler("RUN_RESEARCH_V2", run_research_handler)
-register_handler("RUN_PLATEAU_V2", run_plateau_handler)
-register_handler("RUN_FREEZE_V2", run_freeze_handler)
-register_handler("RUN_COMPILE_V2", run_compile_handler)
 register_handler("BUILD_PORTFOLIO_V2", build_portfolio_handler)
 register_handler("RUN_RESEARCH_WFS", run_research_wfs_handler)
-register_handler("RUN_PORTFOLIO_ADMISSION", run_portfolio_admission_handler)
 
 
 def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:
@@ -73,6 +56,51 @@ def submit(job_type: str, params: dict, metadata: Optional[dict] = None) -> str:
             },
         )
         raise PolicyEnforcementError(job_id, policy_result)
+
+    # After policy passes, validate handler payload. If invalid, record REJECTED.
+    handler = get_handler(str(spec.job_type))
+    if handler is None:
+        # Should not happen due to validate_job_spec, but keep deterministic.
+        invalid = PolicyResult(
+            allowed=False,
+            code="POLICY_REJECT_UNKNOWN_HANDLER",
+            message=f"Unknown job_type: {spec.job_type}",
+            details={"job_type": str(spec.job_type)},
+            stage="preflight",
+        )
+        job_id = db.submit_rejected_job(
+            spec,
+            "",
+            invalid.message,
+            failure_code=invalid.code,
+            failure_message=invalid.message,
+            failure_details=invalid.details,
+            policy_stage=invalid.stage,
+        )
+        write_policy_check_artifact(job_id, spec.job_type, preflight_results=[invalid])
+        raise PolicyEnforcementError(job_id, invalid)
+
+    try:
+        handler.validate_params(spec.params)
+    except Exception as e:
+        invalid = PolicyResult(
+            allowed=False,
+            code="POLICY_REJECT_INVALID_PAYLOAD",
+            message=str(e),
+            details={"params_keys": list(spec.params.keys())},
+            stage="preflight",
+        )
+        job_id = db.submit_rejected_job(
+            spec,
+            "",
+            invalid.message,
+            failure_code=invalid.code,
+            failure_message=invalid.message,
+            failure_details=invalid.details,
+            policy_stage=invalid.stage,
+        )
+        write_policy_check_artifact(job_id, spec.job_type, preflight_results=[invalid])
+        raise PolicyEnforcementError(job_id, invalid)
 
     job_id = db.submit_job(spec)
     write_policy_check_artifact(

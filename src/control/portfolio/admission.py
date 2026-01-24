@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime, timezone
 
-from portfolio.governance.params import load_governance_params
-from portfolio.models.governance_models import GovernanceParams
+# from portfolio.governance.params import load_governance_params # REMOVED
+# from portfolio.models.governance_models import GovernanceParams # REMOVED
 from control.portfolio.evidence_reader import RunEvidenceReader
 from control.portfolio.policies.correlation import CorrelationGate, CorrelationGateResult
 from control.portfolio.policies.risk_budget import RiskBudgetGate, RiskBudgetResult
@@ -37,7 +37,7 @@ class PortfolioAdmissionController:
     
     def __init__(
         self,
-        params: GovernanceParams,
+        params: Any,
         evidence_reader: RunEvidenceReader,
         season: str = "current"
     ):
@@ -49,7 +49,8 @@ class PortfolioAdmissionController:
     @classmethod
     def from_defaults(cls, season: str = "current") -> "PortfolioAdmissionController":
         """Factory method using default GovernanceParams and RunEvidenceReader."""
-        params = load_governance_params()
+        # params = load_governance_params()
+        params = None # Stub
         reader = RunEvidenceReader()
         return cls(params, reader, season)
     

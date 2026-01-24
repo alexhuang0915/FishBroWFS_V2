@@ -83,7 +83,7 @@ class AdmissionController:
     def _check_timeframe_allowed(self, job_type: str, payload: Dict[str, Any]) -> PolicyCheck:
         """Check if timeframe parameter is allowed (15, 30, 60, 120, 240)."""
         # Only apply to job types that have timeframe parameter
-        if job_type not in ["RUN_RESEARCH_V2", "RUN_PLATEAU_V2"]:
+        if job_type not in ["RUN_RESEARCH_WFS"]:
             return PolicyCheck(
                 policy_name="check_timeframe_allowed",
                 passed=True,
@@ -119,7 +119,7 @@ class AdmissionController:
     def _check_season_format(self, job_type: str, payload: Dict[str, Any]) -> PolicyCheck:
         """Validate YYYYQ# format if season exists."""
         # Only apply to job types that have season parameter
-        if job_type not in ["RUN_FREEZE_V2", "RUN_COMPILE_V2", "BUILD_PORTFOLIO_V2"]:
+        if job_type not in ["BUILD_PORTFOLIO_V2"]:
             return PolicyCheck(
                 policy_name="check_season_format",
                 passed=True,

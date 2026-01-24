@@ -40,6 +40,8 @@ class SupervisorDB:
     
     def _connect(self) -> sqlite3.Connection:
         """Create connection with explicit transaction control."""
+        # Ensure runtime root exists before opening/creating jobs_v2.db.
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         conn = sqlite3.connect(str(self.db_path), isolation_level=None)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
@@ -163,6 +165,17 @@ class SupervisorDB:
                         exported_by TEXT NOT NULL,
                         PRIMARY KEY (season_id, artifact_path),
                         FOREIGN KEY (season_id) REFERENCES seasons (season_id) ON DELETE CASCADE
+                    )
+                """)
+
+                # supervisors table (Track active orchestrators)
+                conn.execute("""
+                    CREATE TABLE IF NOT EXISTS supervisors (
+                        supervisor_id TEXT PRIMARY KEY,
+                        pid INTEGER NOT NULL,
+                        hostname TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
                     )
                 """)
                 
@@ -463,10 +476,20 @@ class SupervisorDB:
                     UPDATE jobs
                     SET state = ?, updated_at = ?,
                         result_json = ?, state_reason = '',
+                        progress = ?, phase = ?, last_heartbeat = ?,
                         failure_code = '', failure_message = '',
                         failure_details = NULL, policy_stage = ''
                     WHERE job_id = ? AND state = ?
-                """, (JobStatus.SUCCEEDED, now_iso(), result_json, job_id, JobStatus.RUNNING))
+                """, (
+                    JobStatus.SUCCEEDED,
+                    now_iso(),
+                    result_json,
+                    1.0,
+                    "complete",
+                    now_iso(),
+                    job_id,
+                    JobStatus.RUNNING,
+                ))
                 # Clear worker assignment
                 if row["worker_id"]:
                     conn.execute("""
@@ -738,3 +761,49 @@ class SupervisorDB:
             if row is None:
                 return None
             return WorkerRow(**dict(row))
+
+    def register_supervisor(self, supervisor_id: str, pid: int, hostname: str) -> None:
+        """Register a new supervisor process."""
+        now = now_iso()
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("""
+                    INSERT OR REPLACE INTO supervisors (supervisor_id, pid, hostname, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (supervisor_id, pid, hostname, now, now))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    def heartbeat_supervisor(self, supervisor_id: str) -> None:
+        """Update supervisor heartbeat."""
+        now = now_iso()
+        with self._connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            try:
+                conn.execute("""
+                    UPDATE supervisors
+                    SET updated_at = ?
+                    WHERE supervisor_id = ?
+                """, (now, supervisor_id))
+                conn.commit()
+            except Exception:
+                conn.rollback()
+                raise
+
+    def get_active_supervisors_count(self, timeout_sec: float = 30.0) -> int:
+        """Count supervisors active within timeout."""
+        now = now_iso()
+        with self._connect() as conn:
+            cursor = conn.execute("""
+                SELECT updated_at FROM supervisors
+            """)
+            rows = cursor.fetchall()
+
+        count = 0
+        for row in rows:
+            if seconds_since(row["updated_at"], now) < timeout_sec:
+                count += 1
+        return count

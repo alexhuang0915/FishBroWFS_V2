@@ -101,7 +101,7 @@ def format_job_row(job: JobRow) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Supervisor CLI")
     parser.add_argument("--db", type=Path, default=None,
-                       help="Path to jobs_v2.db (default: outputs/jobs_v2.db)")
+                       help="Path to jobs_v2.db (default: outputs/runtime/jobs_v2.db)")
     
     subparsers = parser.add_subparsers(dest="command", required=True)
     

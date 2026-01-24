@@ -13,7 +13,28 @@ from pathlib import Path
 from typing import Optional
 
 from contracts.data.snapshot_models import SnapshotMetadata
-from data.dataset_registry import DatasetIndex, DatasetRecord
+# from data.dataset_registry import DatasetIndex, DatasetRecord # REMOVED
+
+from pydantic import BaseModel
+from typing import List, Any
+from datetime import date
+
+class DatasetRecord(BaseModel):
+    id: str
+    symbol: str
+    exchange: str
+    timeframe: str
+    path: str
+    start_date: date
+    end_date: date
+    fingerprint_sha1: str
+    fingerprint_sha256_40: str
+    tz_provider: str
+    tz_version: str
+
+class DatasetIndex(BaseModel):
+    generated_at: datetime
+    datasets: List[DatasetRecord]
 
 
 def _get_dataset_registry_root() -> Path:

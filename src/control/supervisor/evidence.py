@@ -20,6 +20,18 @@ from contracts.supervisor.evidence_schemas import (
 )
 
 
+def _normalize_job_type(job_type: str) -> str:
+    normalized = (job_type or "").strip().lower()
+    return normalized
+
+
+def _receipt_manifest_filename(job_type: str) -> str:
+    normalized = _normalize_job_type(job_type)
+    if not normalized:
+        return "job_manifest.json"
+    return f"{normalized}_manifest.json"
+
+
 def job_evidence_dir(base_dir: Path, job_id: str) -> Path:
     """Get the evidence directory for a job."""
     return base_dir / job_id
@@ -84,6 +96,9 @@ def write_manifest(
         manifest.update(additional_info)
     
     atomic_write_json(evidence_dir / "manifest.json", manifest)
+    receipt_name = _receipt_manifest_filename(job_type)
+    if receipt_name != "manifest.json":
+        atomic_write_json(evidence_dir / receipt_name, manifest)
 
 
 def write_policy_check(

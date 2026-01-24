@@ -17,6 +17,11 @@ class Supervisor:
     """Main supervisor loop."""
     
     def __init__(
+        self,
+        db_path: Optional[Path] = None,
+        max_workers: int = 4,
+        tick_interval: float = 1.0,
+        artifacts_root: Optional[Path] = None,
     ):
         from core.paths import get_artifacts_root
         self.db_path = db_path or get_default_db_path()
@@ -31,6 +36,12 @@ class Supervisor:
         
         # Ensure artifacts directory exists
         self.artifacts_root.mkdir(parents=True, exist_ok=True)
+
+        # Supervisor Identity
+        import socket
+        self.hostname = socket.gethostname()
+        self.pid = os.getpid()
+        self.supervisor_id = f"sup_{self.hostname}_{self.pid}"
     
     def spawn_worker(self, job_id: str) -> Optional[int]:
         """Spawn a worker process for the given job."""
@@ -47,8 +58,9 @@ class Supervisor:
             ]
             
             try:
-                from .models import get_job_artifact_dir
-                job_artifacts_dir = get_job_artifact_dir(self.artifacts_root, job_id)
+                # Manually construct job dir to avoid double-nesting "artifacts"
+                # get_job_artifact_dir expects outputs_root, but we have artifacts_root
+                job_artifacts_dir = self.artifacts_root / "jobs" / job_id
                 job_artifacts_dir.mkdir(parents=True, exist_ok=True)
 
                 stdout_path = job_artifacts_dir / "worker_stdout.txt"
@@ -248,8 +260,18 @@ class Supervisor:
                 self.db.mark_aborted(job.job_id, "user_abort", error_details=error_details)
                 print(f"Aborted RUNNING job {job.job_id}")
     
-    def tick(self) -> None:
-        """Perform one supervisor tick."""
+    def tick(self) -> List[str]:
+        """Perform one supervisor tick.
+
+        Returns:
+            List of job_ids spawned this tick.
+        """
+        # 0. Heartbeat self
+        try:
+            self.db.heartbeat_supervisor(self.supervisor_id)
+        except Exception as e:
+            print(f"Supervisor heartbeat failed: {e}")
+
         # 1. Reap exited children
         self.reap_children()
         
@@ -261,6 +283,7 @@ class Supervisor:
         
         # 4. Spawn workers for queued jobs
         available_slots = self.max_workers - len(self.children)
+        spawned: List[str] = []
         for _ in range(available_slots):
             job_id = self.db.fetch_next_queued_job()
             if job_id is None:
@@ -270,12 +293,20 @@ class Supervisor:
                 # No more slots
                 break
             print(f"Spawned worker {pid} for job {job_id}")
+            spawned.append(job_id)
+        return spawned
     
     def run_forever(self) -> None:
         """Run supervisor loop forever."""
         self.running = True
         print(f"Supervisor started (max_workers={self.max_workers}, db={self.db_path})")
         
+        # Register self
+        try:
+            self.db.register_supervisor(self.supervisor_id, self.pid, self.hostname)
+        except Exception as e:
+            print(f"Failed to register supervisor: {e}")
+
         try:
             while self.running:
                 self.tick()
@@ -317,7 +348,7 @@ def main() -> None:
     
     parser = argparse.ArgumentParser(description="Supervisor main loop")
     parser.add_argument("--db", type=Path, default=None,
-                       help="Path to jobs_v2.db (default: outputs/jobs_v2.db)")
+                       help="Path to jobs_v2.db (default: outputs/runtime/jobs_v2.db)")
     parser.add_argument("--max-workers", type=int, default=4,
                        help="Maximum concurrent workers")
     parser.add_argument("--tick-interval", type=float, default=1.0,

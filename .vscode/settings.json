@@ -3,5 +3,8 @@
     "geminicodeassist.agentYoloMode": true,
     "geminicodeassist.contextExclusionGitignore": false,
     "python.analysis.typeCheckingMode": "off",
-    "cursorpyright.analysis.typeCheckingMode": "off"
+    "cursorpyright.analysis.typeCheckingMode": "off",
+    "tfa.status.displayFormat": "remaining",
+    "tfa.status.showCache": true,
+    "chatgpt.openOnStartup": true
 }

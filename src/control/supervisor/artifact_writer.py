@@ -3,7 +3,7 @@
 Canonical artifact writer for supervisor jobs.
 
 Writes spec.json, state.json, result.json, stdout.log, stderr.log
-under the canonical job artifact directory (outputs/jobs/<job_id>/).
+under the canonical job artifact directory (outputs/artifacts/jobs/<job_id>/).
 """
 
 from __future__ import annotations
@@ -85,6 +85,43 @@ class CanonicalArtifactWriter:
         """Write result.json."""
         result_path = self.artifacts_dir / "result.json"
         write_json_atomic(result_path, result)
+
+    def write_manifest(
+        self,
+        *,
+        job_type: str,
+        state: str,
+        start_time: str,
+        end_time: str,
+        additional_info: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Write a local receipt manifest (no HTTP assumptions)."""
+        evidence_files = []
+        try:
+            for p in sorted(self.artifacts_dir.iterdir(), key=lambda x: x.name):
+                if p.is_file():
+                    evidence_files.append(p.name)
+        except Exception:
+            evidence_files = []
+
+        manifest: Dict[str, Any] = {
+            "job_id": self.job_id,
+            "job_type": str(job_type),
+            "state": state,
+            "start_time": start_time,
+            "end_time": end_time,
+            "evidence_files": evidence_files,
+        }
+        if additional_info:
+            manifest.update(additional_info)
+
+        # Write both generic + typed receipt for stable discovery.
+        write_json_atomic(self.artifacts_dir / "manifest.json", manifest)
+        normalized = str(job_type).strip().lower()
+        if normalized:
+            receipt = self.artifacts_dir / f"{normalized}_manifest.json"
+            if receipt.name != "manifest.json":
+                write_json_atomic(receipt, manifest)
     
     def write_all(self, status: JobStatus, result: Optional[Dict[str, Any]] = None,
                   progress: Optional[float] = None, phase: Optional[str] = None,

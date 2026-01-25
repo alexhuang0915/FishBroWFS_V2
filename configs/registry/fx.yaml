@@ -1,0 +1,17 @@
+# FX Registry (V1)
+#
+# - V1 uses fixed FX constants only (no time-series FX alignment).
+# - Used to convert instrument-currency PnL into the base currency for scoring/reporting.
+#
+# Base currency (aligned): TWD
+
+version: "1.0"
+base_currency: "TWD"
+as_of: "2026-01-25"
+
+# fx_to_base[currency] = base_currency amount for 1 unit of `currency`
+# V1 uses fixed constants. If you want to change values, bump version (or add an "as_of" field).
+fx_to_base:
+  TWD: 1.0
+  USD: 31.5
+  JPY: 0.21

@@ -135,27 +135,54 @@ def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
     if not strategy_id:
         raise ValueError(f"策略配置缺少 strategy_id: {yaml_path}")
     
-    # 提取 features 列表
+    # 提取 features
     features = data.get("features", [])
     
     # 轉換為 StrategyFeatureRequirements 格式
     required = []
     optional = []
     
-    for feature in features:
-        name = feature.get("name")
-        timeframe = feature.get("timeframe")
-        required_flag = feature.get("required", True)
-        
-        if not name or not timeframe:
-            raise ValueError(f"特徵缺少 name 或 timeframe: {feature}")
-        
-        feature_ref = FeatureRef(name=name, timeframe_min=timeframe)
-        
-        if required_flag:
-            required.append(feature_ref)
-        else:
-            optional.append(feature_ref)
+    def _consume(items):
+        for feature in items or []:
+            if not isinstance(feature, dict):
+                continue
+            name = feature.get("name")
+            timeframe = feature.get("timeframe")
+            required_flag = feature.get("required", True)
+            if not name or not timeframe:
+                raise ValueError(f"特徵缺少 name 或 timeframe: {feature}")
+            feature_ref = FeatureRef(name=str(name), timeframe_min=int(timeframe))
+            if required_flag:
+                required.append(feature_ref)
+            else:
+                optional.append(feature_ref)
+
+    def _expand_decl(decl):
+        if isinstance(decl, list):
+            return decl
+        if isinstance(decl, dict):
+            from control.feature_packs_yaml import expand_pack_with_overrides
+
+            pack_id = decl.get("pack")
+            add = decl.get("add")
+            remove = decl.get("remove")
+            return expand_pack_with_overrides(
+                pack_id=str(pack_id).strip() if pack_id else None,
+                add=add if isinstance(add, list) else None,
+                remove=remove if isinstance(remove, list) else None,
+            )
+        return []
+
+    # legacy: list
+    if isinstance(features, list):
+        _consume(features)
+    # v2: dict partitions
+    elif isinstance(features, dict):
+        _consume(_expand_decl(features.get("data1")))
+        _consume(_expand_decl(features.get("data2")))
+        _consume(_expand_decl(features.get("cross")))
+    else:
+        raise ValueError(f"不支援的 features 格式: {type(features)}")
     
     return StrategyFeatureRequirements(
         strategy_id=strategy_id,
@@ -195,5 +222,3 @@ def save_requirements_to_json(
         path.write_text(json_str, encoding="utf-8")
     except (IOError, OSError) as e:
         raise ValueError(f"無法寫入需求檔案 {json_path}: {e}")
-
-

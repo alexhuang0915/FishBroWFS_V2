@@ -1,29 +1,23 @@
-# Profile for CME.6J with Taipei fixed sessions and mandatory cost model
+# Profile for CME.6J with Taipei fixed sessions
 version: "2.0"
 symbol: "CME.6J"
 
-# MANDATORY cost model
-cost_model:
-  commission_per_side_usd: 0.85
-  slippage_per_side_usd: 1.25
+# Cost model SSOT: configs/registry/instruments.yaml
 
 # Session configuration
-exchange_tz: "Asia/Taipei"
+# Exchange timezone (rules follow exchange; data is Taipei-local timestamps)
+exchange_tz: "America/Chicago"
 data_tz: "Asia/Taipei"
+# windows are expressed in exchange local time (will be converted to data_tz in UI)
+windows_tz: "America/Chicago"
 
 windows:
   - state: "TRADING"
-    start: "08:45:00"
-    end: "13:45:00"
+    start: "17:00:00"
+    end: "16:00:00"
   - state: "BREAK"
-    start: "13:45:00"
-    end: "21:00:00"
-  - state: "TRADING"
-    start: "21:00:00"
-    end: "06:00:00"
-  - state: "BREAK"
-    start: "06:00:00"
-    end: "08:45:00"
+    start: "16:00:00"
+    end: "17:00:00"
 
 # Memory configuration
 memory:

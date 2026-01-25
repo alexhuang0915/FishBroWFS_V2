@@ -1,15 +1,14 @@
-# Profile for TWF.MXF with Taipei fixed sessions and mandatory cost model
+# Profile for TWF.MXF with Taipei fixed sessions
 version: "2.0"
 symbol: "TWF.MXF"
 
-# MANDATORY cost model
-cost_model:
-  commission_per_side_usd: 3.00
-  slippage_per_side_usd: 2.50
+# Cost model SSOT: configs/registry/instruments.yaml
 
 # Session configuration
 exchange_tz: "Asia/Taipei"
 data_tz: "Asia/Taipei"
+# windows are expressed in this timezone (current profiles are FIXED_TPE)
+windows_tz: "Asia/Taipei"
 
 windows:
   - state: "TRADING"

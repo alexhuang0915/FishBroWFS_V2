@@ -8,6 +8,5 @@ seasons:
 spec_sha256: e02e5b3ab43357d7bfe7c6732e76efdbd1a287b125cb2e32c62b8f0a4ed4fe13
 start_date: null
 strategy_ids:
-- sma_cross
-- mean_revert_zscore
+- regime_filter_v1
 version: PORTFOLIO_SPEC_V1

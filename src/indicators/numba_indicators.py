@@ -4,7 +4,7 @@ Numba-accelerated technical indicators.
 import numpy as np
 from numba import njit
 
-@njit
+@njit(cache=True)
 def rolling_max(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -22,7 +22,7 @@ def rolling_max(arr: np.ndarray, window: int) -> np.ndarray:
         out[i] = m
     return out
 
-@njit
+@njit(cache=True)
 def rolling_min(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -40,7 +40,7 @@ def rolling_min(arr: np.ndarray, window: int) -> np.ndarray:
         out[i] = m
     return out
 
-@njit
+@njit(cache=True)
 def sma(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -58,15 +58,37 @@ def sma(arr: np.ndarray, window: int) -> np.ndarray:
         out[i] = slice_sum / window
     return out
 
-@njit
+@njit(cache=True)
+def ema(arr: np.ndarray, window: int) -> np.ndarray:
+    n = arr.shape[0]
+    out = np.full(n, np.nan, dtype=np.float64)
+    if window <= 0 or n == 0:
+        return out
+    if window == 1:
+        for i in range(n):
+            out[i] = arr[i]
+        return out
+    # Seed with SMA of first window
+    if n < window:
+        return out
+    s = 0.0
+    for i in range(window):
+        s += arr[i]
+    out[window - 1] = s / window
+    alpha = 2.0 / (window + 1.0)
+    for i in range(window, n):
+        out[i] = (arr[i] * alpha) + (out[i - 1] * (1.0 - alpha))
+    return out
+
+@njit(cache=True)
 def hh(arr: np.ndarray, window: int) -> np.ndarray:
     return rolling_max(arr, window)
 
-@njit
+@njit(cache=True)
 def ll(arr: np.ndarray, window: int) -> np.ndarray:
     return rolling_min(arr, window)
 
-@njit
+@njit(cache=True)
 def atr_wilder(high, low, close, window):
     n = len(high)
     out = np.full(n, np.nan, dtype=np.float64)
@@ -92,7 +114,7 @@ def atr_wilder(high, low, close, window):
         out[i] = (out[i - 1] * (window - 1) + tr[i]) / window
     return out
 
-@njit
+@njit(cache=True)
 def rolling_stdev(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -119,7 +141,7 @@ def rolling_stdev(arr: np.ndarray, window: int) -> np.ndarray:
         out[i] = np.sqrt(var_sample)
     return out
 
-@njit
+@njit(cache=True)
 def bbands_pb(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -139,7 +161,7 @@ def bbands_pb(arr: np.ndarray, window: int) -> np.ndarray:
             out[i] = (arr[i] - lower) / denom
     return out
 
-@njit
+@njit(cache=True)
 def bbands_width(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -159,7 +181,7 @@ def bbands_width(arr: np.ndarray, window: int) -> np.ndarray:
             out[i] = (upper - lower) / denom
     return out
 
-@njit
+@njit(cache=True)
 def atr_channel_upper(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -173,7 +195,7 @@ def atr_channel_upper(high: np.ndarray, low: np.ndarray, close: np.ndarray, wind
         out[i] = sma_vals[i] + atr_vals[i]
     return out
 
-@njit
+@njit(cache=True)
 def atr_channel_lower(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -187,7 +209,7 @@ def atr_channel_lower(high: np.ndarray, low: np.ndarray, close: np.ndarray, wind
         out[i] = sma_vals[i] - atr_vals[i]
     return out
 
-@njit
+@njit(cache=True)
 def atr_channel_pos(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -207,7 +229,7 @@ def atr_channel_pos(high: np.ndarray, low: np.ndarray, close: np.ndarray, window
             out[i] = (close[i] - lower) / denom
     return out
 
-@njit
+@njit(cache=True)
 def donchian_width(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -225,7 +247,7 @@ def donchian_width(high: np.ndarray, low: np.ndarray, close: np.ndarray, window:
             out[i] = (hh_vals[i] - ll_vals[i]) / denom
     return out
 
-@njit
+@njit(cache=True)
 def dist_to_hh(high: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -242,7 +264,7 @@ def dist_to_hh(high: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
             out[i] = (close[i] / denom) - 1.0
     return out
 
-@njit
+@njit(cache=True)
 def dist_to_ll(low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
     n = close.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -259,7 +281,7 @@ def dist_to_ll(low: np.ndarray, close: np.ndarray, window: int) -> np.ndarray:
             out[i] = (close[i] / denom) - 1.0
     return out
 
-@njit
+@njit(cache=True)
 def percentile_rank(arr: np.ndarray, window: int) -> np.ndarray:
     n = arr.shape[0]
     out = np.full(n, np.nan, dtype=np.float64)
@@ -280,6 +302,6 @@ def percentile_rank(arr: np.ndarray, window: int) -> np.ndarray:
         out[i] = cnt / float(denom)
     return out
 
-@njit
+@njit(cache=True)
 def vx_percentile(arr: np.ndarray, window: int) -> np.ndarray:
     return percentile_rank(arr, window)

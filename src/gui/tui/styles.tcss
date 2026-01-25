@@ -13,9 +13,22 @@ Screen {
     color: $text;
 }
 
+Select {
+    height: 3;
+}
+
+.full_panel {
+    padding: 1 2;
+}
+
+.half_panel {
+    width: 1fr;
+    padding: 0 2;
+}
+
 Header {
     background: $header-bg;
-    color: $text;
+    color: $accent;
     height: 1;
     content-align: center middle;
     text-style: bold;
@@ -75,17 +88,34 @@ Header {
 
 DataTable {
     height: 1fr;
-    margin: 1 2;
-    border: round $border;
+    margin: 0 2 1 2;
+    border: none;
+    background: transparent;
+}
+
+DataTable > .datatable--header {
+    text-style: bold;
+    color: $accent;
+    background: $header-bg;
+}
+
+DataTable > .datatable--cursor {
+    background: $accent 30%;
+    color: $text;
+    text-style: bold;
+}
+
+DataTable > .datatable--hover {
+    background: $accent 10%;
 }
 
 .form_panel {
-    width: 3fr;
+    width: 1fr;
     padding: 1 2;
 }
 
 .monitor_panel {
-    width: 2fr;
+    width: 1fr;
     padding: 1 2;
     border-left: solid $border;
 }
@@ -97,24 +127,219 @@ DataTable {
 }
 
 .label {
-    width: 22;
-    text-align: right;
+    width: 25;
+    text-align: left;
     text-style: bold;
     color: $accent;
+    margin-right: 2;
+    height: 3;
+    content-align: left middle;
 }
 
 .value {
     width: 1fr;
-    margin-left: 2;
+    max-height: 3;
+}
+
+Button {
+    min-width: 12;
+    height: 3;
+    margin-left: 1;
+}
+
+.field_row {
+    height: 3;
+    align: left middle;
+}
+
+.field_row Label {
+    height: 3;
+    content-align: left middle;
+}
+
+#monitor_actions_row, #tail_actions_row, #portfolio_recent_row {
+    height: 3;
 }
 
 .hint {
     color: $text-muted;
-    margin: 0 2 1 2;
+    margin: 0 0 1 27;
+    text-style: italic;
+    opacity: 0.8;
 }
 
 .section_title {
     color: $accent;
     text-style: bold;
+    background: $header-bg;
+    padding: 0 2;
     margin: 1 0 0 0;
+    width: 100%;
+}
+
+#title {
+    text-style: bold reverse;
+    color: $accent;
+    padding: 0 2;
+    margin-bottom: 1;
+    width: 100%;
+}
+
+#info_row {
+    height: auto;
+}
+
+#readiness_table, #instr_table {
+    height: 1fr;
+}
+
+#profiles_table {
+    height: 3fr;
+}
+
+#audit_table, #storage_table {
+    height: 1fr;
+}
+
+#strategy_table {
+    height: 2fr;
+}
+
+#artifact_list_container, #log_container {
+    height: 1fr;
+    width: 1fr;
+    margin: 1 1;
+}
+
+#audit_table, #storage_table {
+    height: 1fr;
+}
+
+
+#report_sidebar {
+    width: 2fr;
+    padding: 1 2;
+    border-right: solid $border;
+}
+
+#report_sidebar Input {
+    margin: 0 0 1 0;
+}
+
+#report_body {
+    width: 3fr;
+    padding: 1 2;
+}
+
+#report_title {
+    text-style: bold;
+    color: $accent;
+}
+
+.report_card {
+    border: round $border;
+    padding: 1 2;
+    margin: 1 1;
+    height: auto;
+    width: 1fr;
+}
+
+#section_a, #section_b, #section_c {
+    height: auto;
+}
+
+#robust_panel {
+    width: 1fr;
+    padding: 0 1 0 0;
+}
+
+#windows_panel {
+    width: 2fr;
+}
+
+#window_detail {
+    margin-top: 1;
+    color: $text-muted;
+}
+
+#footer {
+    margin: 1 0 0 0;
+    color: $text-muted;
+}
+
+#confirm_delete_modal {
+    width: 60%;
+    max-width: 80;
+    padding: 2 4;
+    border: round $border;
+    background: $surface;
+    align: center middle;
+}
+
+#confirm_delete_title {
+    text-style: bold;
+    color: $accent;
+}
+
+#confirm_delete_body {
+    margin: 1 0;
+}
+
+#confirm_delete_actions {
+    height: auto;
+}
+
+#catalog_header {
+    height: 1;
+    background: $header-bg;
+    color: $accent;
+    text-style: bold;
+    padding: 0 2;
+}
+
+#strategy_list {
+    height: 3fr;
+    background: transparent;
+    border: none;
+}
+
+.strategy_card {
+    height: auto;
+    padding: 0 0;
+    margin: 0;
+}
+
+.card_header {
+    height: 1;
+    padding: 0 2;
+}
+
+.card_header Label {
+    height: 1;
+}
+
+.card_features {
+    margin: 0 0 1 2;
+    color: $text-muted;
+    width: 100%;
+}
+
+.spacer {
+    width: 1fr;
+}
+
+.id_col { width: 12; }
+.name_col { width: 30; }
+.family_col { width: 15; }
+.readiness_col { width: 40; }
+.data2_col { width: 12; }
+
+Button.error {
+    background: #7a2e2e;
+    color: $text;
+}
+
+Button.error:hover {
+    background: #a23a3a;
+    color: $text;
 }

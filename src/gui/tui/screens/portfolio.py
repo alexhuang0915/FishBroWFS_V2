@@ -3,6 +3,7 @@ from textual.widgets import Label, Button, Static, Input, Select
 from textual.containers import Vertical, Horizontal
 
 from gui.tui.screens.base import BaseScreen
+from gui.tui.screens.portfolio_recommendations import PortfolioRecommendationsModal
 from gui.tui.services.bridge import Bridge
 from gui.tui.widgets.job_monitor import JobMonitorPanel
 
@@ -25,31 +26,27 @@ class PortfolioScreen(BaseScreen):
                     yield Input(value="2026Q1", id="season", classes="value")
 
                 with Horizontal():
-                    yield Label("Candidate Run IDs:", classes="label")
+                    yield Label("Candidate IDs:", classes="label")
                     yield Input(placeholder="comma-separated WFS job_ids", id="candidate_run_ids", classes="value")
 
-                with Horizontal():
-                    yield Label("Recent WFS Jobs:", classes="label")
+                with Horizontal(id="portfolio_recent_row"):
+                    yield Label("Recent Jobs:", classes="label")
                     recent = self.bridge.get_recent_job_ids("RUN_RESEARCH_WFS", limit=10)
                     options = [(jid[:8], jid) for jid in recent] if recent else [("none", Select.BLANK)]
                     yield Select(options, id="recent_wfs_jobs", classes="value")
                     yield Button("Add", id="add_recent_wfs")
                     yield Button("Copy", id="copy_recent_wfs")
-                    yield Button("Copy Latest", id="copy_latest_wfs")
 
                 with Horizontal():
-                    yield Label("Portfolio ID (opt):", classes="label")
-                    yield Input(placeholder="optional", id="portfolio_id", classes="value")
+                    yield Label("Portfolio ID:", classes="label")
+                    yield Input(placeholder="optional unique name", id="portfolio_id", classes="value")
 
                 with Horizontal():
-                    yield Label("Allowlist (opt):", classes="label")
+                    yield Label("Allowlist:", classes="label")
                     yield Input(placeholder="comma-separated symbols (optional)", id="allowlist", classes="value")
 
-                with Horizontal():
-                    yield Label("Timeframe (opt):", classes="label")
-                    yield Input(placeholder="e.g. 60m", id="timeframe", classes="value")
-
-                yield Button("Submit BUILD_PORTFOLIO_V2", variant="primary", id="submit_portfolio")
+                yield Button("Submit BUILD_PORTFOLIO Job", variant="primary", id="submit_portfolio")
+                yield Button("Open Recommendations (Advisory)", id="open_recommendations")
                 yield Static("", id="status")
 
             yield JobMonitorPanel(self.bridge, classes="monitor_panel")
@@ -60,7 +57,7 @@ class PortfolioScreen(BaseScreen):
         run_ids_raw = self.query_one("#candidate_run_ids", Input).value.strip()
         portfolio_id = self.query_one("#portfolio_id", Input).value.strip()
         allowlist = self.query_one("#allowlist", Input).value.strip()
-        timeframe = self.query_one("#timeframe", Input).value.strip()
+        timeframe = None
 
         if not season:
             self.query_one("#status").update("Error: season is required.")
@@ -85,6 +82,10 @@ class PortfolioScreen(BaseScreen):
             self.query_one("#status").update(f"Submitted BUILD_PORTFOLIO_V2 job: {job_id[:8]}...")
         except Exception as e:
             self.query_one("#status").update(f"Error: {e}")
+
+    @on(Button.Pressed, "#open_recommendations")
+    def handle_open_recommendations(self) -> None:
+        self.app.push_screen(PortfolioRecommendationsModal(self.bridge))
 
     @on(Button.Pressed, "#add_recent_wfs")
     def handle_add_recent(self):

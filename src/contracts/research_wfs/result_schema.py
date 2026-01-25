@@ -99,12 +99,20 @@ class InstrumentConfig(TypedDict):
     multiplier: float
 
 
+class FxConfig(TypedDict):
+    """FX configuration."""
+    base_currency: str
+    fx_to_base: Dict[str, float]
+    as_of: Optional[str]
+
+
 class ConfigSection(BaseModel):
     """Configuration used for the research run."""
     instrument: InstrumentConfig
     costs: CostsConfig
     risk: RiskConfig
     data: DataConfig
+    fx: Optional[FxConfig] = None
     
     model_config = ConfigDict(frozen=True)
 
@@ -151,6 +159,7 @@ class WindowResult(BaseModel):
     oos_metrics: Dict[str, Any]  # MUST include: net, mdd, trades
     pass_: bool = Field(alias="pass")
     fail_reasons: List[str]
+    warnings: List[str] = Field(default_factory=list)
     
     model_config = ConfigDict(frozen=True, populate_by_name=True)
 
@@ -244,6 +253,7 @@ class ResearchWFSResult(BaseModel):
     series: SeriesSection
     metrics: MetricsSection
     verdict: VerdictSection
+    warnings: List[str] = Field(default_factory=list)
     
     model_config = ConfigDict(frozen=True)
     
@@ -302,7 +312,7 @@ def create_stub_result(job_id: str) -> ResearchWFSResult:
         meta=MetaSection(
             job_id=job_id,
             run_at=datetime.now(timezone.utc).isoformat(),
-            strategy_family="s1_v1",
+            strategy_family="regime_filter_v1",
             instrument="MNQ",
             timeframe="5m",
             start_season="2020Q1",

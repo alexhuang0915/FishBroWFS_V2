@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Dict, Literal, Optional, Union
 import numpy as np
 from contracts.data_models import TimeFrame
+from core.paths import get_shared_cache_root
 
 
 def bars_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
     """
     取得 bars 目錄路徑
 
-    建議位置：outputs/shared/{season}/{dataset_id}/bars/
+    建議位置：cache/shared/{season}/{dataset_id}/bars/
 
     Args:
         outputs_root: 輸出根目錄
@@ -31,7 +32,7 @@ def bars_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
         目錄路徑
     """
     # 建立路徑
-    path = outputs_root / "shared" / season / dataset_id / "bars"
+    path = get_shared_cache_root() / season / dataset_id / "bars"
     return path
 
 
@@ -39,7 +40,7 @@ def normalized_bars_path(outputs_root: Path, season: str, dataset_id: str) -> Pa
     """
     取得 normalized bars 檔案路徑
 
-    建議位置：outputs/shared/{season}/{dataset_id}/bars/normalized_bars.npz
+    建議位置：cache/shared/{season}/{dataset_id}/bars/normalized_bars.npz
 
     Args:
         outputs_root: 輸出根目錄
@@ -62,7 +63,7 @@ def resampled_bars_path(
     """
     取得 resampled bars 檔案路徑
 
-    建議位置：outputs/shared/{season}/{dataset_id}/bars/resampled_{tf_min}m.npz
+    建議位置：cache/shared/{season}/{dataset_id}/bars/resampled_{tf_min}m.npz
 
     Args:
         outputs_root: 輸出根目錄
@@ -212,7 +213,7 @@ def bars_path_parquet(
 ) -> Path:
     """
     Get resampled bars parquet file path.
-    Location: outputs/shared/{season}/{dataset_id}/bars/resampled_{tf_min}m.parquet
+    Location: cache/shared/{season}/{dataset_id}/bars/resampled_{tf_min}m.parquet
     """
     dir_path = bars_dir(outputs_root, season, dataset_id)
     return dir_path / f"resampled_{tf_min}m.parquet"

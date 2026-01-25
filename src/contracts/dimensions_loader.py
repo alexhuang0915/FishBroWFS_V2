@@ -15,19 +15,15 @@ def default_registry_path() -> Path:
     取得預設維度註冊表檔案路徑
     
     Returns:
-        Path 物件指向 configs/dimensions_registry.json (legacy)
-        or configs/registry/datasets.yaml (new)
+        Mainline: use any stable YAML path under configs/registry/ so we can
+        deterministically build DimensionRegistry without relying on a datasets registry.
     """
     # 從專案根目錄開始
     project_root = Path(__file__).parent.parent.parent
-    
-    # First try YAML registry (new)
-    yaml_path = project_root / "configs" / "registry" / "datasets.yaml"
-    if yaml_path.exists():
-        return yaml_path
-    
-    # Fall back to legacy JSON
-    return project_root / "configs" / "dimensions_registry.json"
+
+    # Mainline: datasets registry is removed; DimensionRegistry is derived (stubbed)
+    # from profiles/instruments. Keep a YAML suffix to route to YAML loader.
+    return project_root / "configs" / "registry" / "instruments.yaml"
 
 
 def load_dimension_registry(path: Path | None = None) -> DimensionRegistry:
@@ -92,8 +88,8 @@ def _load_dimension_registry_from_yaml(path: Path) -> DimensionRegistry:
     """
     從 YAML 檔案載入維度註冊表 (new format)
     
-    Note: This now builds DimensionRegistry from profiles + instruments registry
-    instead of reading from datasets.yaml directly.
+    Note: Mainline builds DimensionRegistry from profiles/instruments and does not
+    parse the YAML content for registry rows.
     """
     try:
         # Build DimensionRegistry from profiles and instruments registry
@@ -104,60 +100,83 @@ def _load_dimension_registry_from_yaml(path: Path) -> DimensionRegistry:
 
 def _build_dimension_registry_from_profiles() -> DimensionRegistry:
     """
-    Stubbed for Mainline: Returns hardcoded InstrumentDimension for MNQ/VX.
+    Build DimensionRegistry from configs/registry/instruments.yaml and each instrument's default_profile.
+
+    Note:
+      - This registry is used mainly as a stable lookup for session tz and tick_size.
+      - Detailed session boundaries are enforced via `core.trade_dates.is_trading_time_for_instrument`
+        (DST-aware and profile-window-aware), so we keep SessionSpec minimal and deterministic here.
     """
-    from .dimensions import SessionSpec # Ensure imported
-    
-    # Stub MNQ session
-    mnq_session = SessionSpec(
-        tz="Asia/Taipei",
-        open_taipei = "06:00",
-        close_taipei = "05:00",
-        breaks_taipei=[]
-    )
-    
-    # Stub VX session
-    vx_session = SessionSpec(
-        tz="Asia/Taipei",
-        open_taipei="06:00",
-        close_taipei="05:00",
-        breaks_taipei=[]
-    )
+    project_root = Path(__file__).parent.parent.parent
+    instruments_path = project_root / "configs" / "registry" / "instruments.yaml"
+    profiles_dir = project_root / "configs" / "profiles"
 
-    mnq = InstrumentDimension(
-        instrument_id="MNQ",
-        exchange="CME",
-        market="FUTURE",
-        currency="USD",
-        tick_size=0.25,
-        session=mnq_session,
-        source="stub",
-        source_updated_at="2026-01-22T00:00:00Z",
-        version="v2"
-    )
-    
-    vx = InstrumentDimension(
-        instrument_id="VX",
-        exchange="CFE",
-        market="FUTURE",
-        currency="USD",
-        tick_size=0.05,
-        session=vx_session,
-        source="stub",
-        source_updated_at="2026-01-22T00:00:00Z",
-        version="v2"
-    )
+    if not instruments_path.exists():
+        return DimensionRegistry()
 
-    by_symbol = {
-        "CME.MNQ": mnq,
-        "CFE.VX": vx
-    }
-    
-    by_dataset_id = {
-        # Catch-all or specific? The build command passes "CME.MNQ.60m.2020-2024"
-        "CME.MNQ.60m.2020-2024": mnq,
-        "CFE.VX.60m.2020-2024": vx
-    }
+    doc = yaml.safe_load(instruments_path.read_text(encoding="utf-8")) or {}
+    instruments = doc.get("instruments") or []
+    if not isinstance(instruments, list):
+        return DimensionRegistry()
+
+    by_symbol: Dict[str, InstrumentDimension] = {}
+    by_dataset_id: Dict[str, InstrumentDimension] = {}
+
+    for item in instruments:
+        if not isinstance(item, dict):
+            continue
+        symbol = str(item.get("id") or "").strip()
+        if not symbol:
+            continue
+
+        exchange = str(item.get("exchange") or "").strip()
+        currency = str(item.get("currency") or "").strip()
+        market = str(item.get("type") or "").strip().upper()
+
+        try:
+            tick_size = float(item.get("tick_size"))
+        except Exception:
+            continue
+
+        # Determine data tz from profile if available; default to Taipei.
+        data_tz = "Asia/Taipei"
+        default_profile = str(item.get("default_profile") or "").strip()
+        if default_profile:
+            prof_path = profiles_dir / f"{default_profile}.yaml"
+            if prof_path.exists():
+                try:
+                    prof = yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
+                    data_tz = str(prof.get("data_tz") or data_tz)
+                except Exception:
+                    pass
+
+        # InstrumentDimension expects instrument_id like "MNQ" (not "CME.MNQ").
+        parts = symbol.split(".", 1)
+        instrument_id = parts[1] if len(parts) == 2 else symbol
+
+        session = SessionSpec(
+            tz=data_tz,
+            open_taipei="00:00",
+            close_taipei="23:59",
+            breaks_taipei=[],
+            notes="derived_from_configs",
+        )
+
+        dim = InstrumentDimension(
+            instrument_id=instrument_id,
+            exchange=exchange,
+            market=market,
+            currency=currency,
+            tick_size=tick_size,
+            session=session,
+            source="derived_from_configs",
+            source_updated_at="",
+            version="v2",
+        )
+
+        by_symbol[symbol] = dim
+        # Mainline: dataset_id == instrument symbol (DimensionRegistry.get also derives symbol from legacy ids).
+        by_dataset_id[symbol] = dim
 
     return DimensionRegistry(by_dataset_id=by_dataset_id, by_symbol=by_symbol)
 
@@ -198,5 +217,3 @@ def write_dimension_registry(registry: DimensionRegistry, path: Path | None = No
             except:
                 pass
         raise IOError(f"寫入維度註冊表失敗 {path}: {e}")
-
-

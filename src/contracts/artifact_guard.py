@@ -51,10 +51,21 @@ def assert_artifacts_present(root: Path, contract: JobArtifactContract) -> List[
 
 # --- SSOT Registry of Contracts ---
 
-# 1. Feature Build Contract
-# Root: outputs/shared/{season}/{dataset_id}
-CONTRACT_FEATURE_BUILD = JobArtifactContract(
-    job_type="BUILD_DATA",
+# Bars Build Contract
+# Root: cache/shared/{season}/{dataset_id}
+CONTRACT_BARS_BUILD = JobArtifactContract(
+    job_type="BUILD_BARS",
+    root_kind="shared_dir",
+    required_paths=[
+        ArtifactPathSpec("bars", ArtifactKind.DIR_NONEMPTY, "Bars directory (NPZ files)"),
+        ArtifactPathSpec("bars/bars_manifest.json", ArtifactKind.FILE, "Bars manifest"),
+    ],
+)
+
+# Features Build Contract
+# Root: cache/shared/{season}/{dataset_id}
+CONTRACT_FEATURES_BUILD = JobArtifactContract(
+    job_type="BUILD_FEATURES",
     root_kind="shared_dir",
     required_paths=[
         ArtifactPathSpec("features", ArtifactKind.DIR_NONEMPTY, "Features directory (NPZ files)"),
@@ -75,10 +86,17 @@ CONTRACT_PLATEAU = JobArtifactContract(
 )
 
 def get_contract_for_job(job_type: str, mode: str = "FULL") -> Optional[JobArtifactContract]:
+    if job_type == "BUILD_BARS":
+        return CONTRACT_BARS_BUILD
+
+    if job_type == "BUILD_FEATURES":
+        return CONTRACT_FEATURES_BUILD
+
     if job_type == "BUILD_DATA":
         if mode in ["FULL", "FEATURES_ONLY"]:
-            return CONTRACT_FEATURE_BUILD
-        # BARS_ONLY handled by separate logic or we can add CONTRACT_BARS here too
+            return CONTRACT_FEATURES_BUILD
+        if mode in ["BARS_ONLY"]:
+            return CONTRACT_BARS_BUILD
         return None
         
     if job_type == "RUN_PLATEAU_V2":

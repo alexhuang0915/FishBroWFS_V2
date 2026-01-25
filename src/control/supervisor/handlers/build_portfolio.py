@@ -109,23 +109,26 @@ class BuildPortfolioHandler(BaseJobHandler):
 
         context.heartbeat(progress=0.45, phase="loading_results")
         loaded: Dict[str, Dict[str, Any]] = {}
-        selected: List[str] = []
+        recommended: List[str] = []
         for rid, path in resolved.items():
             data = json.loads(path.read_text())
             loaded[rid] = data
             if bool(((data.get("verdict") or {}).get("is_tradable"))):
-                selected.append(rid)
+                recommended.append(rid)
 
         context.heartbeat(progress=0.7, phase="writing_portfolio_artifacts")
+        # Advisory mode: do not block; default selection includes all candidates.
+        selected = sorted(run_ids)
         portfolio_config = {
             "version": "0.1",
             "season": payload.season,
             "portfolio_id": portfolio_id,
             "candidate_run_ids": run_ids,
-            "selected_run_ids": sorted(selected),
+            "selected_run_ids": selected,
+            "recommended_run_ids": sorted(recommended),
             "timeframe": payload.timeframe,
             "allowlist": payload.allowlist,
-            "note": "Phase-1 minimal portfolio config (wiring closure).",
+            "note": "Advisory portfolio bundle (no automatic blocking).",
         }
         write_json_atomic(portfolio_dir / "portfolio_config.json", portfolio_config)
 
@@ -135,7 +138,9 @@ class BuildPortfolioHandler(BaseJobHandler):
             "season": payload.season,
             "run_count": len(run_ids),
             "selected_count": len(selected),
-            "selected_run_ids": sorted(selected),
+            "selected_run_ids": selected,
+            "recommended_count": len(recommended),
+            "recommended_run_ids": sorted(recommended),
             "source_results": {rid: str(p) for rid, p in resolved.items()},
         }
         write_json_atomic(portfolio_dir / "portfolio_manifest.json", portfolio_manifest)
@@ -145,6 +150,54 @@ class BuildPortfolioHandler(BaseJobHandler):
         for rid, data in loaded.items():
             write_json_atomic(results_dir / f"{rid}.json", data)
 
+        # Recommendations are derived from per-run WFS result.json (advisory only).
+        recs: list[dict[str, Any]] = []
+        for rid in sorted(run_ids):
+            data = loaded.get(rid) or {}
+            meta = data.get("meta") or {}
+            verdict = data.get("verdict") or {}
+            metrics = data.get("metrics") or {}
+            raw = metrics.get("raw") or {}
+            scores = metrics.get("scores") or {}
+            recs.append(
+                {
+                    "run_id": rid,
+                    "instrument": meta.get("instrument"),
+                    "strategy_family": meta.get("strategy_family"),
+                    "timeframe": meta.get("timeframe"),
+                    "grade": verdict.get("grade"),
+                    "is_tradable": bool(verdict.get("is_tradable")),
+                    "hard_gates_triggered": list(metrics.get("hard_gates_triggered") or []),
+                    "score_total_weighted": scores.get("total_weighted"),
+                    "raw": {
+                        "pass_rate": raw.get("pass_rate"),
+                        "trades": raw.get("trades"),
+                        "wfe": raw.get("wfe"),
+                        "ulcer_index": raw.get("ulcer_index"),
+                        "max_underwater_days": raw.get("max_underwater_days"),
+                    },
+                    "summary": verdict.get("summary"),
+                }
+            )
+
+        recommendations = {
+            "version": "1.0",
+            "portfolio_id": portfolio_id,
+            "season": payload.season,
+            "candidate_run_ids": run_ids,
+            "recommended_run_ids": sorted(recommended),
+            "default_selected_run_ids": selected,
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "runs": recs,
+        }
+        rec_path = portfolio_dir / "recommendations.json"
+        write_json_atomic(rec_path, recommendations)
+
+        # Write path contract to job evidence for TUI/Bridge access
+        evidence_dir = Path(context.artifacts_dir)
+        (evidence_dir / "portfolio_manifest_path.txt").write_text(str(portfolio_dir / "manifest.json"))
+        (evidence_dir / "portfolio_recommendations_path.txt").write_text(str(rec_path))
+
         context.heartbeat(progress=0.95, phase="done")
         return {
             "ok": True,
@@ -152,7 +205,9 @@ class BuildPortfolioHandler(BaseJobHandler):
             "portfolio_dir": str(portfolio_dir),
             "portfolio_config_path": str(portfolio_dir / "portfolio_config.json"),
             "portfolio_manifest_path": str(portfolio_dir / "portfolio_manifest.json"),
-            "selected_run_ids": sorted(selected),
+            "selected_run_ids": selected,
+            "recommended_run_ids": sorted(recommended),
+            "recommendations_path": str(rec_path),
         }
 
     def _write_domain_manifest(
@@ -185,4 +240,3 @@ class BuildPortfolioHandler(BaseJobHandler):
 
 
 build_portfolio_handler = BuildPortfolioHandler()
-

@@ -1,5 +1,7 @@
 import json
 
+from textual import events
+
 from textual.widgets import DataTable, Label
 from textual.containers import Vertical
 from textual import on
@@ -18,54 +20,76 @@ class JobMonitorPanel(Vertical):
     def compose(self):
         yield Label("Live Jobs", id="monitor_title")
         yield DataTable(id="monitor_table", cursor_type="row")
-
     def on_mount(self):
         table = self.query_one("#monitor_table", DataTable)
-        table.add_column("Job ID", key="job_id")
-        table.add_column("Type", key="job_type")
-        table.add_column("Data2", key="data2")
-        table.add_column("State", key="state")
-        table.add_column("Progress", key="progress")
-        table.add_column("Phase", key="phase")
-        table.add_column("Updated", key="updated_at")
+        table.add_columns("Job ID", "Type", "Data2", "State", "Progress", "Elapsed", "Updated")
         self.refresh_jobs()
-        self.set_interval(1.0, self.refresh_jobs)
+        self.set_interval(2.0, self.refresh_jobs)
+
+    def on_key(self, event) -> None:
+        if event.key == "R":
+            self._open_report_from_cursor()
 
     def refresh_jobs(self):
-        table = self.query_one("#monitor_table", DataTable)
-        jobs = self.bridge.get_recent_jobs(limit=30)
-        job_ids = [job.job_id for job in jobs]
-
-        if job_ids != self._job_order:
+        try:
+            from datetime import datetime, timezone
+            now = datetime.now(timezone.utc)
+            
+            jobs = self.bridge.get_recent_jobs(limit=15)
+            table = self.query_one("#monitor_table", DataTable)
             table.clear()
-            for job in jobs:
-                table.add_row(
-                    job.job_id[:8],
-                    str(job.job_type),
-                    self._extract_data2(job),
-                    job.state,
-                    self._format_progress(job.progress),
-                    job.phase or "",
-                    (job.updated_at or "")[:19].replace("T", " "),
-                    key=job.job_id,
-                )
-            self._job_order = job_ids
-            return
+            for j in jobs:
+                # Elapsed calculation
+                try:
+                    start_dt = datetime.fromisoformat(j.created_at.replace("Z", "+00:00"))
+                    if j.state in ("SUCCEEDED", "FAILED", "ABORTED"):
+                        end_dt = datetime.fromisoformat(j.updated_at.replace("Z", "+00:00"))
+                        dur = end_dt - start_dt
+                    else:
+                        dur = now - start_dt
+                    elapsed_str = f"{int(dur.total_seconds()) // 60}m {int(dur.total_seconds()) % 60}s"
+                except:
+                    elapsed_str = "-"
 
-        for job in jobs:
-            table.update_cell(job.job_id, "data2", self._extract_data2(job))
-            table.update_cell(job.job_id, "state", job.state)
-            table.update_cell(job.job_id, "progress", self._format_progress(job.progress))
-            table.update_cell(job.job_id, "phase", job.phase or "")
-            table.update_cell(job.job_id, "updated_at", (job.updated_at or "")[:19].replace("T", " "))
+                table.add_row(
+                    j.job_id[:8],
+                    str(j.job_type),
+                    self._extract_data2(j),
+                    j.state,
+                    self._format_progress(j.progress),
+                    elapsed_str,
+                    (j.updated_at or "")[:19].replace("T", " "),
+                    key=j.job_id
+                )
+        except Exception:
+            pass
+
 
     @on(DataTable.RowSelected, "#monitor_table")
     def _open_artifacts(self, event: DataTable.RowSelected) -> None:
-        # Allow "Enter" / row select to drill into artifacts from any screen.
+        # Allow "Enter" / row select to drill into artifacts/report from any screen.
         try:
             job_id = str(event.row_key.value)
             if hasattr(self.app, "open_job_artifacts"):
                 self.app.open_job_artifacts(job_id)
+        except Exception:
+            return
+
+    def _open_report_from_cursor(self) -> None:
+        try:
+            table = self.query_one("#monitor_table", DataTable)
+            row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+            job_id = str(row_key.value) if hasattr(row_key, "value") else str(row_key)
+            if hasattr(self.app, "open_job_report"):
+                self.app.open_job_report(job_id)
+        except Exception:
+            return
+
+    def _update_status(self, text: str) -> None:
+        try:
+            screen = self.app.screen
+            status = screen.query_one("#status", Label)
+            status.update(text)
         except Exception:
             return
 

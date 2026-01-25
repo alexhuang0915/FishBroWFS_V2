@@ -20,7 +20,7 @@ class TestPolicyPreflight(unittest.TestCase):
         from control.supervisor.db import SupervisorDB, get_default_db_path
 
         params = {
-            "strategy_id": "s1_v1",
+            "strategy_id": "regime_filter_v1",
             "instrument": "CME.MNQ",
             "timeframe": "60m",
             "start_season": "2020Q1",
@@ -43,7 +43,7 @@ class TestPolicyPreflight(unittest.TestCase):
         from control.policy_enforcement import PolicyEnforcementError
 
         params = {
-            "strategy_id": "s1_v1",
+            "strategy_id": "regime_filter_v1",
             "instrument": "CME.MNQ",
             "timeframe": "bad",
             "start_season": "2020Q1",
@@ -58,4 +58,3 @@ class TestPolicyPreflight(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

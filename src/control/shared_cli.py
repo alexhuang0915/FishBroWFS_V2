@@ -14,16 +14,20 @@ from typing import Optional
 
 import click
 
+from core.paths import get_shared_cache_root
 from control.shared_build import (
     BuildMode,
     IncrementalBuildRejected,
     build_shared,
 )
+from contracts.config_consistency import assert_cost_model_ssot_instruments
 
 
 @click.group(name="shared")
 def shared_cli():
     """Shared data build commands"""
+    # Fail-closed SSOT checks (fast, local file reads only).
+    assert_cost_model_ssot_instruments()
     pass
 
 
@@ -79,6 +83,18 @@ def shared_cli():
     help="Build features cache (requires bars cache)",
 )
 @click.option(
+    "--feature-scope",
+    type=click.Choice(["baseline", "all_packs"], case_sensitive=False),
+    default="baseline",
+    help="Which feature set to cache when building features (default: baseline).",
+)
+@click.option(
+    "--purge-shared-dir",
+    is_flag=True,
+    default=False,
+    help="Purge cache/shared/<season>/<dataset_id>/ before building (DANGEROUS).",
+)
+@click.option(
     "--build-all",
     is_flag=True,
     default=False,
@@ -119,6 +135,8 @@ def build_command(
     generated_at_utc: Optional[str],
     build_bars: bool,
     build_features: bool,
+    feature_scope: str,
+    purge_shared_dir: bool,
     build_all: bool,
     features_only: bool,
     dry_run: bool,
@@ -161,6 +179,18 @@ def build_command(
     elif features_only:
         build_bars = False
         build_features = True
+
+    if purge_shared_dir:
+        shared_root = get_shared_cache_root().resolve()
+        target = (shared_root / season / dataset_id).resolve()
+        try:
+            target.relative_to(shared_root)
+        except Exception:
+            raise click.ClickException(f"Refusing to purge outside shared cache root: {target}")
+        if target.exists():
+            import shutil
+
+            shutil.rmtree(target)
     
     # 驗證 dry-run 模式
     if dry_run:
@@ -200,6 +230,7 @@ def build_command(
             generated_at_utc=generated_at_utc,
             build_bars=build_bars,
             build_features=build_features,
+            feature_scope=feature_scope.upper(),
             tfs=tf_list,
         )
         
@@ -340,4 +371,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

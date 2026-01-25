@@ -17,6 +17,7 @@ from datetime import datetime
 
 from contracts.dimensions import canonical_json
 from contracts.features import FeatureRegistry, FeatureSpec
+from core.paths import get_shared_cache_root
 
 
 def write_features_manifest(payload: Dict[str, Any], path: Path) -> Dict[str, Any]:
@@ -129,7 +130,7 @@ def features_manifest_path(outputs_root: Path, season: str, dataset_id: str) -> 
     """
     取得 features manifest 檔案路徑
     
-    建議位置：outputs/shared/{season}/{dataset_id}/features/features_manifest.json
+    建議位置：cache/shared/{season}/{dataset_id}/features/features_manifest.json
     
     Args:
         outputs_root: 輸出根目錄
@@ -140,7 +141,7 @@ def features_manifest_path(outputs_root: Path, season: str, dataset_id: str) -> 
         檔案路徑
     """
     # 建立路徑
-    path = outputs_root / "shared" / season / dataset_id / "features" / "features_manifest.json"
+    path = get_shared_cache_root() / season / dataset_id / "features" / "features_manifest.json"
     return path
 
 
@@ -207,5 +208,3 @@ def feature_spec_to_dict(spec: FeatureSpec) -> Dict[str, Any]:
         "lookback_bars": spec.lookback_bars,
         "params": spec.params,
     }
-
-

@@ -1,8 +1,18 @@
 version: "1.0"
-allowed_timeframes:
-  - 15
-  - 30
-  - 60
-  - 120
-  - 240
-default: 60
+timeframes:
+  - id: "15m"
+    minutes: 15
+    label: "15m"
+  - id: "30m"
+    minutes: 30
+    label: "30m"
+  - id: "60m"
+    minutes: 60
+    label: "60m"
+  - id: "120m"
+    minutes: 120
+    label: "120m"
+  - id: "240m"
+    minutes: 240
+    label: "240m"
+default: "60m"

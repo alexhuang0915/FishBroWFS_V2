@@ -1,0 +1,57 @@
+version: "2.0"
+strategy_id: "regime_filter_v1"
+class_path: "core.strategies.v2.regime_filter_v1.RegimeFilterV1"
+
+# V1: Regime filter. Cross decides allow/bias; data1 provides execution bars.
+# Feature declaration is SSOT: strategy must only use declared features.
+features:
+  data1:
+    pack: "data1_v1_basic"
+    add: []
+    remove: []
+  cross:
+    pack: "cross_v1_full"
+    add: []
+    remove: []
+
+parameters:
+  direction_mode:
+    type: "choice"
+    default: "spread_z"
+    choices: ["spread_z", "beta_sign", "rel_mom", "fixed_long", "fixed_short"]
+    description: "How to choose bias direction when allowed"
+
+  corr_min:
+    type: "choice"
+    default: 0.20
+    choices: [0.00, 0.10, 0.20, 0.30]
+    description: "Minimum corr_60 to allow trading"
+
+  r2_min:
+    type: "choice"
+    default: 0.05
+    choices: [0.00, 0.05, 0.10]
+    description: "Minimum r2_60 to allow trading"
+
+  rel_vol_ratio_max:
+    type: "choice"
+    default: 3.0
+    choices: [2.0, 3.0, 4.0]
+    description: "Maximum rel_vol_ratio to allow trading (volatility mismatch gate)"
+
+  spread_z_abs_min:
+    type: "choice"
+    default: 0.3
+    choices: [0.2, 0.3, 0.4]
+    description: "Minimum abs(spread_log_z_60) to take a directional bias (else flat)"
+
+  beta_abs_max:
+    type: "choice"
+    default: 5.0
+    choices: [2.0, 5.0, 10.0]
+    description: "Maximum abs(beta_60) to allow trading"
+
+notes: |
+  This is the new V1 strategy spec (no legacy S1/S2/S3).
+  Entry model: market via target_dir (open(T+1)).
+  Stop entry/exit can be added later via compute_orders_ctx contract.

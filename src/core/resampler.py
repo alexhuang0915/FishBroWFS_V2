@@ -199,10 +199,10 @@ def get_session_spec_for_dataset(dataset_id: str) -> Tuple[SessionSpecTaipei, bo
     return fallback_spec, False
 
 
-def compute_session_start(ts: datetime, session: SessionSpecTaipei) -> datetime:
+def compute_session_start(ts: datetime, session: SessionSpecTaipei, *, dataset_id: str | None = None) -> datetime:
     """
     Return the session_start datetime (Taipei) whose session window contains ts.
-    
+
     Must handle overnight sessions where close < open (cross midnight).
     
     Args:
@@ -212,6 +212,18 @@ def compute_session_start(ts: datetime, session: SessionSpecTaipei) -> datetime:
     Returns:
         session_start: 包含 ts 的 session 開始時間
     """
+    # Mainline override: if dataset_id provided and instrument config has exchange roll,
+    # compute session start by following exchange roll rule and converting to Taipei time.
+    if dataset_id:
+        try:
+            from core.trade_dates import session_start_taipei_for_instrument
+
+            start = session_start_taipei_for_instrument(ts, dataset_id, data_tz=session.tz)
+            if start is not None:
+                return start
+        except Exception:
+            pass
+
     # 對於隔夜時段，需要特別處理
     if session.is_overnight():
         # 嘗試當天的 session_start
@@ -241,7 +253,9 @@ def compute_session_start(ts: datetime, session: SessionSpecTaipei) -> datetime:
 def compute_safe_recompute_start(
     ts_append_start: datetime, 
     tf_min: int, 
-    session: SessionSpecTaipei
+    session: SessionSpecTaipei,
+    *,
+    dataset_id: str | None = None,
 ) -> datetime:
     """
     Safe point = session_start + floor((ts - session_start)/tf)*tf
@@ -261,7 +275,7 @@ def compute_safe_recompute_start(
         safe_recompute_start: 安全重算開始時間
     """
     # 1. 計算包含 ts_append_start 的 session_start
-    session_start = compute_session_start(ts_append_start, session)
+    session_start = compute_session_start(ts_append_start, session, dataset_id=dataset_id)
     
     # 2. 計算從 session_start 到 ts_append_start 的總分鐘數
     delta = ts_append_start - session_start
@@ -293,6 +307,7 @@ def resample_ohlcv(
     v: np.ndarray,
     tf_min: int,
     session: SessionSpecTaipei,
+    dataset_id: str | None = None,
     start_ts: Optional[datetime] = None,
 ) -> Dict[str, np.ndarray]:
     """
@@ -386,13 +401,35 @@ def resample_ohlcv(
     valid_v = []
     
     for i, dt in enumerate(ts_datetime):
-        # 檢查是否在交易時段內
-        if not session.is_in_session(dt):
-            continue
-        
-        # 檢查是否在休市時段內
-        if session.is_in_break(dt):
-            continue
+        if dataset_id:
+            try:
+                from core.trade_dates import is_trading_time_for_instrument
+
+                allowed = is_trading_time_for_instrument(dt, dataset_id, data_tz=session.tz)
+                if allowed is False:
+                    continue
+                if allowed is True:
+                    # Exchange-rule override applied; skip legacy session/break checks.
+                    pass
+                else:
+                    # No exchange override available; fall back to session rules.
+                    if not session.is_in_session(dt):
+                        continue
+                    if session.is_in_break(dt):
+                        continue
+            except Exception:
+                # Conservative: fall back to legacy session rules.
+                if not session.is_in_session(dt):
+                    continue
+                if session.is_in_break(dt):
+                    continue
+        else:
+            # 檢查是否在交易時段內
+            if not session.is_in_session(dt):
+                continue
+            # 檢查是否在休市時段內
+            if session.is_in_break(dt):
+                continue
         
         # 檢查是否在 start_ts 之後（如果提供）
         if start_ts is not None and dt < start_ts:
@@ -427,7 +464,7 @@ def resample_ohlcv(
     }, index=pd.DatetimeIndex(valid_ts, tz=None))
     
     # 計算每個 bar 所屬的 session_start
-    session_starts = [compute_session_start(dt, session) for dt in valid_ts]
+    session_starts = [compute_session_start(dt, session, dataset_id=dataset_id) for dt in valid_ts]
     
     # 計算從 session_start 開始的經過分鐘數
     # 我們需要將每個 bar 分配到以 session_start 為基準的 tf 分鐘區間
@@ -508,5 +545,3 @@ def normalize_raw_bars(raw_ingest_result) -> Dict[str, np.ndarray]:
         "close": df["close"].to_numpy(dtype="float64"),
         "volume": df["volume"].to_numpy(dtype="int64"),
     }
-
-

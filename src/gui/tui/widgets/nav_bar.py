@@ -11,6 +11,8 @@ class NavBar(Horizontal):
         yield Button("  3 WFS  ", id="nav_wfs", variant="default")
         yield Button("  4 Portfolio  ", id="nav_portfolio", variant="default")
         yield Button("  5 System  ", id="nav_runtime", variant="default")
+        yield Button("  6 Catalog  ", id="nav_catalog", variant="default")
+        yield Button("  7 Report  ", id="nav_report", variant="default")
         yield Static("  |  [q] Quit  ", classes="nav_quit")
         # Spacer and status label removed - now in Header title
 

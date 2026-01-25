@@ -12,6 +12,7 @@
 *.toml text eol=lf
 *.ini  text eol=lf
 *.cfg  text eol=lf
+*.tcss text eol=lf
 *.c    text eol=lf
 *.h    text eol=lf
 *.cpp  text eol=lf
@@ -24,3 +25,10 @@ Makefile text eol=lf
 *.jpeg binary
 *.gif binary
 *.pdf binary
+*.npz binary
+*.parquet binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.gz binary
+*.zip binary

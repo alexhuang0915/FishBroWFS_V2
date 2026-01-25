@@ -36,6 +36,44 @@ def get_outputs_root() -> Path:
     p = os.environ.get("FISHBRO_OUTPUTS_ROOT", "outputs")
     return Path(p).resolve()
 
+def get_cache_root() -> Path:
+    """
+    Single source of truth for cache root (bars/features/JIT cache).
+    - Default: ./cache (repo relative)
+    - Override: env FISHBRO_CACHE_ROOT
+    """
+    explicit = os.environ.get("FISHBRO_CACHE_ROOT")
+    if explicit:
+        return Path(explicit).resolve()
+
+    # If outputs root is explicitly redirected, keep cache adjacent to it by default.
+    # This avoids writing into repo-level cache/ and makes runs/test isolation predictable.
+    if os.environ.get("FISHBRO_OUTPUTS_ROOT") not in (None, "", "outputs"):
+        try:
+            return (get_outputs_root().parent / "cache").resolve()
+        except Exception:
+            pass
+
+    # Test/CI isolation (fallback): if outputs root is redirected, keep cache adjacent to it
+    # so tests don't write into repo-level cache/.
+    if os.environ.get("PYTEST_CURRENT_TEST") is not None or os.environ.get("FISHBRO_TEST_MODE") == "1":
+        try:
+            return (get_outputs_root().parent / "cache").resolve()
+        except Exception:
+            pass
+
+    return Path("cache").resolve()
+
+
+def get_shared_cache_root() -> Path:
+    """Shared cache (bars/features) root."""
+    return get_cache_root() / "shared"
+
+
+def get_numba_cache_root() -> Path:
+    """Numba JIT disk cache root."""
+    return get_cache_root() / "numba"
+
 
 def get_runtime_root() -> Path:
     """Ephemeral system state (DB, locks, status)."""
@@ -96,5 +134,3 @@ def ensure_run_dir(outputs_root: Path, season: str, run_id: str) -> Path:
     run_dir = get_run_dir(outputs_root, season, run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir
-
-

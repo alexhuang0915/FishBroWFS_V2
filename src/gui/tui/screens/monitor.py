@@ -29,6 +29,7 @@ class MonitorScreen(BaseScreen):
     BINDINGS = [
         ("r", "refresh", "Refresh"),
         ("t", "tail", "Tail"),
+        ("R", "report", "Report"),
     ]
 
     def __init__(self, bridge: Bridge, **kwargs):
@@ -41,29 +42,29 @@ class MonitorScreen(BaseScreen):
         with Horizontal():
             with Vertical(classes="form_panel"):
                 yield Label("Monitor + Artifacts", id="title")
-                yield Label(
-                    "Select a job on the right (Enter) to load artifacts.\n"
-                    "Select a file on the left and press 't' or Tail to refresh.",
-                    classes="hint",
-                )
+                yield Label("Select a job on the right (Enter) to inspect.", classes="hint")
 
-                with Horizontal():
-                    yield Label("Job ID:", classes="label")
-                    yield Input(placeholder="auto from right table, or paste here", id="job_id", classes="value")
+                with Horizontal(id="monitor_actions_row"):
+                    yield Label("Target Job ID:", classes="label")
+                    yield Input(placeholder="autofilled or paste UUID", id="job_id", classes="value")
                     yield Button("Load", id="load_job", variant="primary")
+                    yield Button("Delete", id="delete_job_btn", variant="error")
+                yield Label("Manage research artifacts and logs.", classes="hint")
 
-                with Horizontal():
-                    yield Label("Tail lines:", classes="label")
+                with Horizontal(id="tail_actions_row"):
+                    yield Label("Tail Lines:", classes="label")
                     yield Input(value="200", id="tail_lines", classes="value")
                     yield Button("Tail", id="tail_btn")
-                    yield Button("Copy Job ID", id="copy_job_id")
+                    yield Button("Copy ID", id="copy_job_id")
+                    yield Button("Report", id="open_report")
+                yield Label("Preview the end of log files.", classes="hint")
 
                 with Horizontal():
                     with Vertical(id="artifact_list_container"):
-                        yield Label("Artifacts", classes="section_title")
+                        yield Label("RESEARCH ARTIFACTS", classes="section_title")
                         yield ListView(id="artifact_list")
                     with Vertical(id="log_container"):
-                        yield Label("Preview", classes="section_title")
+                        yield Label("FILE PREVIEW", classes="section_title")
                         yield RichLog(id="log_viewer", highlight=True, markup=True)
 
                 yield Static("", id="status")
@@ -133,6 +134,14 @@ class MonitorScreen(BaseScreen):
     def action_tail(self):
         self._refresh_preview()
 
+    def action_report(self):
+        job_id = (self._selected_job_id or "").strip()
+        if not job_id:
+            self.query_one("#status").update("No job selected.")
+            return
+        if hasattr(self.app, "open_job_report"):
+            self.app.open_job_report(job_id)
+
     @on(Button.Pressed, "#load_job")
     def _on_load_job(self):
         job_id = self.query_one("#job_id", Input).value.strip()
@@ -155,8 +164,20 @@ class MonitorScreen(BaseScreen):
             self.app._clipboard_set(job_id)
             self.query_one("#status").update("Copied job id.")
 
+    @on(Button.Pressed, "#open_report")
+    def _on_open_report(self):
+        self.action_report()
+
+    @on(Button.Pressed, "#delete_job_btn")
+    def _on_delete_job_btn(self):
+        job_id = self.query_one("#job_id", Input).value.strip()
+        if not job_id:
+            self.query_one("#status").update("Error: job_id is required to delete.")
+            return
+        if hasattr(self.app, "open_delete_confirm"):
+            self.app.open_delete_confirm(job_id)
+
     @on(ListView.Selected, "#artifact_list")
     def _on_artifact_selected(self, event: ListView.Selected):
         self._selected_artifact = event.item.name
         self._refresh_preview()
-

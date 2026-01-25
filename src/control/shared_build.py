@@ -62,6 +62,7 @@ from control.features_manifest import (
     build_features_manifest_data,
     feature_spec_to_dict,
 )
+from core.paths import get_shared_cache_root
 
 
 BuildMode = Literal["FULL", "INCREMENTAL"]
@@ -83,6 +84,7 @@ def build_shared(
     generated_at_utc: Optional[str] = None,
     build_bars: bool = False,
     build_features: bool = False,
+    feature_scope: str = "BASELINE",
     feature_registry: Optional[FeatureRegistry] = None,
     tfs: Optional[List[int]] = None,
 ) -> dict:
@@ -113,7 +115,8 @@ def build_shared(
         generated_at_utc: 固定時間戳記（UTC ISO 格式），若為 None 則省略欄位
         build_bars: 是否建立 bars cache（normalized + resampled bars）
         build_features: 是否建立 features cache
-        feature_registry: 特徵註冊表，若為 None 則使用 default_feature_registry()
+        feature_scope: 特徵 scope（BASELINE / ALL_PACKS）
+        feature_registry: 特徵註冊表，若為 None 則依 feature_scope 決定
         tfs: timeframe 分鐘數列表，預設為 [15, 30, 60, 120, 240]
 
     Returns:
@@ -209,7 +212,13 @@ def build_shared(
                 )
         
         # 使用預設或提供的 feature registry
-        registry = feature_registry or default_feature_registry()
+        if feature_registry is not None:
+            registry = feature_registry
+        else:
+            if str(feature_scope).upper() == "ALL_PACKS":
+                registry = _feature_registry_from_all_packs(tfs=tfs)
+            else:
+                registry = default_feature_registry()
         
         features_cache_report = _build_features_cache(
             season=season,
@@ -364,7 +373,7 @@ def _shared_manifest_path(
     """
     取得 shared manifest 檔案路徑
     
-    建議位置：outputs/shared/{season}/{dataset_id}/shared_manifest.json
+    建議位置：cache/shared/{season}/{dataset_id}/shared_manifest.json
     
     Args:
         season: 季節標記
@@ -375,7 +384,7 @@ def _shared_manifest_path(
         檔案路徑
     """
     # 建立路徑
-    path = outputs_root / "shared" / season / dataset_id / "shared_manifest.json"
+    path = get_shared_cache_root() / season / dataset_id / "shared_manifest.json"
     return path
 
 
@@ -551,7 +560,7 @@ def _build_bars_cache(
         # 計算 safe recompute start（如果是 INCREMENTAL append-only）
         safe_start = None
         if mode == "INCREMENTAL" and diff["append_only"] and first_ts_dt is not None:
-            safe_start = compute_safe_recompute_start(first_ts_dt, tf, session_spec)
+            safe_start = compute_safe_recompute_start(first_ts_dt, tf, session_spec, dataset_id=dataset_id)
             safe_recompute_start_by_tf[str(tf)] = safe_start.isoformat() if safe_start else None
         
         # 進行 resample
@@ -564,6 +573,7 @@ def _build_bars_cache(
             v=normalized["volume"],
             tf_min=tf,
             session=session_spec,
+            dataset_id=dataset_id,
             start_ts=safe_start,
         )
         
@@ -755,10 +765,11 @@ def _build_features_cache(
                 try:
                     existing_features = load_features_npz(features_path_obj)
                     
-                    # 驗證現有 features 的結構
-                    feat_required_keys = {"ts", "atr_14", "ret_z_200", "session_vwap"}
+                    # 驗證現有 features 的結構（依 registry 的 tf specs）
+                    feat_required_keys = {"ts"} | {s.name for s in registry.specs_for_tf(tf)}
                     if not feat_required_keys.issubset(existing_features.keys()):
-                        raise ValueError(f"現有 features 缺少必要欄位: {existing_features.keys()}")
+                        missing = sorted(feat_required_keys - set(existing_features.keys()))
+                        raise ValueError(f"現有 features 缺少必要欄位: {missing}")
                     
                     # 找到現有 features 中 < rewind_start_ts 的部分
                     existing_ts = existing_features["ts"]
@@ -797,16 +808,7 @@ def _build_features_cache(
                             # 拼接 prefix + new_part
                             final_features = {}
                             for key in feat_required_keys:
-                                if key == "ts":
-                                    final_features[key] = np.concatenate([
-                                        prefix_features[key],
-                                        new_features[key]
-                                    ])
-                                else:
-                                    final_features[key] = np.concatenate([
-                                        prefix_features[key],
-                                        new_features[key]
-                                    ])
+                                final_features[key] = np.concatenate([prefix_features[key], new_features[key]])
                             
                             # 寫入 features NPZ
                             write_features_npz_atomic(features_path_obj, final_features)
@@ -888,31 +890,7 @@ def _build_features_cache(
     for spec in registry.specs:
         if spec.timeframe_min in tfs:
             features_specs.append(feature_spec_to_dict(spec))
-    
-    # 加入 baseline 特徵規格（不在 registry 中但必須存在）
-    baseline_specs = []
-    for tf in tfs:
-        # ret_z_200
-        baseline_specs.append(FeatureSpec(
-            name="ret_z_200",
-            timeframe_min=tf,
-            lookback_bars=200,
-            params={"window": 200, "method": "log"}
-        ))
-        # session_vwap
-        baseline_specs.append(FeatureSpec(
-            name="session_vwap",
-            timeframe_min=tf,
-            lookback_bars=0,
-            params={}
-        ))
-    # 轉換為字典並加入 features_specs（避免重複）
-    existing_names = {(spec["name"], spec["timeframe_min"]) for spec in features_specs}
-    for spec in baseline_specs:
-        key = (spec.name, spec.timeframe_min)
-        if key not in existing_names:
-            features_specs.append(feature_spec_to_dict(spec))
-    
+
     features_manifest_data = build_features_manifest_data(
         season=season,
         dataset_id=dataset_id,
@@ -933,3 +911,77 @@ def _build_features_cache(
     }
 
 
+def _feature_registry_from_all_packs(*, tfs: list[int]) -> FeatureRegistry:
+    """
+    Build a finite feature registry from the SSOT packs union (data1-only).
+
+    Notes:
+    - Cross features are excluded (they require a data2 pair).
+    - Pack feature `timeframe` is treated as declarative; when caching for a tf, we apply the same
+      feature name to that tf as well (finite set across tfs).
+    """
+    from control.feature_packs_yaml import load_feature_packs_yaml
+
+    supported_prefixes = (
+        "sma_",
+        "ema_",
+        "hh_",
+        "ll_",
+        "atr_",
+        "percentile_",
+        "zscore_",
+        "ret_z_",
+        "bb_pb_",
+        "bb_width_",
+        "atr_ch_upper_",
+        "atr_ch_lower_",
+        "atr_ch_pos_",
+        "donchian_width_",
+        "dist_hh_",
+        "dist_ll_",
+        "vx_percentile_",
+    )
+
+    def is_data1_feature(name: str) -> bool:
+        if name == "session_vwap":
+            return True
+        return name.startswith(supported_prefixes)
+
+    def spec_from_name(name: str, tf_min: int) -> FeatureSpec:
+        n = name.strip()
+        if n == "session_vwap":
+            return FeatureSpec(name=n, timeframe_min=tf_min, lookback_bars=0, params={}, window=1, min_warmup_bars=0)
+        window = None
+        if "_" in n:
+            try:
+                window = int(n.split("_")[-1])
+            except Exception:
+                window = None
+        if window and window > 0:
+            return FeatureSpec(
+                name=n,
+                timeframe_min=tf_min,
+                lookback_bars=window,
+                params={"window": window},
+                window=window,
+                min_warmup_bars=window,
+            )
+        return FeatureSpec(name=n, timeframe_min=tf_min, lookback_bars=0, params={}, window=1, min_warmup_bars=0)
+
+    packs = load_feature_packs_yaml()
+    names: set[str] = set()
+    for pack in packs.values():
+        feats = pack.get("features") or []
+        if not isinstance(feats, list):
+            continue
+        for f in feats:
+            if isinstance(f, dict) and f.get("name"):
+                n = str(f["name"]).strip()
+                if n and is_data1_feature(n):
+                    names.add(n)
+
+    specs: list[FeatureSpec] = []
+    for tf in tfs:
+        for n in sorted(names):
+            specs.append(spec_from_name(n, int(tf)))
+    return FeatureRegistry(specs=specs)

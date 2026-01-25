@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from contracts.dimensions import canonical_json
+from core.paths import get_shared_cache_root
 
 
 def write_bars_manifest(payload: Dict[str, Any], path: Path) -> Dict[str, Any]:
@@ -126,7 +127,7 @@ def bars_manifest_path(outputs_root: Path, season: str, dataset_id: str) -> Path
     """
     取得 bars manifest 檔案路徑
     
-    建議位置：outputs/shared/{season}/{dataset_id}/bars/bars_manifest.json
+    建議位置：cache/shared/{season}/{dataset_id}/bars/bars_manifest.json
     
     Args:
         outputs_root: 輸出根目錄
@@ -137,7 +138,5 @@ def bars_manifest_path(outputs_root: Path, season: str, dataset_id: str) -> Path
         檔案路徑
     """
     # 建立路徑
-    path = outputs_root / "shared" / season / dataset_id / "bars" / "bars_manifest.json"
+    path = get_shared_cache_root() / season / dataset_id / "bars" / "bars_manifest.json"
     return path
-
-

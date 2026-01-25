@@ -31,6 +31,7 @@ from control.features_store import (
     load_features_npz,
 )
 from control.shared_build import build_shared
+from core.paths import get_shared_cache_root
 
 
 class FeatureResolutionError(RuntimeError):
@@ -69,7 +70,7 @@ def resolve_features(
     Ensure required features exist in shared cache and load them.
     
     行為規格（必須精準）：
-    1. 找到 features 目錄：outputs/shared/{season}/{dataset_id}/features/
+    1. 找到 features 目錄：cache/shared/{season}/{dataset_id}/features/
     2. 檢查 features_manifest.json 是否存在
         - 不存在 → missing
     3. 載入 manifest，驗證硬合約：
@@ -523,5 +524,3 @@ def reload_feature_registry() -> bool:
         return True
     except Exception:
         return False
-
-

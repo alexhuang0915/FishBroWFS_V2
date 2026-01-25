@@ -18,6 +18,7 @@ from contracts.supervisor.evidence_schemas import (
 )
 from control.rejection_artifact import create_policy_rejection, write_rejection_artifact
 from control.policy_enforcement import PolicyResult, write_policy_check_artifact
+from contracts.timeframes_registry import load_timeframes
 
 
 class AdmissionController:
@@ -81,7 +82,7 @@ class AdmissionController:
         )
     
     def _check_timeframe_allowed(self, job_type: str, payload: Dict[str, Any]) -> PolicyCheck:
-        """Check if timeframe parameter is allowed (15, 30, 60, 120, 240)."""
+        """Check if timeframe parameter is allowed by registry."""
         # Only apply to job types that have timeframe parameter
         if job_type not in ["RUN_RESEARCH_WFS"]:
             return PolicyCheck(
@@ -100,8 +101,29 @@ class AdmissionController:
                 checked_at=now_iso()
             )
         
-        allowed = {15, 30, 60, 120, 240}
-        if timeframe in allowed:
+        try:
+            registry = load_timeframes()
+            allowed = set(registry.allowed_timeframes)
+            # Accept int minutes or strings like '60m' / '1h'
+            if isinstance(timeframe, str):
+                tf = timeframe.strip().lower()
+                if tf.endswith("m"):
+                    timeframe_min = int(tf[:-1])
+                elif tf.endswith("h"):
+                    timeframe_min = int(tf[:-1]) * 60
+                else:
+                    timeframe_min = int(tf)
+            else:
+                timeframe_min = int(timeframe)
+        except Exception as exc:
+            return PolicyCheck(
+                policy_name="check_timeframe_allowed",
+                passed=False,
+                message=f"Failed to validate timeframe: {exc}",
+                checked_at=now_iso(),
+            )
+
+        if timeframe_min in allowed:
             return PolicyCheck(
                 policy_name="check_timeframe_allowed",
                 passed=True,

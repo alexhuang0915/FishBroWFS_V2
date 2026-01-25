@@ -23,7 +23,7 @@ class TestRunResearchWFSSmoke(unittest.TestCase):
 
         os.environ["FISHBRO_TEST_MODE"] = "0"
         params = {
-            "strategy_id": "s1_v1",
+            "strategy_id": "regime_filter_v1",
             "instrument": "CME.MNQ",
             "timeframe": "60m",
             "start_season": "2020Q1",
@@ -62,7 +62,7 @@ class TestRunResearchWFSSmoke(unittest.TestCase):
 
         os.environ["FISHBRO_TEST_MODE"] = "1"
         params = {
-            "strategy_id": "s1_v1",
+            "strategy_id": "regime_filter_v1",
             "instrument": "CME.MNQ",
             "timeframe": "60m",
             "start_season": "2020Q1",

@@ -38,7 +38,7 @@ features:
     required: true
 
 # Defaults
-dataset_id: "CME.MNQ.60m.2023"  # Use recent data for dev
+dataset_id: "CME.MNQ"           # Mainline: dataset_id == instrument symbol
 timeframe: 60                   # Standard hourly
 
 # Metadata

@@ -336,13 +336,18 @@ def compute_features_for_tf(
         else:
             # 根據特徵名稱使用預設計算函數
             from indicators.numba_indicators import (
-                sma, hh, ll, atr_wilder, percentile_rank, bbands_pb, bbands_width,
+                sma, ema, hh, ll, atr_wilder, percentile_rank, bbands_pb, bbands_width,
                 atr_channel_upper, atr_channel_lower, atr_channel_pos,
                 donchian_width, dist_to_hh, dist_to_ll
             )
             if spec.name.startswith("sma_"):
                 window = spec.params.get("window", int(spec.name.split("_")[1]))
                 values = sma(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("ema_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = ema(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("hh_"):
@@ -355,11 +360,6 @@ def compute_features_for_tf(
                 values = ll(l, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
-            elif spec.name.startswith("atr_"):
-                window = spec.params.get("window", int(spec.name.split("_")[1]))
-                values = atr_wilder(h, l, c, window)
-                values = _apply_feature_postprocessing(values, spec)
-                result[spec.name] = values
             elif spec.name.startswith("vx_percentile_"):
                 window = spec.params.get("window", int(spec.name.split("_")[2]))
                 values = percentile_rank(c, window)
@@ -368,6 +368,11 @@ def compute_features_for_tf(
             elif spec.name.startswith("percentile_"):
                 window = spec.params.get("window", int(spec.name.split("_")[1]))
                 values = percentile_rank(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("zscore_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = compute_rolling_z(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name.startswith("bb_pb_"):
@@ -395,6 +400,11 @@ def compute_features_for_tf(
                 values = atr_channel_pos(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
+            elif spec.name.startswith("atr_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = atr_wilder(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
             elif spec.name.startswith("donchian_width_"):
                 window = spec.params.get("window", int(spec.name.split("_")[2]))
                 values = donchian_width(h, l, c, window)
@@ -420,6 +430,12 @@ def compute_features_for_tf(
                 values = compute_rolling_z(returns, window=200)
                 values = _apply_feature_postprocessing(values, spec)
                 result["ret_z_200"] = values
+            elif spec.name.startswith("ret_z_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                returns = compute_returns(c, method="log")
+                values = compute_rolling_z(returns, window=window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
             elif spec.name == "session_vwap":
                 values = compute_session_vwap(
                     ts, c, v, session_spec, breaks_policy
@@ -453,5 +469,3 @@ def compute_features_for_tf(
             raise ValueError(f"Missing required feature: {feat}")
     
     return result
-
-

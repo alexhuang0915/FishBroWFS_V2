@@ -1,0 +1,46 @@
+schema_version: "1.0"
+name: "wfs_mainline"
+description: "Single SSOT WFS policy (hard gates + grading) aligned with result.json v1.0"
+
+# IMPORTANT: This policy may only reference metrics that exist in ResearchWFSResult.metrics.raw/scores.
+# raw metrics: rf, wfe, ecr, trades, pass_rate, ulcer_index, max_underwater_days
+# score metrics: profit, stability, robustness, reliability, armor, total_weighted
+
+hard_gates:
+  - id: "pass_rate_min"
+    metric: "pass_rate"
+    op: ">="
+    threshold: 0.60
+    fail_reason: "pass_rate below 0.60"
+
+  - id: "trades_min"
+    metric: "trades"
+    op: ">="
+    threshold: 50
+    fail_reason: "trades below 50"
+
+  - id: "wfe_min"
+    metric: "wfe"
+    op: ">="
+    threshold: 0.50
+    fail_reason: "wfe below 0.50"
+
+  - id: "ulcer_max"
+    metric: "ulcer_index"
+    op: "<="
+    threshold: 20.0
+    fail_reason: "ulcer_index above 20"
+
+  - id: "underwater_days_max"
+    metric: "max_underwater_days"
+    op: "<="
+    threshold: 90
+    fail_reason: "max_underwater_days above 90 (trading days)"
+
+grading:
+  # If any hard gate fails, grade is forced to "D".
+  score_metric: "total_weighted"
+  cutoffs:
+    A: 80
+    B: 65
+    C: 50

@@ -1,7 +1,44 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "fishbro-wfs"
 version = "0.0.0"
 requires-python = ">=3.10"
 
-# Tests/scripts were deleted by design (Local Research OS mode).
+# Runtime deps (minimal; keep optional deps in extras)
+dependencies = [
+  "numpy>=1.23",
+  "pandas>=2.0",
+  "pydantic>=2.0",
+  "PyYAML>=6.0",
+  "textual>=0.50.0",
+  "numba>=0.59.0",
+]
 
+[project.optional-dependencies]
+# TUI clipboard support (optional; app degrades gracefully without it)
+tui = ["pyperclip>=1.8"]
+
+# Optional parquet support (only if you read/write .parquet)
+parquet = ["pyarrow>=14"]
+
+# Dev/test tooling
+dev = [
+  "pytest>=8",
+  "pyright>=1.1.350",
+  "ruff>=0.5",
+  "types-PyYAML>=6.0.12.20240106",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["contracts*", "control*", "core*", "gui*", "indicators*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

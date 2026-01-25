@@ -3,6 +3,7 @@ import json
 import logging
 import subprocess
 import sys
+import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -24,8 +25,50 @@ from control.bars_store import normalized_bars_path, resampled_bars_path, load_n
 logger = logging.getLogger(__name__)
 
 
+def _parse_timeframes_param(params: Dict[str, Any]) -> list[int]:
+    timeframes = params.get("timeframes")
+    if isinstance(timeframes, list):
+        return [int(x) for x in timeframes]
+    if isinstance(timeframes, str) and timeframes.strip():
+        return [int(x.strip()) for x in timeframes.split(",") if x.strip()]
+    return [int(params.get("timeframe_min", 60) or 60)]
+
+
+def _missing_resampled_bars(season: str, dataset_id: str, tfs: list[int]) -> list[str]:
+    outputs_root = get_outputs_root()
+    missing = []
+    for tf in tfs:
+        p = resampled_bars_path(outputs_root, season, dataset_id, str(int(tf)))
+        if not p.exists():
+            missing.append(str(p))
+    return missing
+
+
+def _purge_shared_dataset_dir(season: str, dataset_id: str) -> Optional[str]:
+    """
+    Purge the entire shared dataset directory:
+      cache/shared/<season>/<dataset_id>/
+    Returns the purged path (string) if something was removed, otherwise None.
+    """
+    from core.paths import get_shared_cache_root
+
+    shared_root = get_shared_cache_root().resolve()
+    target = (shared_root / season / dataset_id).resolve()
+    try:
+        target.relative_to(shared_root)
+    except Exception as exc:
+        raise ValueError(f"Refusing to purge outside shared cache root: {target}") from exc
+
+    if not target.exists():
+        return None
+    shutil.rmtree(target)
+    return str(target)
+
+
 class BuildDataHandler(BaseJobHandler):
     """BUILD_DATA handler for preparing data (bars and features)."""
+
+    JOB_TYPE = "BUILD_DATA"
     
     def validate_params(self, params: Dict[str, Any]) -> None:
         """Validate BUILD_DATA parameters."""
@@ -43,11 +86,29 @@ class BuildDataHandler(BaseJobHandler):
                 raise ValueError("timeframe_min must be an integer")
             if timeframe <= 0:
                 raise ValueError("timeframe_min must be positive")
+
+        # Validate timeframes if provided (preferred)
+        if "timeframes" in params:
+            tfs = params["timeframes"]
+            if isinstance(tfs, str):
+                # comma-separated string
+                _ = [x.strip() for x in tfs.split(",") if x.strip()]
+            elif isinstance(tfs, list):
+                for tf in tfs:
+                    if not isinstance(tf, int):
+                        raise ValueError("timeframes list must be integers")
+            else:
+                raise ValueError("timeframes must be a comma-separated string or list[int]")
         
         # Validate force_rebuild if provided
         if "force_rebuild" in params:
             if not isinstance(params["force_rebuild"], bool):
                 raise ValueError("force_rebuild must be a boolean")
+
+        # Validate purge_before_build if provided
+        if "purge_before_build" in params:
+            if not isinstance(params["purge_before_build"], bool):
+                raise ValueError("purge_before_build must be a boolean")
         
         # Validate mode if provided
         if "mode" in params:
@@ -58,7 +119,8 @@ class BuildDataHandler(BaseJobHandler):
     def execute(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute BUILD_DATA job."""
         dataset_id = params["dataset_id"]
-        timeframe_min = params.get("timeframe_min", 60)
+        tfs = _parse_timeframes_param(params)
+        timeframe_min = int(tfs[0]) if tfs else int(params.get("timeframe_min", 60) or 60)
         force_rebuild = params.get("force_rebuild", False)
         mode = params.get("mode", "FULL")
         
@@ -66,7 +128,7 @@ class BuildDataHandler(BaseJobHandler):
         if context.is_abort_requested():
             return {
                 "ok": False,
-                "job_type": "BUILD_DATA",
+                "job_type": self.JOB_TYPE,
                 "aborted": True,
                 "reason": "user_abort_preinvoke",
                 "dataset_id": dataset_id,
@@ -92,10 +154,22 @@ class BuildDataHandler(BaseJobHandler):
     def _execute_via_cli(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
         """Execute BUILD_DATA via CLI subprocess."""
         dataset_id = params["dataset_id"]
-        timeframe_min = params.get("timeframe_min", 60)
+        tfs = _parse_timeframes_param(params)
+        timeframe_min = int(tfs[0]) if tfs else int(params.get("timeframe_min", 60) or 60)
+        tfs_str = ",".join(str(int(x)) for x in (tfs or [timeframe_min]))
         force_rebuild = params.get("force_rebuild", False)
         mode = params.get("mode", "FULL")
         season = params.get("season") or current_season()
+        purge_before_build = bool(params.get("purge_before_build", False))
+
+        if purge_before_build:
+            context.heartbeat(progress=0.0, phase="purging_shared_cache")
+            purged = _purge_shared_dataset_dir(season, dataset_id)
+            if purged:
+                try:
+                    (Path(context.artifacts_dir) / "purged_shared_dir.txt").write_text(purged + "\n", encoding="utf-8")
+                except Exception:
+                    pass
         
         build_bars = mode in ["BARS_ONLY", "FULL"]
         build_features = mode in ["FEATURES_ONLY", "FULL"]
@@ -105,7 +179,7 @@ class BuildDataHandler(BaseJobHandler):
         if not txt_path:
              return {
                 "ok": False,
-                "job_type": "BUILD_DATA",
+                "job_type": self.JOB_TYPE,
                 "dataset_id": dataset_id,
                 "error": f"Could not find raw TXT file for {dataset_id}",
                 "produced_paths": []
@@ -129,7 +203,7 @@ class BuildDataHandler(BaseJobHandler):
             "--dataset-id",
             dataset_id,
             "--tfs",
-            str(timeframe_min),
+            tfs_str,
             "--mode",
             cli_mode,
             "--outputs-root",
@@ -145,6 +219,8 @@ class BuildDataHandler(BaseJobHandler):
             
         if build_features:
             cmd.append("--build-features")
+            feature_scope = str(params.get("feature_scope") or "baseline")
+            cmd.extend(["--feature-scope", feature_scope])
         else:
             cmd.append("--no-build-features")
         
@@ -178,6 +254,15 @@ class BuildDataHandler(BaseJobHandler):
                 # Prepend to existing PYTHONPATH if any
                 src_path = str(Path.cwd() / "src")
                 env["PYTHONPATH"] = f"{src_path}:{env.get('PYTHONPATH', '')}"
+                # Centralize numba JIT disk cache
+                try:
+                    from core.paths import get_numba_cache_root
+
+                    numba_dir = get_numba_cache_root()
+                    numba_dir.mkdir(parents=True, exist_ok=True)
+                    env.setdefault("NUMBA_CACHE_DIR", str(numba_dir))
+                except Exception:
+                    pass
 
                 # Run subprocess
                 process = subprocess.run(
@@ -206,16 +291,12 @@ class BuildDataHandler(BaseJobHandler):
                 from control.control_types import ReasonCode
 
                 # Determine contract based on mode
-                contract = get_contract_for_job("BUILD_DATA", mode=mode)
+                contract = get_contract_for_job(self.JOB_TYPE, mode=mode)
                 
                 if contract:
-                    # Calculate root based on contract type
-                    # For Features, it's shared root
-                    root_path = Path(resampled_bars_path(get_outputs_root(), season, dataset_id, timeframe_min)).parent
-                    # NOTE: resampled_bars_path returns outputs/shared/{season}/{dataset_id}/bars/resampled_60m.npz
-                    # Parent is outputs/shared/{season}/{dataset_id}/bars
-                    # But contract expects root: outputs/shared/{season}/{dataset_id}
-                    root_path = root_path.parent
+                    from core.paths import get_shared_cache_root
+
+                    root_path = get_shared_cache_root() / season / dataset_id
 
                     missing = assert_artifacts_present(root_path, contract)
                     if missing:
@@ -226,7 +307,7 @@ class BuildDataHandler(BaseJobHandler):
                         })
                         return {
                             "ok": False,
-                            "job_type": "BUILD_DATA",
+                            "job_type": self.JOB_TYPE,
                             "dataset_id": dataset_id,
                             "timeframe_min": timeframe_min,
                             "legacy_invocation": " ".join(cmd),
@@ -250,15 +331,15 @@ class BuildDataHandler(BaseJobHandler):
                 # Previous guard (Bars)
                 if build_bars:
                      try:
-                        bar_path = resampled_bars_path(get_outputs_root(), season, dataset_id, timeframe_min)
-                        if not bar_path.exists():
+                        missing_bars = _missing_resampled_bars(season, dataset_id, tfs)
+                        if missing_bars:
                             manifest_path = self._write_build_manifest(params, context, {
                                 "ok": False,
                                 "error": "ERR_BUILD_ARTIFACTS_MISSING"
                             })
                             return {
                                 "ok": False,
-                                "job_type": "BUILD_DATA",
+                                "job_type": self.JOB_TYPE,
                                 "dataset_id": dataset_id,
                                 "timeframe_min": timeframe_min,
                                 "legacy_invocation": " ".join(cmd),
@@ -266,7 +347,7 @@ class BuildDataHandler(BaseJobHandler):
                                 "stderr_path": str(stderr_path),
                                 "produced_paths": [],
                                 "returncode": 0,
-                                "error": f"ERR_BUILD_ARTIFACTS_MISSING: Bars missing at {bar_path}",
+                                "error": f"ERR_BUILD_ARTIFACTS_MISSING: Bars missing: {missing_bars}",
                                 "manifest_path": str(manifest_path) if manifest_path else None,
                             }
                      except Exception as e:
@@ -282,7 +363,7 @@ class BuildDataHandler(BaseJobHandler):
 
                 return {
                     "ok": True,
-                    "job_type": "BUILD_DATA",
+                    "job_type": self.JOB_TYPE,
                     "dataset_id": dataset_id,
                     "timeframe_min": timeframe_min,
                     "legacy_invocation": " ".join(cmd),
@@ -296,7 +377,7 @@ class BuildDataHandler(BaseJobHandler):
                 manifest_path = self._write_build_manifest(params, context, {"ok": False, "error": "cli_failed"})
                 return {
                     "ok": False,
-                    "job_type": "BUILD_DATA",
+                    "job_type": self.JOB_TYPE,
                     "dataset_id": dataset_id,
                     "timeframe_min": timeframe_min,
                     "legacy_invocation": " ".join(cmd),
@@ -324,7 +405,7 @@ class BuildDataHandler(BaseJobHandler):
             manifest_path = self._write_build_manifest(params, context, {"ok": False, "error": "cli_exception"})
             return {
                 "ok": False,
-                "job_type": "BUILD_DATA",
+                "job_type": self.JOB_TYPE,
                 "dataset_id": dataset_id,
                 "timeframe_min": timeframe_min,
                 "legacy_invocation": " ".join(cmd),
@@ -338,7 +419,8 @@ class BuildDataHandler(BaseJobHandler):
     def _write_build_manifest(self, params: Dict[str, Any], context: JobContext, result: Dict[str, Any]) -> Optional[Path]:
         """Write a minimal build manifest into job artifacts."""
         dataset_id = params.get("dataset_id")
-        timeframe_min = params.get("timeframe_min", 60)
+        tfs = _parse_timeframes_param(params)
+        timeframe_min = int(tfs[0]) if tfs else int(params.get("timeframe_min", 60) or 60)
         season = params.get("season") or current_season()
         outputs_root = get_outputs_root()
 
@@ -356,9 +438,10 @@ class BuildDataHandler(BaseJobHandler):
         manifest = {
             "schema_version": "1.0",
             "job_id": context.job_id,
-            "job_type": "BUILD_DATA",
+            "job_type": self.JOB_TYPE,
             "dataset_id": dataset_id,
             "timeframe_min": timeframe_min,
+            "timeframes": tfs,
             "season": season,
             "outputs_root": str(outputs_root),
             "created_at": datetime.now(timezone.utc).isoformat(),
@@ -624,3 +707,52 @@ def _write_data_alignment_report(job_id: str, params: Dict[str, Any], result: Di
 # Register handler
 build_data_handler = BuildDataHandler()
 register_handler("BUILD_DATA", build_data_handler)
+
+
+class BuildBarsHandler(BuildDataHandler):
+    JOB_TYPE = "BUILD_BARS"
+
+    def validate_params(self, params: Dict[str, Any]) -> None:
+        super().validate_params(params)
+        mode = params.get("mode")
+        if mode not in (None, "BARS_ONLY", "FULL"):
+            raise ValueError("BUILD_BARS does not accept mode other than BARS_ONLY/FULL")
+
+    def execute(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
+        fixed = dict(params)
+        fixed["mode"] = "BARS_ONLY"
+        fixed.pop("feature_scope", None)
+        return super().execute(fixed, context)
+
+
+class BuildFeaturesHandler(BuildDataHandler):
+    JOB_TYPE = "BUILD_FEATURES"
+
+    def validate_params(self, params: Dict[str, Any]) -> None:
+        super().validate_params(params)
+        mode = params.get("mode")
+        if mode not in (None, "FEATURES_ONLY", "FULL"):
+            raise ValueError("BUILD_FEATURES does not accept mode other than FEATURES_ONLY/FULL")
+
+    def execute(self, params: Dict[str, Any], context: JobContext) -> Dict[str, Any]:
+        fixed = dict(params)
+        fixed["mode"] = "FEATURES_ONLY"
+
+        season = fixed.get("season") or current_season()
+        dataset_id = str(fixed["dataset_id"])
+        tfs = _parse_timeframes_param(fixed)
+        missing = _missing_resampled_bars(season, dataset_id, tfs)
+        if missing:
+            raise ValueError(
+                "Missing resampled bars. Run BUILD_BARS first. Missing: "
+                + ", ".join(missing[:5])
+                + (" ..." if len(missing) > 5 else "")
+            )
+
+        return super().execute(fixed, context)
+
+
+build_bars_handler = BuildBarsHandler()
+build_features_handler = BuildFeaturesHandler()
+register_handler("BUILD_BARS", build_bars_handler)
+register_handler("BUILD_FEATURES", build_features_handler)

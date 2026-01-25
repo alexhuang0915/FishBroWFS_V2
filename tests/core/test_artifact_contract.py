@@ -24,7 +24,7 @@ class TestArtifactContract(unittest.TestCase):
         from control.supervisor.db import get_default_db_path
 
         params = {
-            "strategy_id": "s1_v1",
+            "strategy_id": "regime_filter_v1",
             "instrument": "CME.MNQ",
             "timeframe": "60m",
             "start_season": "2020Q1",

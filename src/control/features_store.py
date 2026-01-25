@@ -18,6 +18,7 @@ from control.bars_store import (
     sha256_file,
     canonical_json,
 )
+from core.paths import get_shared_cache_root
 
 # Dynamically create Timeframe literal type based on timeframe registry
 # _timeframe_registry = load_timeframes()
@@ -30,7 +31,7 @@ def features_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
     """
     取得 features 目錄路徑
     
-    建議位置：outputs/shared/{season}/{dataset_id}/features/
+    建議位置：cache/shared/{season}/{dataset_id}/features/
     
     Args:
         outputs_root: 輸出根目錄
@@ -41,7 +42,7 @@ def features_dir(outputs_root: Path, season: str, dataset_id: str) -> Path:
         目錄路徑
     """
     # 建立路徑
-    path = outputs_root / "shared" / season / dataset_id / "features"
+    path = get_shared_cache_root() / season / dataset_id / "features"
     return path
 
 
@@ -54,7 +55,7 @@ def features_path(
     """
     取得 features 檔案路徑
     
-    建議位置：outputs/shared/{season}/{dataset_id}/features/features_{tf_min}m.npz
+    建議位置：cache/shared/{season}/{dataset_id}/features/features_{tf_min}m.npz
     
     Args:
         outputs_root: 輸出根目錄
@@ -76,8 +77,7 @@ def write_features_npz_atomic(
     """
     Write features NPZ via tmp + replace. Deterministic keys order.
 
-    重用 bars_store.write_npz_atomic 但確保 keys 順序固定：
-    ts, atr_14, ret_z_200, session_vwap
+    V2 contract: allow arbitrary feature keys (SSOT decides what gets cached).
 
     Args:
         path: 目標檔案路徑
@@ -88,7 +88,7 @@ def write_features_npz_atomic(
         IOError: 寫入失敗
     """
     # 驗證必要 keys
-    required_keys = {"ts", "atr_14", "ret_z_200", "session_vwap"}
+    required_keys = {"ts"}
     missing_keys = required_keys - set(features_dict.keys())
     if missing_keys:
         raise ValueError(f"features_dict 缺少必要 keys: {missing_keys}")
@@ -98,11 +98,18 @@ def write_features_npz_atomic(
     if not np.issubdtype(ts.dtype, np.datetime64):
         raise ValueError(f"ts 的 dtype 必須是 datetime64，實際為 {ts.dtype}")
     
-    # 確保所有特徵陣列都是 float64
-    for key in ["atr_14", "ret_z_200", "session_vwap"]:
-        arr = features_dict[key]
+    # 確保所有特徵陣列都是 float（ts 제외）
+    n = len(ts)
+    for key, arr in features_dict.items():
+        if key == "ts":
+            continue
+        if len(arr) != n:
+            raise ValueError(f"{key} 長度不一致: {len(arr)} != ts 長度 {n}")
         if not np.issubdtype(arr.dtype, np.floating):
-            raise ValueError(f"{key} 的 dtype 必須是浮點數，實際為 {arr.dtype}")
+            try:
+                features_dict[key] = arr.astype(np.float64)
+            except Exception:
+                raise ValueError(f"{key} 的 dtype 必須是浮點數，實際為 {arr.dtype}")
     
     # 使用 bars_store 的 write_npz_atomic
     write_npz_atomic(path, features_dict)
@@ -126,7 +133,7 @@ def load_features_npz(path: Path) -> Dict[str, np.ndarray]:
     data = load_npz(path)
     
     # 驗證必要 keys
-    required_keys = {"ts", "atr_14", "ret_z_200", "session_vwap"}
+    required_keys = {"ts"}
     missing_keys = required_keys - set(data.keys())
     if missing_keys:
         raise ValueError(f"載入的 NPZ 缺少必要 keys: {missing_keys}")
@@ -194,5 +201,3 @@ def compute_features_sha256_dict(
             continue
     
     return result
-
-

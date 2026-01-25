@@ -27,7 +27,7 @@ class TestBuildPortfolioSmoke(unittest.TestCase):
         wfs_job_id = submit(
             "RUN_RESEARCH_WFS",
             {
-                "strategy_id": "s1_v1",
+                "strategy_id": "regime_filter_v1",
                 "instrument": "CME.MNQ",
                 "timeframe": "60m",
                 "start_season": "2020Q1",

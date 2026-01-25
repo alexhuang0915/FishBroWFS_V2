@@ -14,7 +14,10 @@ from datetime import datetime, timezone
 class JobType(StrEnum):
     """Canonical job types."""
     BUILD_DATA = "BUILD_DATA"
+    BUILD_BARS = "BUILD_BARS"
+    BUILD_FEATURES = "BUILD_FEATURES"
     BUILD_PORTFOLIO_V2 = "BUILD_PORTFOLIO_V2"
+    FINALIZE_PORTFOLIO_V1 = "FINALIZE_PORTFOLIO_V1"
     RUN_RESEARCH_WFS = "RUN_RESEARCH_WFS"  # Phase4-A: Walk-Forward Simulation research
     
     # Legacy / Utility
@@ -85,7 +88,10 @@ def normalize_job_type(job_type: str | JobType) -> JobType:
     # Legacy alias mapping
     legacy_map = {
         "BUILD_PORTFOLIO": JobType.BUILD_PORTFOLIO_V2,
+        "FINALIZE_PORTFOLIO": JobType.FINALIZE_PORTFOLIO_V1,
         "BUILD_DATA": JobType.BUILD_DATA,
+        "BUILD_BARS": JobType.BUILD_BARS,
+        "BUILD_FEATURES": JobType.BUILD_FEATURES,
     }
     
     # Check legacy map first

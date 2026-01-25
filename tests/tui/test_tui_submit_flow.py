@@ -2,6 +2,12 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+import sys
+
+repo_root = Path(__file__).resolve().parents[2]
+src_path = repo_root / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
 
 from textual.widgets import Input, Select, Static
 
@@ -28,7 +34,7 @@ class TestTUISubmitFlows(unittest.IsolatedAsyncioTestCase):
         content = getattr(status, "_Static__content", "")
         return str(content) if content is not None else ""
 
-    async def test_build_data_submit_flow(self) -> None:
+    async def test_build_bars_submit_flow(self) -> None:
         app = FishBroTUI()
         async with app.run_test() as pilot:
             app.switch_screen("data_prepare")
@@ -36,15 +42,55 @@ class TestTUISubmitFlows(unittest.IsolatedAsyncioTestCase):
 
             screen = app.screen
             screen.query_one("#dataset_id", Input).value = "CME.MNQ"
-            screen.query_one("#timeframe_min", Input).value = "60"
-            screen.query_one("#mode", Select).value = "BARS_ONLY"
+            screen.query_one("#timeframes", Input).value = "60"
             screen.query_one("#season", Input).value = "2026Q1"
 
-            await pilot.click("#submit_build_data")
+            await pilot.click("#submit_build_bars")
             await pilot.pause(0.05)
 
             status = await self._get_status_text(app)
-            self.assertIn("Submitted BUILD_DATA job", status)
+            self.assertIn("Submitted BUILD_BARS job", status)
+
+    async def test_build_features_requires_bars_prompt_only(self) -> None:
+        app = FishBroTUI()
+        async with app.run_test() as pilot:
+            app.switch_screen("data_prepare")
+            await pilot.pause(0.1)
+
+            screen = app.screen
+            screen.query_one("#dataset_id", Input).value = "CME.MNQ"
+            screen.query_one("#timeframes", Input).value = "60"
+            screen.query_one("#season", Input).value = "2026Q1"
+            screen.query_one("#feature_scope", Select).value = "all_packs"
+
+            # Call handler directly; screen can be scrollable in CI and pilot click may miss.
+            screen.handle_submit_build_features()
+            await pilot.pause(0.2)
+
+            status = await self._get_status_text(app)
+            self.assertIn("Missing bars. Run BUILD_BARS first.", status)
+
+    async def test_build_features_rejects_purge_in_ui(self) -> None:
+        app = FishBroTUI()
+        async with app.run_test() as pilot:
+            app.switch_screen("data_prepare")
+            await pilot.pause(0.1)
+
+            screen = app.screen
+            screen.query_one("#dataset_id", Input).value = "CME.MNQ"
+            screen.query_one("#timeframes", Input).value = "60"
+            screen.query_one("#season", Input).value = "2026Q1"
+            screen.query_one("#feature_scope", Select).value = "all_packs"
+            # Purge should only be allowed for BUILD_BARS.
+            from textual.widgets import Checkbox
+
+            screen.query_one("#purge_before_build", Checkbox).value = True
+
+            screen.handle_submit_build_features()
+            await pilot.pause(0.2)
+
+            status = await self._get_status_text(app)
+            self.assertIn("purge is not allowed for BUILD_FEATURES", status)
 
     async def test_wfs_submit_flow(self) -> None:
         app = FishBroTUI()
@@ -53,15 +99,15 @@ class TestTUISubmitFlows(unittest.IsolatedAsyncioTestCase):
             await pilot.pause(0.1)
 
             screen = app.screen
-            screen.query_one("#strategy_id", Input).value = "s1_v1"
-            screen.query_one("#instrument", Input).value = "CME.MNQ"
-            screen.query_one("#timeframe", Input).value = "60m"
-            screen.query_one("#dataset_id", Input).value = "CME.MNQ"
+            screen.query_one("#strategy_list", Input).value = "regime_filter_v1"
+            screen.query_one("#instrument", Select).value = "CME.MNQ"
+            screen.query_one("#timeframe_list", Input).value = "60m"
             screen.query_one("#season", Input).value = "2026Q1"
             screen.query_one("#start_season", Input).value = "2026Q1"
             screen.query_one("#end_season", Input).value = "2026Q1"
 
-            await pilot.click("#submit_wfs")
+            # Screen is scrollable; calling handler directly avoids pilot OutOfBounds.
+            screen.handle_submit()
             await pilot.pause(0.05)
 
             status = await self._get_status_text(app)
@@ -71,7 +117,7 @@ class TestTUISubmitFlows(unittest.IsolatedAsyncioTestCase):
         wfs_job_id = submit(
             "RUN_RESEARCH_WFS",
             {
-                "strategy_id": "s1_v1",
+                "strategy_id": "regime_filter_v1",
                 "instrument": "CME.MNQ",
                 "timeframe": "60m",
                 "dataset_id": "CME.MNQ",

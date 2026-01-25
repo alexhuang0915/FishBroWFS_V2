@@ -42,7 +42,7 @@ features:
     required: false
 
 # Default dataset and timeframe
-dataset_id: "CME.MNQ.60m.2020-2024"
+dataset_id: "CME.MNQ"
 timeframe: 60
 
 # Notes

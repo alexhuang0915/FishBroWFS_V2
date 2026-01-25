@@ -13,11 +13,16 @@ from ..policy_enforcement import evaluate_preflight, PolicyEnforcementError, wri
 
 # Import and register built-in handlers (Local Research OS mode: mainline only)
 from .handlers.build_data import build_data_handler
+from .handlers.build_data import build_bars_handler, build_features_handler
 from .handlers.build_portfolio import build_portfolio_handler
+from .handlers.finalize_portfolio import finalize_portfolio_handler
 from .handlers.run_research_wfs import run_research_wfs_handler
 
 register_handler("BUILD_DATA", build_data_handler)
+register_handler("BUILD_BARS", build_bars_handler)
+register_handler("BUILD_FEATURES", build_features_handler)
 register_handler("BUILD_PORTFOLIO_V2", build_portfolio_handler)
+register_handler("FINALIZE_PORTFOLIO_V1", finalize_portfolio_handler)
 register_handler("RUN_RESEARCH_WFS", run_research_wfs_handler)
 
 

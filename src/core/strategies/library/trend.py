@@ -38,3 +38,10 @@ class SmaCross:
         signals[sma_fast < sma_slow] = -1
         
         return signals
+
+    def compute_signals_ctx(self, ctx, df: pd.DataFrame) -> pd.Series:
+        """
+        FeatureContext-aware entrypoint (V1).
+        For now, reuse the same logic on data1 close.
+        """
+        return self.compute_signals(df)

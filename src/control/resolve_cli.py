@@ -188,26 +188,11 @@ def load_requirements(args) -> StrategyFeatureRequirements:
             # 預設為 JSON
             return load_requirements_from_json(str(path))
     elif args.strategy_id:
-        # 自動尋找需求檔案
-        # 優先順序：
-        # 1. configs/strategies/{strategy_id}.yaml (YAML 策略配置)
-        # 2. configs/strategies/{strategy_id}_v1.yaml (帶版本號)
-        
-        possible_paths = [
-            # YAML only (Constitution v1)
-            Path(f"configs/strategies/{args.strategy_id}.yaml"),
-            Path(f"configs/strategies/{args.strategy_id}_v1.yaml"),
-        ]
-        
-        for path in possible_paths:
-            if path.exists():
-                return load_requirements_from_yaml(str(path))
-        
-        raise FileNotFoundError(
-            f"找不到策略 {args.strategy_id} 的需求檔案。"
-            f"嘗試的路徑: {[str(p) for p in possible_paths]}"
-            f"注意：Config Constitution v1 要求所有策略配置必須為 YAML 格式。"
-        )
+        # Strategy SSOT: configs/registry/strategies.yaml
+        from control.strategy_registry_yaml import get_strategy_config_path
+
+        path = get_strategy_config_path(args.strategy_id)
+        return load_requirements_from_yaml(str(path))
     else:
         # 這不應該發生，因為 argparse 確保了二選一
         raise ValueError("必須提供 --req 或 --strategy-id")
@@ -273,5 +258,4 @@ def output_result(bundle, args) -> None:
 
 if __name__ == "__main__":
     sys.exit(main())
-
 

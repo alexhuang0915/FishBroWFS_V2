@@ -14,10 +14,12 @@ It does exactly:
 from __future__ import annotations
 
 import time
+import os
 from pathlib import Path
 
 from .supervisor import Supervisor
 from .db import get_default_db_path
+from core.paths import get_numba_cache_root
 
 
 def main() -> None:
@@ -63,6 +65,14 @@ def main() -> None:
 
     args = parser.parse_args()
     db_path = args.db or get_default_db_path()
+
+    # Ensure numba JIT cache is centralized and writable (disk cache enabled via @njit(cache=True)).
+    try:
+        numba_dir = get_numba_cache_root()
+        numba_dir.mkdir(parents=True, exist_ok=True)
+        os.environ.setdefault("NUMBA_CACHE_DIR", str(numba_dir))
+    except Exception:
+        pass
 
     print("=" * 60)
     print("FISHBRO WORKER INITIALIZING...")

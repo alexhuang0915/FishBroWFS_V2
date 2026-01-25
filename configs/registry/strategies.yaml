@@ -1,0 +1,23 @@
+version: "1.0"
+strategies:
+  - id: "regime_filter_v1"
+    display_name: "Regime Filter V1"
+    family: "cross_regime"
+    status: "active"
+    config_file: "regime_filter_v1.yaml"
+    description: "Cross-asset regime filter: cross decides allow/bias; execution uses target_dir."
+    version: "2.0"
+    author: "FishBro"
+    created_date: "2026-01-25"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+      - "CFE.VX"
+      - "OSE.NK225M"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240
+    requires_secondary_data: false

@@ -14,6 +14,9 @@ from gui.tui.screens.admin import AdminScreen
 from gui.tui.screens.wfs import WFSScreen
 from gui.tui.screens.portfolio import PortfolioScreen
 from gui.tui.screens.runtime import RuntimeIndexScreen
+from gui.tui.screens.report import ReportScreen
+from gui.tui.screens.catalog import CatalogScreen
+from gui.tui.screens.confirm_delete import ConfirmDeleteModal
 from gui.tui.services.bridge import Bridge
 
 class FishBroTUI(App):
@@ -26,7 +29,9 @@ class FishBroTUI(App):
         ("3", "switch_screen('wfs')", "WFS"),
         ("4", "switch_screen('portfolio')", "Portfolio"),
         ("5", "switch_screen('runtime')", "System/Index"),
-        ("7", "switch_screen('admin')", "Admin"),
+        ("6", "switch_screen('catalog')", "Catalog"),
+        ("7", "switch_screen('report')", "Report"),
+        ("8", "switch_screen('admin')", "Admin"),
         ("ctrl+c", "copy_field", "Copy"),
         ("ctrl+v", "paste_field", "Paste"),
         ("q", "quit", "Quit"),
@@ -43,6 +48,8 @@ class FishBroTUI(App):
         self.install_screen(WFSScreen(self.bridge), name="wfs")
         self.install_screen(PortfolioScreen(self.bridge), name="portfolio")
         self.install_screen(RuntimeIndexScreen(self.bridge), name="runtime")
+        self.install_screen(CatalogScreen(self.bridge), name="catalog")
+        self.install_screen(ReportScreen(self.bridge), name="report")
         self.push_screen("monitor")
         self.set_interval(2.0, self._refresh_nav_status)
         self.call_later(self._refresh_nav_status)
@@ -52,9 +59,24 @@ class FishBroTUI(App):
         self.switch_screen("monitor")
         self.call_later(self._set_monitor_job, job_id)
 
+    def open_job_report(self, job_id: str) -> None:
+        self.switch_screen("report")
+        self.call_later(self._set_report_job, job_id)
+
+    def open_delete_confirm(self, job_id: str) -> None:
+        self.push_screen(ConfirmDeleteModal(job_id))
+
     def _set_monitor_job(self, job_id: str) -> None:
         try:
             screen = self.get_screen("monitor")
+            if hasattr(screen, "set_job_id"):
+                screen.set_job_id(job_id)
+        except Exception:
+            return
+
+    def _set_report_job(self, job_id: str) -> None:
+        try:
+            screen = self.get_screen("report")
             if hasattr(screen, "set_job_id"):
                 screen.set_job_id(job_id)
         except Exception:

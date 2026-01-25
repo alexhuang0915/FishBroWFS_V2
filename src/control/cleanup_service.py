@@ -65,7 +65,7 @@ class HeadlessCleanupService:
         # Allowlist patterns (files/directories to never delete)
         self.allowlist_patterns = [
             "outputs/_trash",  # trash directory itself
-            "outputs/shared/artifacts",  # published artifacts
+            "cache/shared/artifacts",  # legacy published artifacts (if any)
             "outputs/seasons/*/shared/artifacts",
             "outputs/seasons/*/shared/features",  # features are cache but may be allowlisted
             "outputs/seasons/*/shared/bars",  # bars cache

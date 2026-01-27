@@ -12,6 +12,7 @@ from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, DataTable, Input, Label, ListItem, ListView, Static
 
 from gui.tui.screens.base import BaseScreen
+from gui.tui.screens.matrix_summary import MatrixSummaryScreen
 from gui.tui.services.bridge import Bridge
 
 
@@ -28,6 +29,7 @@ class ReportScreen(BaseScreen):
         ("enter", "toggle_detail", "Detail"),
         ("/", "focus_filter", "Filter"),
         ("o", "open_folder", "Open Folder"),
+        ("m", "open_matrix", "Matrix Summary"),
     ]
 
     def __init__(self, bridge: Bridge, **kwargs):
@@ -178,6 +180,9 @@ class ReportScreen(BaseScreen):
         except Exception:
             self._set_footer("Failed to open folder.")
 
+    def action_open_matrix(self):
+        self.app.push_screen(MatrixSummaryScreen(self.bridge))
+
     @on(Button.Pressed, "#load_report")
     def handle_load_report(self):
         job_id = self.query_one("#job_id", Input).value.strip()
@@ -242,7 +247,14 @@ class ReportScreen(BaseScreen):
 
         title = f"Report  |  job_id={self._selected_job_id or 'N/A'}"
         self.query_one("#report_title", Label).update(title)
-        subtitle = f"{meta.get('instrument', 'N/A')}  {meta.get('timeframe', 'N/A')}  {meta.get('start_season', 'N/A')}→{meta.get('end_season', 'N/A')}"
+        data2 = ((data.get("config") or {}).get("data") or {}).get("data2")
+        data2_s = str(data2).strip() if data2 else "None"
+        subtitle = (
+            f"{meta.get('instrument', 'N/A')}  "
+            f"data2={data2_s}  "
+            f"{meta.get('timeframe', 'N/A')}  "
+            f"{meta.get('start_season', 'N/A')}→{meta.get('end_season', 'N/A')}"
+        )
         self.query_one("#report_subtitle", Label).update(subtitle)
 
         self.query_one("#verdict_grade", Static).update(f"Grade: {self._fmt(verdict.get('grade'))}")
@@ -254,7 +266,7 @@ class ReportScreen(BaseScreen):
 
         instrument = meta.get("instrument") or data.get("config", {}).get("instrument") or "N/A"
         timeframe = meta.get("timeframe") or data.get("config", {}).get("data", {}).get("timeframe") or "N/A"
-        self.query_one("#data_snapshot", Static).update(f"{instrument}  |  {timeframe}")
+        self.query_one("#data_snapshot", Static).update(f"{instrument}  |  {timeframe}  |  data2={data2_s}")
 
         range_text = self._season_range(meta)
         self.query_one("#data_range", Static).update(f"Range: {range_text}")
@@ -482,6 +494,11 @@ class ReportScreen(BaseScreen):
         for idx, w in enumerate(windows, start=1):
             is_metrics = w.get("is_metrics") or {}
             oos_metrics = w.get("oos_metrics") or {}
+            oos_trades_detail = w.get("oos_trades") or []
+            if isinstance(oos_trades_detail, list):
+                oos_trades_len = len(oos_trades_detail)
+            else:
+                oos_trades_len = 0
             rows.append(
                 {
                     "index": str(idx),
@@ -493,6 +510,10 @@ class ReportScreen(BaseScreen):
                     "oos_net": cls._fmt(cls._pick(oos_metrics, ["net_profit", "net", "pnl", "profit"])),
                     "oos_mdd": cls._fmt(cls._pick(oos_metrics, ["max_drawdown", "mdd", "max_dd"])),
                     "oos_trades": cls._fmt(cls._pick(oos_metrics, ["trades", "total_trades"])),
+                    "oos_trades_detail_len": str(oos_trades_len),
+                    "data2_missing_ratio_pct": cls._fmt(oos_metrics.get("data2_missing_ratio_pct")),
+                    "data2_update_ratio_pct": cls._fmt(oos_metrics.get("data2_update_ratio_pct")),
+                    "data2_hold_ratio_pct": cls._fmt(oos_metrics.get("data2_hold_ratio_pct")),
                     "fail_reason": ", ".join(w.get("fail_reasons") or []) if w.get("fail_reasons") else "",
                 }
             )

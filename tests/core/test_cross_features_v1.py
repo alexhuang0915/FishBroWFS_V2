@@ -54,9 +54,9 @@ def test_cross_features_v1_shapes_and_warmup():
         "beta_60",
         "alpha_60",
         "r2_60",
-        "vol_atr1_14",
-        "vol_atr2_14",
-        "vol_atr_spread",
+        "vol_atr1_14_pct",
+        "vol_atr2_14_pct",
+        "vol_atr_pct_spread",
     }
     assert required.issubset(set(features.keys()))
     for v in features.values():

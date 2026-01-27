@@ -1,0 +1,19 @@
+version: "1.0"
+strategy_id: "baseline_v1"
+class_path: "core.strategies.v2.baseline_v1.BaselineV1"
+
+features:
+  data1:
+    pack: "data1_v1_basic"
+    add: []
+    remove: []
+
+parameters:
+  period:
+    type: "choice"
+    default: 10
+    choices: [10]
+  stop_dist_pct:
+    type: "choice"
+    default: 0.05
+    choices: [0.05]

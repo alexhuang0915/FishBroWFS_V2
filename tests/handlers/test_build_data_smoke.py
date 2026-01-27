@@ -19,6 +19,16 @@ def _write_tiny_raw_csv(path: Path) -> None:
     ]
     path.write_text("\n".join(rows) + "\n", encoding="utf-8")
 
+def _write_tiny_raw_csv_with_old_prefix(path: Path) -> None:
+    rows = [
+        "Date,Time,Open,High,Low,Close,TotalVolume",
+        "2018-12-31,23:59:00,1,1,1,1,1",
+        "2019-01-01,00:00:00,2,2,2,2,2",
+        "2020-01-01,00:00:00,3,3,3,3,3",
+        "2020-01-01,00:01:00,4,4,4,4,4",
+    ]
+    path.write_text("\n".join(rows) + "\n", encoding="utf-8")
+
 
 class TestBuildDataSmoke(unittest.TestCase):
     def setUp(self) -> None:
@@ -70,6 +80,85 @@ class TestBuildDataSmoke(unittest.TestCase):
         self.assertTrue(resampled.exists(), "resampled_60m.npz must exist")
 
         # Job evidence must exist.
+        job_dir = self.outputs_root / "artifacts" / "jobs" / job_id
+        self.assertTrue((job_dir / "manifest.json").exists())
+
+    def test_build_bars_resample_anchor_clip(self) -> None:
+        import numpy as np
+
+        from control.supervisor import submit
+        from control.supervisor.db import get_default_db_path
+
+        dataset_id = "CME.MNQ"
+        season = "2026Q1"
+        raw_path = self.raw_root / "raw" / f"{dataset_id}_SUBSET.txt"
+        _write_tiny_raw_csv_with_old_prefix(raw_path)
+
+        job_id = submit(
+            "BUILD_BARS",
+            {"dataset_id": dataset_id, "timeframes": [60], "season": season, "force_rebuild": True},
+        )
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "control.supervisor.worker",
+            "--db",
+            str(get_default_db_path()),
+            "--max-workers",
+            "1",
+            "--tick-interval",
+            "0.05",
+            "--max-jobs",
+            "1",
+        ]
+        subprocess.run(cmd, check=True, env={**os.environ, "PYTHONPATH": "src"})
+
+        cache_root = Path(os.environ.get("FISHBRO_CACHE_ROOT", Path(self.outputs_root).parent / "cache"))
+        resampled = cache_root / "shared" / season / dataset_id / "bars" / "resampled_60m.npz"
+        self.assertTrue(resampled.exists(), "resampled_60m.npz must exist")
+
+        data = dict(np.load(resampled, allow_pickle=False))
+        ts = data["ts"].astype("datetime64[s]")
+        self.assertTrue(len(ts) > 0)
+        self.assertGreaterEqual(ts[0], np.datetime64("2019-01-01T00:00:00", "s"))
+
+        job_dir = self.outputs_root / "artifacts" / "jobs" / job_id
+        self.assertTrue((job_dir / "manifest.json").exists())
+
+    def test_build_bars_incremental_smoke(self) -> None:
+        from control.supervisor import submit
+        from control.supervisor.db import get_default_db_path
+
+        dataset_id = "CME.MNQ"
+        season = "2026Q1"
+        raw_path = self.raw_root / "raw" / f"{dataset_id}_SUBSET.txt"
+        _write_tiny_raw_csv(raw_path)
+
+        job_id = submit(
+            "BUILD_BARS",
+            {"dataset_id": dataset_id, "timeframes": [60], "season": season, "force_rebuild": False},
+        )
+
+        cmd = [
+            sys.executable,
+            "-m",
+            "control.supervisor.worker",
+            "--db",
+            str(get_default_db_path()),
+            "--max-workers",
+            "1",
+            "--tick-interval",
+            "0.05",
+            "--max-jobs",
+            "1",
+        ]
+        subprocess.run(cmd, check=True, env={**os.environ, "PYTHONPATH": "src"})
+
+        cache_root = Path(os.environ.get("FISHBRO_CACHE_ROOT", Path(self.outputs_root).parent / "cache"))
+        resampled = cache_root / "shared" / season / dataset_id / "bars" / "resampled_60m.npz"
+        self.assertTrue(resampled.exists(), "resampled_60m.npz must exist")
+
         job_dir = self.outputs_root / "artifacts" / "jobs" / job_id
         self.assertTrue((job_dir / "manifest.json").exists())
 

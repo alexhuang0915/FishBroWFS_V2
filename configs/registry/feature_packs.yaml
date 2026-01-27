@@ -15,171 +15,217 @@ packs:
     description: "Minimal data1 pack for V1 (cheap + stable)."
     features:
       - name: "atr_14"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
 
   data1_v1_full:
     description: "Data1 full pack for V1 (finite, window-locked, WFS-ready)."
     features:
       # Trend / level
-      - { name: "sma_5", timeframe: 60, required: true }
-      - { name: "sma_10", timeframe: 60, required: true }
-      - { name: "sma_20", timeframe: 60, required: true }
-      - { name: "sma_40", timeframe: 60, required: true }
-      - { name: "sma_60", timeframe: 60, required: true }
-      - { name: "sma_120", timeframe: 60, required: true }
-      - { name: "sma_240", timeframe: 60, required: true }
+      - { name: "sma_5", timeframe: "RUN", required: true }
+      - { name: "sma_10", timeframe: "RUN", required: true }
+      - { name: "sma_20", timeframe: "RUN", required: true }
+      - { name: "sma_40", timeframe: "RUN", required: true }
+      - { name: "sma_60", timeframe: "RUN", required: true }
+      - { name: "sma_120", timeframe: "RUN", required: true }
+      - { name: "sma_240", timeframe: "RUN", required: true }
 
-      - { name: "ema_5", timeframe: 60, required: true }
-      - { name: "ema_10", timeframe: 60, required: true }
-      - { name: "ema_20", timeframe: 60, required: true }
-      - { name: "ema_40", timeframe: 60, required: true }
-      - { name: "ema_60", timeframe: 60, required: true }
-      - { name: "ema_120", timeframe: 60, required: true }
-      - { name: "ema_240", timeframe: 60, required: true }
+      - { name: "ema_5", timeframe: "RUN", required: true }
+      - { name: "ema_10", timeframe: "RUN", required: true }
+      - { name: "ema_20", timeframe: "RUN", required: true }
+      - { name: "ema_40", timeframe: "RUN", required: true }
+      - { name: "ema_60", timeframe: "RUN", required: true }
+      - { name: "ema_120", timeframe: "RUN", required: true }
+      - { name: "ema_240", timeframe: "RUN", required: true }
 
-      - { name: "hh_20", timeframe: 60, required: true }
-      - { name: "hh_60", timeframe: 60, required: true }
-      - { name: "hh_120", timeframe: 60, required: true }
-      - { name: "ll_20", timeframe: 60, required: true }
-      - { name: "ll_60", timeframe: 60, required: true }
-      - { name: "ll_120", timeframe: 60, required: true }
+      - { name: "hh_20", timeframe: "RUN", required: true }
+      - { name: "hh_60", timeframe: "RUN", required: true }
+      - { name: "hh_120", timeframe: "RUN", required: true }
+      - { name: "ll_20", timeframe: "RUN", required: true }
+      - { name: "ll_60", timeframe: "RUN", required: true }
+      - { name: "ll_120", timeframe: "RUN", required: true }
 
       # Volatility
-      - { name: "atr_10", timeframe: 60, required: true }
-      - { name: "atr_14", timeframe: 60, required: true }
-      - { name: "atr_20", timeframe: 60, required: true }
-      - { name: "donchian_width_20", timeframe: 60, required: true }
-      - { name: "bb_width_20", timeframe: 60, required: true }
-      - { name: "atr_ch_upper_14", timeframe: 60, required: true }
-      - { name: "atr_ch_lower_14", timeframe: 60, required: true }
-      - { name: "atr_ch_pos_14", timeframe: 60, required: true }
+      - { name: "atr_10", timeframe: "RUN", required: true }
+      - { name: "atr_14", timeframe: "RUN", required: true }
+      - { name: "atr_20", timeframe: "RUN", required: true }
+      - { name: "donchian_width_20", timeframe: "RUN", required: true }
+      - { name: "bb_width_20", timeframe: "RUN", required: true }
+      - { name: "atr_ch_upper_14", timeframe: "RUN", required: true }
+      - { name: "atr_ch_lower_14", timeframe: "RUN", required: true }
+      - { name: "atr_ch_pos_14", timeframe: "RUN", required: true }
 
       # Return / rank
-      - { name: "ret_z_200", timeframe: 60, required: true }
-      - { name: "zscore_200", timeframe: 60, required: true }
-      - { name: "percentile_126", timeframe: 60, required: true }
-      - { name: "percentile_252", timeframe: 60, required: true }
+      - { name: "ret_z_200", timeframe: "RUN", required: true }
+      - { name: "zscore_200", timeframe: "RUN", required: true }
+      - { name: "percentile_126", timeframe: "RUN", required: true }
+      - { name: "percentile_252", timeframe: "RUN", required: true }
 
       # Band position / distances
-      - { name: "bb_pb_20", timeframe: 60, required: true }
-      - { name: "dist_hh_20", timeframe: 60, required: true }
-      - { name: "dist_ll_20", timeframe: 60, required: true }
+      - { name: "bb_pb_20", timeframe: "RUN", required: true }
+      - { name: "dist_hh_20", timeframe: "RUN", required: true }
+      - { name: "dist_ll_20", timeframe: "RUN", required: true }
 
       # Session
-      - { name: "session_vwap", timeframe: 60, required: true }
+      - { name: "session_vwap", timeframe: "RUN", required: true }
+
+      # Momentum (New V1.1)
+      - { name: "rsi_7", timeframe: "RUN", required: true }
+      - { name: "rsi_14", timeframe: "RUN", required: true }
+      - { name: "rsi_28", timeframe: "RUN", required: true }
+      - { name: "adx_14", timeframe: "RUN", required: true }
+      - { name: "di_plus_14", timeframe: "RUN", required: true }
+      - { name: "di_minus_14", timeframe: "RUN", required: true }
+      - { name: "macd_hist_12_26_9", timeframe: "RUN", required: true }
+      - { name: "roc_5", timeframe: "RUN", required: true }
+      - { name: "roc_20", timeframe: "RUN", required: true }
+      - { name: "roc_60", timeframe: "RUN", required: true }
+      - { name: "atr_pct_14", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_20", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_60", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_120", timeframe: "RUN", required: true }
+
+  data1_v1_momentum:
+    description: "Data1 momentum pack (RSI, ADX, MACD, ROC)."
+    features:
+      - { name: "rsi_7", timeframe: "RUN", required: true }
+      - { name: "rsi_14", timeframe: "RUN", required: true }
+      - { name: "rsi_28", timeframe: "RUN", required: true }
+      - { name: "adx_14", timeframe: "RUN", required: true }
+      - { name: "di_plus_14", timeframe: "RUN", required: true }
+      - { name: "di_minus_14", timeframe: "RUN", required: true }
+      - { name: "macd_hist_12_26_9", timeframe: "RUN", required: true }
+      - { name: "roc_5", timeframe: "RUN", required: true }
+      - { name: "roc_20", timeframe: "RUN", required: true }
+      - { name: "roc_60", timeframe: "RUN", required: true }
+      - { name: "atr_pct_14", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_20", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_60", timeframe: "RUN", required: true }
+      - { name: "atr_pct_z_120", timeframe: "RUN", required: true }
 
   cross_v1_full:
     description: "Cross features V1 full pack (deterministic, multi-window)."
     features:
       # spread_*
       - name: "spread_log"
-        timeframe: 60
+        timeframe: "RUN"
+        required: true
+      - name: "spread_log_z_5"
+        timeframe: "RUN"
         required: true
       - name: "spread_log_z_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "spread_log_z_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "spread_log_z_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
 
       # rel_*
       - name: "rel_ret_1"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_mom_5"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_mom_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_mom_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_mom_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_vol_ratio"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_vol_z_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_vol_z_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "rel_vol_z_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
 
       # corr_*
+      - name: "corr_5"
+        timeframe: "RUN"
+        required: true
       - name: "corr_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "corr_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "corr_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "corr_abs_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "corr_abs_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "corr_abs_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
 
       # beta_*
       - name: "beta_20"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "beta_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "beta_120"
-        timeframe: 60
+        timeframe: "RUN"
+        required: true
+      - name: "beta_z_60"
+        timeframe: "RUN"
+        required: true
+      - name: "beta_z_120"
+        timeframe: "RUN"
         required: true
       - name: "alpha_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "alpha_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "r2_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "r2_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "resid_std_60"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
       - name: "resid_std_120"
-        timeframe: 60
+        timeframe: "RUN"
         required: true
 
       # vol_*
-      - name: "vol_atr1_14"
-        timeframe: 60
+      - name: "vol_atr1_14_pct"
+        timeframe: "RUN"
         required: true
-      - name: "vol_atr2_14"
-        timeframe: 60
+      - name: "vol_atr2_14_pct"
+        timeframe: "RUN"
         required: true
-      - name: "vol_atr_spread"
-        timeframe: 60
+      - name: "vol_atr_pct_spread"
+        timeframe: "RUN"
         required: true
-      - name: "vol_atr_spread_z_20"
-        timeframe: 60
+      - name: "vol_atr_pct_spread_z_20"
+        timeframe: "RUN"
         required: true
-      - name: "vol_atr_spread_z_60"
-        timeframe: 60
+      - name: "vol_atr_pct_spread_z_60"
+        timeframe: "RUN"
         required: true
-      - name: "vol_atr_spread_z_120"
-        timeframe: 60
+      - name: "vol_atr_pct_spread_z_120"
+        timeframe: "RUN"
         required: true

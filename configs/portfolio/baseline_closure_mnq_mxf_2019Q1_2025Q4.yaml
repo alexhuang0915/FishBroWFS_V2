@@ -1,0 +1,17 @@
+version: "PORTFOLIO_SPEC_V1"
+portfolio_id: "baseline_closure_mnq_mxf_2019Q1_2025Q4"
+
+# V1 convention:
+# - seasons[0]..seasons[-1] defines the inclusive WFS window range (start_season..end_season)
+# - The cache/artifacts "snapshot season" is provided via `control.auto_cli --season <SNAPSHOT>`
+seasons:
+  - "2019Q1"
+  - "2025Q4"
+
+instrument_ids:
+  - "CME.MNQ"
+  - "TWF.MXF"
+
+strategy_ids:
+  - "baseline_v1"
+

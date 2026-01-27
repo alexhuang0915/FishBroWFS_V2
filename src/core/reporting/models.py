@@ -24,6 +24,9 @@ class StrategyHeadlineMetricsV1(BaseModel):
     max_drawdown: Optional[float] = None
     trades: Optional[int] = None
     win_rate: Optional[float] = None
+    profit_factor: Optional[float] = None
+    sharpe: Optional[float] = None
+    calmar: Optional[float] = None
     downstream_admissible: Optional[bool] = None
 
 

@@ -8,7 +8,7 @@ Strategy Feature Declaration 合約
 from __future__ import annotations
 
 import json
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel, Field
 
 
@@ -103,7 +103,11 @@ def load_requirements_from_json(json_path: str) -> StrategyFeatureRequirements:
         raise ValueError(f"需求資料驗證失敗 {json_path}: {e}")
 
 
-def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
+def load_requirements_from_yaml(
+    yaml_path: str,
+    *,
+    default_timeframe_min: int = 60,
+) -> StrategyFeatureRequirements:
     """
     從 YAML 策略配置檔案載入策略特徵需求
 
@@ -117,7 +121,6 @@ def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
         FileNotFoundError: 檔案不存在
         ValueError: YAML 解析失敗或驗證失敗
     """
-    from pathlib import Path
     import yaml
     from pathlib import Path
     
@@ -142,6 +145,16 @@ def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
     required = []
     optional = []
     
+    def _parse_timeframe(raw: Any) -> int:
+        if raw is None or raw == "":
+            return int(default_timeframe_min)
+        if isinstance(raw, str):
+            token = raw.strip().upper()
+            if token in {"RUN", "@RUN", "@TF", "@TIMEFRAME"}:
+                return int(default_timeframe_min)
+            return int(token)
+        return int(raw)
+
     def _consume(items):
         for feature in items or []:
             if not isinstance(feature, dict):
@@ -149,9 +162,13 @@ def load_requirements_from_yaml(yaml_path: str) -> StrategyFeatureRequirements:
             name = feature.get("name")
             timeframe = feature.get("timeframe")
             required_flag = feature.get("required", True)
-            if not name or not timeframe:
-                raise ValueError(f"特徵缺少 name 或 timeframe: {feature}")
-            feature_ref = FeatureRef(name=str(name), timeframe_min=int(timeframe))
+            if not name:
+                raise ValueError(f"特徵缺少 name: {feature}")
+            try:
+                tf_min = _parse_timeframe(timeframe)
+            except Exception as e:
+                raise ValueError(f"無法解析 timeframe: {feature}") from e
+            feature_ref = FeatureRef(name=str(name), timeframe_min=tf_min)
             if required_flag:
                 required.append(feature_ref)
             else:

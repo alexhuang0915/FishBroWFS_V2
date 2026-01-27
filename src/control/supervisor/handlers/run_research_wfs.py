@@ -231,6 +231,30 @@ def _load_strategy_config(strategy_id: str) -> dict:
 
     return load_strategy_config(strategy_id)
 
+def _strategy_static_params_from_doc(strategy_doc: dict) -> dict:
+    """
+    Optional: allow a strategy YAML to provide non-grid (non-WFS) params that are always passed
+    into the strategy class constructor.
+
+    This is intentionally fail-closed: only dict is accepted; anything else is ignored as {}.
+    """
+    raw = strategy_doc.get("static_params")
+    return raw if isinstance(raw, dict) else {}
+
+def _strategy_requires_secondary_data(strategy_id: str) -> bool:
+    try:
+        from control.strategy_registry_yaml import load_strategy_registry_yaml
+    except Exception:
+        return False
+    reg = load_strategy_registry_yaml()
+    entry = reg.get(strategy_id)
+    if entry is None:
+        return False
+    try:
+        return bool(entry.raw.get("requires_secondary_data"))
+    except Exception:
+        return False
+
 
 def _strategy_class_path_from_doc(strategy_doc: dict) -> str:
     cp = str(strategy_doc.get("class_path") or "").strip()
@@ -335,13 +359,26 @@ def _feature_specs_from_strategy(
     """
     alias_map: dict[str, str] = {}
 
+    def _parse_tf(raw) -> int:
+        if raw is None or raw == "":
+            return int(default_tf)
+        if isinstance(raw, str):
+            token = raw.strip().upper()
+            if token in {"RUN", "@RUN", "@TF", "@TIMEFRAME"}:
+                return int(default_tf)
+            return int(token)
+        return int(raw)
+
     def _parse_list(items) -> list[FeatureSpec]:
         out: list[FeatureSpec] = []
         for feat in items or []:
             if not isinstance(feat, dict):
                 continue
             name = str(feat.get("name") or "").strip()
-            tf = int(feat.get("timeframe") or default_tf)
+            try:
+                tf = _parse_tf(feat.get("timeframe"))
+            except Exception:
+                tf = int(default_tf)
             params = feat.get("params") or {}
             if name in {"context_feature", "value_feature", "filter_feature"}:
                 actual = str(params.get("feature_name") or "").strip()
@@ -580,12 +617,13 @@ def _run_segment_simulation(
     initial_equity: float,
     strategy_params: dict | None,
     cost: CostConfig,
-) -> tuple[list[EquityPoint], float, float, int, np.ndarray, list[str]]:
+    record_trades: bool = False,
+) -> tuple[list[EquityPoint], float, float, int, np.ndarray, list[str], list[dict[str, Any]]]:
     import numpy as np
 
     seg_ts = ts64[segment_mask]
     if len(seg_ts) == 0:
-        return [], 0.0, 0.0, 0, np.array([], dtype=np.float64), []
+        return [], 0.0, 0.0, 0, np.array([], dtype=np.float64), [], []
 
     df = _build_df_segment(ts64, segment_mask, data, features_data1, alias_map)
     ctx_seg = FeatureContext(
@@ -629,12 +667,13 @@ def _run_segment_simulation(
         signals=signals,
         cost=cost,
         initial_equity=initial_equity,
+        record_trades=record_trades,
     )
 
     t_daily, v_daily = _downsample_daily(seg_ts, sim.equity, instrument=instrument)
     points = [EquityPoint(t=t, v=float(v)) for t, v in zip(t_daily, v_daily)]
 
-    return points, sim.net, sim.mdd, sim.trades, sim.equity, sim.warnings
+    return points, sim.net, sim.mdd, sim.trades, sim.equity, sim.warnings, (sim.trades_ledger or [])
 
 
 def _bundle_from_features(
@@ -739,6 +778,12 @@ class RunResearchWFSHandler(BaseJobHandler):
         dataset_id = str(params.get("dataset_id") or instrument)
         data2_dataset_id = params.get("data2_dataset_id")
         data2_dataset_id = str(data2_dataset_id).strip() if data2_dataset_id else None
+
+        if _strategy_requires_secondary_data(strategy_id) and not data2_dataset_id:
+            raise ValueError(
+                f"strategy '{strategy_id}' requires data2_dataset_id; "
+                "set via configs/registry/data2_pairs.yaml (AutoWFS matrix) or pass --data2/--data2-mode in auto_cli."
+            )
 
         strategy_doc = _load_strategy_config(strategy_id)
         param_grid = _build_param_grid(strategy_doc.get("parameters") or {})
@@ -847,7 +892,8 @@ class RunResearchWFSHandler(BaseJobHandler):
 
             default_params = _load_strategy_defaults(strategy_id)
             override_params = params.get("strategy_params") if isinstance(params.get("strategy_params"), dict) else {}
-            base_params = {**default_params, **override_params}
+            static_params = _strategy_static_params_from_doc(strategy_doc)
+            base_params = {**static_params, **default_params, **override_params}
 
             data1_specs, data2_specs, cross_names, alias_map = _feature_specs_from_strategy(strategy_doc, tf_min)
             registry1 = _build_feature_registry(data1_specs)
@@ -865,7 +911,14 @@ class RunResearchWFSHandler(BaseJobHandler):
             )
             features_data1.pop("ts", None)
 
+            # MultiCharts-style semantics:
+            # - DATA1 drives the timeline.
+            # - DATA2 is aligned onto DATA1 with forward-fill (hold).
+            # - "missing" means DATA2 is truly unavailable after alignment (e.g., before the first DATA2 bar),
+            #   not merely "no update at this exact timestamp".
             data2_missing_mask = None
+            data2_update_mask = None
+            data2_hold_mask = None
             features_data2 = None
             cross_features = None
             if data2_bars_path is not None and data2_bars_path.exists():
@@ -885,7 +938,6 @@ class RunResearchWFSHandler(BaseJobHandler):
                 data2_df_pd = pd.DataFrame(data2_df)
                 aligner = DataAligner()
                 aligned_df, _metrics = aligner.align(data1_df, data2_df_pd)
-                data2_missing_mask = ~np.isin(ts64, data2_ts)
                 aligned_arrays = {
                     "open": aligned_df["open"].to_numpy(dtype=float),
                     "high": aligned_df["high"].to_numpy(dtype=float),
@@ -893,6 +945,9 @@ class RunResearchWFSHandler(BaseJobHandler):
                     "close": aligned_df["close"].to_numpy(dtype=float),
                     "volume": aligned_df["volume"].to_numpy(dtype=float),
                 }
+                data2_update_mask = np.isin(ts64, data2_ts)
+                data2_missing_mask = ~np.isfinite(aligned_arrays["close"])
+                data2_hold_mask = (~data2_update_mask) & (~data2_missing_mask)
                 registry2 = _build_feature_registry(data2_specs)
                 features_data2 = compute_features_for_tf(
                     ts=ts,
@@ -977,7 +1032,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                 total_mdd = 0.0
                 total_trades = 0
                 for win in window_defs:
-                    _, net, mdd, trades, _, _ = _run_segment_simulation(
+                    _, net, mdd, trades, _, _, _ = _run_segment_simulation(
                         ts64=ts64,
                         segment_mask=win["is_mask"],
                         data=data_arrays,
@@ -1021,7 +1076,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                 best_is_warn = []
 
                 for candidate in top_k:
-                    is_points, is_net, is_mdd, is_trades, is_equity, is_warn = _run_segment_simulation(
+                    is_points, is_net, is_mdd, is_trades, is_equity, is_warn, _ = _run_segment_simulation(
                         ts64=ts64,
                         segment_mask=win["is_mask"],
                         data=data_arrays,
@@ -1056,7 +1111,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                 stitched_is.extend(best_is_points)
                 oos_initial = float(best_is_equity[-1]) if len(best_is_equity) else initial_equity
 
-                oos_points, oos_net, oos_mdd, oos_trades, oos_equity, oos_warn = _run_segment_simulation(
+                oos_points, oos_net, oos_mdd, oos_trades, oos_equity, oos_warn, oos_trades_detail = _run_segment_simulation(
                     ts64=ts64,
                     segment_mask=win["oos_mask"],
                     data=data_arrays,
@@ -1073,6 +1128,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                     initial_equity=oos_initial,
                     strategy_params=best_params,
                     cost=cost,
+                    record_trades=True,
                 )
                 stitched_oos.extend(oos_points)
 
@@ -1082,9 +1138,17 @@ class RunResearchWFSHandler(BaseJobHandler):
                 stitched_bnh.extend([EquityPoint(t=t, v=float(v)) for t, v in zip(bnh_t, bnh_e)])
 
                 missing_ratio_pct = None
+                update_ratio_pct = None
+                hold_ratio_pct = None
                 if data2_missing_mask is not None:
                     miss = data2_missing_mask[win["oos_mask"]]
                     missing_ratio_pct = float(np.mean(miss) * 100.0) if miss.size > 0 else 0.0
+                if data2_update_mask is not None:
+                    upd = data2_update_mask[win["oos_mask"]]
+                    update_ratio_pct = float(np.mean(upd) * 100.0) if upd.size > 0 else 0.0
+                if data2_hold_mask is not None:
+                    hold = data2_hold_mask[win["oos_mask"]]
+                    hold_ratio_pct = float(np.mean(hold) * 100.0) if hold.size > 0 else 0.0
 
                 pass_window = oos_net > 0.0 and oos_trades >= 5
                 fail_reasons = [] if pass_window else ["oos_net_nonpositive_or_trades_low"]
@@ -1105,6 +1169,10 @@ class RunResearchWFSHandler(BaseJobHandler):
                 oos_metrics = {"net": oos_net, "mdd": float(oos_mdd), "trades": oos_trades}
                 if missing_ratio_pct is not None:
                     oos_metrics["data2_missing_ratio_pct"] = missing_ratio_pct
+                if update_ratio_pct is not None:
+                    oos_metrics["data2_update_ratio_pct"] = update_ratio_pct
+                if hold_ratio_pct is not None:
+                    oos_metrics["data2_hold_ratio_pct"] = hold_ratio_pct
 
                 windows.append(
                     WindowResult(
@@ -1114,6 +1182,7 @@ class RunResearchWFSHandler(BaseJobHandler):
                         best_params={"strategy_params": best_params},
                         is_metrics={"net": best_is_net, "mdd": float(best_is_mdd), "trades": best_is_trades},
                         oos_metrics=oos_metrics,
+                        oos_trades=oos_trades_detail,  # type: ignore[arg-type]
                         pass_=pass_window,  # type: ignore
                         fail_reasons=fail_reasons,
                         warnings=window_warnings,  # type: ignore
@@ -1144,6 +1213,8 @@ class RunResearchWFSHandler(BaseJobHandler):
             "pass_rate": float(pass_rate),
             "ulcer_index": float(ulcer),
             "max_underwater_days": int(uw_days),
+            "net_profit": float(total_oos_net),
+            "max_drawdown": float(oos_mdd),
         }
         metrics_scores = {
             "profit": float(40.0 + pass_rate * 40.0),

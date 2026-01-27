@@ -157,6 +157,9 @@ class WindowResult(BaseModel):
     best_params: Dict[str, Any]
     is_metrics: Dict[str, Any]  # MUST include: net, mdd, trades
     oos_metrics: Dict[str, Any]  # MUST include: net, mdd, trades
+    # Optional: detailed OOS trade ledger (round-trip trades only).
+    # Keep it window-scoped to avoid exploding result size during grid search.
+    oos_trades: List[Dict[str, Any]] = Field(default_factory=list)
     pass_: bool = Field(alias="pass")
     fail_reasons: List[str]
     warnings: List[str] = Field(default_factory=list)
@@ -205,6 +208,8 @@ class RawMetrics(TypedDict):
     pass_rate: float  # (0..1)
     ulcer_index: float
     max_underwater_days: int
+    net_profit: float
+    max_drawdown: float
 
 
 class ScoreMetrics(TypedDict):
@@ -367,7 +372,9 @@ def create_stub_result(job_id: str) -> ResearchWFSResult:
                 "trades": 0,
                 "pass_rate": 0.0,
                 "ulcer_index": 0.0,
-                "max_underwater_days": 0
+                "max_underwater_days": 0,
+                "net_profit": 0.0,
+                "max_drawdown": 0.0
             },
             scores={
                 "profit": 0.0,

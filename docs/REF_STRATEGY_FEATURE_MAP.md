@@ -53,12 +53,12 @@ spread_log
 spread_log_z_120
 spread_log_z_20
 spread_log_z_60
-vol_atr1_14
-vol_atr2_14
-vol_atr_spread
-vol_atr_spread_z_120
-vol_atr_spread_z_20
-vol_atr_spread_z_60
+vol_atr1_14_pct
+vol_atr2_14_pct
+vol_atr_pct_spread
+vol_atr_pct_spread_z_120
+vol_atr_pct_spread_z_20
+vol_atr_pct_spread_z_60
 ```
 
 ### `data1_v1_basic`
@@ -111,4 +111,3 @@ sma_5
 sma_60
 zscore_200
 ```
-

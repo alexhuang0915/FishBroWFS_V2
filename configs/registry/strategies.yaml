@@ -20,4 +20,44 @@ strategies:
       - 60
       - 120
       - 240
+    requires_secondary_data: true
+
+  - id: "baseline_v1"
+    display_name: "Baseline V1"
+    family: "baseline"
+    status: "active"
+    config_file: "baseline_v1.yaml"
+    description: "Baseline strategy that is guaranteed to trade for pipeline verification."
+    version: "1.0"
+    author: "FishBro"
+    created_date: "2026-01-26"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240
     requires_secondary_data: false
+
+  - id: "dsl_linear_v1"
+    display_name: "DSL Linear V1"
+    family: "dsl"
+    status: "active"
+    config_file: "dsl_linear_v1.yaml"
+    description: "YAML-driven linear score strategy template for LLM authoring (no Python codegen)."
+    version: "1.0"
+    author: "FishBro"
+    created_date: "2026-01-26"
+    supported_instruments:
+      - "CME.MNQ"
+      - "TWF.MXF"
+    supported_timeframes:
+      - 15
+      - 30
+      - 60
+      - 120
+      - 240
+    requires_secondary_data: true

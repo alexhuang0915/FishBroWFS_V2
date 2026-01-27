@@ -1,0 +1,29 @@
+version: "1.0"
+
+# SSOT: Data2 candidate sets for matrix runs.
+#
+# Rule (V1):
+# - Each (data1, data2) pair is an independent run.
+# - Engine strategy/runtime still sees at most one data2 per run.
+#
+# Orchestrators may run either:
+# - "single": only `primary` (if present), else first candidate.
+# - "matrix": all `candidates`.
+data2_pairs:
+  CME.MNQ:
+    primary: "CFE.VX"
+    candidates:
+      - "CFE.VX"
+      - "CME.6J"
+      - "NYBOT.DX"
+      - "CBOT.ZN"
+      - "CME.CL"
+
+  TWF.MXF:
+    primary: "CFE.VX"
+    candidates:
+      - "CFE.VX"
+      - "CME.6J"
+      - "NYBOT.DX"
+      - "CBOT.ZN"
+      - "CME.CL"

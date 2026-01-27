@@ -3,8 +3,9 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, List
 import logging
+import math
 
 from control.job_artifacts import get_job_evidence_dir
 
@@ -55,6 +56,146 @@ def read_portfolio_admission_artifact(portfolio_id: str, filename: str) -> Optio
         return None
 
 
+def _calculate_drawdown_series(equity_points: List[TimePointV1]) -> List[TimePointV1]:
+    """Calculate drawdown series from equity points: (equity - peak) / peak."""
+    if not equity_points:
+        return []
+    
+    drawdown_points = []
+    peak = -float('inf')
+    
+    for p in equity_points:
+        if p.value > peak:
+            peak = p.value
+        
+        dd = 0.0
+        if peak > 0:
+            dd = (p.value - peak) / peak
+        
+        drawdown_points.append(TimePointV1(
+            timestamp=p.timestamp,
+            value=float(dd)
+        ))
+    
+    return drawdown_points
+
+
+def _calculate_returns_histogram(equity_points: List[TimePointV1], bins: int = 21) -> Optional[HistogramV1]:
+    """Calculate deterministic returns histogram from equity points."""
+    if len(equity_points) < 2:
+        return None
+    
+    returns = []
+    for i in range(1, len(equity_points)):
+        prev = equity_points[i-1].value
+        curr = equity_points[i].value
+        if prev != 0:
+            returns.append((curr - prev) / prev)
+    
+    if not returns:
+        return None
+        
+    # Fixed range for histogram: -5% to +5% per bar, or adaptive but deterministic
+    # We'll use a simple fixed range for now to ensure stability
+    r_min, r_max = -0.05, 0.05
+    
+    # Adaptive range if data exceeds fixed range
+    actual_min = min(returns)
+    actual_max = max(returns)
+    if actual_min < r_min or actual_max > r_max:
+        r_min = math.floor(actual_min * 20) / 20.0
+        r_max = math.ceil(actual_max * 20) / 20.0
+
+    step = (r_max - r_min) / bins
+    edges = [r_min + i * step for i in range(bins + 1)]
+    counts = [0] * bins
+    
+    for r in returns:
+        if r < r_min:
+            idx = 0
+        elif r >= r_max:
+            idx = bins - 1
+        else:
+            idx = int((r - r_min) / step)
+            if idx >= bins:
+                idx = bins - 1
+        counts[idx] += 1
+        
+    return HistogramV1(bin_edges=edges, counts=counts)
+
+
+def _calculate_sharpe_daily(equity_points: List[TimePointV1]) -> Optional[float]:
+    """Calculate Sharpe ratio with daily frequency, risk-free = 0."""
+    if len(equity_points) < 2:
+        return None
+    
+    # Resample to daily
+    daily_equity: Dict[str, float] = {}
+    for p in equity_points:
+        day_str = p.timestamp.date().isoformat()
+        daily_equity[day_str] = p.value # Keep last value of the day
+    
+    days = sorted(daily_equity.keys())
+    if len(days) < 2:
+        return None
+        
+    returns = []
+    for i in range(1, len(days)):
+        prev = daily_equity[days[i-1]]
+        curr = daily_equity[days[i]]
+        if prev != 0:
+            returns.append((curr - prev) / prev)
+            
+    if not returns:
+        return 0.0
+        
+    import numpy as np
+    mean_r = np.mean(returns)
+    std_r = np.std(returns)
+    
+    if std_r == 0:
+        return 0.0
+        
+    # Annualize (sqrt(252))
+    return float(mean_r / std_r * math.sqrt(252))
+
+
+def _calculate_profit_factor(trades: List[TradeRowV1]) -> Optional[float]:
+    """Calculate Profit Factor: Sum(Gains) / Sum(Abs(Losses))."""
+    gains = sum(t.pnl for t in trades if t.pnl is not None and t.pnl > 0)
+    losses = sum(abs(t.pnl) for t in trades if t.pnl is not None and t.pnl < 0)
+    
+    if losses == 0:
+        return 100.0 if gains > 0 else 0.0 # Cap pf at 100 if no losses
+    return float(gains / losses)
+
+
+def _calculate_calmar(equity_points: List[TimePointV1], max_drawdown: float) -> Optional[float]:
+    """Calculate Calmar ratio: Annualized Return / Max Drawdown."""
+    if not equity_points:
+        return 0.0
+        
+    start_val = equity_points[0].value
+    end_val = equity_points[-1].value
+    
+    if start_val == 0:
+        return 0.0
+        
+    total_return = (end_val - start_val) / start_val
+    
+    duration_days = (equity_points[-1].timestamp - equity_points[0].timestamp).days
+    if duration_days <= 0:
+        return 0.0
+        
+    # Annualize return
+    ann_return = (1 + total_return) ** (365.25 / duration_days) - 1
+    
+    # Use a floor for drawdown to avoid division by zero
+    effective_dd = max(abs(max_drawdown), 1e-6)
+    
+    return float(ann_return / effective_dd)
+
+
 def build_strategy_report_v1(job_id: str) -> StrategyReportV1:
     """
     Build a StrategyReportV1 from existing evidence artifacts.
@@ -96,39 +237,81 @@ def build_strategy_report_v1(job_id: str) -> StrategyReportV1:
         except Exception:
             pass
     
-    # Build headline metrics
-    headline_metrics = StrategyHeadlineMetricsV1(
-        score=metrics.get("score"),
-        net_profit=metrics.get("net_profit"),
-        max_drawdown=metrics.get("max_drawdown"),
-        trades=metrics.get("trades"),
-        win_rate=metrics.get("win_rate"),
-        downstream_admissible=policy_check.get("downstream_admissible"),
-    )
+    # Try to load domain result
+    wfs_result = read_job_artifact(job_id, "wfs_result.json") or {}
     
-    # Build series (if equity/drawdown data exists)
+    # 1. Build tables and extract trade rows for Profit Factor
+    trade_rows = []
+    for win in wfs_result.get("windows", []):
+        for t in win.get("oos_trades", []):
+            try:
+                row = TradeRowV1(
+                    entry_time=datetime.fromisoformat(t["entry_t"].replace("Z", "+00:00")),
+                    exit_time=datetime.fromisoformat(t["exit_t"].replace("Z", "+00:00")),
+                    pnl=float(t["net_pnl"]),
+                    mfe=float(t.get("mfe", 0.0)),
+                    mae=float(t.get("mae", 0.0)),
+                )
+                trade_rows.append(row)
+            except Exception:
+                continue
+    
+    # 2. Build series (if equity/drawdown data exists)
+    equity_points = []
+    wfs_series = wfs_result.get("series", {})
+    # Use stitched_oos_equity if available, else stitched_is_equity
+    raw_points = wfs_series.get("stitched_oos_equity") or wfs_series.get("stitched_is_equity") or []
+    for p in raw_points:
+        try:
+            # Use 't' and 'v' from ResearchWFSResult
+            equity_points.append(TimePointV1(
+                timestamp=datetime.fromisoformat(p["t"].replace("Z", "+00:00")),
+                value=float(p["v"])
+            ))
+        except Exception:
+            continue
+
+    # 3. Headline Metrics Calculation
+    raw = wfs_result.get("metrics", {}).get("raw", {}) or metrics.get("raw", {})
+    verdict = wfs_result.get("verdict") or policy_check
+    
+    max_dd = raw.get("max_drawdown")
+    if max_dd is None and equity_points:
+        dd_series = _calculate_drawdown_series(equity_points)
+        if dd_series:
+            max_dd = min(p.value for p in dd_series)
+            
+    headline_metrics = StrategyHeadlineMetricsV1(
+        score=wfs_result.get("metrics", {}).get("scores", {}).get("total_weighted"),
+        net_profit=raw.get("net_profit"),
+        max_drawdown=max_dd,
+        trades=raw.get("trades"),
+        win_rate=raw.get("win_rate"),
+        profit_factor=_calculate_profit_factor(trade_rows) if trade_rows else raw.get("profit_factor"),
+        sharpe=_calculate_sharpe_daily(equity_points) if equity_points else None,
+        calmar=_calculate_calmar(equity_points, max_dd) if equity_points and max_dd is not None else None,
+        downstream_admissible=verdict.get("is_tradable") or verdict.get("downstream_admissible"),
+    )
+
     series = StrategySeriesV1(
-        equity=None,  # TODO: parse equity series if available
-        drawdown=None,  # TODO: parse drawdown series if available
+        equity=equity_points if equity_points else None,
+        drawdown=_calculate_drawdown_series(equity_points) if equity_points else None,
         rolling_metric=None,
         rolling_metric_name=None,
     )
     
-    # Build distributions
+    # 4. Build distributions
     distributions = StrategyDistributionsV1(
-        returns_histogram=None,  # TODO: parse returns histogram if available
+        returns_histogram=_calculate_returns_histogram(equity_points) if equity_points else None,
     )
     
-    # Build tables
-    trade_list = None
-    trade_summary = metrics.get("trade_summary")
-    
+    # 5. Build tables
     tables = StrategyTablesV1(
-        trade_list=trade_list,
-        trade_summary=trade_summary,
+        trade_list=trade_rows if trade_rows else None,
+        trade_summary=metrics.get("trade_summary"),
     )
     
-    # Build links
+    # 6. Build links
     links = StrategyLinksV1(
         policy_check_url=f"/api/v1/jobs/{job_id}/artifacts/policy_check.json" if policy_check else None,
         stdout_tail_url=f"/api/v1/jobs/{job_id}/logs/stdout_tail",

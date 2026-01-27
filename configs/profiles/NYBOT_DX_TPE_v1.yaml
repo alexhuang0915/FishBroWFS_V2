@@ -1,23 +1,24 @@
-# Profile for CME.ES with Taipei fixed sessions
+# Profile for NYBOT.DX with Taipei fixed sessions
 version: "2.0"
-symbol: "CME.ES"
+symbol: "NYBOT.DX"
 
 # Cost model SSOT: configs/registry/instruments.yaml
 
 # Session configuration
 # Exchange timezone (rules follow exchange; data is Taipei-local timestamps)
-exchange_tz: "America/Chicago"
+exchange_tz: "America/New_York"
 data_tz: "Asia/Taipei"
 # windows are expressed in exchange local time (will be converted to data_tz in UI)
-windows_tz: "America/Chicago"
+windows_tz: "America/New_York"
 
+# Typical US futures-style day: trading 18:00->17:00, 1h break.
 windows:
   - state: "TRADING"
-    start: "17:00:00"
-    end: "16:00:00"
-  - state: "BREAK"
-    start: "16:00:00"
+    start: "18:00:00"
     end: "17:00:00"
+  - state: "BREAK"
+    start: "17:00:00"
+    end: "18:00:00"
 
 # Memory configuration
 memory:
@@ -30,4 +31,5 @@ memory:
 mode: "FIXED_TPE"
 
 # Notes
-notes: "Migrated from CME_MNQ_TPE_v1.yaml with mandatory cost model"
+notes: "Added 2026-01-26 (DX raw added; ES removed)."
+

@@ -31,6 +31,7 @@ class TestArtifactContract(unittest.TestCase):
             "end_season": "2020Q2",
             "season": "2026Q1",
             "dataset_id": "CME.MNQ",
+            "data2_dataset_id": "CFE.VX",
         }
         job_id = submit("RUN_RESEARCH_WFS", params)
 

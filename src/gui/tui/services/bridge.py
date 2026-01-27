@@ -613,16 +613,23 @@ class Bridge:
                 # Check required instruments x timeframes
                 # (Simplified check: does at least one instrument have the data?)
                 required_tfs = set()
+                run_tokens = {"RUN", "@RUN", "@TF", "@TIMEFRAME"}
                 feats = s_conf.get("features")
                 if isinstance(feats, list):
                     for feat in feats:
                         if isinstance(feat, dict) and feat.get("timeframe"):
-                            required_tfs.add(str(feat.get("timeframe")))
+                            tf = str(feat.get("timeframe")).strip()
+                            if tf.upper() in run_tokens:
+                                continue
+                            required_tfs.add(tf)
                 elif isinstance(feats, dict):
                     for grp in ("data1", "data2", "cross"):
                         for feat in feats.get(grp, []) or []:
                             if isinstance(feat, dict) and feat.get("timeframe"):
-                                required_tfs.add(str(feat.get("timeframe")))
+                                tf = str(feat.get("timeframe")).strip()
+                                if tf.upper() in run_tokens:
+                                    continue
+                                required_tfs.add(tf)
                 if not required_tfs:
                     required_tfs.add(str(s_conf.get("timeframe", 60)))
                 supported_instr = s.get("supported_instruments", [])

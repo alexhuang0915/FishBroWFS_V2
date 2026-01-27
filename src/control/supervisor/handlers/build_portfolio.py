@@ -155,6 +155,7 @@ class BuildPortfolioHandler(BaseJobHandler):
         for rid in sorted(run_ids):
             data = loaded.get(rid) or {}
             meta = data.get("meta") or {}
+            cfg_data = (data.get("config") or {}).get("data") or {}
             verdict = data.get("verdict") or {}
             metrics = data.get("metrics") or {}
             raw = metrics.get("raw") or {}
@@ -163,6 +164,7 @@ class BuildPortfolioHandler(BaseJobHandler):
                 {
                     "run_id": rid,
                     "instrument": meta.get("instrument"),
+                    "data2": cfg_data.get("data2"),
                     "strategy_family": meta.get("strategy_family"),
                     "timeframe": meta.get("timeframe"),
                     "grade": verdict.get("grade"),

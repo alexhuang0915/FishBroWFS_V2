@@ -1,0 +1,96 @@
+version: '1.0'
+strategy_id: dsl_linear_v1
+class_path: core.strategies.v2.dsl_linear_v1.DslLinearV1
+features:
+  data1:
+    pack: data1_v1_full
+    add: []
+    remove: []
+  cross:
+    pack: cross_v1_full
+    add: []
+    remove: []
+static_params:
+  dsl:
+    terms:
+    - source: cross
+      feature: corr_60
+      weight: w_corr
+      transform: {}
+    - source: cross
+      feature: spread_log_z_60
+      weight: w_spread
+      transform: {}
+    - source: cross
+      feature: rel_vol_ratio
+      weight: w_rel_vol
+      transform:
+        clip:
+          min: 0.0
+          max: 5.0
+    thresholds:
+      long_ge: th_long
+      short_le: th_short
+    entry:
+      mode: market
+      long:
+        base:
+          source: data1
+          feature: hh_20
+        offset:
+          kind: atr_mult
+          value: entry_atr_mult
+          sign: +
+      short:
+        base:
+          source: data1
+          feature: ll_20
+        offset:
+          kind: atr_mult
+          value: entry_atr_mult
+          sign: '-'
+    stops:
+      exit_atr_mult: exit_atr_mult
+parameters:
+  w_corr:
+    type: choice
+    default: 2.0
+    choices:
+    - 2.0
+  w_spread:
+    type: choice
+    default: -2.0
+    choices:
+    - -2.0
+  w_rel_vol:
+    type: choice
+    default: -2.0
+    choices:
+    - -2.0
+  th_long:
+    type: choice
+    default: 0.0
+    choices:
+    - -0.3
+    - 0.0
+    - 0.3
+  th_short:
+    type: choice
+    default: -0.0
+    choices:
+    - -0.3
+    - 0.0
+    - 0.3
+  exit_atr_mult:
+    type: choice
+    default: 2.0
+    choices:
+    - 0.0
+    - 1.0
+    - 2.0
+    - 3.0
+  entry_atr_mult:
+    type: choice
+    default: 1.0
+    choices:
+    - 1.0

@@ -61,7 +61,30 @@ def _purge_shared_dataset_dir(season: str, dataset_id: str) -> Optional[str]:
 
     if not target.exists():
         return None
-    shutil.rmtree(target)
+        
+    deleted_paths = []
+    for item in target.iterdir():
+        if item.name == "purge_manifest.json":
+            continue
+        if item.is_dir():
+            shutil.rmtree(item)
+        else:
+            item.unlink()
+        deleted_paths.append(str(item))
+
+    if deleted_paths:
+        audit = {
+            "version": "1.0",
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "season": season,
+            "dataset_id": dataset_id,
+            "action": "purge_before_build",
+            "deleted_paths": deleted_paths
+        }
+        audit_path = target / "purge_manifest.json"
+        with audit_path.open("w", encoding="utf-8") as f:
+            json.dump(audit, f, indent=2)
+            
     return str(target)
 
 
@@ -190,8 +213,12 @@ class BuildDataHandler(BaseJobHandler):
         # `control.shared_cli` is the canonical CLI module (PYTHONPATH is set to include `src/`).
         # Map BUILD_DATA params to shared build contract:
         # - BUILD_DATA.mode: FULL/BARS_ONLY/FEATURES_ONLY -> shared-cli build flags
-        # - shared-cli --mode is FULL/INCREMENTAL, not BUILD_DATA.mode
-        cli_mode = "full"
+        # - shared-cli --mode is FULL/INCREMENTAL (controls rebuild vs reuse)
+        #
+        # force_rebuild:
+        # - False -> incremental (prefer reusing caches)
+        # - True  -> full (rebuild)
+        cli_mode = "full" if (force_rebuild or purge_before_build) else "incremental"
         cmd = [
             sys.executable,
             "-B",
@@ -224,8 +251,7 @@ class BuildDataHandler(BaseJobHandler):
         else:
             cmd.append("--no-build-features")
         
-        # force_rebuild logic is handled by 'mode' (FULL vs INCREMENTAL) and shared_build internal logic
-        # shared_cli does not accept --force-rebuild flag
+        # Note: shared_cli has no dedicated --force-rebuild flag; we map it to --mode (full vs incremental).
         
         # Set up stdout/stderr capture
         stdout_path = Path(context.artifacts_dir) / "build_data_stdout.txt"

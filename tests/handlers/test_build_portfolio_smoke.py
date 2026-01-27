@@ -34,6 +34,7 @@ class TestBuildPortfolioSmoke(unittest.TestCase):
                 "end_season": "2020Q2",
                 "season": season,
                 "dataset_id": "CME.MNQ",
+                "data2_dataset_id": "CFE.VX",
             },
         )
         # Then build portfolio from that WFS result.

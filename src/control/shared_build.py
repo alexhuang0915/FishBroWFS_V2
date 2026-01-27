@@ -67,6 +67,11 @@ from core.paths import get_shared_cache_root
 
 BuildMode = Literal["FULL", "INCREMENTAL"]
 
+# V1 SSOT: resample/feature timeline anchor start (inclusive).
+# We intentionally drop any raw data earlier than this to ensure a consistent
+# dataset horizon across instruments.
+RESAMPLE_ANCHOR_START = pd.Timestamp("2019-01-01 00:00:00")
+
 
 class IncrementalBuildRejected(Exception):
     """INCREMENTAL 模式被拒絕（發現歷史變動）"""
@@ -495,7 +500,7 @@ def _build_bars_cache(
     
     # 2. 將 raw bars 轉換為 normalized bars
     normalized = normalize_raw_bars(raw_ingest_result)
-    
+
     # 3. 處理 INCREMENTAL 模式
     if mode == "INCREMENTAL" and diff["append_only"]:
         # 嘗試載入現有的 normalized bars
@@ -531,6 +536,19 @@ def _build_bars_cache(
             pass
         except Exception as e:
             raise ValueError(f"載入/合併現有 normalized bars 失敗: {e}")
+
+    # 3b. 固定 resample 起點（SSOT）
+    # NOTE: timestamps are stored as naive datetime64[...] and compared as-is.
+    # This is a deterministic clip and must be applied before writing normalized/resampled bars.
+    try:
+        anchor64 = RESAMPLE_ANCHOR_START.to_datetime64()
+        if len(normalized["ts"]) > 0:
+            mask = normalized["ts"] >= anchor64
+            if not np.all(mask):
+                for k in ("ts", "open", "high", "low", "close", "volume"):
+                    normalized[k] = normalized[k][mask]
+    except Exception as e:
+        raise ValueError(f"Failed to apply RESAMPLE_ANCHOR_START clip: {e}")
     
     # 4. 寫入 normalized bars
     norm_path = normalized_bars_path(outputs_root, season, dataset_id)
@@ -605,6 +623,7 @@ def _build_bars_cache(
         "season": season,
         "dataset_id": dataset_id,
         "mode": mode,
+        "resample_anchor_start": RESAMPLE_ANCHOR_START.strftime("%Y-%m-%d %H:%M:%S"),
         "dimension_found": dimension_found,
         "session_open_taipei": session_spec.open_hhmm,
         "session_close_taipei": session_spec.close_hhmm,
@@ -928,6 +947,8 @@ def _feature_registry_from_all_packs(*, tfs: list[int]) -> FeatureRegistry:
         "hh_",
         "ll_",
         "atr_",
+        "atr_pct_",
+        "atr_pct_z_",
         "percentile_",
         "zscore_",
         "ret_z_",
@@ -940,6 +961,12 @@ def _feature_registry_from_all_packs(*, tfs: list[int]) -> FeatureRegistry:
         "dist_hh_",
         "dist_ll_",
         "vx_percentile_",
+        "rsi_",
+        "adx_",
+        "di_plus_",
+        "di_minus_",
+        "macd_hist_",
+        "roc_",
     )
 
     def is_data1_feature(name: str) -> bool:
@@ -951,6 +978,48 @@ def _feature_registry_from_all_packs(*, tfs: list[int]) -> FeatureRegistry:
         n = name.strip()
         if n == "session_vwap":
             return FeatureSpec(name=n, timeframe_min=tf_min, lookback_bars=0, params={}, window=1, min_warmup_bars=0)
+        if n == "atr_pct_14":
+            return FeatureSpec(
+                name=n,
+                timeframe_min=tf_min,
+                lookback_bars=14,
+                params={"window": 14},
+                window=14,
+                min_warmup_bars=14,
+            )
+        if n.startswith("atr_pct_z_"):
+            try:
+                z_window = int(n.split("_")[3])
+            except Exception:
+                z_window = 0
+            lookback = (14 + z_window) if z_window > 0 else 0
+            return FeatureSpec(
+                name=n,
+                timeframe_min=tf_min,
+                lookback_bars=lookback,
+                params={"window": z_window},
+                window=z_window if z_window > 0 else 1,
+                min_warmup_bars=lookback,
+            )
+        if n.startswith("macd_hist_"):
+            parts = n.split("_")
+            # macd_hist_{fast}_{slow}_{signal}
+            try:
+                fast = int(parts[2])
+                slow = int(parts[3])
+                signal = int(parts[4])
+            except Exception:
+                fast, slow, signal = 0, 0, 0
+            # Conservative warmup: EMA(slow) + signal smoothing
+            warmup = (slow + signal) if (slow > 0 and signal > 0) else max(slow, fast, signal, 0)
+            return FeatureSpec(
+                name=n,
+                timeframe_min=tf_min,
+                lookback_bars=warmup,
+                params={"fast": fast, "slow": slow, "signal": signal},
+                window=warmup if warmup > 0 else 1,
+                min_warmup_bars=warmup,
+            )
         window = None
         if "_" in n:
             try:

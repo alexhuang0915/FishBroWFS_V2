@@ -303,5 +303,200 @@ def percentile_rank(arr: np.ndarray, window: int) -> np.ndarray:
     return out
 
 @njit(cache=True)
-def vx_percentile(arr: np.ndarray, window: int) -> np.ndarray:
-    return percentile_rank(arr, window)
+def rsi_wilder(arr: np.ndarray, window: int) -> np.ndarray:
+    n = arr.shape[0]
+    out = np.full(n, np.nan, dtype=np.float64)
+    if window <= 0 or n <= window:
+        return out
+    
+    diff = np.zeros(n, dtype=np.float64)
+    for i in range(1, n):
+        diff[i] = arr[i] - arr[i - 1]
+    
+    gain = np.zeros(n, dtype=np.float64)
+    loss = np.zeros(n, dtype=np.float64)
+    for i in range(1, n):
+        if diff[i] > 0:
+            gain[i] = diff[i]
+        else:
+            loss[i] = -diff[i]
+            
+    # Initial seed: SMA
+    avg_gain = 0.0
+    avg_loss = 0.0
+    for i in range(1, window + 1):
+        avg_gain += gain[i]
+        avg_loss += loss[i]
+    avg_gain /= window
+    avg_loss /= window
+    
+    if avg_loss == 0:
+        out[window] = 100.0 if avg_gain > 0 else 50.0
+    else:
+        rs = avg_gain / avg_loss
+        out[window] = 100.0 - (100.0 / (1.0 + rs))
+        
+    # Wilder smoothing (RMA)
+    for i in range(window + 1, n):
+        avg_gain = (avg_gain * (window - 1) + gain[i]) / window
+        avg_loss = (avg_loss * (window - 1) + loss[i]) / window
+        
+        if avg_loss == 0:
+            out[i] = 100.0 if avg_gain > 0 else 50.0
+        else:
+            rs = avg_gain / avg_loss
+            out[i] = 100.0 - (100.0 / (1.0 + rs))
+    return out
+
+@njit(cache=True)
+def adx_wilder(high: np.ndarray, low: np.ndarray, close: np.ndarray, window: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    n = close.shape[0]
+    adx = np.full(n, np.nan, dtype=np.float64)
+    di_plus = np.full(n, np.nan, dtype=np.float64)
+    di_minus = np.full(n, np.nan, dtype=np.float64)
+    
+    if window <= 1 or n < window * 2:
+        return adx, di_plus, di_minus
+        
+    up_move = np.zeros(n, dtype=np.float64)
+    down_move = np.zeros(n, dtype=np.float64)
+    for i in range(1, n):
+        up_move[i] = high[i] - high[i - 1]
+        down_move[i] = low[i - 1] - low[i]
+        
+    plus_dm = np.zeros(n, dtype=np.float64)
+    minus_dm = np.zeros(n, dtype=np.float64)
+    for i in range(1, n):
+        if up_move[i] > down_move[i] and up_move[i] > 0:
+            plus_dm[i] = up_move[i]
+        if down_move[i] > up_move[i] and down_move[i] > 0:
+            minus_dm[i] = down_move[i]
+            
+    tr = np.zeros(n, dtype=np.float64)
+    tr[0] = high[0] - low[0]
+    for i in range(1, n):
+        tr[i] = max(high[i] - low[i], abs(high[i] - close[i - 1]), abs(low[i] - close[i - 1]))
+        
+    # Initial SMA of DM and TR
+    smooth_plus = 0.0
+    smooth_minus = 0.0
+    smooth_tr = 0.0
+    for i in range(1, window + 1):
+        smooth_plus += plus_dm[i]
+        smooth_minus += minus_dm[i]
+        smooth_tr += tr[i]
+        
+    if smooth_tr > 0:
+        di_plus[window] = 100.0 * smooth_plus / smooth_tr
+        di_minus[window] = 100.0 * smooth_minus / smooth_tr
+    else:
+        di_plus[window] = 0.0
+        di_minus[window] = 0.0
+        
+    dx = np.zeros(n, dtype=np.float64)
+    diff = abs(di_plus[window] - di_minus[window])
+    summ = di_plus[window] + di_minus[window]
+    dx[window] = 100.0 * diff / summ if summ != 0 else 0.0
+    
+    # Smooth DM/TR and calc ADX
+    for i in range(window + 1, n):
+        smooth_plus = (smooth_plus * (window - 1) + plus_dm[i]) / window
+        smooth_minus = (smooth_minus * (window - 1) + minus_dm[i]) / window
+        smooth_tr = (smooth_tr * (window - 1) + tr[i]) / window
+        
+        if smooth_tr > 0:
+            di_plus[i] = 100.0 * smooth_plus / smooth_tr
+            di_minus[i] = 100.0 * smooth_minus / smooth_tr
+        else:
+            di_plus[i] = 0.0
+            di_minus[i] = 0.0
+            
+        diff = abs(di_plus[i] - di_minus[i])
+        summ = di_plus[i] + di_minus[i]
+        dx[i] = 100.0 * diff / summ if summ != 0 else 0.0
+        
+        if i == window * 2 - 1:
+            # First ADX is SMA of DX
+            dx_sum = 0.0
+            for j in range(i - window + 1, i + 1):
+                dx_sum += dx[j]
+            adx[i] = dx_sum / window
+        elif i >= window * 2:
+            adx[i] = (adx[i - 1] * (window - 1) + dx[i]) / window
+            
+    return adx, di_plus, di_minus
+
+@njit(cache=True)
+def macd_hist(arr: np.ndarray, fast: int, slow: int, signal: int) -> np.ndarray:
+    n = arr.shape[0]
+    out = np.full(n, np.nan, dtype=np.float64)
+    if n < slow + signal:
+        return out
+    
+    ema_fast = ema(arr, fast)
+    ema_slow = ema(arr, slow)
+    macd_line = ema_fast - ema_slow
+    
+    # Signal line is EMA of macd_line
+    # Custom EMA for macd_line as it has NaNs at start
+    signal_line = np.full(n, np.nan, dtype=np.float64)
+    start_idx = slow - 1
+    if n < start_idx + signal:
+        return out
+        
+    # Seed Signal SMA
+    s = 0.0
+    for i in range(start_idx, start_idx + signal):
+        s += macd_line[i]
+    signal_line[start_idx + signal - 1] = s / signal
+    
+    alpha = 2.0 / (signal + 1.0)
+    for i in range(start_idx + signal, n):
+        signal_line[i] = (macd_line[i] * alpha) + (signal_line[i - 1] * (1.0 - alpha))
+        
+    for i in range(n):
+        if not np.isnan(macd_line[i]) and not np.isnan(signal_line[i]):
+            out[i] = macd_line[i] - signal_line[i]
+    return out
+
+@njit(cache=True)
+def roc(arr: np.ndarray, window: int) -> np.ndarray:
+    n = arr.shape[0]
+    out = np.full(n, np.nan, dtype=np.float64)
+    if window <= 0 or n <= window:
+        return out
+    for i in range(window, n):
+        prev = arr[i - window]
+        curr = arr[i]
+        if prev != 0 and np.isfinite(prev) and np.isfinite(curr):
+            out[i] = (curr / prev) - 1.0
+    return out
+
+@njit(cache=True)
+def rolling_z_strict(arr: np.ndarray, window: int) -> np.ndarray:
+    n = arr.shape[0]
+    out = np.full(n, np.nan, dtype=np.float64)
+    if window <= 1 or n < window:
+        return out
+    for i in range(window - 1, n):
+        # Strict window check
+        is_valid = True
+        sum_x = 0.0
+        sum_x2 = 0.0
+        for j in range(i - window + 1, i + 1):
+            val = arr[j]
+            if not np.isfinite(val):
+                is_valid = False
+                break
+            sum_x += val
+            sum_x2 += val * val
+        if not is_valid:
+            continue
+            
+        mean = sum_x / window
+        var = (sum_x2 / window) - (mean * mean)
+        if var <= 0:
+            continue
+        std = np.sqrt(var)
+        out[i] = (arr[i] - mean) / std
+    return out

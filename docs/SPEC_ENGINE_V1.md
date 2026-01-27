@@ -125,6 +125,9 @@ Let `c1,o1,h1,l1` be data1 OHLC; and `c2,o2,h2,l2` be **aligned + ffilled** data
 - Rolling windows containing any `NaN` → output `NaN` (no `dropna`).
 - Any division by zero / std==0 → output `NaN`.
 - Rolling z-score uses **population std** (`ddof=0`) for consistency with current deterministic numpy implementation.
+- ATR (V1) is **NaN-aware and strict**:
+  - If there is a missing segment (e.g., aligned Data2 is `NaN` before first bar), ATR remains `NaN` until it sees
+    **14 consecutive valid TR points**, then it resumes producing values.
 
 #### 3.3.4 V1 Column List (Fixed)
 
@@ -139,7 +142,7 @@ Window set (V1 fixed): `N ∈ {20, 60, 120}` and momentum windows `N ∈ {5, 20,
 **rel_***
 - `rel_ret_1[t] = ret1[t] - ret2[t]`
 - `rel_mom_5`, `rel_mom_20`, `rel_mom_60`, `rel_mom_120`
-- `rel_vol_ratio[t] = atr1_14[t] / atr2_14[t]` (if `atr2_14==0` → `NaN`)
+- `rel_vol_ratio[t] = (atr1_14[t] / c1[t]) / (atr2_14[t] / c2[t])` (ATR% ratio; dimensionless, cross-asset safe)
 - `rel_vol_z_20`, `rel_vol_z_60`, `rel_vol_z_120`
 
 **corr_***
@@ -153,9 +156,10 @@ Window set (V1 fixed): `N ∈ {20, 60, 120}` and momentum windows `N ∈ {5, 20,
 - `resid_std_60`, `resid_std_120` (population std of residuals)
 
 **vol_***
-- `vol_atr1_14`, `vol_atr2_14`
-- `vol_atr_spread = atr1_14 - atr2_14`
-- `vol_atr_spread_z_20`, `vol_atr_spread_z_60`, `vol_atr_spread_z_120`
+- `vol_atr1_14_pct = atr1_14 / c1`
+- `vol_atr2_14_pct = atr2_14 / c2`
+- `vol_atr_pct_spread = vol_atr1_14_pct - vol_atr2_14_pct`
+- `vol_atr_pct_spread_z_20`, `vol_atr_pct_spread_z_60`, `vol_atr_pct_spread_z_120`
 
 #### 3.3.5 Naming Decision (V1)
 - `rel_ret_1` is the only canonical name. `spread_ret_1` does **not** exist in V1 to avoid duplicate synonyms.
@@ -168,15 +172,37 @@ Window set (V1 fixed): `N ∈ {20, 60, 120}` and momentum windows `N ∈ {5, 20,
 - Data2 is aligned onto the **data1 timeline** (same timeframe + same rollover rules).
 - Missing bars are handled via **forward-fill** (when permitted).
 
+### 4.1b Resample Anchor Start (SSOT)
+- Shared bars resample is **clipped** to start at **`2019-01-01 00:00:00`** (inclusive) for all instruments.
+  - Any raw data earlier than this is dropped before writing `normalized_bars.npz` and `resampled_*.npz`.
+  - Purpose: keep a consistent dataset horizon across instruments and reduce unnecessary historical baggage.
+
 ### 4.2 Coverage Warning (Not Fail-Closed)
 - Coverage is measured as **missing ratio (%)** of aligned data2 points.
 - **Do not fail** the job/run due to coverage; instead, write warnings to the result.
 - Coverage is computed **per window** (WFS windows).
+- **MultiCharts-style definition (V1):**
+  - Data1 drives the timeline.
+  - Data2 “no update at this timestamp” is **not** missing; it is **hold** (forward-filled last known value).
+  - `missing_ratio%` counts only bars where Data2 is still unavailable **after alignment + forward-fill**
+    (i.e., aligned Data2 is `NaN`, typically before the first Data2 bar exists).
+- For auditability, we also record:
+  - `data2_update_ratio%`: ratio of bars where Data2 had a real update at the exact timestamp.
+  - `data2_hold_ratio%`: ratio of bars that are hold/ffill (not missing).
 - Warning thresholds (V1):
   - `WARN` if missing_ratio ≥ **2.0%**
   - `HIGH` if missing_ratio ≥ **5.0%**
 - When threshold is exceeded, emit a human-readable warning/risk flag, e.g.:
   - `DATA2_COVERAGE_LOW: CFE.VX missing_ratio=3.2% (threshold=2.0%)`
+
+### 4.3 Data2 Pairing SSOT (Matrix Runs)
+
+V1 runtime still uses **0..1** `data2` per run, but orchestration supports a **matrix**:
+- Same strategy + same parameter candidates + same data1
+- Different `data2` candidates
+- Each `(data1, data2)` is an **independent run** (independent grading, `top_k`, and portfolio candidacy)
+
+SSOT: `configs/registry/data2_pairs.yaml`.
 
 ---
 
@@ -443,3 +469,19 @@ The canonical rich result output is `result.json` with a strict, versioned schem
 All values written to JSON must be JSON-serializable:
 - no `NaN` / `inf` in outputs
 - convert to `null` (or a safe numeric) and emit warnings if needed
+
+### 14.2 Trades Ledger (V1)
+
+To support report/debug without re-simulating, V1 records a **window-scoped OOS trade ledger**:
+
+- `windows[i].oos_trades[]` — list of round-trip trades (entry→exit) for the **OOS** segment only.
+- Each record is in **base currency** (TWD) and includes:
+  - `entry_t`, `exit_t` (ISO `...Z`)
+  - `direction` (`long`/`short`)
+  - `entry_price`, `exit_price`
+  - `gross_pnl`, `commission`, `net_pnl`
+  - `entry_reason`, `exit_reason`
+  - `bars_held`
+
+Design rules:
+- Trades are stored only for the **final OOS run** (best params), not for grid-search candidates (size control).

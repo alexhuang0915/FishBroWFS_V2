@@ -282,6 +282,7 @@ def compute_cross_features_v1(
     valid_spread = (c1 > 0) & (c2 > 0)
     spread_log[valid_spread] = np.log(c1[valid_spread] / c2[valid_spread])
 
+    spread_log_z_5 = _rolling_z_strict(spread_log, window=5)
     spread_log_z_20 = _rolling_z_strict(spread_log, window=20)
     spread_log_z_60 = _rolling_z_strict(spread_log, window=60)
     spread_log_z_120 = _rolling_z_strict(spread_log, window=120)
@@ -294,14 +295,25 @@ def compute_cross_features_v1(
 
     atr1_14 = compute_atr_14(o1, h1, l1, c1)
     atr2_14 = compute_atr_14(o2, h2, l2, c2)
+
+    # Relative volatility ratio must be dimensionless to work across instruments
+    # with different price scales (e.g., MNQ vs VX). Use ATR% = ATR/close.
+    atr1_pct = np.full(n, np.nan, dtype=np.float64)
+    atr2_pct = np.full(n, np.nan, dtype=np.float64)
+    valid_atr1 = (~np.isnan(atr1_14)) & (c1 > 0)
+    valid_atr2 = (~np.isnan(atr2_14)) & (c2 > 0)
+    atr1_pct[valid_atr1] = atr1_14[valid_atr1] / c1[valid_atr1]
+    atr2_pct[valid_atr2] = atr2_14[valid_atr2] / c2[valid_atr2]
+
     rel_vol_ratio = np.full(n, np.nan, dtype=np.float64)
-    valid_vol = (~np.isnan(atr1_14)) & (~np.isnan(atr2_14)) & (atr2_14 != 0)
-    rel_vol_ratio[valid_vol] = atr1_14[valid_vol] / atr2_14[valid_vol]
+    valid_vol = (~np.isnan(atr1_pct)) & (~np.isnan(atr2_pct)) & (atr2_pct != 0)
+    rel_vol_ratio[valid_vol] = atr1_pct[valid_vol] / atr2_pct[valid_vol]
 
     rel_vol_z_20 = _rolling_z_strict(rel_vol_ratio, window=20)
     rel_vol_z_60 = _rolling_z_strict(rel_vol_ratio, window=60)
     rel_vol_z_120 = _rolling_z_strict(rel_vol_ratio, window=120)
 
+    corr_5 = _rolling_corr_strict(ret1, ret2, window=5)
     corr_20 = _rolling_corr_strict(ret1, ret2, window=20)
     corr_60 = _rolling_corr_strict(ret1, ret2, window=60)
     corr_120 = _rolling_corr_strict(ret1, ret2, window=120)
@@ -312,6 +324,10 @@ def compute_cross_features_v1(
     alpha_20, beta_20, r2_20 = _rolling_ols_strict(ret2, ret1, window=20)
     alpha_60, beta_60, r2_60 = _rolling_ols_strict(ret2, ret1, window=60)
     alpha_120, beta_120, r2_120 = _rolling_ols_strict(ret2, ret1, window=120)
+    
+    beta_z_60 = _rolling_z_strict(beta_60, window=60)
+    beta_z_120 = _rolling_z_strict(beta_120, window=120)
+
     resid_std_60 = _rolling_resid_std_strict(ret2, ret1, window=60, alpha=alpha_60, beta=beta_60)
     resid_std_120 = _rolling_resid_std_strict(ret2, ret1, window=120, alpha=alpha_120, beta=beta_120)
 
@@ -322,8 +338,17 @@ def compute_cross_features_v1(
     vol_atr_spread_z_60 = _rolling_z_strict(vol_atr_spread, window=60)
     vol_atr_spread_z_120 = _rolling_z_strict(vol_atr_spread, window=120)
 
+    # Volatility features should also be dimensionless for cross-asset use.
+    vol_atr1_14_pct = atr1_pct
+    vol_atr2_14_pct = atr2_pct
+    vol_atr_pct_spread = atr1_pct - atr2_pct
+    vol_atr_pct_spread_z_20 = _rolling_z_strict(vol_atr_pct_spread, window=20)
+    vol_atr_pct_spread_z_60 = _rolling_z_strict(vol_atr_pct_spread, window=60)
+    vol_atr_pct_spread_z_120 = _rolling_z_strict(vol_atr_pct_spread, window=120)
+
     return {
         "spread_log": spread_log,
+        "spread_log_z_5": spread_log_z_5,
         "spread_log_z_20": spread_log_z_20,
         "spread_log_z_60": spread_log_z_60,
         "spread_log_z_120": spread_log_z_120,
@@ -336,6 +361,7 @@ def compute_cross_features_v1(
         "rel_vol_z_20": rel_vol_z_20,
         "rel_vol_z_60": rel_vol_z_60,
         "rel_vol_z_120": rel_vol_z_120,
+        "corr_5": corr_5,
         "corr_20": corr_20,
         "corr_60": corr_60,
         "corr_120": corr_120,
@@ -345,16 +371,26 @@ def compute_cross_features_v1(
         "beta_20": beta_20,
         "beta_60": beta_60,
         "beta_120": beta_120,
+        "beta_z_60": beta_z_60,
+        "beta_z_120": beta_z_120,
         "alpha_60": alpha_60,
         "alpha_120": alpha_120,
         "r2_60": r2_60,
         "r2_120": r2_120,
         "resid_std_60": resid_std_60,
         "resid_std_120": resid_std_120,
+        # Deprecated (non-normalized; kept for backward compatibility)
         "vol_atr1_14": vol_atr1_14,
         "vol_atr2_14": vol_atr2_14,
         "vol_atr_spread": vol_atr_spread,
         "vol_atr_spread_z_20": vol_atr_spread_z_20,
         "vol_atr_spread_z_60": vol_atr_spread_z_60,
         "vol_atr_spread_z_120": vol_atr_spread_z_120,
+        # V1 normalized volatility pack (preferred)
+        "vol_atr1_14_pct": vol_atr1_14_pct,
+        "vol_atr2_14_pct": vol_atr2_14_pct,
+        "vol_atr_pct_spread": vol_atr_pct_spread,
+        "vol_atr_pct_spread_z_20": vol_atr_pct_spread_z_20,
+        "vol_atr_pct_spread_z_60": vol_atr_pct_spread_z_60,
+        "vol_atr_pct_spread_z_120": vol_atr_pct_spread_z_120,
     }

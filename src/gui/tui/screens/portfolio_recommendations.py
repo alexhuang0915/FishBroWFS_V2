@@ -47,6 +47,7 @@ class PortfolioRecommendationsModal(ModalScreen):
         table.add_columns(
             "Sel",
             "Run",
+            "Data2",
             "Grade",
             "Tradable",
             "Score",
@@ -90,6 +91,7 @@ class PortfolioRecommendationsModal(ModalScreen):
             rid = str(item.get("run_id") or "")
             if not rid:
                 continue
+            data2 = str(item.get("data2") or "").strip() or "-"
             raw = item.get("raw") or {}
             gates = item.get("hard_gates_triggered") or []
             score = item.get("score_total_weighted")
@@ -98,6 +100,7 @@ class PortfolioRecommendationsModal(ModalScreen):
             table.add_row(
                 "[x]" if rid in self._selected_run_ids else "[ ]",
                 rid[:8],
+                data2,
                 str(item.get("grade") or ""),
                 "Y" if bool(item.get("is_tradable")) else "N",
                 score_s,

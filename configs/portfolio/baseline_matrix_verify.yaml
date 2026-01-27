@@ -1,0 +1,8 @@
+version: "PORTFOLIO_SPEC_V1"
+portfolio_id: "baseline_matrix_verify"
+instrument_ids:
+  - "CME.MNQ"
+strategy_ids:
+  - "baseline_v1"
+seasons:
+  - "2026Q1"

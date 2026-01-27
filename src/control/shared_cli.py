@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
 import click
 
 from core.paths import get_shared_cache_root
+from core.paths import get_numba_cache_root
 from control.shared_build import (
     BuildMode,
     IncrementalBuildRejected,
@@ -266,6 +268,134 @@ def build_command(
         else:
             click.echo(click.style(f"❌ {error_msg}", fg="red"))
         sys.exit(1)
+
+
+@shared_cli.command(name="purge")
+@click.option("--season", required=True, help="Season identifier")
+@click.option("--dataset-id", required=True, help="Dataset ID")
+@click.option("--tfs", type=str, help="Timeframes to purge (comma-separated), if omitted all TFs are purged")
+@click.option("--bars", is_flag=True, help="Purge bars cache")
+@click.option("--features", is_flag=True, help="Purge features cache")
+@click.option("--all", "purge_all", is_flag=True, help="Purge everything for this dataset-season")
+def purge_command(season: str, dataset_id: str, tfs: Optional[str], bars: bool, features: bool, purge_all: bool):
+    """Purge cached data for a dataset/season/timeframes."""
+    shared_root = get_shared_cache_root()
+    target_base = shared_root / season / dataset_id
+    
+    if not target_base.exists():
+        click.echo(f"Nothing to purge: {target_base} does not exist.")
+        return
+
+    tf_list = [int(tf.strip()) for tf in tfs.split(",") if tf.strip()] if tfs else []
+    
+    deleted_paths = []
+    
+    import shutil
+    import os
+
+    def safe_delete(path: Path):
+        if path.exists():
+            if path.is_dir():
+                shutil.rmtree(path)
+            else:
+                path.unlink()
+            deleted_paths.append(str(path))
+
+    if purge_all:
+        for item in target_base.iterdir():
+            safe_delete(item)
+    else:
+        if bars:
+            bars_dir = target_base / "bars"
+            if not tf_list:
+                safe_delete(bars_dir)
+            else:
+                for tf in tf_list:
+                    safe_delete(bars_dir / f"resampled_{tf}m.npz")
+                # If all resampled are gone, maybe manifest and normalized too? 
+                # User said "selective", so if specific tfs are given, we only delete those files.
+                # If NO tfs are given, we delete the whole bars dir.
+
+        if features:
+            feat_dir = target_base / "features"
+            if not tf_list:
+                safe_delete(feat_dir)
+            else:
+                for tf in tf_list:
+                    safe_delete(feat_dir / f"features_{tf}m.npz")
+
+    # Audit record
+    if deleted_paths:
+        audit = {
+            "version": "1.0",
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "season": season,
+            "dataset_id": dataset_id,
+            "tfs": tf_list,
+            "deleted_paths": deleted_paths
+        }
+        audit_path = target_base / "purge_manifest.json"
+        if not target_base.exists():
+             target_base.mkdir(parents=True, exist_ok=True)
+             
+        with audit_path.open("w", encoding="utf-8") as f:
+            json.dump(audit, f, indent=2)
+        click.echo(f"Purge complete. Deleted {len(deleted_paths)} items. Audit written to {audit_path}")
+    else:
+        click.echo("Nothing was deleted.")
+
+
+@shared_cli.command(name="purge-numba")
+@click.option("--all", "purge_all", is_flag=True, default=True, help="Purge all Numba disk cache entries (default: true)")
+def purge_numba_command(purge_all: bool):
+    """Purge Numba JIT disk cache (cache/numba)."""
+    numba_root = get_numba_cache_root()
+
+    if not numba_root.exists():
+        click.echo(f"Nothing to purge: {numba_root} does not exist.")
+        return
+
+    # Safety: never allow deleting outside cache root.
+    cache_root = numba_root.parent
+    try:
+        numba_root.resolve().relative_to(cache_root.resolve())
+    except Exception as exc:
+        raise click.ClickException(f"Refusing to purge outside cache root: {numba_root}") from exc
+
+    import shutil
+
+    deleted_paths: list[str] = []
+
+    def safe_delete(path: Path) -> None:
+        if not path.exists():
+            return
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+        deleted_paths.append(str(path))
+
+    if purge_all:
+        for item in list(numba_root.iterdir()):
+            # Keep the root directory; delete its children.
+            safe_delete(item)
+
+    # Audit record (write after deletion; keep root directory present).
+    if deleted_paths:
+        numba_root.mkdir(parents=True, exist_ok=True)
+        audit = {
+            "version": "1.0",
+            "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            "scope": "numba",
+            "numba_cache_root": str(numba_root),
+            "deleted_paths": deleted_paths,
+        }
+        audit_path = numba_root / "purge_manifest.json"
+        with audit_path.open("w", encoding="utf-8") as f:
+            json.dump(audit, f, indent=2)
+        click.echo(f"Purge complete. Deleted {len(deleted_paths)} items. Audit written to {audit_path}")
+    else:
+        click.echo("Nothing was deleted.")
 
 
 def _print_human_summary(report: dict):

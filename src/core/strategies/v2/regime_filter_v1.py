@@ -29,7 +29,8 @@ class RegimeFilterV1:
             n = len(df) if df is not None else 0
             return {"target_dir": np.zeros(n, dtype=np.int64)}
 
-        corr = x.get_series("corr_60", tf).values
+        # Gate on correlation *strength* (abs), since many useful cross relationships are negative.
+        corr = x.get_series("corr_abs_60", tf).values
         beta = x.get_series("beta_60", tf).values
         r2 = x.get_series("r2_60", tf).values
         rel_vol = x.get_series("rel_vol_ratio", tf).values

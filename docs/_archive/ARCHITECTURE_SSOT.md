@@ -35,7 +35,7 @@ graph TD
 | **Strategies** | `configs/registry/strategies.yaml` | TUI bridge + resolver | Strategy metadata + config file links |
 | **WFS Policy** | `configs/policies/wfs/policy_v1_default.yaml` | `contracts.wfs_policy` | gates + grading |
 
-**Rule**: Code NEVER hardcodes configuration (e.g., "CME.ES"). It queries the Registry.
+**Rule**: Code NEVER hardcodes configuration (e.g., "CME.MNQ"). It queries the Registry.
 
 ---
 

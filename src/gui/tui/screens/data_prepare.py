@@ -58,12 +58,14 @@ class DataPrepareScreen(BaseScreen):
                     )
                 yield Label("Used only for BUILD_FEATURES. all_packs = union of SSOT packs.", classes="hint")
 
-                yield Checkbox("Force rebuild (reserved)", id="force_rebuild")
+                yield Checkbox("Force rebuild", id="force_rebuild")
                 yield Checkbox("Purge dataset cache (DANGEROUS)", id="purge_before_build")
 
                 with Horizontal():
                     yield Button("Submit BUILD_BARS", variant="primary", id="submit_build_bars")
                     yield Button("Submit BUILD_FEATURES", variant="default", id="submit_build_features")
+                    yield Button("Purge Cache Only", variant="warning", id="purge_only")
+                    yield Button("Purge Numba Cache", variant="warning", id="purge_numba")
                 yield Static("", id="status")
 
             yield JobMonitorPanel(self.bridge, classes="monitor_panel")
@@ -161,3 +163,44 @@ class DataPrepareScreen(BaseScreen):
             self.query_one("#status").update(f"Submitted BUILD_FEATURES job: {job_id[:8]}...")
         except Exception as e:
             self.query_one("#status").update(f"Error: {e}")
+
+    @on(Button.Pressed, "#purge_only")
+    def handle_purge_only(self):
+        parsed = self._common_inputs()
+        if parsed is None:
+            return
+        dataset_id, tfs, season, _, _ = parsed
+        
+        resolved_season = season or current_season()
+        
+        import subprocess
+        import sys
+        
+        cmd = [sys.executable, "-m", "control.shared_cli", "purge", "--season", resolved_season, "--dataset-id", dataset_id, "--all"]
+        # Use --all for simplicity in "Purge Cache Only" button.
+        
+        try:
+            self.query_one("#status").update(f"Purging {dataset_id} for {resolved_season}...")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                self.query_one("#status").update(f"Purge complete: {result.stdout.strip()}")
+            else:
+                self.query_one("#status").update(f"Purge failed: {result.stderr or result.stdout}")
+        except Exception as e:
+            self.query_one("#status").update(f"Purge error: {e}")
+
+    @on(Button.Pressed, "#purge_numba")
+    def handle_purge_numba(self):
+        import subprocess
+        import sys
+
+        cmd = [sys.executable, "-m", "control.shared_cli", "purge-numba"]
+        try:
+            self.query_one("#status").update("Purging Numba cache...")
+            result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                self.query_one("#status").update(f"Numba purge complete: {result.stdout.strip()}")
+            else:
+                self.query_one("#status").update(f"Numba purge failed: {result.stderr or result.stdout}")
+        except Exception as e:
+            self.query_one("#status").update(f"Numba purge error: {e}")

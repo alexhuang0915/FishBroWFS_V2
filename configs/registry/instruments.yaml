@@ -90,10 +90,10 @@ instruments:
     timezone: "America/Chicago"
     trade_date_roll_time_local: "17:00"
 
-  - id: "CME.ES"
-    display_name: "E-mini S&P 500 Futures (ES)"
+  - id: "NYBOT.DX"
+    display_name: "U.S. Dollar Index Futures (DX)"
     type: "future"
-    default_profile: "CME_ES_TPE_v1"
+    default_profile: "NYBOT_DX_TPE_v1"
     currency: "USD"
     cost_model:
       # Commission in instrument currency (USD)
@@ -101,10 +101,29 @@ instruments:
       # Slippage is fixed at 1 tick per side in V1
       slippage_per_side_ticks: 1
     default_timeframe: 60
-    exchange: "CME"
-    multiplier: 50.0
-    tick_size: 0.25
-    tick_value: 12.5
+    exchange: "NYBOT"
+    multiplier: 1000.0
+    tick_size: 0.005
+    tick_value: 5.0
+    # NOTE(V1): treat as US exchange hours; roll is defined in local exchange time.
+    timezone: "America/New_York"
+    trade_date_roll_time_local: "18:00"
+
+  - id: "CBOT.ZN"
+    display_name: "10-Year U.S. Treasury Note Futures (ZN)"
+    type: "future"
+    default_profile: "CBOT_ZN_TPE_v1"
+    currency: "USD"
+    cost_model:
+      # Commission in instrument currency (USD)
+      commission_per_side: 1.4
+      # Slippage is fixed at 1 tick per side in V1
+      slippage_per_side_ticks: 1
+    default_timeframe: 60
+    exchange: "CBOT"
+    multiplier: 1000.0
+    tick_size: 0.015625
+    tick_value: 15.625
     timezone: "America/Chicago"
     trade_date_roll_time_local: "17:00"
 

@@ -46,37 +46,44 @@ def compute_atr_14(
     n = len(c)
     if n == 0:
         return np.array([], dtype=np.float64)
-    
-    # 計算 True Range
-    tr = np.empty(n, dtype=np.float64)
-    
-    # 第一根 bar 的 TR = high - low
-    tr[0] = h[0] - l[0]
-    
-    # 後續 bar 的 TR
+
+    # 計算 True Range（NaN-aware）
+    # 若 input 有 NaN，TR 該點為 NaN，但後續可在累積 14 根有效 TR 後恢復。
+    tr = np.full(n, np.nan, dtype=np.float64)
+
+    # 第一根 bar 的 TR = high - low（若有效）
+    if np.isfinite(h[0]) and np.isfinite(l[0]):
+        tr[0] = h[0] - l[0]
+
+    # 後續 bar 的 TR（需要 prev_close 有效）
     for i in range(1, n):
+        if not (np.isfinite(h[i]) and np.isfinite(l[i]) and np.isfinite(c[i - 1])):
+            continue
         hl = h[i] - l[i]
-        hc = abs(h[i] - c[i-1])
-        lc = abs(l[i] - c[i-1])
+        hc = abs(h[i] - c[i - 1])
+        lc = abs(l[i] - c[i - 1])
         tr[i] = max(hl, hc, lc)
-    
-    # 計算 rolling mean with window=14 (population std, ddof=0)
-    # 使用 cumulative sums 確保 deterministic
+
+    # ATR = rolling mean of TR with window=14, strict NaN propagation per window.
     atr = np.full(n, np.nan, dtype=np.float64)
-    
-    if n >= 14:
-        # 計算 cumulative sum of TR
-        cumsum = np.cumsum(tr, dtype=np.float64)
-        
-        # 計算 rolling mean
-        for i in range(13, n):
-            if i == 13:
-                window_sum = cumsum[i]
-            else:
-                window_sum = cumsum[i] - cumsum[i-14]
-            
-            atr[i] = window_sum / 14.0
-    
+    if n < 14:
+        return atr
+
+    valid = np.isfinite(tr)
+    tr0 = np.where(valid, tr, 0.0)
+    csum = np.cumsum(tr0, dtype=np.float64)
+    ccount = np.cumsum(valid.astype(np.int64))
+
+    for i in range(13, n):
+        if i == 13:
+            count = int(ccount[i])
+            total = float(csum[i])
+        else:
+            count = int(ccount[i] - ccount[i - 14])
+            total = float(csum[i] - csum[i - 14])
+        if count == 14:
+            atr[i] = total / 14.0
+
     return atr
 
 
@@ -338,7 +345,8 @@ def compute_features_for_tf(
             from indicators.numba_indicators import (
                 sma, ema, hh, ll, atr_wilder, percentile_rank, bbands_pb, bbands_width,
                 atr_channel_upper, atr_channel_lower, atr_channel_pos,
-                donchian_width, dist_to_hh, dist_to_ll
+                donchian_width, dist_to_hh, dist_to_ll,
+                rsi_wilder, adx_wilder, macd_hist, roc, rolling_z_strict
             )
             if spec.name.startswith("sma_"):
                 window = spec.params.get("window", int(spec.name.split("_")[1]))
@@ -400,6 +408,22 @@ def compute_features_for_tf(
                 values = atr_channel_pos(h, l, c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
+            elif spec.name == "atr_pct_14":
+                atr_vals = atr_wilder(h, l, c, 14)
+                values = np.full(n, np.nan, dtype=np.float64)
+                valid = (c != 0) & (~np.isnan(atr_vals))
+                values[valid] = atr_vals[valid] / c[valid]
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("atr_pct_z_"):
+                window = spec.params.get("window", int(spec.name.split("_")[3]))
+                atr_vals = atr_wilder(h, l, c, 14)
+                atr_pct = np.full(n, np.nan, dtype=np.float64)
+                valid = (c != 0) & (~np.isnan(atr_vals))
+                atr_pct[valid] = atr_vals[valid] / c[valid]
+                values = rolling_z_strict(atr_pct, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
             elif spec.name.startswith("atr_"):
                 window = spec.params.get("window", int(spec.name.split("_")[1]))
                 values = atr_wilder(h, l, c, window)
@@ -418,6 +442,39 @@ def compute_features_for_tf(
             elif spec.name.startswith("dist_ll_"):
                 window = spec.params.get("window", int(spec.name.split("_")[2]))
                 values = dist_to_ll(l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("rsi_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = rsi_wilder(c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("adx_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values, _, _ = adx_wilder(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("di_plus_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                _, values, _ = adx_wilder(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("di_minus_"):
+                window = spec.params.get("window", int(spec.name.split("_")[2]))
+                _, _, values = adx_wilder(h, l, c, window)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("macd_hist_"):
+                parts = spec.name.split("_")
+                fast = spec.params.get("fast", int(parts[2]))
+                slow = spec.params.get("slow", int(parts[3]))
+                signal = spec.params.get("signal", int(parts[4]))
+                values = macd_hist(c, fast, slow, signal)
+                values = _apply_feature_postprocessing(values, spec)
+                result[spec.name] = values
+            elif spec.name.startswith("roc_"):
+                window = spec.params.get("window", int(spec.name.split("_")[1]))
+                values = roc(c, window)
                 values = _apply_feature_postprocessing(values, spec)
                 result[spec.name] = values
             elif spec.name == "atr_14":

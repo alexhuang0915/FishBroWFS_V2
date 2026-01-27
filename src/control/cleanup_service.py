@@ -289,7 +289,8 @@ class HeadlessCleanupService:
         
         elif scope == CleanupScope.CACHE:
             season = criteria.get("season", self._get_current_season())
-            market = criteria.get("market", "ES")
+            # Default to a current SSOT instrument id (legacy default was "ES").
+            market = criteria.get("market", "CME.MNQ")
             cache_type = criteria.get("cache_type", "both")
             items = self._scan_cache(season, market, cache_type)
         

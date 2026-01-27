@@ -21,6 +21,7 @@ class SimulationResult:
     net: float
     mdd: float
     warnings: list[str]
+    trades_ledger: list[dict[str, Any]]
 
 
 def simulate_bar_engine(
@@ -33,10 +34,18 @@ def simulate_bar_engine(
     signals: Dict[str, Optional[np.ndarray]],
     cost: CostConfig,
     initial_equity: float = 10_000.0,
+    record_trades: bool = False,
 ) -> SimulationResult:
     n = len(ts)
     if n == 0:
-        return SimulationResult(equity=np.array([], dtype=np.float64), trades=0, net=0.0, mdd=0.0, warnings=[])
+        return SimulationResult(
+            equity=np.array([], dtype=np.float64),
+            trades=0,
+            net=0.0,
+            mdd=0.0,
+            warnings=[],
+            trades_ledger=[],
+        )
 
     target_dir = signals.get("target_dir")
     long_stop = signals.get("long_stop")
@@ -78,6 +87,15 @@ def simulate_bar_engine(
     entry_price = 0.0
     trades = 0
     warnings: list[str] = []
+    trades_ledger: list[dict[str, Any]] = []
+    entry_idx: int | None = None
+    entry_reason: str | None = None
+
+    def _ts_iso_z(ts64) -> str:
+        try:
+            return f"{np.datetime_as_string(ts64, unit='s')}Z"
+        except Exception:
+            return str(ts64)
 
     equity[0] = cash
 
@@ -111,14 +129,17 @@ def simulate_bar_engine(
 
         entry_triggered = False
         entry_fill = None
+        entry_fill_reason = None
         if entry_stop_side == "long" and entry_stop_price is not None:
             if bar_high >= entry_stop_price:
                 entry_triggered = True
                 entry_fill = bar_open if bar_open >= entry_stop_price else entry_stop_price
+                entry_fill_reason = "stop_entry"
         elif entry_stop_side == "short" and entry_stop_price is not None:
             if bar_low <= entry_stop_price:
                 entry_triggered = True
                 entry_fill = bar_open if bar_open <= entry_stop_price else entry_stop_price
+                entry_fill_reason = "stop_entry"
 
         exit_triggered = False
         exit_fill = None
@@ -131,48 +152,108 @@ def simulate_bar_engine(
                 exit_triggered = True
                 exit_fill = bar_open if bar_open >= exit_short_p else exit_short_p
 
-        # Same-bar stop entry + stop exit ambiguity => no trade.
+        # Stop-exit has priority (protective). If both entry+exit are possible in the same bar while holding,
+        # ignore entry and execute the exit (never skip a stop-loss).
         if entry_triggered and exit_triggered:
-            warnings.append(f"AMBIGUOUS_STOP_ENTRY_EXIT at {i}")
-        else:
-            # Stop-exit first (protective)
-            if exit_triggered:
-                if pos > 0:
-                    exit_price = _apply_slippage(float(exit_fill), "sell")
-                    pnl = (exit_price - entry_price) * pos * cost.multiplier * cost.fx_rate
-                    cash += pnl
-                    cash -= _commission()
-                elif pos < 0:
-                    exit_price = _apply_slippage(float(exit_fill), "buy")
-                    pnl = (entry_price - exit_price) * (-pos) * cost.multiplier * cost.fx_rate
-                    cash += pnl
-                    cash -= _commission()
-                pos = 0
-                trades += 1
+            warnings.append(f"AMBIGUOUS_ENTRY_IGNORED_DUE_TO_EXIT at {i}")
 
-            # Market exit if target_dir requests change (after stop-exit)
-            if pos != desired and pos != 0:
-                exit_price = _apply_slippage(bar_open, "sell" if pos > 0 else "buy")
-                if pos > 0:
-                    pnl = (exit_price - entry_price) * pos * cost.multiplier * cost.fx_rate
-                else:
-                    pnl = (entry_price - exit_price) * (-pos) * cost.multiplier * cost.fx_rate
-                cash += pnl
+        if exit_triggered:
+            # Close position via stop-loss.
+            if pos > 0:
+                exit_price = _apply_slippage(float(exit_fill), "sell")
+                gross = (exit_price - entry_price) * pos * cost.multiplier * cost.fx_rate
+                commission_total = _commission()
+                cash += gross
+                cash -= commission_total
+                if record_trades and entry_idx is not None:
+                    trades_ledger.append(
+                        {
+                            "entry_t": _ts_iso_z(ts[entry_idx]),
+                            "exit_t": _ts_iso_z(ts[i]),
+                            "direction": "long",
+                            "entry_price": float(entry_price),
+                            "exit_price": float(exit_price),
+                            "gross_pnl": float(gross),
+                            "commission": float(commission_total),
+                            "net_pnl": float(gross - commission_total),
+                            "entry_reason": entry_reason or "unknown",
+                            "exit_reason": "stop_exit",
+                            "bars_held": int(i - entry_idx),
+                        }
+                    )
+            elif pos < 0:
+                exit_price = _apply_slippage(float(exit_fill), "buy")
+                gross = (entry_price - exit_price) * (-pos) * cost.multiplier * cost.fx_rate
+                commission_total = _commission()
+                cash += gross
+                cash -= commission_total
+                if record_trades and entry_idx is not None:
+                    trades_ledger.append(
+                        {
+                            "entry_t": _ts_iso_z(ts[entry_idx]),
+                            "exit_t": _ts_iso_z(ts[i]),
+                            "direction": "short",
+                            "entry_price": float(entry_price),
+                            "exit_price": float(exit_price),
+                            "gross_pnl": float(gross),
+                            "commission": float(commission_total),
+                            "net_pnl": float(gross - commission_total),
+                            "entry_reason": entry_reason or "unknown",
+                            "exit_reason": "stop_exit",
+                            "bars_held": int(i - entry_idx),
+                        }
+                    )
+            pos = 0
+            entry_idx = None
+            entry_reason = None
+            trades += 1
+
+        # Market exit if target_dir requests change (after stop-exit)
+        if pos != desired and pos != 0:
+            exit_price = _apply_slippage(bar_open, "sell" if pos > 0 else "buy")
+            if pos > 0:
+                gross = (exit_price - entry_price) * pos * cost.multiplier * cost.fx_rate
+            else:
+                gross = (entry_price - exit_price) * (-pos) * cost.multiplier * cost.fx_rate
+            commission_total = _commission()
+            cash += gross
+            cash -= commission_total
+            if record_trades and entry_idx is not None:
+                trades_ledger.append(
+                    {
+                        "entry_t": _ts_iso_z(ts[entry_idx]),
+                        "exit_t": _ts_iso_z(ts[i]),
+                        "direction": "long" if pos > 0 else "short",
+                        "entry_price": float(entry_price),
+                        "exit_price": float(exit_price),
+                        "gross_pnl": float(gross),
+                        "commission": float(commission_total),
+                        "net_pnl": float(gross - commission_total),
+                        "entry_reason": entry_reason or "unknown",
+                        "exit_reason": "target_change",
+                        "bars_held": int(i - entry_idx),
+                    }
+                )
+            pos = 0
+            entry_idx = None
+            entry_reason = None
+            trades += 1
+
+        # Entry: if flat and desired !=0
+        if pos == 0 and desired != 0:
+            if entry_stop_side is None:
+                # Market entry
+                entry_price = _apply_slippage(bar_open, "buy" if desired > 0 else "sell")
                 cash -= _commission()
-                pos = 0
-                trades += 1
-
-            # Entry: if flat and desired !=0
-            if pos == 0 and desired != 0:
-                if entry_stop_side is None:
-                    # Market entry
-                    entry_price = _apply_slippage(bar_open, "buy" if desired > 0 else "sell")
-                    cash -= _commission()
-                    pos = 1 if desired > 0 else -1
-                elif entry_triggered and entry_fill is not None:
-                    entry_price = _apply_slippage(float(entry_fill), "buy" if desired > 0 else "sell")
-                    cash -= _commission()
-                    pos = 1 if desired > 0 else -1
+                pos = 1 if desired > 0 else -1
+                entry_idx = i
+                entry_reason = "market_entry"
+            elif entry_triggered and entry_fill is not None:
+                entry_price = _apply_slippage(float(entry_fill), "buy" if desired > 0 else "sell")
+                cash -= _commission()
+                pos = 1 if desired > 0 else -1
+                entry_idx = i
+                entry_reason = entry_fill_reason or "stop_entry"
 
         # Mark-to-market
         if pos == 0:
@@ -182,7 +263,7 @@ def simulate_bar_engine(
 
     net = float(equity[-1] - equity[0]) if len(equity) >= 2 else 0.0
     mdd = _max_drawdown(equity)
-    return SimulationResult(equity=equity, trades=trades, net=net, mdd=mdd, warnings=warnings)
+    return SimulationResult(equity=equity, trades=trades, net=net, mdd=mdd, warnings=warnings, trades_ledger=trades_ledger)
 
 
 def _max_drawdown(equity: np.ndarray) -> float:
